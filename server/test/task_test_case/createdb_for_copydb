@@ -1,0 +1,13 @@
+task:createdb
+token:cdfb4c5717170c5e237a227a2ceeccc6ae9e10c16754fb85371c0d74fa0d9d577926f07dd201b6aa
+dbname:copydb
+numpage:10240
+pagesize:4096
+logpagesize:4096
+logsize:10240
+genvolpath:$CUBRID_DATABASES/copydb
+logvolpath:$CUBRID_DATABASES/copydb
+open:exvol
+close:exvol
+overwrite_config_file:YES
+

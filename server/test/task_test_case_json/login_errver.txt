@@ -1,0 +1,6 @@
+{"task":"login",
+"token":"ae873897a0a9a2afb9bb12a49c4237744a82ea77049df67c9b58d7acc5c0c7527926f07dd201b6aa",
+"id":"admin",
+"password":"admin",
+"clientver":"0.1"
+}

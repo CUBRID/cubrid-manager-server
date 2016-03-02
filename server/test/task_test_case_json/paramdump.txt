@@ -1,0 +1,4 @@
+{"task":"paramdump",
+"token":"cdfb4c5717170c5e2d40a680732333064610bcfeec1c0d870c43c1586a92dd1f7926f07dd201b6aa",
+"dbname":"demodb",
+"both":"y"}

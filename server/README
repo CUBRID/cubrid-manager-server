@@ -1,0 +1,80 @@
+CUBRID Manager Server System
+==========================
+CUBRID Manager Server(CMS) is a part of CUBRID Tools. It's a very important part 
+of CUBRID, and distributed within CUBRID distribution.
+
+CMS provides both HTTP or Socket interfaces for CUBRID Manager and CUBRID Web Manager 
+to managing CUBRID system, and also provides monitoring information about CUBRID system.
+
+MAJOR REFERENCES
+================
+- CMS wiki page: http://www.cubrid.org/wiki_tools/entry/cubrid-manager-server
+- CMS Development Site: http://jira.cubrid.org/browse/TOOLS/component/10108
+- CMS Release Note: http://www.cubrid.org/wiki_tools/entry/cms-release-notes 
+
+DOWNLOADS and FILE REPOSITORIES
+=====================
+CMS is distributed within CUBRID distribution which can be found here:
+- http://www.cubrid.org/downloads
+- http://ftp.cubrid.org
+- http://sourceforge.net/projects/cubrid/files/
+
+
+HOW TO BUILD/INSTALL CMS
+=====================
+- you can refer to the wiki page 
+   http://www.cubrid.org/wiki_tools/entry/cms-build-and-install
+- build and install on Linux
+  
+  Unzip the package of CUBRID and you can find the source code of CMS here: cubrid-{version}/cubridmanager/server.
+   1.Move to the directory where the source is stored.
+     cd $HOME/cubridmanager/server 
+
+   2.Execute autogen.sh.
+     ./autogen.sh 
+
+   3.Execute the configure script.
+     ./configure --prefix=$CUBRID 
+
+        --prefix=$CUBRID 
+        It specifies a directory to be installed. 
+        --enable-debug
+        Used to enable debug mode.
+        --enable-64bit 
+        Used to build in a 64-bit environment since supporting 64-bit from CUBRID 2008 R2.0 or higher.
+
+   4.Build by using make.
+     make 
+   5.Install by using make install.
+     make install 
+
+- build and install on windows
+    if you want to build CMS on windows, VS2008 must be installed.
+   1.Open a commander "cmd.exe" and Move to the directory where the source is stored.
+     cd %CUBRID-SRC%/cubridmanager/server 
+
+   2.Execute the build batche file
+     cmd /c build.bat --prefix=%CUBRID% --with-cubrid-dir=%CUBRID% 
+
+        --prefix=%CUBRID% 
+        It specifies a directory to be installed. 
+        --enable-64bit 
+        Used to build in a 64-bit environment since supporting 64-bit from CUBRID 2008 R2.0 or higher.
+        --with-cubrid-dir=%CUBRID%
+        Option specifies the directory CUBRID is installed. 
+    
+    
+PROGRAMMING APIs
+================
+- CMS APIs
+   http://www.cubrid.org/wiki_tools/entry/cms-socket-interface
+   http://www.cubrid.org/wiki_tools/entry/cms-http-interface
+
+GETTING HELP
+============
+If You encounter any difficulties with getting started, or just have some
+questions, or find bugs, or have some suggestions, we kindly ask You to 
+post your thoughts on CUBRID Forum at http://forum.cubrid.org.
+
+Sincerely,
+Your CMS Development Team.

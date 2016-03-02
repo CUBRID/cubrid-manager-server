@@ -1,0 +1,11 @@
+{"task":"createdb",
+"token":"cdfb4c5717170c5e237a227a2ceeccc6ae9e10c16754fb85371c0d74fa0d9d577926f07dd201b6aa",
+"dbname":"alatestdb",
+"numpage":"10240",
+"pagesize":"4096",
+"logsize":"10240",
+"logpagesize":"4096",
+"genvolpath":"$CUBRID_DATABASES/alatestdb",
+"logvolpath":"$CUBRID_DATABASES/alatestdb",
+"exvol":[{"alatestdb_data_x001":"data;100;$CUBRID_DATABASES/alatestdb"}],
+"overwrite_config_file":"YES"}

@@ -1,0 +1,4 @@
+{"task":"setdbmtpasswd",
+"token":"cdfb4c5717170c5e68bce31aed8914a5c8960905fd00c5b4109835ba08149d137926f07dd201b6aa",
+"targetid":"admin",
+"newpassword":"admin"}

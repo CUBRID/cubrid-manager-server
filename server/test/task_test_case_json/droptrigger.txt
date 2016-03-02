@@ -1,0 +1,4 @@
+{"task":"droptrigger",
+"token":"cdfb4c5717170c5e52c7be2e979d2b1abf6a689bc913b6adf7426b1af535049d7926f07dd201b6aa",
+"dbname":"demodb",
+"triggername":"example"}

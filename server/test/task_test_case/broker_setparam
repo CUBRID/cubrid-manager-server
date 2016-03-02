@@ -1,0 +1,61 @@
+task:broker_setparam
+token:cdfb4c5717170c5e942a1cf0685a4d40251d18395ef56a5f2ba8a5984e6435207926f07dd201b6aa
+confdata:
+confdata:#
+confdata:# Copyright (C) 2009 Search Solution Corporation. All rights reserved by Search Solution.
+confdata:#
+confdata:#   This program is free software; you can redistribute it and/or modify 
+confdata:#   it under the terms of the GNU General Public License as published by 
+confdata:#   the Free Software Foundation; version 2 of the License. 
+confdata:#
+confdata:#  This program is distributed in the hope that it will be useful,
+confdata:#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+confdata:#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+confdata:#  GNU General Public License for more details.
+confdata:#
+confdata:#  You should have received a copy of the GNU General Public License
+confdata:#  along with this program; if not, write to the Free Software
+confdata:#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
+confdata:
+confdata:#
+confdata:[broker]
+confdata:MASTER_SHM_ID=30001
+confdata:ADMIN_LOG_FILE=log/broker/cubrid_broker.log
+confdata:
+confdata:
+confdata:[%broker1]
+confdata:SERVICE=ON
+confdata:BROKER_PORT=30000
+confdata:MIN_NUM_APPL_SERVER=5
+confdata:MAX_NUM_APPL_SERVER=40
+confdata:APPL_SERVER_SHM_ID=30000
+confdata:LOG_DIR=log/broker/sql_log
+confdata:ERROR_LOG_DIR=log/broker/error_log
+confdata:SQL_LOG=ALL
+confdata:TIME_TO_KILL=120
+confdata:SESSION_TIMEOUT=300
+confdata:KEEP_CONNECTION=AUTO
+confdata:
+confdata:[%query_editor]
+confdata:SERVICE=ON
+confdata:BROKER_PORT=33000
+confdata:MIN_NUM_APPL_SERVER=5
+confdata:MAX_NUM_APPL_SERVER=40
+confdata:APPL_SERVER_SHM_ID=33000
+confdata:LOG_DIR=log/broker/sql_log
+confdata:ERROR_LOG_DIR=log/broker/error_log
+confdata:SQL_LOG=ALL
+confdata:TIME_TO_KILL=120
+confdata:SESSION_TIMEOUT=300
+confdata:KEEP_CONNECTION=AUTO
+confdata:SQL_LOG_MAX_SIZE=100000
+confdata:LOG_BACKUP=OFF
+confdata:MAX_STRING_LENGTH=-1
+confdata:ACCESS_LOG=ON
+
+
+
+
+
+
+

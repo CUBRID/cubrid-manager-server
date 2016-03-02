@@ -1,0 +1,9 @@
+{"task":"updatestatustemplate",
+"token":"cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
+"name":"dbserver_clier_requet",
+"desc":"status monitor template of demodb",
+"db_name":"demodb",
+"sampling_term":"1",
+"open":"target_config",
+"server_conn_cli_request":"1 1",
+"close":"target_config"}

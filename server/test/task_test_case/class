@@ -1,0 +1,15 @@
+task:class
+token:cdfb4c5717170c5ed30ef86644baf8151531ce5adff4a1f9a54711c51e0f50767926f07dd201b6aa
+dbname:demodb
+classname:athlete
+_STAMP:32
+_SVRTYPE:fsvr
+_PROGNAME:cub_js
+_CLIENTIP:127.0.0.1
+_CLIENTPORT:60375
+_ID:admin
+_CLIENT_VERSION:8.2.2
+_DBID:dba
+_DBPASSWD:
+_DBNAME:demodb
+

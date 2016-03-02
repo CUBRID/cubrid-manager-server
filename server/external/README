@@ -1,0 +1,77 @@
+CUBRID Manager Server System
+=============================
+CUBRID Manager Server(CMS) use some 3rd software, like openssl, libevent and json.
+The following is steps to compile them by yourself.
+
+==============
+#Openssl: openssl-1.0.1h
+
+How to compile openssl?
+1. Linux
+- wget http://www.openssl.org/source/openssl-1.0.1h.tar.gz
+- tar zxvf openssl-1.0.1h.tar.gz && cd openssl-1.0.1h
+- use "which openssl" to check the path of openssl.
+  if it is /user/bin/openssl:
+  ./config --prefix=/usr/ --openssldir=/usr/openssl threads no-shared
+  if it is /user/local/bin/openssl
+  ./config --prefix=/usr/local --openssldir=/usr/local/openssl threads no-shared
+- sudo make install (Must have root permission to upgrade openssl)
+- open a new terminal -> openssl version
+  check openssl version, if it is 'OpenSSL 1.0.1h 5 Jun 2014', it is successful.
+  
+2. Windows
+Dependence: perl, VS2008.
+- download openssl from  http://www.openssl.org/source/openssl-1.0.1h.tar.gz
+***** 64bit start
+- Start VS2008 command line
+  Start -> Microsoft Visual Studio 2008 -> Visual Studio Tools -> Visual Studio 2008 x64 Win64 Command Prompt
+- Go to working path of openssl
+- run following command:
+perl Configure VC-WIN64A --prefix=F:\openssl --openssldir=F:\openssl\dir threads  no-shared
+ms\do_win64a
+nmake -f ms\nt.mak
+nmake -f ms\nt.mak install
+
+***** 64bit end
+***** 32bit start
+- Start VS2008 command line
+  Start -> Microsoft Visual Studio 2008 -> Visual Studio Tools -> Visual Studio 2008 Command Prompt
+- Go to working path of openssl
+- run following command:
+perl Configure VC-WIN32 --prefix=F:\openssl --openssldir=F:\openssl\dir threads  no-shared no-asm
+ms\do_ms
+nmake /f ms\nt.mak
+nmake /f ms\nt.mak install
+
+==============
+#libevent : libevent-2.1.4-alpha
+How to compile libevent?
+- download libevent from http://libevent.org/
+wget https://sourceforge.net/projects/levent/files/libevent/libevent-2.1/libevent-2.1.4-alpha.tar.gz/download --no-check-certificate
+- decompress the file
+  tar zxvf libevent-2.1.4-alpha.tar.gz
+- go to working space: cd libevent-2.1.4-alpha
+Linux:
+- ./configure --prefix=/usr
+- make
+- make install (needs root permission)
+
+Windows 32bit:
+- Start VS2008 command line
+  Start -> Microsoft Visual Studio 2008 -> Visual Studio Tools -> Visual Studio 2008 Command Prompt
+- Go to working path of libevent
+- run following command:
+nmake OPENSSL_DIR=F:\openssl /f Makefile.nmake
+- get the library files in out/out32
+
+Windows 64bit:
+- Start VS2008 command line
+  Start -> Microsoft Visual Studio 2008 -> Visual Studio Tools -> Visual Studio 2008 x64 Win64 Command Prompt
+- Go to working path of libevent
+- run following command:
+nmake OPENSSL_DIR=F:\openssl /f Makefile.nmake
+- get the library files in out/out32
+
+
+Sincerely,
+Your CMS Development Team.

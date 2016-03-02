@@ -1,0 +1,17 @@
+task:loaddb
+token:cdfb4c5717170c5e34919b640249979f8375a218acf865b0b8100f0f25c069587926f07dd201b6aa
+dbname:alatestdb
+checkoption:both
+period:none
+user:dba
+estimated:none
+oiduse:yes
+nolog:no
+schema:$CUBRID_DATABASES/demodb/demodb_schema
+object:$CUBRID_DATABASES/demodb/demodb_objects
+index:none
+errorcontrolfile:none
+ignoreclassfile:none
+delete_orignal_files:y
+
+

@@ -1,0 +1,11 @@
+task:renamedb
+token:cdfb4c5717170c5edfc2912f2940ab35013dd1336cf7d77e4cfaae281cffa1417926f07dd201b6aa
+dbname:destinationdb
+rename:anotherdb
+exvolpath:/root/testpass
+advanced:off
+open:volume
+$CUBRID_DATABASES/destinationdb/destinationdb:$CUBRID_DATABASES/anotherdb/anotherdb
+close:volume
+forcedel:y
+

@@ -1,0 +1,3 @@
+{"task":"deletebroker",
+"token":"cdfb4c5717170c5eff38bf38711a5318d74ad4769721528348698c5ef683475a7926f07dd201b6aa",
+"bname":"broker_test"}

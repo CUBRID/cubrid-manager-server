@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="gb2312"?>
+<VisualStudioProject
+	ProjectType="Visual C++"
+	Version="9.00"
+	Name="install"
+	ProjectGUID="{4767EEE0-220E-4FDE-8788-0E8BAE173CE1}"
+	RootNamespace="install"
+	Keyword="MakeFileProj"
+	TargetFrameworkVersion="196613"
+	>
+	<Platforms>
+		<Platform
+			Name="Win32"
+		/>
+		<Platform
+			Name="x64"
+		/>
+	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
+	<Configurations>
+		<Configuration
+			Name="Debug|Win32"
+			OutputDirectory="$(SolutionDir)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			BuildLogFile="$(IntDir)\BuildLog_$(ProjectName).htm"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake all_debug SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				ReBuildCommandLine="nmake all_debug SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				CleanCommandLine="nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Debug|x64"
+			OutputDirectory="$(SolutionDir)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			BuildLogFile="$(IntDir)\BuildLog_$(ProjectName).htm"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake all_debug SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				ReBuildCommandLine="nmake all_debug SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				CleanCommandLine="nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|Win32"
+			OutputDirectory="$(SolutionDir)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			BuildLogFile="$(IntDir)\BuildLog_$(ProjectName).htm"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				ReBuildCommandLine="nmake  SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				CleanCommandLine="nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+		<Configuration
+			Name="Release|x64"
+			OutputDirectory="$(SolutionDir)\$(ConfigurationName)"
+			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			ConfigurationType="0"
+			BuildLogFile="$(IntDir)\BuildLog_$(ProjectName).htm"
+			>
+			<Tool
+				Name="VCNMakeTool"
+				BuildCommandLine="nmake SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				ReBuildCommandLine="nmake SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(ConfigurationName)_$(PlatformName)"
+				CleanCommandLine="nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CUBRID_$(ConfigurationName)_$(PlatformName)"
+				Output=""
+				PreprocessorDefinitions=""
+				IncludeSearchPath=""
+				ForcedIncludes=""
+				AssemblySearchPath=""
+				ForcedUsingAssemblies=""
+				CompileAsManaged=""
+			/>
+		</Configuration>
+	</Configurations>
+	<References>
+	</References>
+	<Files>
+	</Files>
+	<Globals>
+	</Globals>
+</VisualStudioProject>

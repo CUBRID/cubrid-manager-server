@@ -1,0 +1,24 @@
+task:setautoexecquery
+token:cdfb4c5717170c5e99586a2763e2b6dce92982faacefb068d7e5a24b9c5fa0a37926f07dd201b6aa
+dbname:alatestdb
+open:planlist
+open:queryplan
+query_id:bbaa
+username:dba
+userpass:none
+period:ONE
+detail:$AUTO_QUERY_TIME
+query_string:select * from db_class;
+close:queryplan
+close:planlist
+
+
+
+
+
+
+
+
+
+
+

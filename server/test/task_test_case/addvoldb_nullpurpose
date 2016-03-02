@@ -1,0 +1,8 @@
+task:addvoldb
+token:cdfb4c5717170c5e51196b3bf16112949ea2e1dcf05030c13351f8d4306356bf7926f07dd201b6aa
+dbname:alatestdb
+volname:
+path:$CUBRID_DATABASES/alatestdb
+numberofpages:100
+size_need_mb:0.391(MB)
+

@@ -1,0 +1,13 @@
+task:updatedbmtuser
+token:cdfb4c5717170c5eb159540c0384c7424ea3fcd68c6ea615f538801cd09c6f3a7926f07dd201b6aa
+targetid:admin
+open:dbauth
+dbname:demodb
+dbid:dba
+dbpassword:
+dbbrokeraddress:192.168.0.1,33000
+close:dbauth
+casauth:admin
+dbcreate:admin
+statusmonitorauth:admin
+

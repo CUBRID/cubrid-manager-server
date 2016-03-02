@@ -1,0 +1,5 @@
+{"task":"applylogdb",
+"token":"cdfb4c5717170c5ebd99d3152b799ba8c8960905fd00c5b4d503c6215bcffe1d7926f07dd201b6aa",
+"dbname":"demodb",
+"la_max_mem_size":"200",
+"logpath":"$CUBRID_DATABASES/applylogdb"}

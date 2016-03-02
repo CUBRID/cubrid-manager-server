@@ -1,0 +1,99 @@
+[
+    {
+        "task":"get_mon_statistic" ,
+        "metric" : "vol_freespace" ,
+        "dbname" : "demodb" ,
+        "volname" : "demodb" ,
+        "dtype" : "daily"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "vol_freespace" ,
+        "dbname" : "demodb" ,
+        "volname" : "demodb" ,
+        "dtype" : "weekly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "vol_freespace" ,
+        "dbname" : "demodb" ,
+        "volname" : "demodb" ,
+        "dtype" : "monthly"
+    },
+    {
+        "task" : "get_mon_statistic", 
+        "metric" : "vol_freespace", 
+        "dbname" : "demodb", 
+        "volname" : "demodb", 
+        "dtype" : "yearly"
+    },
+    {
+        "task" : "get_mon_statistic", 
+        "metric" : "broker_qps", 
+        "bname" : "query_editor", 
+        "dtype" : "daily"
+    },
+    {
+        "task" : "get_mon_statistic", 
+        "metric" : "broker_qps",
+        "bname" : "query_editor" ,
+        "dtype" : "weekly"
+    },
+    {
+        "task" : "get_mon_statistic",
+        "metric" : "broker_qps",
+        "bname" : "query_editor" ,
+        "dtype" : "monthly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "broker_qps" ,
+        "bname" : "query_editor" ,
+        "dtype" : "yearly"
+    },
+    {
+        "task" : "get_mon_statistic",
+        "metric" : "db_io_read", 
+        "dbname" : "demodb",
+        "dtype" : "daily"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "db_io_read" ,
+        "dbname" : "demodb" ,
+        "dtype" : "weekly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "db_io_read" ,
+        "dbname" : "demodb" ,
+        "dtype" : "monthly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "db_io_read" ,
+        "dbname" : "demodb" ,
+        "dtype" : "yearly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "os_cpu_iowait" ,
+        "dtype" : "daily"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "os_cpu_iowait" ,
+        "dtype" : "weekly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "os_cpu_iowait" ,
+        "dtype" : "monthly"
+    },
+    {
+        "task" : "get_mon_statistic" ,
+        "metric" : "os_cpu_iowait" ,
+        "dtype" : "yearly"
+    }
+]
+
