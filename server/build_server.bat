@@ -18,15 +18,7 @@ if not "%exitcode%" == "0" exit /b %exitcode%
 cd win/install
 cd CMServer_%mode%_%platform%
 
-if not exist "%prefix%\bin" (
-	mkdir %prefix%\bin
-)
-if not exist "%prefix%\conf" (
-	mkdir %prefix%\conf
-)
-copy bin\*.* %prefix%\bin
-copy conf\*.* %prefix%\conf
-robocopy share %prefix%\share\ /MIR
+robocopy . %prefix%\ /MIR
 if errorlevel 1 (
 	set exitcode=0
 	) else (
