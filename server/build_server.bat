@@ -18,7 +18,7 @@ if not "%exitcode%" == "0" exit /b %exitcode%
 cd win/install
 cd CMServer_%mode%_%platform%
 
-robocopy . %prefix%\ /MIR
+robocopy . %prefix%\ /e
 if errorlevel 1 (
 	set exitcode=0
 	) else (
