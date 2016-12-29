@@ -12379,8 +12379,9 @@ _ts_lockdb_parse_us (nvplist * res, FILE * infile)
                     strncpy (buf, temp + 1, (int) (temp2 - temp - 1));
                     buf[(int) (temp2 - temp) - 1] = '\0';
                     nv_add_nvp (res, "host", buf);
+	
+                    nv_add_nvp (res, "pid", temp2 + 1);    /* moved from below to avoid seg. fault */
                 }
-                nv_add_nvp (res, "pid", temp2 + 1);
 
                 fgets (buf, sizeof (buf), infile);
                 buf[strlen (buf) - 1] = '\0';
