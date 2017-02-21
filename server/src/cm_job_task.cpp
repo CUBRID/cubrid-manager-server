@@ -3089,7 +3089,7 @@ tsRenameDB (nvplist * req, nvplist * res, char *_dbmt_error)
     argv[argc++] = newdbname;
     argv[argc++] = NULL;
 
-    strncpy(task_name, "renamedb", TASKNAME_LEN);
+    strncpy (task_name, "renamedb", TASKNAME_LEN);
     retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
     if (retval != ERR_NO_ERROR)
     {
@@ -4016,7 +4016,7 @@ ts_checkdb (nvplist * req, nvplist * res, char *_dbmt_error)
 
     argv[argc++] = NULL;
 
-    strncpy(task_name, "checkdb", TASKNAME_LEN);
+    strncpy (task_name, "checkdb", TASKNAME_LEN);
     retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
 
     return retval;
@@ -7029,7 +7029,7 @@ ts_killtran (nvplist * req, nvplist * res, char *_dbmt_error)
 
     argv[argc++] = NULL;
 
-    strncpy(task_name, "killtran", TASKNAME_LEN);
+    strncpy (task_name, "killtran", TASKNAME_LEN);
     retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
     if (retval != ERR_NO_ERROR)
     {
@@ -7100,7 +7100,7 @@ ts_lockdb (nvplist * req, nvplist * res, char *_dbmt_error)
 
     argv[argc++] = NULL;
 
-    strncpy(task_name, "lockdb", TASKNAME_LEN);
+    strncpy (task_name, "lockdb", TASKNAME_LEN);
 
     retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
     if (retval != ERR_NO_ERROR)
@@ -9944,7 +9944,7 @@ run_csql_statement (const char *sql_stat, char *dbname, char *dbuser,
 
     SET_TRANSACTION_NO_WAIT_MODE_ENV ();
 
-    strncpy(task_name, "csql", TASKNAME_LEN);
+    strncpy (task_name, "csql", TASKNAME_LEN);
     retval = _run_child (argv, 1, task_name, outfilepath, _dbmt_error);
 
     return retval;
