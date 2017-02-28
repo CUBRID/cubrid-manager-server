@@ -52,7 +52,7 @@ static T_SPACEDB_RESULT *new_spacedb_result (void);
 static const char *get_cubrid_mode_opt (T_CUBRID_MODE mode);
 static void read_server_status_output (T_SERVER_STATUS_RESULT * res,
                                        char *out_file);
-static void read_spacedb_output (T_SPACEDB_RESULT * res, char *out_file);
+static void read_spacedb_output (IGeneralSpacedbResult * res, char *out_file);
 static void set_spacedb_info (T_SPACEDB_INFO * vol_info, int volid,
                               char *purpose, int total_page, int free_page,
                               char *vol_name);
@@ -162,20 +162,57 @@ cmd_spacedb_result_free (T_SPACEDB_RESULT * res)
     }
 }
 
+void find_and_parse_cub_admin_version(int& major_version, int& minor_version){
+    const char *argv[3];
+    char tmpfile[PATH_MAX], strbuf[128];
+    FILE *infile;
+    char cmd_name[CUBRID_CMD_NAME_LEN];
 
-T_SPACEDB_RESULT *
-cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
-{
-    T_SPACEDB_RESULT *res;
+    cubrid_cmd_name (cmd_name);
+    snprintf (tmpfile, PATH_MAX - 1, "%s/cub_admin_version", sco.dbmt_tmp_dir);
+    argv[0] = cmd_name;
+    argv[1] = "--version";
+    argv[2] = NULL;
+
+    run_child (argv, 1, NULL, tmpfile, NULL, NULL);
+    if ((infile = fopen (tmpfile, "r")) != NULL){
+	fgets (strbuf, sizeof (strbuf), infile);
+	fgets (strbuf, sizeof (strbuf), infile);
+	char version[10];
+	sscanf(strbuf, "%*s %s", version);
+
+	char *p = strtok(version, ".");
+	major_version = atoi(p);
+	p = strtok(NULL, ".");
+	minor_version = atoi(p);
+
+	fclose (infile);
+	unlink (tmpfile);
+    }else{
+	major_version = minor_version = -1;
+    }
+}
+
+IGeneralSpacedbResult *
+cmd_spacedb (const char *dbname, T_CUBRID_MODE mode) {
+    IGeneralSpacedbResult *res = NULL;
+    char version[10];
+    int minor_version, major_version;
     char out_file[128];
     char cubrid_err_file[PATH_MAX];
     char cmd_name[CUBRID_CMD_NAME_LEN];
+    char *err_message = NULL;
     const char *argv[10];
     int argc = 0;
     cubrid_err_file[0] = '\0';
-    res = new_spacedb_result ();
-    if (res == NULL)
-        return NULL;
+
+    find_and_parse_cub_admin_version(major_version, minor_version);
+
+    if (major_version < 10 || (major_version == 10 && minor_version == 0)){
+	res = new SpaceDbResultOldFormat();
+    } else {
+	res = new SpaceDbResultNewFormat();
+    }
 
     sprintf (out_file, "%s/DBMT_util_002.%d", sco.dbmt_tmp_dir,
             (int) getpid ());
@@ -188,12 +225,19 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
     argv[argc++] = "--" SPACE_OUTPUT_FILE_L;
     argv[argc++] = out_file;
     argv[argc++] = dbname;
+    argv[argc++] = "-p";
     argv[argc++] = NULL;
+
+    if(typeid(*res) == typeid(SpaceDbResultNewFormat)){
+	err_message = dynamic_cast<SpaceDbResultNewFormat*>(res)->get_err_msg();
+    } else if(typeid(*res) == typeid(SpaceDbResultOldFormat)){
+	err_message = dynamic_cast<SpaceDbResultOldFormat*>(res)->get_err_msg();
+    }
 
     snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
               sco.dbmt_tmp_dir, "cmd_spacedb", getpid ());
     run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* spacedb */
-    read_error_file (cubrid_err_file, res->err_msg, ERR_MSG_SIZE);
+    read_error_file (cubrid_err_file, err_message, ERR_MSG_SIZE);
     read_spacedb_output (res, out_file);
     if (access (cubrid_err_file, F_OK) == 0)
     {
@@ -691,159 +735,243 @@ parse_volume_line (T_SPACEDB_INFO * vol_info, char *str_buf)
     return TRUE;
 }
 
+static int is_valid_database_description(char *str){
+    if(strncmp(str, "PERMANENT", 9) != 0 && strncmp(str, "TEMPORARY", 9) != 0){
+	return 0;
+    }
+
+    return 1;
+}
+
+static int is_valid_volume_description(char *str){
+    if(strstr(str, "PERMANENT") == NULL && strstr(str, "TEMPORARY") == NULL){
+	return 0;
+    }
+
+    return 1;
+}
+
+static int is_valid_file_description(char *str){
+    if(strncmp(str, "INDEX", 5) != 0 && strncmp(str, "HEAP", 4) != 0 &&
+       strncmp(str, "SYSTEM", 6) != 0 && strncmp(str, "TEMP", 4) != 0){
+	return 0;
+    }
+
+    return 1;
+}
+
 static void
-read_spacedb_output (T_SPACEDB_RESULT * res, char *out_file)
+read_spacedb_output (IGeneralSpacedbResult *res, char *out_file)
 {
     FILE *fp;
     char str_buf[1024];
     int db_page_size = 0, log_page_size = 0;
-    int num_vol = 0, num_tmp_vol = 0;
-    T_SPACEDB_INFO *vol_info = NULL, *tmp_vol_info = NULL;
 
     fp = fopen (out_file, "r");
     if (fp == NULL)
         return;
 
-    vol_info = (T_SPACEDB_INFO *) malloc (sizeof (T_SPACEDB_INFO));
-    tmp_vol_info = (T_SPACEDB_INFO *) malloc (sizeof (T_SPACEDB_INFO));
-    if (vol_info == NULL || tmp_vol_info == NULL)
-        goto spacedb_error;
+    if(typeid(*res) == typeid(SpaceDbResultOldFormat)){
+	SpaceDbResultOldFormat *result = (SpaceDbResultOldFormat*)res;
+	while (fgets (str_buf, sizeof (str_buf), fp))
+	{
+	    char *tmp_p;
 
-    while (fgets (str_buf, sizeof (str_buf), fp))
-    {
-        char *tmp_p;
+	    ut_trim (str_buf);
 
-        ut_trim (str_buf);
+	    if (strncmp (str_buf, "Space", 5) == 0)
+	    {
+		int matchs = 0;
+		double page_size = 0.0;
+		char page_unit = 'H';
 
-        if (strncmp (str_buf, "Space", 5) == 0)
-        {
-            int matchs = 0;
-            double page_size = 0.0;
-            char page_unit = 'H';
+		/*
+		* The log format looks like the following:
+		* Space description for database 'demodb' with pagesize 16.0K. (log pagesize: 16.0K)
+		*/
+		tmp_p = strstr (str_buf, "pagesize");
+		if (tmp_p == NULL)
+		{
+		    goto spacedb_error;
+		}
 
-            /*
-            * The log format looks like the following:
-            * Space description for database 'demodb' with pagesize 16.0K. (log pagesize: 16.0K)
-            */
-            tmp_p = strstr (str_buf, "pagesize");
-            if (tmp_p == NULL)
-            {
-                goto spacedb_error;
-            }
+		if ((matchs =
+			     sscanf (tmp_p, "pagesize %lf%c", &page_size, &page_unit)) != 2)
+		{
+		    goto spacedb_error;
+		}
 
-            if ((matchs =
-                sscanf (tmp_p, "pagesize %lf%c", &page_size, &page_unit)) != 2)
-            {
-                goto spacedb_error;
-            }
+		if ((db_page_size =
+			     _size_to_byte_by_unit (page_size, page_unit)) < 0)
+		{
+		    goto spacedb_error;
+		}
 
-            if ((db_page_size =
-                _size_to_byte_by_unit (page_size, page_unit)) < 0)
-            {
-                goto spacedb_error;
-            }
+		tmp_p = strstr (str_buf, "log pagesize:");
+		if (tmp_p != NULL)
+		{
+		    if ((matchs =
+				 sscanf (tmp_p, "log pagesize: %lf%c", &page_size,
+					 &page_unit)) != 2)
+		    {
+			goto spacedb_error;
+		    }
 
-            tmp_p = strstr (str_buf, "log pagesize:");
-            if (tmp_p != NULL)
-            {
-                if ((matchs =
-                    sscanf (tmp_p, "log pagesize: %lf%c", &page_size,
-                            &page_unit)) != 2)
-                {
-                    goto spacedb_error;
-                }
+		    if ((log_page_size =
+				 _size_to_byte_by_unit (page_size, page_unit)) < 0)
+		    {
+			goto spacedb_error;
+		    }
+		}
+		else
+		{
+		    /* log pagesize default value */
+		    log_page_size = 4096;
+		}
+	    }
 
-                if ((log_page_size =
-                    _size_to_byte_by_unit (page_size, page_unit)) < 0)
-                {
-                    goto spacedb_error;
-                }
-            }
-            else
-            {
-                /* log pagesize default value */
-                log_page_size = 4096;
-            }
-        }
+	    else if (strncmp (str_buf, "Volid", 5) == 0)
+	    {
+		break;
+	    }
+	}
 
-        else if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-            break;
-        }
-    }
+	while (fgets (str_buf, sizeof (str_buf), fp))
+	{
+	    ut_trim (str_buf);
+	    if (str_buf[0] == '\0' || str_buf[0] == '-')
+	    {
+		continue;
+	    }
+	    if (strncmp (str_buf, "Volid", 5) == 0)
+	    {
+		break;
+	    }
 
-    while (fgets (str_buf, sizeof (str_buf), fp))
-    {
-        ut_trim (str_buf);
-        if (str_buf[0] == '\0' || str_buf[0] == '-')
-        {
-            continue;
-        }
-        if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-            break;
-        }
+	    if (strncmp (str_buf, "Space", 5) == 0)
+	    {
+		continue;
+	    }
 
-        if (strncmp (str_buf, "Space", 5) == 0)
-        {
-            continue;
-        }
+	    if (!result->add_volume(str_buf)){
+		continue;
+	    }
+	}
 
-        if (!parse_volume_line (&(vol_info[num_vol]), str_buf))
-        {
-            continue;
-        }
+	while (fgets (str_buf, sizeof (str_buf), fp))
+	{
+	    ut_trim (str_buf);
+	    if (str_buf[0] == '\0' || str_buf[0] == '-')
+	    {
+		continue;
+	    }
+	    if (strncmp (str_buf, "Volid", 5) == 0)
+	    {
+		break;
+	    }
 
-        num_vol++;
-        vol_info =
-            (T_SPACEDB_INFO *) realloc (vol_info,
-                                        sizeof (T_SPACEDB_INFO) * (num_vol + 1));
-        if (vol_info == NULL)
-            goto spacedb_error;
-    }
+	    if (!result->add_temporary_volume(str_buf)){
+		continue;
+	    }
+	}
+	result->set_page_size(db_page_size);
+	result->set_log_page_size(log_page_size);
+    }else if(typeid(*res) == typeid(SpaceDbResultNewFormat)){
+	SpaceDbResultNewFormat *result = (SpaceDbResultNewFormat*)res;
+	char page_unit, log_page_unit, *p;
+	double page_size, log_page_size_double;
 
-    while (fgets (str_buf, sizeof (str_buf), fp))
-    {
-        ut_trim (str_buf);
-        if (str_buf[0] == '\0' || str_buf[0] == '-')
-        {
-            continue;
-        }
-        if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-            break;
-        }
+	while (fgets(str_buf, sizeof(str_buf), fp)){
+	    ut_trim(str_buf);
 
-        if (!parse_volume_line (&(tmp_vol_info[num_tmp_vol]), str_buf))
-        {
-            continue;
-        }
+	    if (strncmp(str_buf, "Space", 5) == 0){
+		p = strstr(str_buf, "pagesize");
+		if (p){
+		    sscanf (p, "pagesize %lf%c", &page_size, &page_unit);
+		    if ((db_page_size =
+				 _size_to_byte_by_unit (page_size, page_unit)) < 0)
+		    {
+			goto spacedb_error;
+		    }
+		    result->set_page_size(db_page_size);
+		}
+		p = strstr(str_buf, "log pagesize:");
+		if(p){
+		    sscanf (p, "log pagesize: %lf%c", &log_page_size_double, &log_page_unit);
+		    if ((log_page_size =
+				 _size_to_byte_by_unit (log_page_size_double, log_page_unit)) < 0)
+		    {
+			goto spacedb_error;
+		    }
+		    result->set_log_page_size(log_page_size);
+		}
+	    }
+	    if(strncmp(str_buf, "type", 4) == 0){
+		break;
+	    }
+	}
+	int index = 0;
+	while(fgets(str_buf, sizeof(str_buf), fp)){
+	    ut_trim(str_buf);
 
-        num_tmp_vol++;
-        tmp_vol_info =
-            (T_SPACEDB_INFO *) realloc (tmp_vol_info,
-                                        sizeof (T_SPACEDB_INFO) * (num_tmp_vol + 1));
-        if (tmp_vol_info == NULL)
-            goto spacedb_error;
+	    if(strncmp(str_buf, "Space", 5) == 0){
+		break;
+	    }
+	    if(!is_valid_database_description(str_buf)){
+		break;
+	    }
+	    sscanf(str_buf, "%s %s DATA %d %d %d %d", result->databaseSpaceDescriptions[index].type, result->databaseSpaceDescriptions[index].purpose, &result->databaseSpaceDescriptions[index].volume_count,
+		                                                  &result->databaseSpaceDescriptions[index].used_size,
+		                                                  &result->databaseSpaceDescriptions[index].free_size,
+		                                                  &result->databaseSpaceDescriptions[index].total_size);
+	    index++;
+	}
+
+	while(fgets(str_buf, sizeof(str_buf), fp)){
+	    ut_trim(str_buf);
+
+	    if(strncmp(str_buf, "Detailed", 8) == 0){
+		break;
+	    }
+
+	    if(!is_valid_volume_description(str_buf)){
+		continue;
+	    }
+
+	    result->add_volume(str_buf);
+	}
+
+	while(fgets(str_buf, sizeof(str_buf), fp)){
+	    ut_trim(str_buf);
+
+	    if(strncmp(str_buf, "data_type", 9) == 0){
+		break;
+	    }
+	}
+
+	index = 0;
+
+	while(fgets(str_buf, sizeof(str_buf), fp)){
+	    ut_trim(str_buf);
+
+	    if(!is_valid_file_description(str_buf)){
+		continue;
+	    }
+
+	    sscanf(str_buf, "%s %d %d %d %d %d\n", result->fileSpaceDescriptions[index].data_type, &result->fileSpaceDescriptions[index].file_count,
+		   &result->fileSpaceDescriptions[index].used_size,
+		   &result->fileSpaceDescriptions[index].file_table_size,
+		   &result->fileSpaceDescriptions[index].reserved_size,
+		   &result->fileSpaceDescriptions[index].total_size);
+	    index++;
+	}
     }
 
     fclose (fp);
-
-    res->page_size = db_page_size;
-    res->log_page_size = log_page_size;
-    res->num_vol = num_vol;
-    res->num_tmp_vol = num_tmp_vol;
-    res->vol_info = vol_info;
-    res->tmp_vol_info = tmp_vol_info;
-
     return;
 
 spacedb_error:
     fclose (fp);
-    if (tmp_vol_info)
-        free (tmp_vol_info);
-    if (vol_info)
-        free (vol_info);
 }
 
 static void
@@ -968,4 +1096,119 @@ _size_to_byte_by_unit (double orgin_num, char unit)
     }
 
     return (int) (orgin_num);
+}
+
+void SpaceDbResultNewFormat::add_volume(char *str_buf){
+    char purpose[128], volume_name[PATH_MAX], type[32];
+
+    SpaceDbVolumeInfoNewFormat volume;
+    sscanf(str_buf, "%d %s %s DATA %d %d %d %s", &volume.volid, type, purpose,
+	   &volume.used_size,
+	   &volume.free_size,
+	   &volume.total_size,
+	   volume_name);
+    strcpy(volume.purpose, purpose);
+    strcpy(volume.type, type);
+    strcpy(volume.volume_name, volume_name);
+
+    volumes.push_back(volume);
+}
+
+int SpaceDbResultOldFormat::get_volume_info(char *str_buf, SpaceDbVolumeInfoOldFormat& volume){
+    int volid, total_page, free_page;
+    char purpose[128], vol_name[PATH_MAX];
+    char *token = NULL, *p;
+    struct stat statbuf;
+
+    volid = total_page = free_page = 0;
+    purpose[0] = vol_name[0] = '\0';
+
+    token = strtok (str_buf, " ");
+    if (token == NULL)
+    {
+	return FALSE;
+    }
+    volid = atoi (token);
+
+    token = strtok (NULL, " ");
+    if (token == NULL)
+    {
+	return FALSE;
+    }
+    strcpy (purpose, token);
+
+    if (strcmp (purpose, "GENERIC") != 0 && strcmp (purpose, "DATA") != 0
+	&& strcmp (purpose, "INDEX") != 0 && strcmp (purpose, "TEMP") != 0)
+    {
+	return FALSE;
+    }
+
+    token = strtok (NULL, " ");
+    if (token == NULL)
+    {
+	return FALSE;
+    }
+
+    if (strcmp (token, "TEMP") == 0)
+    {
+	if (strcmp (purpose, "TEMP") != 0)
+	{
+	    return FALSE;
+	}
+	else
+	{
+	    strcat (purpose, " ");
+	    strcat (purpose, token);
+	}
+
+	token = strtok (NULL, " ");
+	if (token == NULL)
+	{
+	    return FALSE;
+	}
+    }
+    total_page = atoi (token);
+
+    token = strtok (NULL, " ");
+    if (token == NULL)
+    {
+	return FALSE;
+    }
+    free_page = atoi (token);
+
+    token = strtok (NULL, "\n");
+    if (token == NULL)
+    {
+	return FALSE;
+    }
+    strcpy (vol_name, token + 1);
+
+    volume.volid = volid;
+    volume.total_size = total_page;
+    volume.free_size = free_page;
+    strcpy(volume.purpose, purpose);
+
+    stat (vol_name, &statbuf);
+    volume.date = statbuf.st_mtime;
+
+#if defined(WINDOWS)
+    unix_style_path (vol_name);
+#endif
+
+    p = strrchr (vol_name, '/');
+    if (p == NULL)
+    {
+	volume.location[0] = '\0';
+	volume.vol_name[0] = '\0';
+    }
+    else
+    {
+	*p = '\0';
+	snprintf (volume.location, sizeof (volume.location) - 1, "%s", vol_name);
+	snprintf (volume.vol_name, sizeof (volume.vol_name) - 1, "%s", p + 1);
+	*p = '/';
+    }
+
+    return TRUE;
+
 }

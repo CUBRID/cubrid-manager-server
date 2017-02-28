@@ -197,7 +197,7 @@ static void aj_autohistory_handler (void *ajp, time_t prev_check_time,
 
 static void aj_backupdb (autobackupdb_node * n);
 static void _aj_autobackupdb_error_log (autobackupdb_node * n, char *errmsg);
-static double ajFreeSpace (T_SPACEDB_RESULT * cmd_res, const char *type);
+static double ajFreeSpace (IGeneralSpacedbResult * cmd_res, const char *type);
 static void aj_add_volume (char *dbname, const char *type,
                            int increase, int pagesize);
 
@@ -249,22 +249,23 @@ aj_initialize (ajob * ajlist, void *ud)
 
 /* This function calculates the free space fraction of given type */
 static double
-ajFreeSpace (T_SPACEDB_RESULT * cmd_res, const char *type)
+ajFreeSpace (IGeneralSpacedbResult * cmd_res, const char *type)
 {
     double total_page, free_page;
     int i;
 
     total_page = free_page = 0.0;
 
-    for (i = 0; i < cmd_res->num_vol; i++)
-    {
-        if (strcmp (cmd_res->vol_info[i].purpose, type) == 0)
-        {
-            total_page += cmd_res->vol_info[i].total_page;
-            free_page += cmd_res->vol_info[i].free_page;
-        }
-    }
+    if(typeid(*cmd_res) == typeid(SpaceDbResultOldFormat)) {
+	std::vector<SpaceDbVolumeInfoOldFormat> volumes = ((SpaceDbResultOldFormat*)cmd_res)->get_volumes();
 
+	for (i = 0; i < volumes.size(); i++) {
+	    if (strcmp(volumes[i].purpose, type) == 0) {
+		total_page += volumes[i].total_size;
+		free_page += volumes[i].free_size;
+	    }
+	}
+    }
     if (total_page > 0.0)
     {
         return (free_page / total_page);
@@ -290,8 +291,7 @@ aj_add_volume (char *dbname, const char *type, int increase,
     char inc_str[128];
     const char *argv[16];
     int argc = 0;
-    T_SPACEDB_RESULT *all_volumes;
-    T_SPACEDB_INFO *vol_info;
+    IGeneralSpacedbResult *all_volumes;
     int i;
     char *pos = NULL;
     char tmp_dbname[DB_NAME_LEN + MAXHOSTNAMELEN];
@@ -352,21 +352,22 @@ aj_add_volume (char *dbname, const char *type, int increase,
     if (all_volumes == NULL)
         return;
 
-    vol_info = all_volumes->vol_info;
+    if(typeid(*all_volumes) == typeid(SpaceDbResultOldFormat)){
+	std::vector<SpaceDbVolumeInfoOldFormat> vol_info = ((SpaceDbResultOldFormat*)all_volumes)->get_volumes();
 
-    for (i = 0; i < all_volumes->num_vol; i++)
-    {
-        if (uStringEqual (vol_info[i].purpose, "DATA")
-            || uStringEqual (vol_info[i].purpose, "INDEX"))
-        {
-            strcpy (volname, vol_info[i].vol_name);
-            sprintf (strbuf, "%s/%s", dbloca, volname);
-            if (!stat (strbuf, &statbuf))
-                mytime = statbuf.st_mtime;
-        }
+	for (i = 0; i < vol_info.size(); i++)
+	{
+	    if (uStringEqual (vol_info[i].purpose, "DATA")
+		|| uStringEqual (vol_info[i].purpose, "INDEX"))
+	    {
+		strcpy (volname, vol_info[i].vol_name);
+		sprintf (strbuf, "%s/%s", dbloca, volname);
+		if (!stat (strbuf, &statbuf))
+		    mytime = statbuf.st_mtime;
+	    }
+	}
+	delete all_volumes;
     }
-
-    cmd_spacedb_result_free (all_volumes);
 
     mytime = time (&mytime);
     if ((outfile = fopen (log_file_name, "a")) != NULL)
@@ -512,7 +513,7 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
     autoaddvoldb_node *curr;
     double frate;
     int page_add, pagesize;
-    T_SPACEDB_RESULT *spacedb_res;
+    IGeneralSpacedbResult *spacedb_res;
     T_SERVER_STATUS_RESULT *server_status_res;
     int db_mode = 0;
 
@@ -546,50 +547,42 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
         if (spacedb_res == NULL)
             continue;
 
-        pagesize = spacedb_res->page_size;
-        page_add = curr->data_ext_page;
-        if ((curr->data_vol) && (page_add > 0))
-        {
-            frate = ajFreeSpace (spacedb_res, "DATA");
-            if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
-                page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
-            if (curr->data_warn_outofspace >= frate)
-            {
-                if (db_mode == 2)
-                {
-                    append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                           sizeof (dbname_at_hostname));
-                    aj_add_volume (dbname_at_hostname, "data", page_add, pagesize);
-                }
-                else
-                {
-                    aj_add_volume (curr->dbname, "data", page_add, pagesize);
-                }
-            }
-        }
+	if(typeid(*spacedb_res) == typeid(SpaceDbResultOldFormat)) {
+	    SpaceDbResultOldFormat *result = (SpaceDbResultOldFormat*)spacedb_res;
+	    pagesize = result->get_page_size();
+	    page_add = curr->data_ext_page;
+	    if ((curr->data_vol) && (page_add > 0)) {
+		frate = ajFreeSpace(spacedb_res, "DATA");
+		if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
+		    page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
+		if (curr->data_warn_outofspace >= frate) {
+		    if (db_mode == 2) {
+			append_host_to_dbname(dbname_at_hostname, curr->dbname,
+					      sizeof(dbname_at_hostname));
+			aj_add_volume(dbname_at_hostname, "data", page_add, pagesize);
+		    } else {
+			aj_add_volume(curr->dbname, "data", page_add, pagesize);
+		    }
+		}
+	    }
 
-        page_add = curr->index_ext_page;
-        if ((curr->index_vol) && (page_add > 0))
-        {
-            frate = ajFreeSpace (spacedb_res, "INDEX");
-            if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
-                page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
-            if (curr->index_warn_outofspace >= frate)
-            {
-                if (db_mode == 2)
-                {
-                    append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                           sizeof (dbname_at_hostname));
-                    aj_add_volume (dbname_at_hostname, "index", page_add, pagesize);
-                }
-                else
-                {
-                    aj_add_volume (curr->dbname, "index", page_add, pagesize);
-                }
-            }
-        }
-
-        cmd_spacedb_result_free (spacedb_res);
+	    page_add = curr->index_ext_page;
+	    if ((curr->index_vol) && (page_add > 0)) {
+		frate = ajFreeSpace(spacedb_res, "INDEX");
+		if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
+		    page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
+		if (curr->index_warn_outofspace >= frate) {
+		    if (db_mode == 2) {
+			append_host_to_dbname(dbname_at_hostname, curr->dbname,
+					      sizeof(dbname_at_hostname));
+			aj_add_volume(dbname_at_hostname, "index", page_add, pagesize);
+		    } else {
+			aj_add_volume(curr->dbname, "index", page_add, pagesize);
+		    }
+		}
+	    }
+	    delete result;
+	}
     }
     cmd_servstat_result_free (server_status_res);
 }
