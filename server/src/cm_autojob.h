@@ -26,8 +26,10 @@
 #define _CM_AUTOJOB_H_
 
 #include <time.h>
+#include "cm_cmd_exec.h"
 
 #define AUTOJOB_SIZE 4
+#define MIN_AUTO_ADDVOL_PAGE_SIZE      1000
 
 /* autobackupdb.conf */
 #define AJ_BACKUP_CONF_DBNAME          "dbname"
@@ -41,6 +43,8 @@
 #define AJ_BACKUP_CONF_UPDATESTATUS    "updatestatus"
 #define AJ_BACKUP_CONF_STOREOLD        "storeold"
 #define AJ_BACKUP_CONF_ONOFF           "onoff"
+
+class GeneralSpacedbResult;
 
 /* automatic job */
 typedef struct _ajob
@@ -56,6 +60,22 @@ typedef struct _ajob
     void *mondata;
 } ajob;
 
+typedef struct autoaddvoldb_t
+{
+    char dbname[64];
+    int data_vol;
+    double data_warn_outofspace;
+    int data_ext_page;
+    int index_vol;
+    double index_warn_outofspace;
+    int index_ext_page;
+    struct autoaddvoldb_t *next;
+} autoaddvoldb_node;
+
 void aj_initialize (ajob * ajlist, void *ud);
+void aj_add_volume (char *dbname, const char *type,
+		    int increase, int pagesize);
+double
+ajFreeSpace (GeneralSpacedbResult * cmd_res, const char *type);
 
 #endif /* _CM_AUTOJOB_H_ */
