@@ -3190,7 +3190,7 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
 {
     char *dbname = NULL;
     int retval = ERR_NO_ERROR;
-    char *err_message;
+    const char *err_message;
     char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
     int ha_mode = 0;
     T_CUBRID_MODE cubrid_mode;

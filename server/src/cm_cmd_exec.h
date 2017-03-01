@@ -149,17 +149,17 @@ class GeneralSpacedbResult{
 protected:
     int page_size;
     int log_page_size;
-    char *err_msg;
+    char err_msg[ERR_MSG_SIZE];
 public:
     GeneralSpacedbResult(){
 	page_size = 0;
 	log_page_size = 0;
-	err_msg = new char[ERR_MSG_SIZE];
+	err_msg[0] = '\0';
     }
     GeneralSpacedbResult(int page_size, int log_page_size){
 	this->page_size = page_size;
 	this->log_page_size = log_page_size;
-	err_msg = new char[ERR_MSG_SIZE];
+	err_msg[0] = '\0';
     }
     int get_page_size(){
 	return page_size;
@@ -173,8 +173,11 @@ public:
     void set_log_page_size(int log_page_size){
 	this->log_page_size = log_page_size;
     }
-    char* get_err_msg(){
+    const char *get_err_msg(){
 	return err_msg;
+    }
+    void set_err_msg(char *str){
+	strncpy(err_msg, str, ERR_MSG_SIZE);
     }
     virtual void create_result(nvplist *) = 0;
     virtual int get_no_tpage() = 0;
@@ -182,18 +185,13 @@ public:
     virtual time_t get_my_time(char *) = 0;
     virtual void auto_add_volume(autoaddvoldb_node *, int, char *) = 0;
     virtual void read_spacedb_output(FILE *) = 0;
-    virtual ~GeneralSpacedbResult(){
-	delete err_msg;
-    }
+    virtual ~GeneralSpacedbResult(){}
 };
 
 class SpaceDbResultNewFormat : public GeneralSpacedbResult{
 public:
     SpaceDbResultNewFormat(){}
     void add_volume(char *);
-    std::vector<SpaceDbVolumeInfoNewFormat>& get_volumes(){
-	return volumes;
-    }
     int get_no_tpage();
     int get_total_and_free_page(const char *type, double &free_page, double &total_page){
 	for (int i = 0; i < volumes.size(); i++) {
@@ -234,14 +232,6 @@ public:
 	    temporary_volumes.push_back(volume);
 	}
 	return rc;
-    }
-
-    std::vector<SpaceDbVolumeInfoOldFormat>& get_volumes(){
-	return volumes;
-    }
-
-    std::vector<SpaceDbVolumeInfoOldFormat>& get_temporary_volumes() {
-	return temporary_volumes;
     }
 
     void create_result(nvplist *);

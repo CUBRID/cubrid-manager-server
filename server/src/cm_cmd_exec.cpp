@@ -202,7 +202,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode) {
     char out_file[128];
     char cubrid_err_file[PATH_MAX];
     char cmd_name[CUBRID_CMD_NAME_LEN];
-    char *err_message = NULL;
+    char err_message[ERR_MSG_SIZE];
     const char *argv[10];
     int argc = 0;
     cubrid_err_file[0] = '\0';
@@ -229,12 +229,11 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode) {
     argv[argc++] = "-p";
     argv[argc++] = NULL;
 
-    err_message = res->get_err_msg();
-
     snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
               sco.dbmt_tmp_dir, "cmd_spacedb", getpid ());
     run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* spacedb */
     read_error_file (cubrid_err_file, err_message, ERR_MSG_SIZE);
+    res->set_err_msg(err_message);
     read_spacedb_output (res, out_file);
     if (access (cubrid_err_file, F_OK) == 0)
     {
