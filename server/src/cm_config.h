@@ -496,6 +496,8 @@
 #define ACCESS_LOG                         "access_log"
 #define ACCESS_ERR                         "access_err"
 
+#define HA_MODE 2
+
 typedef enum
 {
     CMS_TRAN_UNKNOWN_ISOLATION = 0x00,                 /*        0  0000 */
