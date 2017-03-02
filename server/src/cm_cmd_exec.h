@@ -83,28 +83,6 @@ typedef enum
     CUBRID_MODE_SA = 1
 } T_CUBRID_MODE;
 
-typedef struct
-{
-    int volid;
-    int total_page;
-    int free_page;
-    char purpose[16];
-    char location[128];
-    char vol_name[128];
-    time_t date;
-} T_SPACEDB_INFO;
-
-typedef struct
-{
-    int page_size;
-    int log_page_size;
-    int num_vol;
-    T_SPACEDB_INFO *vol_info;
-    int num_tmp_vol;
-    T_SPACEDB_INFO *tmp_vol_info;
-    char err_msg[ERR_MSG_SIZE];
-} T_SPACEDB_RESULT;
-
 struct SpaceDbVolumeInfoOldFormat{
     int volid;
     int total_size;
@@ -179,9 +157,12 @@ public:
     void set_err_msg(char *str){
 	strncpy(err_msg, str, ERR_MSG_SIZE);
     }
+    bool has_error(){
+	return err_msg[0] != '\0';
+    }
     virtual void create_result(nvplist *) = 0;
     virtual int get_no_tpage() = 0;
-    virtual int get_total_and_free_page(const char *, double &, double &) = 0;
+    virtual void get_total_and_free_page(const char *, double &, double &) = 0;
     virtual time_t get_my_time(char *) = 0;
     virtual void auto_add_volume(autoaddvoldb_node *, int, char *) = 0;
     virtual void read_spacedb_output(FILE *) = 0;
@@ -193,8 +174,8 @@ public:
     SpaceDbResultNewFormat(){}
     void add_volume(char *);
     int get_no_tpage();
-    int get_total_and_free_page(const char *type, double &free_page, double &total_page){
-	for (int i = 0; i < volumes.size(); i++) {
+    void get_total_and_free_page(const char *type, double &free_page, double &total_page){
+	for (unsigned int i = 0; i < volumes.size(); i++) {
 	    if (strcmp(volumes[i].purpose, type) == 0) {
 		total_page += volumes[i].total_size;
 		free_page += volumes[i].free_size;
@@ -235,8 +216,8 @@ public:
     }
 
     void create_result(nvplist *);
-    int get_total_and_free_page(const char *type, double &free_page, double &total_page){
-	for (int i = 0; i < volumes.size(); i++) {
+    void get_total_and_free_page(const char *type, double &free_page, double &total_page){
+	for (unsigned int i = 0; i < volumes.size(); i++) {
 	    if (strcmp(volumes[i].purpose, type) == 0) {
 		total_page += volumes[i].total_size;
 		free_page += volumes[i].free_size;
@@ -261,7 +242,6 @@ int cmd_start_server (char *dbname, char *err_buf, int err_buf_size);
 int cmd_stop_server (char *dbname, char *err_buf, int err_buf_size);
 void cmd_start_master (void);
 char *cubrid_cmd_name (char *buf);
-void cmd_spacedb_result_free (T_SPACEDB_RESULT * res);
 int read_error_file (const char *err_file, char *err_buf, int err_buf_size);
 int read_error_file2 (char *err_file, char *err_buf, int err_buf_size, int *err_code);
 int read_csql_error_file (char *err_file, char *err_buf, int err_buf_size);

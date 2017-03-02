@@ -30,7 +30,6 @@
 #endif
 
 #include "cm_dep.h"
-#include <vector>
 
 #define DBMT_ERROR_MSG_SIZE    5000
 
@@ -430,7 +429,7 @@ int ts_is_update_success (nvplist * req, nvplist * res, char *_dbmt_error);
 int ts_monitor_process (nvplist * req, nvplist * res, char *_dbmt_error);
 int ts_generate_cert (nvplist * req, nvplist * res, char *_dbmt_error);
 int
-_add_nvp_time (nvplist * ref, const char *name, time_t t, const char *fmt,
-	       int type);
+ts_add_nvp_time(nvplist *ref, const char *name, time_t t, const char *fmt,
+		int type);
 
 #endif /* _CM_JOB_TASK_H_ */

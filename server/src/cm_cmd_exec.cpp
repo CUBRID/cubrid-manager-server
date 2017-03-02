@@ -49,15 +49,11 @@
 #define new_csql_result()            (T_CSQL_RESULT*) new_cmd_result()
 
 static T_CMD_RESULT *new_cmd_result (void);
-static T_SPACEDB_RESULT *new_spacedb_result (void);
 static const char *get_cubrid_mode_opt (T_CUBRID_MODE mode);
 static void read_server_status_output (T_SERVER_STATUS_RESULT * res,
                                        char *out_file);
 static void read_spacedb_output (GeneralSpacedbResult * res, char *out_file);
-static void set_spacedb_info (T_SPACEDB_INFO * vol_info, int volid,
-                              char *purpose, int total_page, int free_page,
-                              char *vol_name);
-static int parse_volume_line (T_SPACEDB_INFO * vol_info, char *str_buf);
+
 static int read_start_server_output (char *stdout_log_file,
                                      char *stderr_log_file,
                                      char *_dbmt_error);
@@ -148,19 +144,6 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
 
     unlink (out_file);
     return res;
-}
-
-void
-cmd_spacedb_result_free (T_SPACEDB_RESULT * res)
-{
-    if (res)
-    {
-        if (res->vol_info)
-            free (res->vol_info);
-        if (res->tmp_vol_info)
-            free (res->tmp_vol_info);
-        free (res);
-    }
 }
 
 void find_and_parse_cub_admin_version(int& major_version, int& minor_version){
@@ -622,18 +605,6 @@ read_error_file2 (char *err_file, char *err_buf, int err_buf_size,
     return -1;
 }
 
-static T_SPACEDB_RESULT *
-new_spacedb_result (void)
-{
-    T_SPACEDB_RESULT *res;
-
-    res = (T_SPACEDB_RESULT *) malloc (sizeof (T_SPACEDB_RESULT));
-    if (res == NULL)
-        return NULL;
-    memset (res, 0, sizeof (T_SPACEDB_RESULT));
-    return res;
-}
-
 static T_CMD_RESULT *
 new_cmd_result (void)
 {
@@ -653,82 +624,6 @@ get_cubrid_mode_opt (T_CUBRID_MODE mode)
         return ("--" CSQL_SA_MODE_L);
 
     return ("--" CSQL_CS_MODE_L);
-}
-
-static int
-parse_volume_line (T_SPACEDB_INFO * vol_info, char *str_buf)
-{
-    int volid, total_page, free_page;
-    char purpose[128], vol_name[PATH_MAX];
-    char *token = NULL;
-
-    volid = total_page = free_page = 0;
-    purpose[0] = vol_name[0] = '\0';
-
-    token = strtok (str_buf, " ");
-    if (token == NULL)
-    {
-        return FALSE;
-    }
-    volid = atoi (token);
-
-    token = strtok (NULL, " ");
-    if (token == NULL)
-    {
-        return FALSE;
-    }
-    strcpy (purpose, token);
-
-    if (strcmp (purpose, "GENERIC") != 0 && strcmp (purpose, "DATA") != 0
-        && strcmp (purpose, "INDEX") != 0 && strcmp (purpose, "TEMP") != 0)
-    {
-        return FALSE;
-    }
-
-    token = strtok (NULL, " ");
-    if (token == NULL)
-    {
-        return FALSE;
-    }
-
-    if (strcmp (token, "TEMP") == 0)
-    {
-        if (strcmp (purpose, "TEMP") != 0)
-        {
-            return FALSE;
-        }
-        else
-        {
-            strcat (purpose, " ");
-            strcat (purpose, token);
-        }
-
-        token = strtok (NULL, " ");
-        if (token == NULL)
-        {
-            return FALSE;
-        }
-    }
-    total_page = atoi (token);
-
-    token = strtok (NULL, " ");
-    if (token == NULL)
-    {
-        return FALSE;
-    }
-    free_page = atoi (token);
-
-    token = strtok (NULL, "\n");
-    if (token == NULL)
-    {
-        return FALSE;
-    }
-    strcpy (vol_name, token + 1);
-
-    set_spacedb_info (vol_info, volid, purpose, total_page,
-                      free_page, vol_name);
-
-    return TRUE;
 }
 
 static int is_valid_database_description(char *str){
@@ -766,40 +661,6 @@ read_spacedb_output (GeneralSpacedbResult *res, char *out_file)
         return;
 
     res->read_spacedb_output(fp);
-}
-
-static void
-set_spacedb_info (T_SPACEDB_INFO * vol_info, int volid, char *purpose,
-                  int total_page, int free_page, char *vol_name)
-{
-    char *p;
-    struct stat statbuf;
-
-    vol_info->volid = volid;
-    strcpy (vol_info->purpose, purpose);
-    vol_info->total_page = total_page;
-    vol_info->free_page = free_page;
-
-#if defined(WINDOWS)
-    unix_style_path (vol_name);
-#endif
-
-    p = strrchr (vol_name, '/');
-    if (p == NULL)
-    {
-        vol_info->location[0] = '\0';
-        vol_info->vol_name[0] = '\0';
-    }
-    else
-    {
-        *p = '\0';
-        snprintf (vol_info->location, sizeof (vol_info->location) - 1, "%s", vol_name);
-        snprintf (vol_info->vol_name, sizeof (vol_info->vol_name) - 1, "%s", p + 1);
-        *p = '/';
-    }
-
-    stat (vol_name, &statbuf);
-    vol_info->date = statbuf.st_mtime;
 }
 
 static int
@@ -1018,8 +879,8 @@ void SpaceDbResultOldFormat::create_result(nvplist *res){
 	nv_add_nvp(res, "location", volumes[i].location);
 	nv_add_nvp_int(res, "totalpage", volumes[i].total_size);
 	nv_add_nvp_int(res, "freepage", volumes[i].free_size);
-	_add_nvp_time(res, "date", volumes[i].date, "%04d%02d%02d",
-		      NV_ADD_DATE);
+	ts_add_nvp_time(res, "date", volumes[i].date, "%04d%02d%02d",
+			NV_ADD_DATE);
 	nv_add_nvp(res, "close", "spaceinfo");
     }
 
@@ -1030,8 +891,8 @@ void SpaceDbResultOldFormat::create_result(nvplist *res){
 	nv_add_nvp(res, "location", temporary_volumes[i].location);
 	nv_add_nvp_int(res, "totalpage", temporary_volumes[i].total_size);
 	nv_add_nvp_int(res, "freepage", temporary_volumes[i].free_size);
-	_add_nvp_time(res, "date", temporary_volumes[i].date, "%04d%02d%02d",
-		      NV_ADD_DATE);
+	ts_add_nvp_time(res, "date", temporary_volumes[i].date, "%04d%02d%02d",
+			NV_ADD_DATE);
 	nv_add_nvp(res, "close", "spaceinfo");
     }
 }

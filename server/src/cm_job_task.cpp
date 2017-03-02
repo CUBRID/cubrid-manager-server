@@ -410,8 +410,8 @@ rm_return:
 }
 
 int
-_add_nvp_time (nvplist * ref, const char *name, time_t t, const char *fmt,
-               int type)
+ts_add_nvp_time(nvplist *ref, const char *name, time_t t, const char *fmt,
+		int type)
 {
     char strbuf[64];
     if (t == 0)
@@ -505,8 +505,8 @@ ts_get_broker_diagdata (nvplist * cli_request, nvplist * cli_response,
         return ERR_NO_ERROR;
     }
 
-    _add_nvp_time (cli_response, "time", time (NULL),
-                   "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+    ts_add_nvp_time(cli_response, "time", time(NULL),
+		    "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
 
     for (i = 0; i < uc_info.num_info; i++)
     {
@@ -1040,7 +1040,7 @@ ts2_get_admin_log_info (nvplist * in, nvplist * out, char *_dbmt_error)
     nv_add_nvp (out, "path", buf);
     nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
     nv_add_nvp_int (out, "size", statbuf.st_size);
-    _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+    ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
     nv_add_nvp (out, "close", "adminloginfo");
 
     return ERR_NO_ERROR;
@@ -1133,7 +1133,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1179,7 +1179,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1221,7 +1221,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1264,7 +1264,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1382,8 +1382,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
         }
 
         nv_add_nvp (out, "bname", bname);
-        _add_nvp_time (out, "time", time (NULL),
-                       "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+	ts_add_nvp_time(out, "time", time(NULL),
+			"%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
         if (cm_get_cas_info (bname, &as_info_set, &job_info_set, &error) >= 0)
         {
             for (i = 0; i < as_info_set.num_info; i++)
@@ -1407,9 +1407,9 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_float (out, "as_cpu", as_info_set.as_info[i].pcpu, "%.2f");
                 cm_cpu_time_str (as_info_set.as_info[i].cpu_time, buf);
                 nv_add_nvp (out, "as_ctime", buf);
-                _add_nvp_time (out, "as_lat",
-                               as_info_set.as_info[i].last_access_time, 
-                               "%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(out, "as_lat",
+				as_info_set.as_info[i].last_access_time,
+				"%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
                 nv_add_nvp (out, "as_cur", as_info_set.as_info[i].log_msg);
                 nv_add_nvp_int64 (out, "as_num_query", as_info_set.as_info[i].num_queries_processed);
                 nv_add_nvp_int64 (out, "as_num_tran", as_info_set.as_info[i].num_transactions_processed);
@@ -1418,8 +1418,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_int64 (out, "as_error_query", as_info_set.as_info[i].num_error_queries);
                 nv_add_nvp (out, "as_dbname", as_info_set.as_info[i].database_name);
                 nv_add_nvp (out, "as_dbhost", as_info_set.as_info[i].database_host);
-                _add_nvp_time (out, "as_lct", as_info_set.as_info[i].last_connect_time,
-                               "%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(out, "as_lct", as_info_set.as_info[i].last_connect_time,
+				"%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
                 /* add "as_client_ip" nvp. */
                 nv_add_nvp (out, "as_client_ip", as_info_set.as_info[i].clt_ip_addr);
                 nv_add_nvp (out, "close", "asinfo");
@@ -1431,8 +1431,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_int (out, "job_priority",
                                 job_info_set.job_info[i].priority);
                 nv_add_nvp (out, "job_ip", job_info_set.job_info[i].ipstr);
-                _add_nvp_time (out, "job_time",
-                               job_info_set.job_info[i].recv_time, "%02d:%02d:%02d", NV_ADD_TIME);
+		ts_add_nvp_time(out, "job_time",
+				job_info_set.job_info[i].recv_time, "%02d:%02d:%02d", NV_ADD_TIME);
                 snprintf (buf, sizeof (buf) - 1, "%s:%s",
                           job_info_set.job_info[i].script, job_info_set.job_info[i].prgname);
                 nv_add_nvp (out, "job_request", buf);
@@ -4077,7 +4077,7 @@ ts_statdump (nvplist * req, nvplist * res, char *_dbmt_error)
 
     /* set res with parameter in exec_stat. */
     nv_add_nvp (res, "dbname", dbname);
-    _add_nvp_time (res, "time", time (NULL), "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+    ts_add_nvp_time(res, "time", time(NULL), "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
 
     /* Execution statistics for the file io */
     nv_add_nvp_int (res, "num_file_creates", exec_stat.file_num_creates);
@@ -5371,7 +5371,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
         cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
-    if (cmd_res == NULL || cmd_res->get_err_msg()[0]) {
+    if (cmd_res == NULL || cmd_res->has_error()) {
 	sprintf(_dbmt_error, "spacedb %s", dbname);
 	delete cmd_res;
 	return ERR_SYSTEM_CALL;
@@ -5920,8 +5920,8 @@ ts_backupdb_info (nvplist * req, nvplist * res, char *_dbmt_error)
                 nv_add_nvp (res, "open", vinf);
                 nv_add_nvp (res, "path", tok[2]);
                 nv_add_nvp_int (res, "size", statbuf.st_size);
-                _add_nvp_time (res, "data", statbuf.st_mtime,
-                               "%04d.%02d.%02d.%02d.%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(res, "data", statbuf.st_mtime,
+				"%04d.%02d.%02d.%02d.%02d", NV_ADD_DATE_TIME);
                 nv_add_nvp (res, "close", vinf);
             }
         }
@@ -6365,8 +6365,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
         nv_add_nvp (res, ENCRYPT_ARG ("owner"),
                     get_user_name (statbuf.st_uid, buf));
         nv_add_nvp_int (res, "size", statbuf.st_size);
-        _add_nvp_time (res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
-                       NV_ADD_DATE);
+	ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
+			NV_ADD_DATE);
         nv_add_nvp (res, "close", "log");
     }
     FREE_MEM (error_log_param);
@@ -6379,8 +6379,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
         nv_add_nvp (res, ENCRYPT_ARG ("owner"),
         get_user_name (statbuf.st_uid, buf));
         nv_add_nvp_int (res, "size", statbuf.st_size);
-        _add_nvp_time (res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
-                       NV_ADD_DATE);
+	ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
+			NV_ADD_DATE);
         nv_add_nvp (res, "close", "log");
     }
 
@@ -6431,8 +6431,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
             nv_add_nvp (res, ENCRYPT_ARG ("owner"),
             get_user_name (statbuf.st_uid, buf));
             nv_add_nvp_int (res, "size", statbuf.st_size);
-            _add_nvp_time (res, "lastupdate", statbuf.st_mtime,
-                           "%04d.%02d.%02d", NV_ADD_DATE);
+	    ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime,
+			    "%04d.%02d.%02d", NV_ADD_DATE);
             nv_add_nvp (res, "close", "log");
         }
     }
@@ -12260,7 +12260,7 @@ _ts_gen_spaceinfo (nvplist * res, const char *filename,
                     pagesize ? statbuf.st_size / pagesize : 0);
     nv_add_nvp (res, "freepage", " ");
 
-    _add_nvp_time (res, "date", statbuf.st_mtime, "%04d%02d%02d", NV_ADD_DATE);
+    ts_add_nvp_time(res, "date", statbuf.st_mtime, "%04d%02d%02d", NV_ADD_DATE);
 
     nv_add_nvp (res, "close", "spaceinfo");
     return;
