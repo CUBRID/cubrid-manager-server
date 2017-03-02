@@ -74,7 +74,6 @@
 #endif
 
 #include <vector>
-#include <typeinfo>
 #include "cm_autojob.h"
 
 typedef enum
