@@ -39,6 +39,10 @@
 #define cmd_csql_result_free(RESULT)            cmd_result_free(RESULT)
 
 #define ERR_MSG_SIZE    1024
+#define COLUMN_VALUE_MAX_SIZE 32
+#define DATABASE_DESCRIPTION_NUM_LINES 3
+#define FILES_DESCRIPTION_NUM_LINES 4
+#define BUFFER_MAX_LEN 128
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
 #define CUBRID_ERROR_LOG_DIR            "log/server"
@@ -88,9 +92,9 @@ struct SpaceDbVolumeInfoOldFormat{
     int free_size;
     int data_size;
     int index_size;
-    char purpose[16];
-    char location[128];
-    char vol_name[128];
+    char purpose[COLUMN_VALUE_MAX_SIZE];
+    char location[PATH_MAX];
+    char vol_name[PATH_MAX];
     time_t date;
 };
 
@@ -99,14 +103,14 @@ struct SpaceDbVolumeInfoNewFormat{
     int used_size;
     int free_size;
     int total_size;
-    char type[16];
-    char purpose[32];
-    char volume_name[128];
+    char type[COLUMN_VALUE_MAX_SIZE];
+    char purpose[COLUMN_VALUE_MAX_SIZE];
+    char volume_name[PATH_MAX];
 };
 
 struct DatabaseSpaceDescription{
-    char type[16];
-    char purpose[32];
+    char type[COLUMN_VALUE_MAX_SIZE];
+    char purpose[COLUMN_VALUE_MAX_SIZE];
     int volume_count;
     int used_size;
     int free_size;
@@ -114,7 +118,7 @@ struct DatabaseSpaceDescription{
 };
 
 struct FileSpaceDescription{
-    char data_type[8];
+    char data_type[COLUMN_VALUE_MAX_SIZE];
     int file_count;
     int used_size;
     int file_table_size;
@@ -159,12 +163,12 @@ public:
     bool has_error(){
 	return err_msg[0] != '\0';
     }
-    virtual void create_result(nvplist *) = 0;
-    virtual int get_no_tpage() = 0;
-    virtual void get_total_and_free_page(const char *, double &, double &) = 0;
-    virtual time_t get_my_time(char *) = 0;
-    virtual void auto_add_volume(autoaddvoldb_node *, int, char *) = 0;
-    virtual void read_spacedb_output(FILE *) = 0;
+    virtual void create_result(nvplist *res) = 0;
+    virtual int get_cnt_tpage() = 0;
+    virtual void get_total_and_free_page(const char *type, double &free_page, double &total_page) = 0;
+    virtual time_t get_my_time(char *dbloca) = 0;
+    virtual void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname) = 0;
+    virtual void read_spacedb_output(FILE *fp) = 0;
     virtual ~GeneralSpacedbResult(){}
 };
 
@@ -172,7 +176,7 @@ class SpaceDbResultNewFormat : public GeneralSpacedbResult{
 public:
     SpaceDbResultNewFormat(){}
     void add_volume(char *);
-    int get_no_tpage();
+    int get_cnt_tpage();
     void get_total_and_free_page(const char *type, double &free_page, double &total_page){
 	for (unsigned int i = 0; i < volumes.size(); i++) {
 	    if (strcmp(volumes[i].purpose, type) == 0) {
@@ -181,13 +185,13 @@ public:
 	    }
 	}
     }
-    time_t get_my_time(char *);
-    void auto_add_volume(autoaddvoldb_node *, int, char *);
-    void read_spacedb_output(FILE *);
-    void create_result(nvplist *);
+    time_t get_my_time(char *dbloca);
+    void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname);
+    void read_spacedb_output(FILE *fp);
+    void create_result(nvplist *res);
 
-    DatabaseSpaceDescription databaseSpaceDescriptions[3];
-    FileSpaceDescription fileSpaceDescriptions[4];
+    DatabaseSpaceDescription databaseSpaceDescriptions[DATABASE_DESCRIPTION_NUM_LINES];
+    FileSpaceDescription fileSpaceDescriptions[FILES_DESCRIPTION_NUM_LINES];
 private:
     std::vector<SpaceDbVolumeInfoNewFormat> volumes;
 };
@@ -223,9 +227,9 @@ public:
 	    }
 	}
     }
-    int get_no_tpage();
-    time_t get_my_time(char *);
-    void auto_add_volume(autoaddvoldb_node *, int, char *);
+    int get_cnt_tpage();
+    time_t get_my_time(char *dbloca);
+    void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname);
     void read_spacedb_output(FILE *);
 private:
     std::vector<SpaceDbVolumeInfoOldFormat> volumes;

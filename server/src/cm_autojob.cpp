@@ -492,7 +492,7 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
         }
 
         /* if the HA mode is on, the db_mode equals 2. */
-        if (db_mode == 2)
+        if (db_mode == HA_MODE)
         {
             append_host_to_dbname (dbname_at_hostname, curr->dbname,
                                    sizeof (dbname_at_hostname));

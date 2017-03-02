@@ -3235,7 +3235,7 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
         sprintf (_dbmt_error, "spacedb %s", dbname);
         retval = ERR_SYSTEM_CALL;
     }
-    else if (err_message[0])
+    else if (cmd_res->has_error())
     {
         strcpy (_dbmt_error, err_message);
         retval = ERR_WITH_MSG;
@@ -5419,7 +5419,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
 #endif
 
     snprintf (strbuf, sizeof (strbuf) - 1, "%d",
-              cmd_res->get_no_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size());
+	      cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size());
     nv_add_nvp (res, "dbsize", strbuf);
 
     return ERR_NO_ERROR;

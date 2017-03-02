@@ -148,7 +148,7 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
 
 void find_and_parse_cub_admin_version(int& major_version, int& minor_version){
     const char *argv[3];
-    char tmpfile[PATH_MAX], strbuf[128];
+    char tmpfile[PATH_MAX], strbuf[BUFFER_MAX_LEN];
     FILE *infile;
     char cmd_name[CUBRID_CMD_NAME_LEN];
 
@@ -180,9 +180,8 @@ void find_and_parse_cub_admin_version(int& major_version, int& minor_version){
 GeneralSpacedbResult *
 cmd_spacedb (const char *dbname, T_CUBRID_MODE mode) {
     GeneralSpacedbResult *res = NULL;
-    char version[10];
     int minor_version, major_version;
-    char out_file[128];
+    char out_file[PATH_MAX];
     char cubrid_err_file[PATH_MAX];
     char cmd_name[CUBRID_CMD_NAME_LEN];
     char err_message[ERR_MSG_SIZE];
@@ -626,29 +625,29 @@ get_cubrid_mode_opt (T_CUBRID_MODE mode)
     return ("--" CSQL_CS_MODE_L);
 }
 
-static int is_valid_database_description(char *str){
+static bool is_valid_database_description(char *str){
     if(strncmp(str, "PERMANENT", 9) != 0 && strncmp(str, "TEMPORARY", 9) != 0){
-	return 0;
+	return false;
     }
 
-    return 1;
+    return true;
 }
 
-static int is_valid_volume_description(char *str){
+static bool is_valid_volume_description(char *str){
     if(strstr(str, "PERMANENT") == NULL && strstr(str, "TEMPORARY") == NULL){
-	return 0;
+	return false;
     }
 
-    return 1;
+    return true;
 }
 
-static int is_valid_file_description(char *str){
+static bool is_valid_file_description(char *str){
     if(strncmp(str, "INDEX", 5) != 0 && strncmp(str, "HEAP", 4) != 0 &&
        strncmp(str, "SYSTEM", 6) != 0 && strncmp(str, "TEMP", 4) != 0){
-	return 0;
+	return false;
     }
 
-    return 1;
+    return true;
 }
 
 static void
@@ -771,7 +770,7 @@ void SpaceDbResultNewFormat::add_volume(char *str_buf){
 
 int SpaceDbResultOldFormat::get_volume_info(char *str_buf, SpaceDbVolumeInfoOldFormat& volume){
     int volid, total_page, free_page;
-    char purpose[128], vol_name[PATH_MAX];
+    char purpose[COLUMN_VALUE_MAX_SIZE], vol_name[PATH_MAX];
     char *token = NULL, *p;
     struct stat statbuf;
 
@@ -901,7 +900,7 @@ void SpaceDbResultNewFormat::create_result(nvplist *res){
     nv_update_val_int (res, "pagesize", page_size);
     nv_update_val_int (res, "logpagesize", log_page_size);
 
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < DATABASE_DESCRIPTION_NUM_LINES; i++) {
 	nv_add_nvp(res, "open", "dbinfo");
 	nv_add_nvp(res, "type", databaseSpaceDescriptions[i].type);
 	nv_add_nvp(res, "purpose", databaseSpaceDescriptions[i].purpose);
@@ -924,7 +923,7 @@ void SpaceDbResultNewFormat::create_result(nvplist *res){
 	nv_add_nvp(res, "close", "volumeinfo");
     }
 
-    for(int i = 0; i < 4; i++){
+    for(int i = 0; i < FILES_DESCRIPTION_NUM_LINES; i++){
 	nv_add_nvp(res, "open", "fileinfo");
 	nv_add_nvp(res, "data_type", fileSpaceDescriptions[i].data_type);
 	nv_add_nvp_int(res, "file_count", fileSpaceDescriptions[i].file_count);
@@ -936,29 +935,32 @@ void SpaceDbResultNewFormat::create_result(nvplist *res){
     }
 }
 
-int SpaceDbResultOldFormat::get_no_tpage(){
-    int no_tpage = 0, i;
+int SpaceDbResultOldFormat::get_cnt_tpage(){
+    int cnt_tpage = 0, i;
 
     for (i = 0; i < volumes.size(); i++) {
-	no_tpage += volumes[i].total_size;
+	cnt_tpage += volumes[i].total_size;
     }
     for (i = 0; i < temporary_volumes.size(); i++) {
-	no_tpage += temporary_volumes[i].total_size;
+	cnt_tpage += temporary_volumes[i].total_size;
     }
+
+    return cnt_tpage;
 }
 
-int SpaceDbResultNewFormat::get_no_tpage() {
-    int no_tpage;
+int SpaceDbResultNewFormat::get_cnt_tpage() {
+    int cnt_tpage = 0;
 
     for (int i = 0; i < volumes.size(); i++) {
-	no_tpage += volumes[i].total_size;
+	cnt_tpage += volumes[i].total_size;
     }
 
+    return cnt_tpage;
 }
 
 time_t SpaceDbResultOldFormat::get_my_time(char *dbloca) {
-    char strbuf[1024];
-    char volname[512] = { '\0' };
+    char strbuf[BUFFER_MAX_LEN];
+    char volname[PATH_MAX] = { '\0' };
     time_t mytime = time (NULL);;
     struct stat statbuf;
 
@@ -968,7 +970,7 @@ time_t SpaceDbResultOldFormat::get_my_time(char *dbloca) {
 	    || uStringEqual (volumes[i].purpose, "INDEX"))
 	{
 	    strcpy (volname, volumes[i].vol_name);
-	    sprintf (strbuf, "%s/%s", dbloca, volname);
+	    snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
 	    if (!stat (strbuf, &statbuf))
 		mytime = statbuf.st_mtime;
 	}
@@ -978,8 +980,8 @@ time_t SpaceDbResultOldFormat::get_my_time(char *dbloca) {
 }
 
 time_t SpaceDbResultNewFormat::get_my_time(char *dbloca) {
-    char strbuf[1024];
-    char volname[512] = { '\0' };
+    char strbuf[BUFFER_MAX_LEN];
+    char volname[PATH_MAX] = { '\0' };
     time_t mytime = time (NULL);;
     struct stat statbuf;
 
@@ -988,7 +990,7 @@ time_t SpaceDbResultNewFormat::get_my_time(char *dbloca) {
 	if (uStringEqual (volumes[i].purpose, "PERMANENT"))
 	{
 	    strcpy (volname, volumes[i].volume_name);
-	    sprintf (strbuf, "%s/%s", dbloca, volname);
+	    snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
 	    if (!stat (strbuf, &statbuf))
 		mytime = statbuf.st_mtime;
 	}
@@ -1005,7 +1007,7 @@ void SpaceDbResultOldFormat::auto_add_volume(autoaddvoldb_node *curr, int db_mod
 	if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
 	    page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
 	if (curr->data_warn_outofspace >= frate) {
-	    if (db_mode == 2) {
+	    if (db_mode == HA_MODE) {
 		append_host_to_dbname(dbname_at_hostname, curr->dbname,
 				      sizeof(dbname_at_hostname));
 		aj_add_volume(dbname_at_hostname, "data", page_add, page_size);
@@ -1021,7 +1023,7 @@ void SpaceDbResultOldFormat::auto_add_volume(autoaddvoldb_node *curr, int db_mod
 	if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
 	    page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
 	if (curr->index_warn_outofspace >= frate) {
-	    if (db_mode == 2) {
+	    if (db_mode == HA_MODE) {
 		append_host_to_dbname(dbname_at_hostname, curr->dbname,
 				      sizeof(dbname_at_hostname));
 		aj_add_volume(dbname_at_hostname, "index", page_add, page_size);

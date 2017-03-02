@@ -30,6 +30,7 @@
 
 #define AUTOJOB_SIZE 4
 #define MIN_AUTO_ADDVOL_PAGE_SIZE      1000
+#define DBNAME_MAX_LEN 64
 
 /* autobackupdb.conf */
 #define AJ_BACKUP_CONF_DBNAME          "dbname"
@@ -62,7 +63,7 @@ typedef struct _ajob
 
 typedef struct autoaddvoldb_t
 {
-    char dbname[64];
+    char dbname[DBNAME_MAX_LEN];
     int data_vol;
     double data_warn_outofspace;
     int data_ext_page;
