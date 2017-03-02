@@ -1266,3 +1266,4 @@ void SpaceDbResultNewFormat::read_spacedb_output(FILE *fp){
     spacedb_error:
     fclose (fp);
 }
+
