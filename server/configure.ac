@@ -27,7 +27,7 @@ AC_PROG_RANLIB
 AC_PROG_INSTALL
 CFLAGS="$remember_CFLAGS"
 CXXFLAGS="$remember_CXXFLAGS"
-LDFLAGS="$remember_LDFLAGS"
+LDFLAGS="$remember_LDFLAGS -ldl"
 
 # Checks bit model feature.
 AC_ARG_ENABLE([64bit],
