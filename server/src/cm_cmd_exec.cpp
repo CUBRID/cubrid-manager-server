@@ -754,6 +754,7 @@ _size_to_byte_by_unit (double orgin_num, char unit)
 
 void SpaceDbResultNewFormat::add_volume(char *str_buf){
     char purpose[128], volume_name[PATH_MAX], type[32];
+    struct stat statbuf;
 
     SpaceDbVolumeInfoNewFormat volume;
     sscanf(str_buf, "%d %s %s DATA %d %d %d %s", &volume.volid, type, purpose,
@@ -764,6 +765,9 @@ void SpaceDbResultNewFormat::add_volume(char *str_buf){
     strcpy(volume.purpose, purpose);
     strcpy(volume.type, type);
     strcpy(volume.volume_name, volume_name);
+
+    stat (volume_name, &statbuf);
+    volume.date = statbuf.st_mtime;
 
     volumes.push_back(volume);
 }
@@ -912,15 +916,18 @@ void SpaceDbResultNewFormat::create_result(nvplist *res){
     }
 
     for(int i = 0; i < volumes.size(); i++) {
-	nv_add_nvp(res, "open", "volumeinfo");
+	nv_add_nvp(res, "open", "spaceinfo");
 	nv_add_nvp(res, "type", volumes[i].type);
 	nv_add_nvp(res, "purpose", volumes[i].purpose);
-	nv_add_nvp(res, "volume_name", volumes[i].volume_name);
+	nv_add_nvp(res, "location", volumes[i].volume_name);
+	nv_add_nvp(res, "spacename", volumes[i].volume_name);
 	nv_add_nvp_int(res, "volid", volumes[i].volid);
-	nv_add_nvp_int(res, "used_size", volumes[i].used_size);
-	nv_add_nvp_int(res, "free_size", volumes[i].free_size);
-	nv_add_nvp_int(res, "total_size", volumes[i].total_size);
-	nv_add_nvp(res, "close", "volumeinfo");
+	nv_add_nvp_int(res, "usedpage", volumes[i].used_size);
+	nv_add_nvp_int(res, "freepage", volumes[i].free_size);
+	nv_add_nvp_int(res, "totalpage", volumes[i].total_size);
+	ts_add_nvp_time(res, "date", volumes[i].date, "%04d%02d%02d",
+			NV_ADD_DATE);
+	nv_add_nvp(res, "close", "spaceinfo");
     }
 
     for(int i = 0; i < FILES_DESCRIPTION_NUM_LINES; i++){

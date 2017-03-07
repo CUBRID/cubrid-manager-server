@@ -12221,17 +12221,7 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
 #else
 	closedir(dirp);
 #endif
-
-	/* add last line */
-	nv_add_nvp(res, "open", "spaceinfo");
-	nv_add_nvp(res, "spacename", "Total");
-	nv_add_nvp(res, "type", "");
-	nv_add_nvp(res, "location", "");
-	nv_add_nvp(res, "totlapage", "0");
-	nv_add_nvp(res, "freepage", "0");
-	nv_add_nvp(res, "date", "");
-	nv_add_nvp(res, "close", "spaceinfo");
-
+    
 	if (uRetrieveDBDirectory(dbname, dbdir) == ERR_NO_ERROR) {
 	    nv_add_nvp_int(res, "freespace", ut_disk_free_space(dbdir));
 	} else {

@@ -106,6 +106,7 @@ struct SpaceDbVolumeInfoNewFormat{
     char type[COLUMN_VALUE_MAX_SIZE];
     char purpose[COLUMN_VALUE_MAX_SIZE];
     char volume_name[PATH_MAX];
+    time_t date;
 };
 
 struct DatabaseSpaceDescription{
