@@ -12162,6 +12162,8 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
 #endif
 
     cmd_res->create_result(res);
+    pagesize = cmd_res->get_page_size();
+    logpagesize = cmd_res->get_log_page_size();
 
 
 	if (uRetrieveDBLogDirectory(dbname, dbdir) != ERR_NO_ERROR) {
@@ -12221,7 +12223,7 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
 #else
 	closedir(dirp);
 #endif
-    
+
 	if (uRetrieveDBDirectory(dbname, dbdir) == ERR_NO_ERROR) {
 	    nv_add_nvp_int(res, "freespace", ut_disk_free_space(dbdir));
 	} else {
