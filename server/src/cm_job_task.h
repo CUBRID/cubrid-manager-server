@@ -30,6 +30,7 @@
 #endif
 
 #include "cm_dep.h"
+#include <vector>
 
 #define DBMT_ERROR_MSG_SIZE    5000
 

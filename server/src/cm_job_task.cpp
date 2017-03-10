@@ -224,7 +224,7 @@ static const char *_op_get_port_from_config (T_CM_BROKER_CONF * uc_conf,
                                              char *broker_name);
 
 static int _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
-                            char *_dbmt_error, T_SPACEDB_RESULT * cmd_res);
+                            char *_dbmt_error, IGeneralSpacedbResult * cmd_res);
 static void _ts_gen_spaceinfo (nvplist * res, const char *filename,
                                const char *dbinstalldir, const char *type, int pagesize);
 
@@ -3190,10 +3190,11 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
 {
     char *dbname = NULL;
     int retval = ERR_NO_ERROR;
+    char *err_message;
     char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
     int ha_mode = 0;
     T_CUBRID_MODE cubrid_mode;
-    T_SPACEDB_RESULT *cmd_res;
+    IGeneralSpacedbResult *cmd_res;
     T_DB_SERVICE_MODE db_mode;
 
     /* get dbname */
@@ -3227,22 +3228,28 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
         cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
+    if(typeid(*cmd_res) == typeid(SpaceDbResultOldFormat)){
+	err_message = ((SpaceDbResultOldFormat*)cmd_res)->get_err_msg();
+    } else if(typeid(*cmd_res) == typeid(SpaceDbResultNewFormat)){
+	err_message = ((SpaceDbResultNewFormat*)cmd_res)->get_err_msg();
+    }
+
     if (cmd_res == NULL)
     {
         sprintf (_dbmt_error, "spacedb %s", dbname);
         retval = ERR_SYSTEM_CALL;
     }
-    else if (cmd_res->err_msg[0])
+    else if (err_message[0])
     {
-        strcpy (_dbmt_error, cmd_res->err_msg);
+        strcpy (_dbmt_error, err_message);
         retval = ERR_WITH_MSG;
     }
     else
     {
         retval = _tsParseSpacedb (req, res, dbname, _dbmt_error, cmd_res);
     }
-    cmd_spacedb_result_free (cmd_res);
 
+    delete cmd_res;
     return retval;
 }
 
@@ -5326,7 +5333,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
     char strbuf[PATH_MAX], dbdir[PATH_MAX];
     int pagesize, no_tpage = 0, log_size = 0, baselen;
     struct stat statbuf;
-    T_SPACEDB_RESULT *cmd_res;
+    IGeneralSpacedbResult *cmd_res;
     T_CUBRID_MODE cubrid_mode;
     int i;
 #if defined(WINDOWS)
@@ -5368,23 +5375,24 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
         cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
-    if (cmd_res == NULL || cmd_res->err_msg[0])
-    {
-        sprintf (_dbmt_error, "spacedb %s", dbname);
-        cmd_spacedb_result_free (cmd_res);
-        return ERR_SYSTEM_CALL;
-    }
+    if(typeid(*cmd_res) == typeid(SpaceDbResultOldFormat)) {
+	SpaceDbResultOldFormat *result = (SpaceDbResultOldFormat*)cmd_res;
 
-    for (i = 0; i < cmd_res->num_vol; i++)
-    {
-        no_tpage += cmd_res->vol_info[i].total_page;
+	if (cmd_res == NULL || result->get_err_msg()[0]) {
+	    sprintf(_dbmt_error, "spacedb %s", dbname);
+	    delete result;
+	    return ERR_SYSTEM_CALL;
+	}
+
+	for (i = 0; i < result->get_volumes().size(); i++) {
+	    no_tpage += result->get_volumes()[i].total_size;
+	}
+	for (i = 0; i < result->get_temporary_volumes().size(); i++) {
+	    no_tpage += result->get_temporary_volumes()[i].total_size;
+	}
+	pagesize = result->get_page_size();
+	delete result;
     }
-    for (i = 0; i < cmd_res->num_tmp_vol; i++)
-    {
-        no_tpage += cmd_res->tmp_vol_info[i].total_page;
-    }
-    pagesize = cmd_res->page_size;
-    cmd_spacedb_result_free (cmd_res);
 
     /* get log volume info */
 #if defined(WINDOWS)
@@ -12155,10 +12163,9 @@ uca_conf_write (T_CM_BROKER_CONF * uc_conf, char *del_broker,
 
 static int
 _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
-                 char *_dbmt_error, T_SPACEDB_RESULT * cmd_res)
+                 char *_dbmt_error, IGeneralSpacedbResult * cmd_res)
 {
     int pagesize, logpagesize, i;
-    T_SPACEDB_INFO *vol_info;
     char dbdir[PATH_MAX];
 #if defined(WINDOWS)
     WIN32_FIND_DATA data;
@@ -12170,120 +12177,167 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
     struct dirent *dp = NULL;
 #endif
 
-    pagesize = cmd_res->page_size;
-    logpagesize = cmd_res->log_page_size;
-    nv_update_val_int (res, "pagesize", pagesize);
-    nv_update_val_int (res, "logpagesize", logpagesize);
+    if(typeid(*cmd_res) == typeid(SpaceDbResultOldFormat)) {
+	SpaceDbResultOldFormat *result = (SpaceDbResultOldFormat*)cmd_res;
 
-    vol_info = cmd_res->vol_info;
-    for (i = 0; i < cmd_res->num_vol; i++)
-    {
-        nv_add_nvp (res, "open", "spaceinfo");
-        nv_add_nvp (res, "spacename", vol_info[i].vol_name);
-        nv_add_nvp (res, "type", vol_info[i].purpose);
-        nv_add_nvp (res, "location", vol_info[i].location);
-        nv_add_nvp_int (res, "totalpage", vol_info[i].total_page);
-        nv_add_nvp_int (res, "freepage", vol_info[i].free_page);
-        _add_nvp_time (res, "date", vol_info[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
-        nv_add_nvp (res, "close", "spaceinfo");
+	pagesize = result->get_page_size();
+	logpagesize = result->get_log_page_size();
+	nv_update_val_int (res, "pagesize", pagesize);
+	nv_update_val_int (res, "logpagesize", logpagesize);
+
+	std::vector<SpaceDbVolumeInfoOldFormat> volumes = result->get_volumes();
+	std::vector<SpaceDbVolumeInfoOldFormat> tmp_volumes = result->get_temporary_volumes();
+
+	for (i = 0; i < volumes.size(); i++) {
+	    nv_add_nvp(res, "open", "spaceinfo");
+	    nv_add_nvp(res, "spacename", volumes[i].vol_name);
+	    nv_add_nvp(res, "type", volumes[i].purpose);
+	    nv_add_nvp(res, "location", volumes[i].location);
+	    nv_add_nvp_int(res, "totalpage", volumes[i].total_size);
+	    nv_add_nvp_int(res, "freepage", volumes[i].free_size);
+	    _add_nvp_time(res, "date", volumes[i].date, "%04d%02d%02d",
+			  NV_ADD_DATE);
+	    nv_add_nvp(res, "close", "spaceinfo");
+	}
+
+	for (i = 0; i < tmp_volumes.size(); i++) {
+	    nv_add_nvp(res, "open", "spaceinfo");
+	    nv_add_nvp(res, "spacename", tmp_volumes[i].vol_name);
+	    nv_add_nvp(res, "type", tmp_volumes[i].purpose);
+	    nv_add_nvp(res, "location", tmp_volumes[i].location);
+	    nv_add_nvp_int(res, "totalpage", tmp_volumes[i].total_size);
+	    nv_add_nvp_int(res, "freepage", tmp_volumes[i].free_size);
+	    _add_nvp_time(res, "date", tmp_volumes[i].date, "%04d%02d%02d",
+			  NV_ADD_DATE);
+	    nv_add_nvp(res, "close", "spaceinfo");
+	}
+    } else if(typeid(*cmd_res) == typeid(SpaceDbResultNewFormat)) {
+    	SpaceDbResultNewFormat *result = (SpaceDbResultNewFormat*)cmd_res;
+
+	pagesize = result->get_page_size();
+	logpagesize = result->get_log_page_size();
+	nv_update_val_int (res, "pagesize", pagesize);
+	nv_update_val_int (res, "logpagesize", logpagesize);
+
+	std::vector<SpaceDbVolumeInfoNewFormat> volumes = result->get_volumes();
+
+	char type[16];
+	char purpose[32];
+	int volume_count;
+	int used_size;
+	int free_size;
+	int total_size;
+
+	for(i = 0; i < 3; i++) {
+	    nv_add_nvp(res, "open", "dbinfo");
+	    nv_add_nvp(res, "type", result->databaseSpaceDescriptions[i].type);
+	    nv_add_nvp(res, "purpose", result->databaseSpaceDescriptions[i].purpose);
+	    nv_add_nvp_int(res, "volume_count", result->databaseSpaceDescriptions[i].volume_count);
+	    nv_add_nvp_int(res, "used_size", result->databaseSpaceDescriptions[i].used_size);
+	    nv_add_nvp_int(res, "free_size", result->databaseSpaceDescriptions[i].free_size);
+	    nv_add_nvp_int(res, "total_size", result->databaseSpaceDescriptions[i].total_size);
+	    nv_add_nvp(res, "close", "dbinfo");
+	}
+
+	for(i = 0; i < volumes.size(); i++) {
+	    nv_add_nvp(res, "open", "volumeinfo");
+	    nv_add_nvp(res, "type", volumes[i].type);
+	    nv_add_nvp(res, "purpose", volumes[i].purpose);
+	    nv_add_nvp(res, "volume_name", volumes[i].volume_name);
+	    nv_add_nvp_int(res, "volid", volumes[i].volid);
+	    nv_add_nvp_int(res, "used_size", volumes[i].used_size);
+	    nv_add_nvp_int(res, "free_size", volumes[i].free_size);
+	    nv_add_nvp_int(res, "total_size", volumes[i].total_size);
+	    nv_add_nvp(res, "close", "volumeinfo");
+	}
+
+	for(i = 0; i < 4; i++){
+	    nv_add_nvp(res, "open", "fileinfo");
+	    nv_add_nvp(res, "data_type", result->fileSpaceDescriptions[i].data_type);
+	    nv_add_nvp_int(res, "file_count", result->fileSpaceDescriptions[i].file_count);
+	    nv_add_nvp_int(res, "used_size", result->fileSpaceDescriptions[i].used_size);
+	    nv_add_nvp_int(res, "file_table_size", result->fileSpaceDescriptions[i].file_table_size);
+	    nv_add_nvp_int(res, "reserved_size", result->fileSpaceDescriptions[i].reserved_size);
+	    nv_add_nvp_int(res, "total_size", result->fileSpaceDescriptions[i].total_size);
+	    nv_add_nvp(res, "close", "fileinfo");
+	}
     }
 
-    vol_info = cmd_res->tmp_vol_info;
-    for (i = 0; i < cmd_res->num_tmp_vol; i++)
-    {
-        nv_add_nvp (res, "open", "spaceinfo");
-        nv_add_nvp (res, "spacename", vol_info[i].vol_name);
-        nv_add_nvp (res, "type", vol_info[i].purpose);
-        nv_add_nvp (res, "location", vol_info[i].location);
-        nv_add_nvp_int (res, "totalpage", vol_info[i].total_page);
-        nv_add_nvp_int (res, "freepage", vol_info[i].free_page);
-        _add_nvp_time (res, "date", vol_info[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
-        nv_add_nvp (res, "close", "spaceinfo");
-    }
 
-    if (uRetrieveDBLogDirectory (dbname, dbdir) != ERR_NO_ERROR)
-    {
-        strcpy (_dbmt_error, dbname);
-        return ERR_DBDIRNAME_NULL;
-    }
+	if (uRetrieveDBLogDirectory(dbname, dbdir) != ERR_NO_ERROR) {
+	    strcpy(_dbmt_error, dbname);
+	    return ERR_DBDIRNAME_NULL;
+	}
 
-    /* read entries in the directory and generate result */
+	/* read entries in the directory and generate result */
 #if defined(WINDOWS)
-    snprintf (find_file, PATH_MAX - 1, "%s/*", dbdir);
-    if ((handle = FindFirstFile (find_file, &data)) == INVALID_HANDLE_VALUE)
+	snprintf (find_file, PATH_MAX - 1, "%s/*", dbdir);
+	if ((handle = FindFirstFile (find_file, &data)) == INVALID_HANDLE_VALUE)
 #else
-    if ((dirp = opendir (dbdir)) == NULL)
+	if ((dirp = opendir(dbdir)) == NULL)
 #endif
-    {
-        sprintf (_dbmt_error, "%s", dbdir);
-        return ERR_DIROPENFAIL;
-    }
+	{
+	    sprintf(_dbmt_error, "%s", dbdir);
+	    return ERR_DIROPENFAIL;
+	}
 
 #if defined(WINDOWS)
-    for (found = 1; found; found = FindNextFile (handle, &data))
+	for (found = 1; found; found = FindNextFile (handle, &data))
 #else
-    while ((dp = readdir (dirp)) != NULL)
+	while ((dp = readdir(dirp)) != NULL)
 #endif
-    {
-        int baselen;
-        char *fname;
+	{
+	    int baselen;
+	    char *fname;
 
 #if defined(WINDOWS)
-        fname = data.cFileName;
+	    fname = data.cFileName;
 #else
-        fname = dp->d_name;
+	    fname = dp->d_name;
 #endif
-        baselen = strlen (dbname);
+	    baselen = strlen (dbname);
 
-        if (strncmp (fname, dbname, baselen) == 0)
-        {
-            if (!strcmp (fname + baselen, CUBRID_ACT_LOG_EXT))
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Active_log",
-                                   logpagesize);
-            }
-            else if (!strncmp (fname + baselen, CUBRID_ARC_LOG_EXT,
-                               CUBRID_ARC_LOG_EXT_LEN))
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Archive_log",
-                                   logpagesize);
-            }
+	    if (strncmp(fname, dbname, baselen) == 0) {
+		if (!strcmp(fname + baselen, CUBRID_ACT_LOG_EXT)) {
+		    _ts_gen_spaceinfo(res, fname, dbdir, "Active_log",
+				      logpagesize);
+		} else if (!strncmp(fname + baselen, CUBRID_ARC_LOG_EXT,
+				    CUBRID_ARC_LOG_EXT_LEN)) {
+		    _ts_gen_spaceinfo(res, fname, dbdir, "Archive_log",
+				      logpagesize);
+		}
 #if 0
-            else if (strncmp (fname + baselen, "_lginf", 6) == 0)
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Generic_log",
-                                   logpagesize);
-            }
+		else if (strncmp (fname + baselen, "_lginf", 6) == 0)
+		{
+		    _ts_gen_spaceinfo (res, fname, dbdir, "Generic_log",
+				       logpagesize);
+		}
 #endif
 
-        }
-    }
+	    }
+	}
 #if defined(WINDOWS)
-    FindClose (handle);
+	FindClose (handle);
 #else
-    closedir (dirp);
+	closedir(dirp);
 #endif
 
-    /* add last line */
-    nv_add_nvp (res, "open", "spaceinfo");
-    nv_add_nvp (res, "spacename", "Total");
-    nv_add_nvp (res, "type", "");
-    nv_add_nvp (res, "location", "");
-    nv_add_nvp (res, "totlapage", "0");
-    nv_add_nvp (res, "freepage", "0");
-    nv_add_nvp (res, "date", "");
-    nv_add_nvp (res, "close", "spaceinfo");
+	/* add last line */
+	nv_add_nvp(res, "open", "spaceinfo");
+	nv_add_nvp(res, "spacename", "Total");
+	nv_add_nvp(res, "type", "");
+	nv_add_nvp(res, "location", "");
+	nv_add_nvp(res, "totlapage", "0");
+	nv_add_nvp(res, "freepage", "0");
+	nv_add_nvp(res, "date", "");
+	nv_add_nvp(res, "close", "spaceinfo");
 
-    if (uRetrieveDBDirectory (dbname, dbdir) == ERR_NO_ERROR)
-    {
-        nv_add_nvp_int (res, "freespace", ut_disk_free_space (dbdir));
-    }
-    else
-    {
-        nv_add_nvp_int (res, "freespace", -1);
-    }
+	if (uRetrieveDBDirectory(dbname, dbdir) == ERR_NO_ERROR) {
+	    nv_add_nvp_int(res, "freespace", ut_disk_free_space(dbdir));
+	} else {
+	    nv_add_nvp_int(res, "freespace", -1);
+	}
+
     return ERR_NO_ERROR;
 }
 

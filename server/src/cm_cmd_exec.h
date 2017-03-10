@@ -73,6 +73,9 @@
 #endif
 #endif
 
+#include <vector>
+#include <typeinfo>
+
 typedef enum
 {
     CUBRID_MODE_CS = 0,
@@ -101,9 +104,136 @@ typedef struct
     char err_msg[ERR_MSG_SIZE];
 } T_SPACEDB_RESULT;
 
+struct SpaceDbVolumeInfoOldFormat{
+    int volid;
+    int total_size;
+    int free_size;
+    int data_size;
+    int index_size;
+    char purpose[16];
+    char location[128];
+    char vol_name[128];
+    time_t date;
+};
+
+struct SpaceDbVolumeInfoNewFormat{
+    int volid;
+    int used_size;
+    int free_size;
+    int total_size;
+    char type[16];
+    char purpose[32];
+    char volume_name[128];
+};
+
+struct DatabaseSpaceDescription{
+    char type[16];
+    char purpose[32];
+    int volume_count;
+    int used_size;
+    int free_size;
+    int total_size;
+};
+
+struct FileSpaceDescription{
+    char data_type[8];
+    int file_count;
+    int used_size;
+    int file_table_size;
+    int reserved_size;
+    int total_size;
+};
+
+class IGeneralSpacedbResult{
+public:
+    virtual ~IGeneralSpacedbResult(){}
+};
+
+template <typename T>
+class GeneralSpacedbResult : public IGeneralSpacedbResult{
+protected:
+    int page_size;
+    int log_page_size;
+    std::vector<T> volumes;
+    char *err_msg;
+public:
+    GeneralSpacedbResult(){
+	page_size = 0;
+	log_page_size = 0;
+	err_msg = new char[ERR_MSG_SIZE];
+    }
+    GeneralSpacedbResult(int page_size, int log_page_size){
+	this->page_size = page_size;
+	this->log_page_size = log_page_size;
+	err_msg = new char[ERR_MSG_SIZE];
+    }
+    virtual ~GeneralSpacedbResult(){
+	delete err_msg;
+    }
+    int get_page_size(){
+	return page_size;
+    }
+    int get_log_page_size(){
+	return log_page_size;
+    }
+    void set_page_size(int page_size){
+	this->page_size = page_size;
+    }
+    void set_log_page_size(int log_page_size){
+	this->log_page_size = log_page_size;
+    }
+    void add_volume(T volume){
+	volumes.push_back(volume);
+    }
+    std::vector<T>& get_volumes(){
+	return volumes;
+    }
+    char* get_err_msg(){
+	return err_msg;
+    }
+};
+
+class SpaceDbResultNewFormat : public GeneralSpacedbResult<SpaceDbVolumeInfoNewFormat>{
+public:
+    SpaceDbResultNewFormat(){}
+    DatabaseSpaceDescription databaseSpaceDescriptions[3];
+    FileSpaceDescription fileSpaceDescriptions[4];
+
+    void add_volume(char *);
+};
+
+class SpaceDbResultOldFormat : public GeneralSpacedbResult<SpaceDbVolumeInfoOldFormat>{
+public:
+    SpaceDbResultOldFormat(){}
+    int get_volume_info(char *, SpaceDbVolumeInfoOldFormat&);
+    int add_volume(char *str_buf){
+	SpaceDbVolumeInfoOldFormat volume;
+	int rc = get_volume_info(str_buf, volume);
+	if(rc == TRUE) {
+	    volumes.push_back(volume);
+	}
+	return rc;
+    }
+
+    int add_temporary_volume(char *str_buf){
+	SpaceDbVolumeInfoOldFormat volume;
+	int rc = get_volume_info(str_buf, volume);
+	if(rc == TRUE) {
+	    temporary_volumes.push_back(volume);
+	}
+	return rc;
+    }
+
+    std::vector<SpaceDbVolumeInfoOldFormat>& get_temporary_volumes(){
+	return temporary_volumes;
+    }
+private:
+    std::vector<SpaceDbVolumeInfoOldFormat> temporary_volumes;
+};
+
 typedef T_CMD_RESULT T_CSQL_RESULT;
 
-T_SPACEDB_RESULT *cmd_spacedb (const char *dbname, T_CUBRID_MODE mode);
+IGeneralSpacedbResult *cmd_spacedb (const char *dbname, T_CUBRID_MODE mode);
 T_CSQL_RESULT *cmd_csql (char *dbname, char *uid, char *passwd,
                          T_CUBRID_MODE mode, char *infile, char *command, char *error_continue);
 int cmd_start_server (char *dbname, char *err_buf, int err_buf_size);
