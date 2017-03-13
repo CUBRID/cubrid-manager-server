@@ -224,7 +224,7 @@ static const char *_op_get_port_from_config (T_CM_BROKER_CONF * uc_conf,
                                              char *broker_name);
 
 static int _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
-                            char *_dbmt_error, T_SPACEDB_RESULT * cmd_res);
+                            char *_dbmt_error, GeneralSpacedbResult * cmd_res);
 static void _ts_gen_spaceinfo (nvplist * res, const char *filename,
                                const char *dbinstalldir, const char *type, int pagesize);
 
@@ -409,9 +409,9 @@ rm_return:
     return ret_val;
 }
 
-static int
-_add_nvp_time (nvplist * ref, const char *name, time_t t, const char *fmt,
-               int type)
+int
+ts_add_nvp_time(nvplist *ref, const char *name, time_t t, const char *fmt,
+		int type)
 {
     char strbuf[64];
     if (t == 0)
@@ -505,8 +505,8 @@ ts_get_broker_diagdata (nvplist * cli_request, nvplist * cli_response,
         return ERR_NO_ERROR;
     }
 
-    _add_nvp_time (cli_response, "time", time (NULL),
-                   "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+    ts_add_nvp_time(cli_response, "time", time(NULL),
+		    "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
 
     for (i = 0; i < uc_info.num_info; i++)
     {
@@ -1040,7 +1040,7 @@ ts2_get_admin_log_info (nvplist * in, nvplist * out, char *_dbmt_error)
     nv_add_nvp (out, "path", buf);
     nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
     nv_add_nvp_int (out, "size", statbuf.st_size);
-    _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+    ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
     nv_add_nvp (out, "close", "adminloginfo");
 
     return ERR_NO_ERROR;
@@ -1133,7 +1133,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1179,7 +1179,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1221,7 +1221,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1264,7 +1264,7 @@ ts2_get_logfile_info (nvplist * in, nvplist * out, char *_dbmt_error)
                 stat (buf, &statbuf);
                 nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
                 nv_add_nvp_int (out, "size", statbuf.st_size);
-                _add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+		ts_add_nvp_time(out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
                 nv_add_nvp (out, "close", "logfile");
             }
         }
@@ -1382,8 +1382,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
         }
 
         nv_add_nvp (out, "bname", bname);
-        _add_nvp_time (out, "time", time (NULL),
-                       "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+	ts_add_nvp_time(out, "time", time(NULL),
+			"%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
         if (cm_get_cas_info (bname, &as_info_set, &job_info_set, &error) >= 0)
         {
             for (i = 0; i < as_info_set.num_info; i++)
@@ -1407,9 +1407,9 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_float (out, "as_cpu", as_info_set.as_info[i].pcpu, "%.2f");
                 cm_cpu_time_str (as_info_set.as_info[i].cpu_time, buf);
                 nv_add_nvp (out, "as_ctime", buf);
-                _add_nvp_time (out, "as_lat",
-                               as_info_set.as_info[i].last_access_time, 
-                               "%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(out, "as_lat",
+				as_info_set.as_info[i].last_access_time,
+				"%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
                 nv_add_nvp (out, "as_cur", as_info_set.as_info[i].log_msg);
                 nv_add_nvp_int64 (out, "as_num_query", as_info_set.as_info[i].num_queries_processed);
                 nv_add_nvp_int64 (out, "as_num_tran", as_info_set.as_info[i].num_transactions_processed);
@@ -1418,8 +1418,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_int64 (out, "as_error_query", as_info_set.as_info[i].num_error_queries);
                 nv_add_nvp (out, "as_dbname", as_info_set.as_info[i].database_name);
                 nv_add_nvp (out, "as_dbhost", as_info_set.as_info[i].database_host);
-                _add_nvp_time (out, "as_lct", as_info_set.as_info[i].last_connect_time,
-                               "%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(out, "as_lct", as_info_set.as_info[i].last_connect_time,
+				"%02d/%02d/%02d %02d:%02d:%02d", NV_ADD_DATE_TIME);
                 /* add "as_client_ip" nvp. */
                 nv_add_nvp (out, "as_client_ip", as_info_set.as_info[i].clt_ip_addr);
                 nv_add_nvp (out, "close", "asinfo");
@@ -1431,8 +1431,8 @@ ts2_get_broker_status (nvplist * in, nvplist * out, char *_dbmt_error)
                 nv_add_nvp_int (out, "job_priority",
                                 job_info_set.job_info[i].priority);
                 nv_add_nvp (out, "job_ip", job_info_set.job_info[i].ipstr);
-                _add_nvp_time (out, "job_time",
-                               job_info_set.job_info[i].recv_time, "%02d:%02d:%02d", NV_ADD_TIME);
+		ts_add_nvp_time(out, "job_time",
+				job_info_set.job_info[i].recv_time, "%02d:%02d:%02d", NV_ADD_TIME);
                 snprintf (buf, sizeof (buf) - 1, "%s:%s",
                           job_info_set.job_info[i].script, job_info_set.job_info[i].prgname);
                 nv_add_nvp (out, "job_request", buf);
@@ -3190,10 +3190,11 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
 {
     char *dbname = NULL;
     int retval = ERR_NO_ERROR;
+    const char *err_message;
     char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
     int ha_mode = 0;
     T_CUBRID_MODE cubrid_mode;
-    T_SPACEDB_RESULT *cmd_res;
+    GeneralSpacedbResult *cmd_res;
     T_DB_SERVICE_MODE db_mode;
 
     /* get dbname */
@@ -3227,22 +3228,24 @@ tsDbspaceInfo (nvplist * req, nvplist * res, char *_dbmt_error)
         cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
+    err_message = cmd_res->get_err_msg();
+
     if (cmd_res == NULL)
     {
         sprintf (_dbmt_error, "spacedb %s", dbname);
         retval = ERR_SYSTEM_CALL;
     }
-    else if (cmd_res->err_msg[0])
+    else if (cmd_res->has_error())
     {
-        strcpy (_dbmt_error, cmd_res->err_msg);
+        strcpy (_dbmt_error, err_message);
         retval = ERR_WITH_MSG;
     }
     else
     {
         retval = _tsParseSpacedb (req, res, dbname, _dbmt_error, cmd_res);
     }
-    cmd_spacedb_result_free (cmd_res);
 
+    delete cmd_res;
     return retval;
 }
 
@@ -4074,7 +4077,7 @@ ts_statdump (nvplist * req, nvplist * res, char *_dbmt_error)
 
     /* set res with parameter in exec_stat. */
     nv_add_nvp (res, "dbname", dbname);
-    _add_nvp_time (res, "time", time (NULL), "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
+    ts_add_nvp_time(res, "time", time(NULL), "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
 
     /* Execution statistics for the file io */
     nv_add_nvp_int (res, "num_file_creates", exec_stat.file_num_creates);
@@ -5326,7 +5329,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
     char strbuf[PATH_MAX], dbdir[PATH_MAX];
     int pagesize, no_tpage = 0, log_size = 0, baselen;
     struct stat statbuf;
-    T_SPACEDB_RESULT *cmd_res;
+    GeneralSpacedbResult *cmd_res;
     T_CUBRID_MODE cubrid_mode;
     int i;
 #if defined(WINDOWS)
@@ -5368,23 +5371,12 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
         cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
-    if (cmd_res == NULL || cmd_res->err_msg[0])
-    {
-        sprintf (_dbmt_error, "spacedb %s", dbname);
-        cmd_spacedb_result_free (cmd_res);
-        return ERR_SYSTEM_CALL;
+    if (cmd_res == NULL || cmd_res->has_error()) {
+	sprintf(_dbmt_error, "spacedb %s", dbname);
+	delete cmd_res;
+	return ERR_SYSTEM_CALL;
     }
 
-    for (i = 0; i < cmd_res->num_vol; i++)
-    {
-        no_tpage += cmd_res->vol_info[i].total_page;
-    }
-    for (i = 0; i < cmd_res->num_tmp_vol; i++)
-    {
-        no_tpage += cmd_res->tmp_vol_info[i].total_page;
-    }
-    pagesize = cmd_res->page_size;
-    cmd_spacedb_result_free (cmd_res);
 
     /* get log volume info */
 #if defined(WINDOWS)
@@ -5427,7 +5419,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
 #endif
 
     snprintf (strbuf, sizeof (strbuf) - 1, "%d",
-              no_tpage * pagesize + log_size);
+	      cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size());
     nv_add_nvp (res, "dbsize", strbuf);
 
     return ERR_NO_ERROR;
@@ -5928,8 +5920,8 @@ ts_backupdb_info (nvplist * req, nvplist * res, char *_dbmt_error)
                 nv_add_nvp (res, "open", vinf);
                 nv_add_nvp (res, "path", tok[2]);
                 nv_add_nvp_int (res, "size", statbuf.st_size);
-                _add_nvp_time (res, "data", statbuf.st_mtime,
-                               "%04d.%02d.%02d.%02d.%02d", NV_ADD_DATE_TIME);
+		ts_add_nvp_time(res, "data", statbuf.st_mtime,
+				"%04d.%02d.%02d.%02d.%02d", NV_ADD_DATE_TIME);
                 nv_add_nvp (res, "close", vinf);
             }
         }
@@ -6373,8 +6365,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
         nv_add_nvp (res, ENCRYPT_ARG ("owner"),
                     get_user_name (statbuf.st_uid, buf));
         nv_add_nvp_int (res, "size", statbuf.st_size);
-        _add_nvp_time (res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
-                       NV_ADD_DATE);
+	ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
+			NV_ADD_DATE);
         nv_add_nvp (res, "close", "log");
     }
     FREE_MEM (error_log_param);
@@ -6387,8 +6379,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
         nv_add_nvp (res, ENCRYPT_ARG ("owner"),
         get_user_name (statbuf.st_uid, buf));
         nv_add_nvp_int (res, "size", statbuf.st_size);
-        _add_nvp_time (res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
-                       NV_ADD_DATE);
+	ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d",
+			NV_ADD_DATE);
         nv_add_nvp (res, "close", "log");
     }
 
@@ -6439,8 +6431,8 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
             nv_add_nvp (res, ENCRYPT_ARG ("owner"),
             get_user_name (statbuf.st_uid, buf));
             nv_add_nvp_int (res, "size", statbuf.st_size);
-            _add_nvp_time (res, "lastupdate", statbuf.st_mtime,
-                           "%04d.%02d.%02d", NV_ADD_DATE);
+	    ts_add_nvp_time(res, "lastupdate", statbuf.st_mtime,
+			    "%04d.%02d.%02d", NV_ADD_DATE);
             nv_add_nvp (res, "close", "log");
         }
     }
@@ -12155,10 +12147,9 @@ uca_conf_write (T_CM_BROKER_CONF * uc_conf, char *del_broker,
 
 static int
 _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
-                 char *_dbmt_error, T_SPACEDB_RESULT * cmd_res)
+                 char *_dbmt_error, GeneralSpacedbResult * cmd_res)
 {
     int pagesize, logpagesize, i;
-    T_SPACEDB_INFO *vol_info;
     char dbdir[PATH_MAX];
 #if defined(WINDOWS)
     WIN32_FIND_DATA data;
@@ -12170,120 +12161,75 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
     struct dirent *dp = NULL;
 #endif
 
-    pagesize = cmd_res->page_size;
-    logpagesize = cmd_res->log_page_size;
-    nv_update_val_int (res, "pagesize", pagesize);
-    nv_update_val_int (res, "logpagesize", logpagesize);
+    cmd_res->create_result(res);
+    pagesize = cmd_res->get_page_size();
+    logpagesize = cmd_res->get_log_page_size();
 
-    vol_info = cmd_res->vol_info;
-    for (i = 0; i < cmd_res->num_vol; i++)
-    {
-        nv_add_nvp (res, "open", "spaceinfo");
-        nv_add_nvp (res, "spacename", vol_info[i].vol_name);
-        nv_add_nvp (res, "type", vol_info[i].purpose);
-        nv_add_nvp (res, "location", vol_info[i].location);
-        nv_add_nvp_int (res, "totalpage", vol_info[i].total_page);
-        nv_add_nvp_int (res, "freepage", vol_info[i].free_page);
-        _add_nvp_time (res, "date", vol_info[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
-        nv_add_nvp (res, "close", "spaceinfo");
-    }
 
-    vol_info = cmd_res->tmp_vol_info;
-    for (i = 0; i < cmd_res->num_tmp_vol; i++)
-    {
-        nv_add_nvp (res, "open", "spaceinfo");
-        nv_add_nvp (res, "spacename", vol_info[i].vol_name);
-        nv_add_nvp (res, "type", vol_info[i].purpose);
-        nv_add_nvp (res, "location", vol_info[i].location);
-        nv_add_nvp_int (res, "totalpage", vol_info[i].total_page);
-        nv_add_nvp_int (res, "freepage", vol_info[i].free_page);
-        _add_nvp_time (res, "date", vol_info[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
-        nv_add_nvp (res, "close", "spaceinfo");
-    }
+	if (uRetrieveDBLogDirectory(dbname, dbdir) != ERR_NO_ERROR) {
+	    strcpy(_dbmt_error, dbname);
+	    return ERR_DBDIRNAME_NULL;
+	}
 
-    if (uRetrieveDBLogDirectory (dbname, dbdir) != ERR_NO_ERROR)
-    {
-        strcpy (_dbmt_error, dbname);
-        return ERR_DBDIRNAME_NULL;
-    }
-
-    /* read entries in the directory and generate result */
+	/* read entries in the directory and generate result */
 #if defined(WINDOWS)
-    snprintf (find_file, PATH_MAX - 1, "%s/*", dbdir);
-    if ((handle = FindFirstFile (find_file, &data)) == INVALID_HANDLE_VALUE)
+	snprintf (find_file, PATH_MAX - 1, "%s/*", dbdir);
+	if ((handle = FindFirstFile (find_file, &data)) == INVALID_HANDLE_VALUE)
 #else
-    if ((dirp = opendir (dbdir)) == NULL)
+	if ((dirp = opendir(dbdir)) == NULL)
 #endif
-    {
-        sprintf (_dbmt_error, "%s", dbdir);
-        return ERR_DIROPENFAIL;
-    }
+	{
+	    sprintf(_dbmt_error, "%s", dbdir);
+	    return ERR_DIROPENFAIL;
+	}
 
 #if defined(WINDOWS)
-    for (found = 1; found; found = FindNextFile (handle, &data))
+	for (found = 1; found; found = FindNextFile (handle, &data))
 #else
-    while ((dp = readdir (dirp)) != NULL)
+	while ((dp = readdir(dirp)) != NULL)
 #endif
-    {
-        int baselen;
-        char *fname;
+	{
+	    int baselen;
+	    char *fname;
 
 #if defined(WINDOWS)
-        fname = data.cFileName;
+	    fname = data.cFileName;
 #else
-        fname = dp->d_name;
+	    fname = dp->d_name;
 #endif
-        baselen = strlen (dbname);
+	    baselen = strlen (dbname);
 
-        if (strncmp (fname, dbname, baselen) == 0)
-        {
-            if (!strcmp (fname + baselen, CUBRID_ACT_LOG_EXT))
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Active_log",
-                                   logpagesize);
-            }
-            else if (!strncmp (fname + baselen, CUBRID_ARC_LOG_EXT,
-                               CUBRID_ARC_LOG_EXT_LEN))
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Archive_log",
-                                   logpagesize);
-            }
+	    if (strncmp(fname, dbname, baselen) == 0) {
+		if (!strcmp(fname + baselen, CUBRID_ACT_LOG_EXT)) {
+		    _ts_gen_spaceinfo(res, fname, dbdir, "Active_log",
+				      logpagesize);
+		} else if (!strncmp(fname + baselen, CUBRID_ARC_LOG_EXT,
+				    CUBRID_ARC_LOG_EXT_LEN)) {
+		    _ts_gen_spaceinfo(res, fname, dbdir, "Archive_log",
+				      logpagesize);
+		}
 #if 0
-            else if (strncmp (fname + baselen, "_lginf", 6) == 0)
-            {
-                _ts_gen_spaceinfo (res, fname, dbdir, "Generic_log",
-                                   logpagesize);
-            }
+		else if (strncmp (fname + baselen, "_lginf", 6) == 0)
+		{
+		    _ts_gen_spaceinfo (res, fname, dbdir, "Generic_log",
+				       logpagesize);
+		}
 #endif
 
-        }
-    }
+	    }
+	}
 #if defined(WINDOWS)
-    FindClose (handle);
+	FindClose (handle);
 #else
-    closedir (dirp);
+	closedir(dirp);
 #endif
 
-    /* add last line */
-    nv_add_nvp (res, "open", "spaceinfo");
-    nv_add_nvp (res, "spacename", "Total");
-    nv_add_nvp (res, "type", "");
-    nv_add_nvp (res, "location", "");
-    nv_add_nvp (res, "totlapage", "0");
-    nv_add_nvp (res, "freepage", "0");
-    nv_add_nvp (res, "date", "");
-    nv_add_nvp (res, "close", "spaceinfo");
+	if (uRetrieveDBDirectory(dbname, dbdir) == ERR_NO_ERROR) {
+	    nv_add_nvp_int(res, "freespace", ut_disk_free_space(dbdir));
+	} else {
+	    nv_add_nvp_int(res, "freespace", -1);
+	}
 
-    if (uRetrieveDBDirectory (dbname, dbdir) == ERR_NO_ERROR)
-    {
-        nv_add_nvp_int (res, "freespace", ut_disk_free_space (dbdir));
-    }
-    else
-    {
-        nv_add_nvp_int (res, "freespace", -1);
-    }
     return ERR_NO_ERROR;
 }
 
@@ -12306,7 +12252,7 @@ _ts_gen_spaceinfo (nvplist * res, const char *filename,
                     pagesize ? statbuf.st_size / pagesize : 0);
     nv_add_nvp (res, "freepage", " ");
 
-    _add_nvp_time (res, "date", statbuf.st_mtime, "%04d%02d%02d", NV_ADD_DATE);
+    ts_add_nvp_time(res, "date", statbuf.st_mtime, "%04d%02d%02d", NV_ADD_DATE);
 
     nv_add_nvp (res, "close", "spaceinfo");
     return;
