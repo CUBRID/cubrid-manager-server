@@ -4093,8 +4093,6 @@ ts_statdump (nvplist * req, nvplist * res, char *_dbmt_error)
     nv_add_nvp_int (res, "num_data_page_dirties", exec_stat.pb_num_dirties);
     nv_add_nvp_int (res, "num_data_page_ioreads", exec_stat.pb_num_ioreads);
     nv_add_nvp_int (res, "num_data_page_iowrites", exec_stat.pb_num_iowrites);
-    nv_add_nvp_int (res, "num_data_page_victims", exec_stat.pb_num_victims);
-    nv_add_nvp_int (res, "num_data_page_iowrites_for_replacement", exec_stat.pb_num_replacements);
 
     /* Execution statistics for the log manager */
     nv_add_nvp_int (res, "num_log_page_ioreads", exec_stat.log_num_ioreads);
