@@ -237,7 +237,6 @@ double
 ajFreeSpace (GeneralSpacedbResult * cmd_res, const char *type)
 {
     double total_page, free_page;
-    int i;
 
     total_page = free_page = 0.0;
     cmd_res->get_total_and_free_page(type, free_page, total_page);
@@ -260,14 +259,12 @@ aj_add_volume (char *dbname, const char *type, int increase,
     FILE *outfile;
     time_t mytime;
     int retval;
-    struct stat statbuf;
     char log_file_name[512];
     char cmd_name[CUBRID_CMD_NAME_LEN];
     char inc_str[128];
     const char *argv[16];
     int argc = 0;
     GeneralSpacedbResult *all_volumes;
-    int i;
     char *pos = NULL;
     char tmp_dbname[DB_NAME_LEN + MAXHOSTNAMELEN];
 
@@ -470,8 +467,6 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
 {
     char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
     autoaddvoldb_node *curr;
-    double frate;
-    int page_add, pagesize;
     GeneralSpacedbResult *spacedb_res;
     T_SERVER_STATUS_RESULT *server_status_res;
     int db_mode = 0;

@@ -939,7 +939,7 @@ int ext_get_db_err_log(Json::Value & request, Json::Value & response)
 #else
         fname = dp->d_name;
 #endif
-        fname_len = strlen (fname);
+        fname_len = (int) strlen (fname);
         /* the "4" is the size of ".err" */
         if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
         {
@@ -2264,7 +2264,7 @@ int ext_ut_add_userlist_to_response(Json::Value &response, const T_DBMT_USER& db
 
 static bool _validate_token_active_time(time_t &active_time)
 {
-    int len = 0; 
+    size_t len = 0;
 
     active_time = 0; 
     len = strlen(sco.szTokenActiveTime); 
