@@ -32,7 +32,7 @@
 
 #include <errno.h>
 
-#if defined(WINDOWS)
+#if defined(WINDOWS) && !defined (EOVERFLOW)
 #define EOVERFLOW    75
 #endif
 
@@ -224,8 +224,6 @@ typedef long INT64;
 #define THREAD_FUNC    void*
 #define T_THREAD       pthread_t
 #endif
-
-#define strlen(s1)  ((int) strlen(s1))
 
 #if defined(WINDOWS)
 #define DEL_FILE        "del"

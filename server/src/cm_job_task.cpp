@@ -5325,11 +5325,10 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
     char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
     int ha_mode = 0;
     char strbuf[PATH_MAX], dbdir[PATH_MAX];
-    int pagesize, no_tpage = 0, log_size = 0, baselen;
+    int no_tpage = 0, log_size = 0, baselen;
     struct stat statbuf;
     GeneralSpacedbResult *cmd_res;
     T_CUBRID_MODE cubrid_mode;
-    int i;
 #if defined(WINDOWS)
     char find_file[PATH_MAX];
     WIN32_FIND_DATA data;
@@ -5388,7 +5387,7 @@ ts_get_dbsize (nvplist * req, nvplist * res, char *_dbmt_error)
         return ERR_DIROPENFAIL;
     }
 
-    baselen = strlen (dbname);
+    baselen = (int) strlen (dbname);
 #if defined(WINDOWS)
     for (found = 1; found; found = FindNextFile (handle, &data))
 #else
@@ -6406,7 +6405,7 @@ ts_get_log_info (nvplist * req, nvplist * res, char *_dbmt_error)
 #else
         fname = dp->d_name;
 #endif
-        fname_len = strlen (fname);
+        fname_len = (int) strlen (fname);
         /* the "4" is the size of ".err" */
         if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
         {
@@ -6768,7 +6767,7 @@ ts_get_tran_info (nvplist * req, nvplist * res, char *_dbmt_error)
     {
         ut_trim (buf);
         strncpy (_dbmt_error + tmp, buf, DBMT_ERROR_MSG_SIZE - tmp);
-        tmp += strlen (buf);
+        tmp += (int) strlen (buf);
         retval = ERR_WITH_MSG;
     }
 
@@ -6854,7 +6853,7 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
             while (fgets (buf, sizeof (buf), fp) != NULL)
             {
                 ut_trim (buf);
-                len_tmp = strlen (buf);
+                len_tmp = (int) strlen (buf);
 
                 if (len_tmp < DBMT_ERROR_MSG_SIZE - len - 1)
                 {
@@ -6882,7 +6881,7 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
             while (fgets (buf, sizeof (buf), fp) != NULL)
             {
                 ut_trim (buf);
-                len_tmp = strlen (buf);
+                len_tmp = (int) strlen (buf);
 
                 if (len_tmp < DBMT_ERROR_MSG_SIZE - len - 1)
                 {
@@ -10904,7 +10903,7 @@ ts_remove_files (nvplist * req, nvplist * res, char *_dbmt_error)
                          "Please inform file names to be deleted.");
                 return ERR_WITH_MSG;
             }
-            path_len = strlen (path);
+            path_len = (int) strlen (path);
             if (path_len <= 2 || strstr (path, "..") || strstr (path, "/")
                 || strstr (path, "\\"))
             {
@@ -11106,7 +11105,7 @@ _get_block_from_log (FILE * fp, char *block_buf, int len)
             break;
 
         strcpy_limit (buf_t, buf, space_left);
-        space_left -= strlen (buf);
+        space_left -= (int) strlen (buf);
         buf_t += strlen (buf);
         retval = 0;
     }
@@ -11436,7 +11435,7 @@ set_copylogdb_mode (T_HA_LOG_PROC_INFO * copylogdb)
     {
         int s_len = 0;
 
-        s_len = strlen (buf_t);
+        s_len = (int) strlen (buf_t);
 
         if (uStringEqual (buf_t, "-m") || uStringEqual (buf_t, "--mode"))
         {
@@ -12147,7 +12146,7 @@ static int
 _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
                  char *_dbmt_error, GeneralSpacedbResult * cmd_res)
 {
-    int pagesize, logpagesize, i;
+    int pagesize, logpagesize;
     char dbdir[PATH_MAX];
 #if defined(WINDOWS)
     WIN32_FIND_DATA data;
@@ -12195,7 +12194,7 @@ _tsParseSpacedb (nvplist * req, nvplist * res, char *dbname,
 #else
 	    fname = dp->d_name;
 #endif
-	    baselen = strlen (dbname);
+	    baselen = (int) strlen (dbname);
 
 	    if (strncmp(fname, dbname, baselen) == 0) {
 		if (!strcmp(fname + baselen, CUBRID_ACT_LOG_EXT)) {
@@ -12814,7 +12813,7 @@ get_broker_info_from_filename (char *path, char *br_name, int *as_id)
 {
 #if defined(WINDOWS)
     const char *sql_log_ext = ".sql.log";
-    int sql_log_ext_len = strlen (sql_log_ext);
+    int sql_log_ext_len = (int) strlen (sql_log_ext);
     int path_len;
     char *p;
 
@@ -12822,7 +12821,7 @@ get_broker_info_from_filename (char *path, char *br_name, int *as_id)
     {
         return -1;
     }
-    path_len = strlen (path);
+    path_len = (int) strlen (path);
     if (strncmp (path, sco.szCubrid, strlen (sco.szCubrid)) != 0 ||
         path_len <= sql_log_ext_len ||
         strcmp (path + (path_len - sql_log_ext_len), sql_log_ext) != 0)
@@ -12838,7 +12837,7 @@ get_broker_info_from_filename (char *path, char *br_name, int *as_id)
         }
     }
     path = p + 1;
-    path_len = strlen (path);
+    path_len = (int) strlen (path);
 
     *(path + path_len - sql_log_ext_len) = '\0';
     p = strrchr (path, '_');
@@ -13272,7 +13271,7 @@ _update_nvplist_name (nvplist * ref, const char *name, const char *value)
         if (uStringEqual (name_buf, name))
         {
             dst_reset (nvp->name);
-            dst_append (nvp->name, value, strlen (value));
+            dst_append (nvp->name, value, (int) strlen (value));
         }
     }
 
@@ -13302,7 +13301,7 @@ read_shard_info_output (nvplist * res, char *stdout_file, char *stderr_file,
                 {
                     continue;
                 }
-                len += strlen (str_buf);
+                len += (int) strlen (str_buf);
                 if (len < (DBMT_ERROR_MSG_SIZE - 1))
                 {
                     strcpy (_dbmt_error, str_buf);
@@ -13462,7 +13461,7 @@ read_shard_status_output (nvplist * res, char *stdout_file, char *stderr_file,
                 {
                     continue;
                 }
-                len += strlen (str_buf);
+                len += (int) strlen (str_buf);
                 if (len < (DBMT_ERROR_MSG_SIZE - 1))
                 {
                     strcpy (_dbmt_error, str_buf);
@@ -13635,7 +13634,7 @@ read_start_shard_output (char *stdout_file, char *stderr_file,
             {
                 continue;
             }
-            len += strlen (buf);
+            len += (int) strlen (buf);
             if (len < (DBMT_ERROR_MSG_SIZE - 1))
             {
                 strcpy (_dbmt_error, buf);
@@ -13804,7 +13803,7 @@ read_broker_changer_output (char *stdout_file, char *stderr_file,
                     return ERR_NO_ERROR;
                 }
                 ut_trim (buf);
-                len += strlen (buf);
+                len += (int) strlen (buf);
                 if (len < DBMT_ERROR_MSG_SIZE - len - 1)
                 {
                     strcpy (_dbmt_error, buf);
@@ -13830,7 +13829,7 @@ read_broker_changer_output (char *stdout_file, char *stderr_file,
             while (fgets (buf, sizeof (buf), fp) != NULL)
             {
                 ut_trim (buf);
-                len += strlen (buf);
+                len += (int) strlen (buf);
                 if (len < DBMT_ERROR_MSG_SIZE - len - 1)
                 {
                     strcpy (_dbmt_error, buf);
@@ -13956,7 +13955,7 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
             while (fgets (buf, sizeof (buf), fp) != NULL)
             {
                 ut_trim (buf);
-                len_tmp = strlen (buf);
+                len_tmp = (int) strlen (buf);
 
                 if (len_tmp < DBMT_ERROR_MSG_SIZE - len - 1)
                 {
@@ -13985,7 +13984,7 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
             while (fgets (buf, sizeof (buf), fp) != NULL)
             {
                 ut_trim (buf);
-                len_tmp = strlen (buf);
+                len_tmp = (int) strlen (buf);
 
                 if (len_tmp < DBMT_ERROR_MSG_SIZE - len - 1)
                 {

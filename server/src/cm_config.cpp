@@ -323,7 +323,7 @@ uReadSystemConfig (void)
         }
         else if (strcasecmp (ent_name, "max_log_filesize") == 0)
         {
-            str_len = strlen(ent_val);
+            str_len = (int) strlen(ent_val);
             if ((ent_val[str_len - 1] == 'M') || (ent_val[str_len - 1] == 'm'))
             {
                 ent_val[str_len - 1] = '\0';
