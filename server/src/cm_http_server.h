@@ -54,7 +54,7 @@
 
 
 /**
- * @brief load_webfiles_cb 
+ * @brief load_webfiles_cb
  * This callback gets invoked when we get any http request that doesn't match
  * any other callback.  Like any evhttp server callback, it has a simple job:
  * it must eventually call evhttp_send_error() or evhttp_send_reply().
@@ -77,11 +77,11 @@ void load_webfiles_cb (struct evhttp_request *req, void *arg);
  * @param base
  * See also: struct event_base and bufferevent_openssl_socket_new
  * @param arg
- * It must be struct SSL_CTX, 
+ * It must be struct SSL_CTX,
  * See also: SSL_CTX
- * @return bufferevent 
+ * @return bufferevent
  */
-struct bufferevent* create_sslconn_cb (struct event_base *base, void *arg);
+struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg);
 
 /**
  * @brief init_SSL
@@ -94,7 +94,7 @@ struct bufferevent* create_sslconn_cb (struct event_base *base, void *arg);
  * private key file. It can be full path,also can be the name of file.
  * @return SSL_CTX
  */
-SSL_CTX* init_SSL (const char* certificate_chain,const char* private_key);
+SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key);
 
 /**
  * @brief thread_setup_SSL

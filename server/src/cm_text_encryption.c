@@ -1,19 +1,19 @@
 /*
  * Copyright (C) 2008 Search Solution Corporation. All rights reserved by Search Solution.
  *
- *   This program is free software; you can redistribute it and/or modify 
- *   it under the terms of the GNU General Public License as published by 
- *   the Free Software Foundation; either version 2 of the License, or 
- *   (at your option) any later version. 
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License 
- *  along with this program; if not, write to the Free Software 
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA 
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
 
@@ -71,10 +71,14 @@ uEncrypt (int len, const char *src, char *trg)
   int i;
 
   if (src == NULL)
-    src = "";
+    {
+      src = "";
+    }
 
   if ((encstr = (char *) malloc (len + 1)) == NULL)
-    return;
+    {
+      return;
+    }
 
   array_init_random_value (encstr, sizeof (encstr));
   strcpy (encstr, src);
@@ -113,7 +117,9 @@ uDecrypt (int len, const char *src, char *trg)
     }
 
   if ((hexacode = (char *) malloc (len * 2 + 1)) == NULL)
-    return;
+    {
+      return;
+    }
 
   memset (hexacode, 0, sizeof (hexacode));
   strcpy (hexacode, src);
@@ -144,19 +150,19 @@ tea_encrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-	{
-	  memset (ulbuf, ' ', sizeof (ulbuf));
-	  memcpy (ulbuf, text, len);
-	  _encrypt (key, ulbuf);
-	  memcpy (text, ulbuf, len);
-	  break;
-	}
+        {
+          memset (ulbuf, ' ', sizeof (ulbuf));
+          memcpy (ulbuf, text, len);
+          _encrypt (key, ulbuf);
+          memcpy (text, ulbuf, len);
+          break;
+        }
       else
-	{
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _encrypt (key, ulbuf);
-	  memcpy (text, ulbuf, sizeof (ulbuf));
-	}
+        {
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _encrypt (key, ulbuf);
+          memcpy (text, ulbuf, sizeof (ulbuf));
+        }
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }
@@ -172,20 +178,20 @@ tea_decrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-	{
-	  memset (ulbuf, ' ', sizeof (ulbuf));
-	  /*memcpy(ulbuf,text,len); */
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _decrypt (key, ulbuf);
-	  memcpy (text, ulbuf, len);
-	  break;
-	}
+        {
+          memset (ulbuf, ' ', sizeof (ulbuf));
+          /*memcpy(ulbuf,text,len); */
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _decrypt (key, ulbuf);
+          memcpy (text, ulbuf, len);
+          break;
+        }
       else
-	{
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _decrypt (key, ulbuf);
-	  memcpy (text, ulbuf, sizeof (ulbuf));
-	}
+        {
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _decrypt (key, ulbuf);
+          memcpy (text, ulbuf, sizeof (ulbuf));
+        }
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }
@@ -233,10 +239,14 @@ static char
 ut_get_hexval (char c)
 {
   if (c >= '0' && c <= '9')
-    return (c - '0');
+    {
+      return (c - '0');
+    }
 
   if (c >= 'a' && c <= 'f')
-    return (c - 'a' + 10);
+    {
+      return (c - 'a' + 10);
+    }
 
   return (c - 'A' + 10);	/* c >= 'A' && c <= 'F' */
 }
@@ -254,7 +264,9 @@ array_init_random_value (char *arr, int arrsize)
     }
 
   for (i = 0; i < arrsize; i++)
-    arr[i] = rand () % 100;
+    {
+      arr[i] = rand () % 100;
+    }
 }
 
 static int
