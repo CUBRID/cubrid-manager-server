@@ -42,40 +42,42 @@ static void _print_help (void);
 int
 main (int argc, char *argv[])
 {
-    int retval = 0;
+  int retval = 0;
 
-    if (argc < 2)
+  if (argc < 2)
     {
-        retval = 0;
-        goto print_help_msg;
+      retval = 0;
+      goto print_help_msg;
     }
 
-    sys_config_init ();
-    if (uReadEnvVariables (argv[0]) < 0)
-        return -1;
-
-    retval = run_task (argv[1], (argc - 1), (const char **) (&argv[1]));
-
-    if (retval == E_CMD_NOT_EXIST)
+  sys_config_init ();
+  if (uReadEnvVariables (argv[0]) < 0)
     {
-        retval = -1;
-        goto print_help_msg;
+      return -1;
     }
 
-    return 0;
+  retval = run_task (argv[1], (argc - 1), (const char **) (&argv[1]));
+
+  if (retval == E_CMD_NOT_EXIST)
+    {
+      retval = -1;
+      goto print_help_msg;
+    }
+
+  return 0;
 
 print_help_msg:
-    _print_help ();
-    return retval;
+  _print_help ();
+  return retval;
 }
 
 static void
 _print_help (void)
 {
-    const char *title_pattern =
-        "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
-    printf (title_pattern, CM_ADMIN_VERSION, CM_ADMIN_NAME);
-    print_cmd ();
+  const char *title_pattern =
+    "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
+  printf (title_pattern, CM_ADMIN_VERSION, CM_ADMIN_NAME);
+  print_cmd ();
 
-    return;
+  return;
 }

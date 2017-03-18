@@ -30,8 +30,8 @@ extern "C"
 #endif
 #ident "$Id$"
 
-  void uEncrypt (int len, const char *src, char *trg);
-  void uDecrypt (int len, const char *src, char *trg);
+void uEncrypt (int len, const char *src, char *trg);
+void uDecrypt (int len, const char *src, char *trg);
 #ifdef __cplusplus
 }
 #endif

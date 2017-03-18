@@ -39,40 +39,40 @@ using namespace std;
 
 enum AGG_TYPE
 {
-    HOUR, DAY
+  HOUR, DAY
 };
 
 enum MDTYPE
 {
-    DAILY = 0,
-    WEEKLY,
-    MONTHLY,
-    YEARLY
+  DAILY = 0,
+  WEEKLY,
+  MONTHLY,
+  YEARLY
 };
 
 // TODO: need a switch for monitoring data collection
 
 class cm_mon_stat
 {
-public:
+  public:
     static cm_mon_stat *get_instance (void);
     bool initial (void);
     void gather_mon_data (void);
     bool set_mon_interval (time_t interval);
-    bool get_mon_interval (time_t & interval) const;
-    bool get_mon_statistic (const Json::Value req, Json::Value & res,
-                            string & errmsg) const;
+    bool get_mon_interval (time_t &interval) const;
+    bool get_mon_statistic (const Json::Value req, Json::Value &res,
+                            string &errmsg) const;
 
-protected:
+  protected:
     cm_mon_stat (string data_path);
     virtual ~ cm_mon_stat (void)
     {
-        MUTEX_DESTROY (_data_mutex);
-        delete _instance;
-        _instance = NULL;
+      MUTEX_DESTROY (_data_mutex);
+      delete _instance;
+      _instance = NULL;
     }
 
-private:
+  private:
     bool init_meta (int interval);
     bool reset_meta (int new_interval);
     bool flush_meta_file ();
@@ -86,16 +86,16 @@ private:
     void aggregate_brokers (int read_offset, int buf_base, int write_offset,
                             AGG_TYPE atype, time_t gather_time);
     void gather_daily_brokers_mon (time_t gather_time);
-    bool gather_dbs_tran_query (time_t gather_time, Json::Value & db_tq);
+    bool gather_dbs_tran_query (time_t gather_time, Json::Value &db_tq);
     void gather_daily_dbs_mon (time_t gather_time);
     void gather_daily_os_mon (time_t gather_time);
     bool reset_mon_file (string fpath, int block_num, int mlen,
                          int new_interval);
     bool get_rrd_data (MDTYPE mdtype, string dpath, int didx, int midx,
-                       int pfactor, bool ddiff, int mlen, Json::Value & res, string & errmsg) const;
-    bool m_get_mon_statistic (const Json::Value req, Json::Value & res, string & errmsg) const;
+                       int pfactor, bool ddiff, int mlen, Json::Value &res, string &errmsg) const;
+    bool m_get_mon_statistic (const Json::Value req, Json::Value &res, string &errmsg) const;
 
-private:
+  private:
     static cm_mon_stat *_instance;
     const string _data_path;
     const string _meta_file;

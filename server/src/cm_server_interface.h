@@ -27,7 +27,7 @@
 #include "cm_job_task.h"
 #include "cm_server_util.h"
 
-int cub_cm_request_handler (Json::Value & request, Json::Value & response);
+int cub_cm_request_handler (Json::Value &request, Json::Value &response);
 void cub_cm_init_env ();
 
 #endif /*  */

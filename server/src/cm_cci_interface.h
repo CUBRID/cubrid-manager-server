@@ -21,33 +21,33 @@
 #define __CM_CII_H__
 #include <json/json.h>
 
-typedef int (*T_HTTP_TASK_FUNC) (Json::Value & request,
-                                 Json::Value & response);
+typedef int (*T_HTTP_TASK_FUNC) (Json::Value &request,
+                                 Json::Value &response);
 
 typedef struct
 {
-    const char *task_str;
-    int task_code;
-    T_HTTP_TASK_FUNC task_func;
+  const char *task_str;
+  int task_code;
+  T_HTTP_TASK_FUNC task_func;
 } T_HTTP_TASK_INFO;
 
 typedef union tagUNI_CCI_A_TYPE
 {
-    char *str;
-    int i;
-    short s;
-    float f;
-    double d;
+  char *str;
+  int i;
+  short s;
+  float f;
+  double d;
 } UNI_CCI_A_TYPE;
 
 #define JSON_FIND_V(root, key, err)     \
     if (Json::Value::null == root[key]) \
         return err;
 
-int http_cubrid_exportdb (Json::Value & request, Json::Value & response);
-int http_cubrid_importdb (Json::Value & request, Json::Value & response);
-int http_cubrid_sql (Json::Value & request, Json::Value & response);
-int get_cci_task_info (const char *task, T_HTTP_TASK_FUNC * task_func);
-int cub_cci_request_handler (Json::Value & request, Json::Value & response);
+int http_cubrid_exportdb (Json::Value &request, Json::Value &response);
+int http_cubrid_importdb (Json::Value &request, Json::Value &response);
+int http_cubrid_sql (Json::Value &request, Json::Value &response);
+int get_cci_task_info (const char *task, T_HTTP_TASK_FUNC *task_func);
+int cub_cci_request_handler (Json::Value &request, Json::Value &response);
 
 #endif

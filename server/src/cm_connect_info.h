@@ -30,19 +30,19 @@
 /* conlist */
 typedef struct
 {
-    char dbname[DBMT_USER_NAME_LEN];
-    char uid[32];
-    char passwd[80];
+  char dbname[DBMT_USER_NAME_LEN];
+  char uid[32];
+  char passwd[80];
 } T_DBMT_CON_DBINFO;
 
 typedef struct
 {
-    char user_name[DBMT_USER_NAME_LEN];
-    char cli_ip[20];
-    char cli_port[10];
-    char cli_ver[15];
-    int num_con_dbinfo;
-    T_DBMT_CON_DBINFO *con_dbinfo;
+  char user_name[DBMT_USER_NAME_LEN];
+  char cli_ip[20];
+  char cli_port[10];
+  char cli_ver[15];
+  int num_con_dbinfo;
+  T_DBMT_CON_DBINFO *con_dbinfo;
 } T_DBMT_CON_INFO;
 
 int dbmt_con_search (const char *ip, const char *port, char *cli_ver);
@@ -50,13 +50,13 @@ int dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
                   const char *user_name);
 int dbmt_con_delete (const char *ip, const char *port);
 
-int dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO * dbinfo, const char *ip,
+int dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
                           const char *port, const char *dbname,
                           char *_dbmt_error);
-int dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO * dbinfo, const char *ip,
+int dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
                            const char *port, const char *dbname,
                            int creat_flag, char *_dbmt_error);
-void dbmt_con_set_dbinfo (T_DBMT_CON_DBINFO * dbinfo, const char *dbname,
+void dbmt_con_set_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *dbname,
                           const char *uid, const char *passwd);
 
 #endif /* _CM_CONNECT_INFO_H_ */
