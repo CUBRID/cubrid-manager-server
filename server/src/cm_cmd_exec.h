@@ -1,19 +1,19 @@
 /*
  * Copyright (C) 2008 Search Solution Corporation. All rights reserved by Search Solution.
  *
- *   This program is free software; you can redistribute it and/or modify 
- *   it under the terms of the GNU General Public License as published by 
- *   the Free Software Foundation; either version 2 of the License, or 
- *   (at your option) any later version. 
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
  *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License 
- *  along with this program; if not, write to the Free Software 
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA 
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
 
@@ -82,157 +82,183 @@
 
 typedef enum
 {
-    CUBRID_MODE_CS = 0,
-    CUBRID_MODE_SA = 1
+  CUBRID_MODE_CS = 0,
+  CUBRID_MODE_SA = 1
 } T_CUBRID_MODE;
 
-struct SpaceDbVolumeInfoOldFormat{
-    int volid;
-    int total_size;
-    int free_size;
-    int data_size;
-    int index_size;
-    char purpose[COLUMN_VALUE_MAX_SIZE];
-    char location[PATH_MAX];
-    char vol_name[PATH_MAX];
-    time_t date;
+struct SpaceDbVolumeInfoOldFormat
+{
+  int volid;
+  int total_size;
+  int free_size;
+  int data_size;
+  int index_size;
+  char purpose[COLUMN_VALUE_MAX_SIZE];
+  char location[PATH_MAX];
+  char vol_name[PATH_MAX];
+  time_t date;
 };
 
-struct SpaceDbVolumeInfoNewFormat{
-    int volid;
-    int used_size;
-    int free_size;
-    int total_size;
-    char type[COLUMN_VALUE_MAX_SIZE];
-    char purpose[COLUMN_VALUE_MAX_SIZE];
-    char volume_name[PATH_MAX];
-    time_t date;
+struct SpaceDbVolumeInfoNewFormat
+{
+  int volid;
+  int used_size;
+  int free_size;
+  int total_size;
+  char type[COLUMN_VALUE_MAX_SIZE];
+  char purpose[COLUMN_VALUE_MAX_SIZE];
+  char volume_name[PATH_MAX];
+  time_t date;
 };
 
-struct DatabaseSpaceDescription{
-    char type[COLUMN_VALUE_MAX_SIZE];
-    char purpose[COLUMN_VALUE_MAX_SIZE];
-    int volume_count;
-    int used_size;
-    int free_size;
-    int total_size;
+struct DatabaseSpaceDescription
+{
+  char type[COLUMN_VALUE_MAX_SIZE];
+  char purpose[COLUMN_VALUE_MAX_SIZE];
+  int volume_count;
+  int used_size;
+  int free_size;
+  int total_size;
 };
 
-struct FileSpaceDescription{
-    char data_type[COLUMN_VALUE_MAX_SIZE];
-    int file_count;
-    int used_size;
-    int file_table_size;
-    int reserved_size;
-    int total_size;
+struct FileSpaceDescription
+{
+  char data_type[COLUMN_VALUE_MAX_SIZE];
+  int file_count;
+  int used_size;
+  int file_table_size;
+  int reserved_size;
+  int total_size;
 };
 
-class GeneralSpacedbResult{
-protected:
+class GeneralSpacedbResult
+{
+  protected:
     int page_size;
     int log_page_size;
     char err_msg[ERR_MSG_SIZE];
-public:
-    GeneralSpacedbResult(){
-	page_size = 0;
-	log_page_size = 0;
-	err_msg[0] = '\0';
+  public:
+    GeneralSpacedbResult()
+    {
+      page_size = 0;
+      log_page_size = 0;
+      err_msg[0] = '\0';
     }
-    GeneralSpacedbResult(int page_size, int log_page_size){
-	this->page_size = page_size;
-	this->log_page_size = log_page_size;
-	err_msg[0] = '\0';
+    GeneralSpacedbResult (int page_size, int log_page_size)
+    {
+      this->page_size = page_size;
+      this->log_page_size = log_page_size;
+      err_msg[0] = '\0';
     }
-    int get_page_size(){
-	return page_size;
+    int get_page_size()
+    {
+      return page_size;
     }
-    int get_log_page_size(){
-	return log_page_size;
+    int get_log_page_size()
+    {
+      return log_page_size;
     }
-    void set_page_size(int page_size){
-	this->page_size = page_size;
+    void set_page_size (int page_size)
+    {
+      this->page_size = page_size;
     }
-    void set_log_page_size(int log_page_size){
-	this->log_page_size = log_page_size;
+    void set_log_page_size (int log_page_size)
+    {
+      this->log_page_size = log_page_size;
     }
-    const char *get_err_msg(){
-	return err_msg;
+    const char *get_err_msg()
+    {
+      return err_msg;
     }
-    void set_err_msg(char *str){
-	strncpy(err_msg, str, ERR_MSG_SIZE);
+    void set_err_msg (char *str)
+    {
+      strncpy (err_msg, str, ERR_MSG_SIZE);
     }
-    bool has_error(){
-	return err_msg[0] != '\0';
+    bool has_error()
+    {
+      return err_msg[0] != '\0';
     }
-    virtual void create_result(nvplist *res) = 0;
+    virtual void create_result (nvplist *res) = 0;
     virtual int get_cnt_tpage() = 0;
-    virtual void get_total_and_free_page(const char *type, double &free_page, double &total_page) = 0;
-    virtual time_t get_my_time(char *dbloca) = 0;
-    virtual void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname) = 0;
-    virtual void read_spacedb_output(FILE *fp) = 0;
-    virtual ~GeneralSpacedbResult(){}
+    virtual void get_total_and_free_page (const char *type, double &free_page, double &total_page) = 0;
+    virtual time_t get_my_time (char *dbloca) = 0;
+    virtual void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname) = 0;
+    virtual void read_spacedb_output (FILE *fp) = 0;
+    virtual ~GeneralSpacedbResult() {}
 };
 
-class SpaceDbResultNewFormat : public GeneralSpacedbResult{
-public:
-    SpaceDbResultNewFormat(){}
-    void add_volume(char *);
+class SpaceDbResultNewFormat : public GeneralSpacedbResult
+{
+  public:
+    SpaceDbResultNewFormat() {}
+    void add_volume (char *);
     int get_cnt_tpage();
-    void get_total_and_free_page(const char *type, double &free_page, double &total_page){
-	for (unsigned int i = 0; i < volumes.size(); i++) {
-	    if (strcmp(volumes[i].purpose, type) == 0) {
-		total_page += volumes[i].total_size;
-		free_page += volumes[i].free_size;
-	    }
-	}
+    void get_total_and_free_page (const char *type, double &free_page, double &total_page)
+    {
+      for (unsigned int i = 0; i < volumes.size(); i++)
+        {
+          if (strcmp (volumes[i].purpose, type) == 0)
+            {
+              total_page += volumes[i].total_size;
+              free_page += volumes[i].free_size;
+            }
+        }
     }
-    time_t get_my_time(char *dbloca);
-    void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname);
-    void read_spacedb_output(FILE *fp);
-    void create_result(nvplist *res);
+    time_t get_my_time (char *dbloca);
+    void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname);
+    void read_spacedb_output (FILE *fp);
+    void create_result (nvplist *res);
 
     DatabaseSpaceDescription databaseSpaceDescriptions[DATABASE_DESCRIPTION_NUM_LINES];
     FileSpaceDescription fileSpaceDescriptions[FILES_DESCRIPTION_NUM_LINES];
-private:
+  private:
     std::vector<SpaceDbVolumeInfoNewFormat> volumes;
 };
 
-class SpaceDbResultOldFormat : public GeneralSpacedbResult{
-public:
-    SpaceDbResultOldFormat(){}
-    int get_volume_info(char *, SpaceDbVolumeInfoOldFormat&);
-    int add_volume(char *str_buf){
-	SpaceDbVolumeInfoOldFormat volume;
-	int rc = get_volume_info(str_buf, volume);
-	if(rc == TRUE) {
-	    volumes.push_back(volume);
-	}
-	return rc;
+class SpaceDbResultOldFormat : public GeneralSpacedbResult
+{
+  public:
+    SpaceDbResultOldFormat() {}
+    int get_volume_info (char *, SpaceDbVolumeInfoOldFormat &);
+    int add_volume (char *str_buf)
+    {
+      SpaceDbVolumeInfoOldFormat volume;
+      int rc = get_volume_info (str_buf, volume);
+      if (rc == TRUE)
+        {
+          volumes.push_back (volume);
+        }
+      return rc;
     }
 
-    int add_temporary_volume(char *str_buf){
-	SpaceDbVolumeInfoOldFormat volume;
-	int rc = get_volume_info(str_buf, volume);
-	if(rc == TRUE) {
-	    temporary_volumes.push_back(volume);
-	}
-	return rc;
+    int add_temporary_volume (char *str_buf)
+    {
+      SpaceDbVolumeInfoOldFormat volume;
+      int rc = get_volume_info (str_buf, volume);
+      if (rc == TRUE)
+        {
+          temporary_volumes.push_back (volume);
+        }
+      return rc;
     }
 
-    void create_result(nvplist *);
-    void get_total_and_free_page(const char *type, double &free_page, double &total_page){
-	for (unsigned int i = 0; i < volumes.size(); i++) {
-	    if (strcmp(volumes[i].purpose, type) == 0) {
-		total_page += volumes[i].total_size;
-		free_page += volumes[i].free_size;
-	    }
-	}
+    void create_result (nvplist *);
+    void get_total_and_free_page (const char *type, double &free_page, double &total_page)
+    {
+      for (unsigned int i = 0; i < volumes.size(); i++)
+        {
+          if (strcmp (volumes[i].purpose, type) == 0)
+            {
+              total_page += volumes[i].total_size;
+              free_page += volumes[i].free_size;
+            }
+        }
     }
     int get_cnt_tpage();
-    time_t get_my_time(char *dbloca);
-    void auto_add_volume(autoaddvoldb_node *current, int db_mode, char *dbname);
-    void read_spacedb_output(FILE *);
-private:
+    time_t get_my_time (char *dbloca);
+    void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname);
+    void read_spacedb_output (FILE *);
+  private:
     std::vector<SpaceDbVolumeInfoOldFormat> volumes;
     std::vector<SpaceDbVolumeInfoOldFormat> temporary_volumes;
 };

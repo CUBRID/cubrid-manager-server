@@ -1,25 +1,25 @@
 /*
- * Copyright (C) 2008 Search Solution Corporation. All rights reserved by Search Solution. 
+ * Copyright (C) 2008 Search Solution Corporation. All rights reserved by Search Solution.
  *
- *   This program is free software; you can redistribute it and/or modify 
- *   it under the terms of the GNU General Public License as published by 
- *   the Free Software Foundation; either version 2 of the License, or 
- *   (at your option) any later version. 
+ *   This program is free software; you can redistribute it and/or modify
+ *   it under the terms of the GNU General Public License as published by
+ *   the Free Software Foundation; either version 2 of the License, or
+ *   (at your option) any later version.
  *
- *  This program is distributed in the hope that it will be useful, 
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of 
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
- *  GNU General Public License for more details. 
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License 
- *  along with this program; if not, write to the Free Software 
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA 
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  */
 
 
 /*
- * server_stat.c - 
+ * server_stat.c -
  */
 
 #ident "$Id$"
@@ -63,16 +63,16 @@
 
 #ifdef HOST_MONITOR_PROC
 static long percentages (int cnt, int *out1, register long *new1,
-			 register long *old, long *diffs);
+                         register long *old, long *diffs);
 static void get_swapinfo (int *total, int *fr);
-static int get_system_info (kstat_ctl_t * kc, sys_stat * sst);
+static int get_system_info (kstat_ctl_t *kc, sys_stat *sst);
 #ifdef HOST_MONITOR_IO
-static void record_iostat (nvplist * res);
+static void record_iostat (nvplist *res);
 #endif /* ifdef HOST_MONITOR_IO */
 #endif /* ifdef HOST_MONITOR_PROC */
 
 void
-record_system_info (sys_stat * sstat)
+record_system_info (sys_stat *sstat)
 {
 #ifdef HOST_MONITOR_PROC
   static kstat_ctl_t *kc = NULL;
@@ -84,12 +84,14 @@ record_system_info (sys_stat * sstat)
     }
 
   while (get_system_info (kc, sstat) < 0)
-    SLEEP_MILISEC (0, 100);
+    {
+      SLEEP_MILISEC (0, 100);
+    }
 #endif
 }
 
 void
-record_cubrid_proc_info (userdata * ud)
+record_cubrid_proc_info (userdata *ud)
 {
 #ifdef HOST_MONITOR_PROC
   int i, fd;
@@ -102,28 +104,28 @@ record_cubrid_proc_info (userdata * ud)
   for (i = 0; i < MAX_INSTALLED_DB; ++i)
     {
       if (vect[i])
-	{
-	  sprintf (procbuf, "/proc/%d", buff[i].db_pid);
-	  if ((fd = open (procbuf, O_RDONLY)) == -1)
-	    {
-	      ud->dbsrv_refresh_flag = 1;
-	      continue;
-	    }
-	  if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
-	    {
-	      ud->dbsrv_refresh_flag = 1;
-	      close (fd);
-	      continue;
-	    }
-	  close (fd);
+        {
+          sprintf (procbuf, "/proc/%d", buff[i].db_pid);
+          if ((fd = open (procbuf, O_RDONLY)) == -1)
+            {
+              ud->dbsrv_refresh_flag = 1;
+              continue;
+            }
+          if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
+            {
+              ud->dbsrv_refresh_flag = 1;
+              close (fd);
+              continue;
+            }
+          close (fd);
 
-	  /* fill in the structure */
-	  buff[i].db_size = (unsigned long) psbuff.pr_bysize >> 10;
-	  buff[i].proc_stat[0] = psbuff.pr_sname;
-	  buff[i].db_start_time = psbuff.pr_start.tv_sec;
-	  buff[i].db_cpu_usage = (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
-	  buff[i].db_mem_usage = (((double) psbuff.pr_pctmem) / 0x8000 * 100);
-	}
+          /* fill in the structure */
+          buff[i].db_size = (unsigned long) psbuff.pr_bysize >> 10;
+          buff[i].proc_stat[0] = psbuff.pr_sname;
+          buff[i].db_start_time = psbuff.pr_start.tv_sec;
+          buff[i].db_cpu_usage = (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
+          buff[i].db_mem_usage = (((double) psbuff.pr_pctmem) / 0x8000 * 100);
+        }
     }
 #endif
 }
@@ -139,27 +141,29 @@ record_unicas_proc_info (int vect[], cas_stat buff[])
   for (i = 0; i < MAX_UNICAS_PROC; ++i)
     {
       if (vect[i])
-	{
-	  sprintf (procbuf, "/proc/%d", buff[i].cas_pid);
+        {
+          sprintf (procbuf, "/proc/%d", buff[i].cas_pid);
 
-	  if ((fd = open (procbuf, O_RDONLY)) == -1)
-	    {
-	      vect[i] = 0;
-	      continue;
-	    }
-	  if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
-	    continue;
-	  close (fd);
+          if ((fd = open (procbuf, O_RDONLY)) == -1)
+            {
+              vect[i] = 0;
+              continue;
+            }
+          if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
+            {
+              continue;
+            }
+          close (fd);
 
-	  /* fill in the structure */
-	  buff[i].cas_size = (unsigned long) psbuff.pr_bysize >> 10;
-	  buff[i].proc_stat[0] = psbuff.pr_sname;
-	  buff[i].cas_start_time = psbuff.pr_start.tv_sec;
-	  buff[i].cas_cpu_usage =
-	    (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
-	  buff[i].cas_mem_usage =
-	    (((double) psbuff.pr_pctmem) / 0x8000 * 100);
-	}
+          /* fill in the structure */
+          buff[i].cas_size = (unsigned long) psbuff.pr_bysize >> 10;
+          buff[i].proc_stat[0] = psbuff.pr_sname;
+          buff[i].cas_start_time = psbuff.pr_start.tv_sec;
+          buff[i].cas_cpu_usage =
+            (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
+          buff[i].cas_mem_usage =
+            (((double) psbuff.pr_pctmem) / 0x8000 * 100);
+        }
     }
 #endif
 }
@@ -167,7 +171,7 @@ record_unicas_proc_info (int vect[], cas_stat buff[])
 #ifdef HOST_MONITOR_PROC
 static long
 percentages (int cnt, int *out1, register long *new1, register long *old,
-	     long *diffs)
+             long *diffs)
 {
   register int i;
   register long change;
@@ -183,10 +187,10 @@ percentages (int cnt, int *out1, register long *new1, register long *old,
   for (i = 0; i < cnt; i++)
     {
       if ((change = *new1 - *old) < 0)
-	{
-	  /* this only happens when the counter wraps */
-	  change = (int) ((unsigned long) *new1 - (unsigned long) *old);
-	}
+        {
+          /* this only happens when the counter wraps */
+          change = (int) ((unsigned long) *new1 - (unsigned long) *old);
+        }
       total_change += (*dp++ = change);
       *old++ = *new1++;
     }
@@ -233,7 +237,7 @@ get_swapinfo (int *total, int *fr)
   /* allocate enough space to hold count + n swapents */
   swt =
     (struct swaptable *) malloc (sizeof (int) +
-				 cnt * sizeof (struct swapent));
+                                 cnt * sizeof (struct swapent));
   if (swt == NULL)
     {
       *total = 0;
@@ -244,7 +248,7 @@ get_swapinfo (int *total, int *fr)
 
   /* fill in ste_path pointers: we don't care about the paths, so we point
      them all to the same buffer */
-  ste = &(swt->swt_ent[0]);
+  ste = & (swt->swt_ent[0]);
   i = cnt;
   while (--i >= 0)
     {
@@ -256,16 +260,16 @@ get_swapinfo (int *total, int *fr)
 
   /* walk thru the structs and sum up the fields */
   t = f = 0;
-  ste = &(swt->swt_ent[0]);
+  ste = & (swt->swt_ent[0]);
   i = cnt;
   while (--i >= 0)
     {
       /* don't count slots being deleted */
-      if (!(ste->ste_flags & ST_INDEL) && !(ste->ste_flags & ST_DOINGDEL))
-	{
-	  t += ste->ste_pages;
-	  f += ste->ste_free;
-	}
+      if (! (ste->ste_flags & ST_INDEL) && ! (ste->ste_flags & ST_DOINGDEL))
+        {
+          t += ste->ste_pages;
+          f += ste->ste_free;
+        }
       ste++;
     }
 
@@ -277,7 +281,7 @@ get_swapinfo (int *total, int *fr)
 }
 
 static int
-get_system_info (kstat_ctl_t * kc, sys_stat * sst)
+get_system_info (kstat_ctl_t *kc, sys_stat *sst)
 {
   kstat_t *ksp;
   kstat_named_t *kn;
@@ -327,33 +331,37 @@ kcid_changed:
     {
       ncpu = 0;
       for (ksp = kc->kc_chain; ksp && ncpu < MAX_CPU; ksp = ksp->ks_next)
-	{
-	  if (strncmp (ksp->ks_name, "cpu_stat", 8) == 0)
-	    {
-	      nkcid = kstat_read (kc, ksp, NULL);
-	      CHECK_KCID (nkcid, kcid);
-	      cpu_ks[ncpu] = ksp;
-	      ncpu++;
-	    }
-	}
+        {
+          if (strncmp (ksp->ks_name, "cpu_stat", 8) == 0)
+            {
+              nkcid = kstat_read (kc, ksp, NULL);
+              CHECK_KCID (nkcid, kcid);
+              cpu_ks[ncpu] = ksp;
+              ncpu++;
+            }
+        }
     }
 
   for (i = 0; i < ncpu; i++)
     {
-      nkcid = kstat_read (kc, cpu_ks[i], &(cpu_stat[i]));
+      nkcid = kstat_read (kc, cpu_ks[i], & (cpu_stat[i]));
       CHECK_KCID (nkcid, kcid);
     }
 
   for (j = 0; j < CPUSTATES; j++)
-    cp_time[j] = 0L;
+    {
+      cp_time[j] = 0L;
+    }
 
   for (i = 0; i < ncpu; i++)
     {
       for (j = 0; j < CPU_WAIT; j++)
-	cp_time[j] += (long) cpu_stat[i].cpu_sysinfo.cpu[j];
+        {
+          cp_time[j] += (long) cpu_stat[i].cpu_sysinfo.cpu[j];
+        }
 
       cp_time[CPUSTATE_IOWAIT] += (long) cpu_stat[i].cpu_sysinfo.wait[W_IO] +
-	(long) cpu_stat[i].cpu_sysinfo.wait[W_PIO];
+                                  (long) cpu_stat[i].cpu_sysinfo.wait[W_PIO];
       cp_time[CPUSTATE_SWAP] = (long) cpu_stat[i].cpu_sysinfo.wait[W_SWAP];
     }
 
@@ -363,7 +371,9 @@ kcid_changed:
    *  collect memory information
    */
   if (pagesize == 0)
-    pagesize = sysconf (_SC_PAGESIZE);
+    {
+      pagesize = sysconf (_SC_PAGESIZE);
+    }
   if (maxmem == 0)
     {
       maxmem = sysconf (_SC_PHYS_PAGES);
@@ -380,7 +390,9 @@ kcid_changed:
       sst->memory_stats[2] = PAGETOM (kn->value.ui32, pagesize);
 
       if (sst->memory_stats[0] - sst->memory_stats[2] > 0)
-	sst->memory_stats[1] = sst->memory_stats[0] - sst->memory_stats[2];
+        {
+          sst->memory_stats[1] = sst->memory_stats[0] - sst->memory_stats[2];
+        }
       freemem_check_time = time (NULL);
     }
 
@@ -397,27 +409,33 @@ kcid_changed:
 
 #ifdef HOST_MONITOR_IO
 static void
-record_iostat (nvplist * res)
+record_iostat (nvplist *res)
 {
   FILE *infile;
   char buf[1024], d[256], rs[16], ws[16], krs[16], kws[16], wait[16],
-    actv[16], svc_t[16], w[16], b[16], tmpfile[256];
+       actv[16], svc_t[16], w[16], b[16], tmpfile[256];
   sprintf (tmpfile, "%s/DBMT_rec_iostat.%d", sco.dbmt_tmp_dir,
-	   (int) getpid ());
+           (int) getpid ());
   sprintf (buf, "/usr/bin/iostat -x > %s", tmpfile);
 
   if (system (buf) != 0)	/* iostat */
-    return;
+    {
+      return;
+    }
   infile = fopen (tmpfile, "r");
   if (infile == NULL)
-    return;
+    {
+      return;
+    }
   fgets (buf, 1024, infile);
   fgets (buf, 1024, infile);
   while (fgets (buf, 1024, infile))
     {
       if (sscanf (buf, "%s %s %s %s %s %s %s %s %s %s",
-		  d, rs, ws, krs, kws, wait, actv, svc_t, w, b) != 10)
-	continue;
+                  d, rs, ws, krs, kws, wait, actv, svc_t, w, b) != 10)
+        {
+          continue;
+        }
       /* name of the disk */
       nv_add_nvp (res, "device", d);
       /* reads per second */

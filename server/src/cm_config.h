@@ -500,101 +500,101 @@
 
 typedef enum
 {
-    CMS_TRAN_UNKNOWN_ISOLATION = 0x00,                 /*        0  0000 */
-    CMS_TRAN_COMMIT_CLASS_UNCOMMIT_INSTANCE = 0x01,    /*        0  0001 */
-    CMS_TRAN_DEGREE_1_CONSISTENCY = 0x01,              /* Alias of above */
+  CMS_TRAN_UNKNOWN_ISOLATION = 0x00,                 /*        0  0000 */
+  CMS_TRAN_COMMIT_CLASS_UNCOMMIT_INSTANCE = 0x01,    /*        0  0001 */
+  CMS_TRAN_DEGREE_1_CONSISTENCY = 0x01,              /* Alias of above */
 
-    CMS_TRAN_COMMIT_CLASS_COMMIT_INSTANCE = 0x02,      /*        0  0010 */
-    CMS_TRAN_DEGREE_2_CONSISTENCY = 0x02,              /* Alias of above */
+  CMS_TRAN_COMMIT_CLASS_COMMIT_INSTANCE = 0x02,      /*        0  0010 */
+  CMS_TRAN_DEGREE_2_CONSISTENCY = 0x02,              /* Alias of above */
 
-    CMS_TRAN_REP_CLASS_UNCOMMIT_INSTANCE = 0x03,       /*        0  0011 */
-    CMS_TRAN_READ_UNCOMMITTED = 0x03,                  /* Alias of above */
+  CMS_TRAN_REP_CLASS_UNCOMMIT_INSTANCE = 0x03,       /*        0  0011 */
+  CMS_TRAN_READ_UNCOMMITTED = 0x03,                  /* Alias of above */
 
-    CMS_TRAN_REP_CLASS_COMMIT_INSTANCE = 0x04,         /*        0  0100 */
-    CMS_TRAN_READ_COMMITTED = 0x04,                    /* Alias of above */
-    CMS_TRAN_CURSOR_STABILITY = 0x04,                  /* Alias of above */
+  CMS_TRAN_REP_CLASS_COMMIT_INSTANCE = 0x04,         /*        0  0100 */
+  CMS_TRAN_READ_COMMITTED = 0x04,                    /* Alias of above */
+  CMS_TRAN_CURSOR_STABILITY = 0x04,                  /* Alias of above */
 
-    CMS_TRAN_REP_CLASS_REP_INSTANCE = 0x05,            /*        0  0101 */
-    CMS_TRAN_REP_READ = 0x05,                          /* Alias of above */
-    CMS_TRAN_DEGREE_2_9999_CONSISTENCY = 0x05,         /* Alias of above */
+  CMS_TRAN_REP_CLASS_REP_INSTANCE = 0x05,            /*        0  0101 */
+  CMS_TRAN_REP_READ = 0x05,                          /* Alias of above */
+  CMS_TRAN_DEGREE_2_9999_CONSISTENCY = 0x05,         /* Alias of above */
 
-    CMS_TRAN_SERIALIZABLE = 0x06,                      /*        0  0110 */
-    CMS_TRAN_DEGREE_3_CONSISTENCY = 0x06,              /* Alias of above */
-    CMS_TRAN_NO_PHANTOM_READ = 0x06,                   /* Alias of above */
+  CMS_TRAN_SERIALIZABLE = 0x06,                      /*        0  0110 */
+  CMS_TRAN_DEGREE_3_CONSISTENCY = 0x06,              /* Alias of above */
+  CMS_TRAN_NO_PHANTOM_READ = 0x06,                   /* Alias of above */
 
-    CMS_TRAN_DEFAULT_ISOLATION = CMS_TRAN_REP_CLASS_UNCOMMIT_INSTANCE,
+  CMS_TRAN_DEFAULT_ISOLATION = CMS_TRAN_REP_CLASS_UNCOMMIT_INSTANCE,
 
 } CMS_DB_TRAN_ISOLATION;                             /* extract from dbi.h */
 
 
 typedef enum
 {
-    FID_DBMT_CONF,
-    FID_DBMT_PASS,
-    FID_DBMT_CUBRID_PASS,
-    FID_CONN_LIST,
-    FID_AUTO_ADDVOLDB_CONF,
-    FID_AUTO_ADDVOLDB_LOG,
-    FID_AUTO_BACKUPDB_CONF,
-    FID_AUTO_HISTORY_CONF,
-    FID_AUTO_EXECQUERY_CONF,
-    FID_PSVR_DBINFO_TEMP,
-    FID_LOCK_CONN_LIST,
-    FID_LOCK_PSVR_DBINFO,
-    FID_LOCK_SVR_LOG,
-    FID_LOCK_DBMT_PASS,
-    FID_DIAG_ACTIVITY_LOG,
-    FID_DIAG_STATUS_TEMPLATE,
-    FID_DIAG_ACTIVITY_TEMPLATE,
-    FID_DIAG_SERVER_PID,
-    FID_CMSERVER_PID,
-    FID_CMS_LOG,
-    FID_CMS_ERROR_LOG,
-    FID_AUTO_JOBS_CONF,
-    FID_SHARD_CONF,
+  FID_DBMT_CONF,
+  FID_DBMT_PASS,
+  FID_DBMT_CUBRID_PASS,
+  FID_CONN_LIST,
+  FID_AUTO_ADDVOLDB_CONF,
+  FID_AUTO_ADDVOLDB_LOG,
+  FID_AUTO_BACKUPDB_CONF,
+  FID_AUTO_HISTORY_CONF,
+  FID_AUTO_EXECQUERY_CONF,
+  FID_PSVR_DBINFO_TEMP,
+  FID_LOCK_CONN_LIST,
+  FID_LOCK_PSVR_DBINFO,
+  FID_LOCK_SVR_LOG,
+  FID_LOCK_DBMT_PASS,
+  FID_DIAG_ACTIVITY_LOG,
+  FID_DIAG_STATUS_TEMPLATE,
+  FID_DIAG_ACTIVITY_TEMPLATE,
+  FID_DIAG_SERVER_PID,
+  FID_CMSERVER_PID,
+  FID_CMS_LOG,
+  FID_CMS_ERROR_LOG,
+  FID_AUTO_JOBS_CONF,
+  FID_SHARD_CONF,
 } T_DBMT_FILE_ID;
 
 typedef struct
 {
-    T_DBMT_FILE_ID fid;
-    char dir_name[PATH_MAX];
-    char file_name[32];
+  T_DBMT_FILE_ID fid;
+  char dir_name[PATH_MAX];
+  char file_name[32];
 } T_DBMT_FILE_INFO;
 
 typedef struct
 {
-    /*
-     *  program name (either fserver or pserver)
-     */
-    char *szProgname;
+  /*
+   *  program name (either fserver or pserver)
+   */
+  char *szProgname;
 
-    /*
-     *  CUBRID environment variables
-     */
-    char *szCubrid;              /* CUBRID           */
-    char *szCubrid_databases;    /* CUBRID_DATABASES */
+  /*
+   *  CUBRID environment variables
+   */
+  char *szCubrid;              /* CUBRID           */
+  char *szCubrid_databases;    /* CUBRID_DATABASES */
 
-    char *dbmt_tmp_dir;
+  char *dbmt_tmp_dir;
 
-    int iMonitorInterval;
-    char sMonStatDataPath[PATH_MAX];
-    char szCWMPath[PATH_MAX];
-    char szSSLKey[PATH_MAX];
-    char szSSLCertificate[PATH_MAX];
-    int iAllow_AdminMultiCon;
-    int iAutoJobTimeout;
-    int iCMS_port;
-    int iSupportWebManager;
-    int iSupportMonStat;
-    int iHttpTimeout;
-    char szAutoUpdateURL[PATH_MAX];
-    char szCMSVersion[PATH_MAX];
-    char szTokenActiveTime[PATH_MAX];
-    int hmtab1, hmtab2, hmtab3, hmtab4;
-    char szAccessLog[PATH_MAX];
-    char szErrorLog[PATH_MAX];
-    int iMaxLogFileSize;
-    int iMaxLogFiles;
+  int iMonitorInterval;
+  char sMonStatDataPath[PATH_MAX];
+  char szCWMPath[PATH_MAX];
+  char szSSLKey[PATH_MAX];
+  char szSSLCertificate[PATH_MAX];
+  int iAllow_AdminMultiCon;
+  int iAutoJobTimeout;
+  int iCMS_port;
+  int iSupportWebManager;
+  int iSupportMonStat;
+  int iHttpTimeout;
+  char szAutoUpdateURL[PATH_MAX];
+  char szCMSVersion[PATH_MAX];
+  char szTokenActiveTime[PATH_MAX];
+  int hmtab1, hmtab2, hmtab3, hmtab4;
+  char szAccessLog[PATH_MAX];
+  char szErrorLog[PATH_MAX];
+  int iMaxLogFileSize;
+  int iMaxLogFiles;
 } sys_config;
 
 void sys_config_init (void);
@@ -617,8 +617,8 @@ extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
                              char *dest_dbname);
 extern int auto_conf_execquery_update_dbuser (const char *src_db_uid,
-                                              const char *dest_db_uid,
-                                              const char *dest_db_passwd);
+    const char *dest_db_uid,
+    const char *dest_db_passwd);
 extern int auto_conf_execquery_delete_by_dbuser (const char *db_uid);
 
 #endif                /* _CM_CONFIG_H_ */
