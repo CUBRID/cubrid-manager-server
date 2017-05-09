@@ -400,7 +400,7 @@ read_csql_error_file (char *err_file, char *err_buf, int err_buf_size)
             {
                 snprintf (err_buf, err_buf_size - 1, "%s", buf + 6);
             }
-            msg_size = strlen (buf + 6);
+            msg_size = (int) strlen (buf + 6);
             break;
         }
         else if (strstr (buf, "*** ERROR") != NULL)
@@ -412,7 +412,7 @@ read_csql_error_file (char *err_file, char *err_buf, int err_buf_size)
             {
                 snprintf (err_buf, err_buf_size - 1, "%s", buf);
             }
-            msg_size = strlen (buf);
+            msg_size = (int) strlen (buf);
             break;
         }
     }
@@ -494,7 +494,7 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
         {
             break;
         }
-        msg_size += strlen (buf);
+        msg_size += (int) strlen (buf);
         rm_prev_flag = 0;
     }
     err_buf[err_buf_size - 1] = '\0';
@@ -700,7 +700,7 @@ read_start_server_output (char *stdout_file, char *stderr_file,
             while (fgets (buf, sizeof (buf), fp2) != NULL)
             {
                 ut_trim (buf);
-                len += strlen (buf);
+                len += (int) strlen (buf);
                 if (len < (DBMT_ERROR_MSG_SIZE - 1))
                 {
                     strcpy (_dbmt_error, buf);

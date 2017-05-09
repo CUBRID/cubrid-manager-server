@@ -565,7 +565,7 @@ ut_getline (char **lineptr, int *n, FILE * fp)
 void
 uRemoveCRLF (char *str)
 {
-    int i;
+    size_t i;
     if (str == NULL)
         return;
     for (i = strlen (str) - 1; (i >= 0) && (str[i] == 10 || str[i] == 13); i--)
@@ -739,7 +739,7 @@ ut_send_response (SOCKET fd, nvplist * res)
 
             uEncrypt (str_len, dst_buffer (res->nvpairs[i]->value),
                       encrypt_buf);
-            write_to_socket (fd, encrypt_buf, strlen (encrypt_buf));
+            write_to_socket (fd, encrypt_buf, (int) strlen (encrypt_buf));
 
             FREE_MEM (encrypt_buf);
         }
@@ -794,7 +794,7 @@ ut_receive_request (SOCKET fd, nvplist * req)
                         int len;
                         char *decrypt_buf;
 
-                        len = strlen (p);
+                        len = (int) strlen (p);
                         if (len % 2)
                             goto error_return;
 
@@ -2241,7 +2241,7 @@ ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
 {
     char sbuf[TOKEN_LENGTH + 1];
     char token_string[TOKEN_ENC_LENGTH];
-    int i, len;
+    size_t i, len;
 
     if ((client_ip == NULL) || (client_port == NULL) || (dbmt_id == NULL))
         return NULL;
@@ -2663,8 +2663,8 @@ remove_extra_subdir (const char *dirpath, const char *pattern,
 int
 IsValidUserName (const char *pUserName)
 {
-    int len = 0;
-    int idx = 0;
+    size_t len = 0;
+    size_t idx = 0;
     if (!pUserName || !*pUserName)
         return -1;
 
@@ -2852,7 +2852,7 @@ get_short_filename (char *ret_name, int ret_name_len,
         return -1;
     }
 
-    if (ret_name_len <= strlen (short_filename))
+    if (ret_name_len <= (int) strlen (short_filename))
     {
         return -1;
     }
