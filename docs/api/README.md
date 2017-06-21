@@ -68,162 +68,162 @@ CMs Interfaces are conposed by Json and is used for communication between CMS an
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| getbrokersinfo | socket, http | ALL_AUTHORITY |
-| startbroker | socket, http | DBC, DBO, BRK |
-| stopbroker | socket, http | DBC, DBO, BRK |
-| getaddbrokerinfo | socket, http | ALL_AUTHORITY |
-| deletebroker | socket, http | DBC, DBO, BRK |
-| getbrokerstatus | socket, http | ALL_AUTHORITY |
-| broker_setparam | socket, http | DBC, DBO, BRK |
-| broker_start | socket, http | DBC, DBO, BRK |
-| broker_stop | socket, http | DBC, DBO, BRK |
-| broker_restart | socket, http | DBC, DBO, BRK |
-| getbrokerdiagdata | socket, http | ALL_AUTHORITY |
+| [startbroker](startbroker.md) | socket, http | DBC, DBO, BRK |
+| [stopbroker](stopbroker.md) | socket, http | DBC, DBO, BRK |
+| [getaddbrokerinfo](getaddbrokerinfo.md) | socket, http | ALL_AUTHORITY |
+| [deletebroker](deletebroker.md) | socket, http | DBC, DBO, BRK |
+| [getbrokerstatus](getbrokerstatus.md) | socket, http | ALL_AUTHORITY |
+| [broker_setparam](broker_setparam.md) | socket, http | DBC, DBO, BRK |
+| [broker_start](broker_start.md) | socket, http | DBC, DBO, BRK |
+| [broker_stop](broker_stop.md) | socket, http | DBC, DBO, BRK |
+| [broker_restart](broker_restart.md) | socket, http | DBC, DBO, BRK |
+| [getbrokerdiagdata](getbrokerdiagdata.md) | socket, http | ALL_AUTHORITY |
+| [getbrokersinfo](getbrokersinfo.md) | socket, http | ALL_AUTHORITY |
 
 ### DB
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| createdb | socket, http | DBC |
-| deletedb | socket, http | DBC |
-| renamedb | socket, http | DBC |
-| startdb | socket, http | DBC, DBO |
-| stopdb | socket, http | DBC, DBO |
-| dbspaceinfo | socket, http | ALL_AUTHORITY |
-| copydb | socket, http | DBC |
-| optimizedb | socket, http | DBC, DBO |
-| checkdb | socket, http | DBC, DBO |
-| compactdb | socket, http | DBC, DBO |
-| backupdb | socket, http | DBC, DBO |
-| unloaddb | socket, http | DBC, DBO |
-| loaddb | socket, http | DBC, DBO |
-| lockdb | socket, http | ALL_AUTHORITY |
-| restoredb | socket, http | DBC, DBO |
-| getdbsize | socket, http | ALL_AUTHORITY |
-| startinfo | socket, http | ALL_AUTHORITY |
-| getbackuplist | socket, http | ALL_AUTHORITY |
-| getdbprocstat | socket, http | ALL_AUTHORITY |
-| changemode | socket, http | DBC, DBO |
-| getdbmode | socket, http | ALL_AUTHORITY |
-| dbspace | socket, http | ALL_AUTHORITY |
-| addvoldb | socket, http | DBC, DBO |
-| class | socket, http | ALL_AUTHORITY |
-| classinfo | socket, http | ALL_AUTHORITY |
-| updateattribute | socket, http | ALL_AUTHORITY |
+| [createdb](createdb.md) | socket, http | DBC |
+| [deletedb](deletedb.md) | socket, http | DBC |
+| [renamedb](renamedb.md) | socket, http | DBC |
+| [startdb](startdb.md) | socket, http | DBC, DBO |
+| [stopdb](stopdb.md) | socket, http | DBC, DBO |
+| [dbspaceinfo](dbspaceinfo.md) | socket, http | ALL_AUTHORITY |
+| [copydb](copydb.md) | socket, http | DBC |
+| [optimizedb](optimizedb.md) | socket, http | DBC, DBO |
+| [checkdb](checkdb.md) | socket, http | DBC, DBO |
+| [compactdb](compactdb.md) | socket, http | DBC, DBO |
+| [backupdb](backupdb.md) | socket, http | DBC, DBO |
+| [unloaddb](unloaddb.md) | socket, http | DBC, DBO |
+| [loaddb](loaddb.md) | socket, http | DBC, DBO |
+| [lockdb](lockdb.md) | socket, http | ALL_AUTHORITY |
+| [restoredb](restoredb.md) | socket, http | DBC, DBO |
+| [getdbsize](getdbsize.md) | socket, http | ALL_AUTHORITY |
+| [startinfo](startinfo.md) | socket, http | ALL_AUTHORITY |
+| [getbackuplist](getbackuplist.md) | socket, http | ALL_AUTHORITY |
+| [getdbprocstat](getdbprocstat.md) | socket, http | ALL_AUTHORITY |
+| [changemode](changemode.md) | socket, http | DBC, DBO |
+| [getdbmode](getdbmode.md) | socket, http | ALL_AUTHORITY |
+| [dbspace](dbspace.md) | socket, http | ALL_AUTHORITY |
+| [addvoldb](addvoldb.md) | socket, http | DBC, DBO |
+| [class](class.md) | socket, http | ALL_AUTHORITY |
+| [classinfo](classinfo.md) | socket, http | ALL_AUTHORITY |
+| [updateattribute](updateattribute.md) | socket, http | ALL_AUTHORITY |
 
 ### DB User
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| userinfo | socket, http | ALL_AUTHORITY |
-| createuser | socket, http | DBO |
-| deleteuser | socket, http | DBO |
-| updateuser | socket, http | DBO |
-| userverify | socket, http | ALL_AUTHORITY |
+| [userinfo](userinfo.md) | socket, http | ALL_AUTHORITY |
+| [createuser](createuser.md) | socket, http | DBO |
+| [deleteuser](deleteuser.md) | socket, http | DBO |
+| [updateuser](updateuser.md) | socket, http | DBO |
+| [userverify](userverify.md) | socket, http | ALL_AUTHORITY |
 
 ### CM User
 
 | **Interface Name**| **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| getdbmtuserinfo | socket, http | ALL_AUTHORITY |
-| deletedbmtuser | socket, http | DBC |
-| updatedbmtuser | socket, http | DBC |
-| setdbmtpasswd | socket, http | DBC and Owner |
-| adddbmtuser | socket, http | DBC |
-| getaddvolstatus | socket, http | ALL_AUTHORITY |
-| dbmtuserlogin | socket, http | ALL_AUTHORITY |
-| adddbmtuser_new | http | DBC |
-| updatedbmtuser_new | http | DBC, DBO |
-| getdbmtuserinfo_new | http | DBC, DBO |
+| [getdbmtuserinfo](getdbmtuserinfo.md) | socket, http | ALL_AUTHORITY |
+| [deletedbmtuser](deletedbmtuser.md) | socket, http | DBC |
+| [updatedbmtuser](updatedbmtuser.md) | socket, http | DBC |
+| [setdbmtpasswd](setdbmtpasswd.md) | socket, http | DBC and Owner |
+| [adddbmtuser](adddbmtuser.md) | socket, http | DBC |
+| [getaddvolstatus](getaddvolstatus.md) | socket, http | ALL_AUTHORITY |
+| [dbmtuserlogin](dbmtuserlogin.md) | socket, http | ALL_AUTHORITY |
+| [adddbmtuser_new](adddbmtuser_new.md) | http | DBC |
+| [updatedbmtuser_new](updatedbmtuser_new.md) | http | DBC, DBO |
+| [getdbmtuserinfo_new](getdbmtuserinfo_new.md) | http | DBC, DBO |
 
 ### Transaction
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| gettransactioninfo | socket, http | ALL_AUTHORITY |
-| killtransaction | socket, http | DBC, DBO, MON |
+| [gettransactioninfo](gettransactioninfo.md) | socket, http | ALL_AUTHORITY |
+| [killtransaction](killtransaction.md) | socket, http | DBC, DBO, MON |
 
 ### Trigger
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| addtrigger | socket, http | DBC, DBO |
-| altertrigger | socket, http | DBC, DBO |
-| droptrigger | socket, http | DBC, DBO |
-| gettriggerinfo | socket, http | ALL_AUTHORITY |
+| [addtrigger](addtrigger.md) | socket, http | DBC, DBO |
+| [altertrigger](altertrigger.md) | socket, http | DBC, DBO |
+| [droptrigger](droptrigger.md) | socket, http | DBC, DBO |
+| [gettriggerinfo](gettriggerinfo.md) | socket, http | ALL_AUTHORITY |
 
 ### Automation
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| backupdbinfo | socket, http | ALL_AUTHORITY |
-| getbackupinfo | socket, http | ALL_AUTHORITY |
-| addbackupinfo | socket, http | DBC, DBO, JOB |
-| deletebackupinfo | socket, http | DBC, DBO, JOB |
-| setbackupinfo | socket, http | DBC, DBO, JOB |
-| getautoaddvol | socket, http | ALL_AUTHORITY |
-| setautoaddvol | socket, http | DBC, DBO |
-| getautoexecquery | socket, http | ALL_AUTHORITY |
-| setautoexecquery | socket, http | DBC, DBO, JOB |
-| setautostart | http | DBC, DBO, JOB |
-| getautostart | http | ALL_AUTHORITY |
-| getautojobconf | http | ALL_AUTHORITY |
-| setautojobconf | http | DBC, DBO, JOB |
-| execautostart | http | ALL_AUTHORITY |
+| [backupdbinfo](backupdbinfo.md) | socket, http | ALL_AUTHORITY |
+| [getbackupinfo](getbackupinfo.md) | socket, http | ALL_AUTHORITY |
+| [addbackupinfo](addbackupinfo.md) | socket, http | DBC, DBO, JOB |
+| [deletebackupinfo](deletebackupinfo.md) | socket, http | DBC, DBO, JOB |
+| [setbackupinfo](setbackupinfo.md) | socket, http | DBC, DBO, JOB |
+| [getautoaddvol](getautoaddvol.md) | socket, http | ALL_AUTHORITY |
+| [setautoaddvol](setautoaddvol.md) | socket, http | DBC, DBO |
+| [getautoexecquery](getautoexecquery.md) | socket, http | ALL_AUTHORITY |
+| [setautoexecquery](setautoexecquery.md) | socket, http | DBC, DBO, JOB |
+| [setautostart](setautostart.md) | http | DBC, DBO, JOB |
+| [getautostart](getautostart.md) | http | ALL_AUTHORITY |
+| [getautojobconf](getautojobconf.md) | http | ALL_AUTHORITY |
+| [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |
+| [execautostart](execautostart.md) | http | ALL_AUTHORITY |
 
 ### HA
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| heartbeatlist | socket, http | ALL_AUTHORITY |
-| rolechange | socket, http | DBC, DBO |
-| ha_reload | socket, http | DBC, DBO |
-| ha_status | socket, http | ALL_AUTHORITY |
-| ha_start | socket, http | DBC, DBO |
-| ha_stop | socket, http | DBC, DBO |
-| gethaapplyinfo | http | DBC, DBO |
+| [heartbeatlist](heartbeatlist.md) | socket, http | ALL_AUTHORITY |
+| [rolechange](rolechange.md) | socket, http | DBC, DBO |
+| [ha_reload](ha_reload.md) | socket, http | DBC, DBO |
+| [ha_status](ha_status.md) | socket, http | ALL_AUTHORITY |
+| [ha_start](ha_start.md) | socket, http | DBC, DBO |
+| [ha_stop](ha_stop.md) | socket, http | DBC, DBO |
+| [gethaapplyinfo](gethaapplyinfo.md) | http | DBC, DBO |
 
 ### Monitoring
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| get_mon_interval | http | MON |
-| set_mon_interval | http | ADMIN |
-| get_mon_statistic | http | MON |
-| monitorprocess | socket, http | ALL_AUTHORITY |
+| [get_mon_interval](get_mon_interval.md) | http | MON |
+| [set_mon_interval](set_mon_interval.md) | http | ADMIN |
+| [get_mon_statistic](get_mon_statistic.md) | http | MON |
+| [monitorprocess](monitorprocess.md) | socket, http | ALL_AUTHORITY |
 
 ### Log
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| getloginfo | socket, http | ALL_AUTHORITY |
+| [getloginfo](getloginfo.md) | socket, http | ALL_AUTHORITY |
 | [viewlog/viewlog2](viewlogviewlog2.md) | socket, http | ALL_AUTHORITY |
-| loadaccesslog | socket, http | ALL_AUTHORITY |
-| deleteaccesslog | socket, http | DBC, DBO |
-| deleteerrorlog | socket, http | DBC, DBO |
-| getautobackupdberrlog | socket, http | ALL_AUTHORITY |
-| getautoexecqueryerrlog | socket, http | ALL_AUTHORITY |
-| getautoaddvollog | socket, http | ALL_AUTHORITY |
-| getadminloginfo | socket, http | ALL_AUTHORITY |
-| getlogfileinfo | socket, http | ALL_AUTHORITY |
-| analyzecaslog | socket, http | ALL_AUTHORITY |
-| getcaslogtopresult | socket, http | ALL_AUTHORITY |
+| [loadaccesslog](loadaccesslog.md) | socket, http | ALL_AUTHORITY |
+| [deleteaccesslog](deleteaccesslog.md) | socket, http | DBC, DBO |
+| [deleteerrorlog](deleteerrorlog.md) | socket, http | DBC, DBO |
+| [getautobackupdberrlog](getautobackupdberrlog.md) | socket, http | ALL_AUTHORITY |
+| [getautoexecqueryerrlog](getautoexecqueryerrlog.md) | socket, http | ALL_AUTHORITY |
+| [getautoaddvollog](getautoaddvollog.md) | socket, http | ALL_AUTHORITY |
+| [getadminloginfo](getadminloginfo.md) | socket, http | ALL_AUTHORITY |
+| [getlogfileinfo](getlogfileinfo.md) | socket, http | ALL_AUTHORITY |
+| [analyzecaslog](analyzecaslog.md) | socket, http | ALL_AUTHORITY |
+| [getcaslogtopresult](getcaslogtopresult.md) | socket, http | ALL_AUTHORITY |
 
 ### Others
 
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
-| setsysparam | socket, http | DBC, DBO |
-| getallsysparam | socket, http | ALL_AUTHORITY |
-| plandump | socket, http | ALL_AUTHORITY |
-| paramdump | socket, http | ALL_AUTHORITY |
-| statdump | socket, http | ALL_AUTHORITY |
-| unloaddbinfo | socket, http | ALL_AUTHORITY |
-| backupvolinfo | socket, http | ALL_AUTHORITY |
-| getdiagdata | socket, http | ALL_AUTHORITY |
-| getstandbyserverstat | socket, http | ALL_AUTHORITY |
-| login | socket, http | ALL_AUTHORITY |
-| logout | socket, http | ALL_AUTHORITY |
-| getcmsenv | socket, http | ALL_AUTHORITY |
-| shard_start | socket, http | DBC, DBO, BRK |
-| shard_stop | socket, http | DBC, DBO, BRK |
+| [setsysparam](setsysparam.md) | socket, http | DBC, DBO |
+| [getallsysparam](getallsysparam.md) | socket, http | ALL_AUTHORITY |
+| [plandump](plandump.md) | socket, http | ALL_AUTHORITY |
+| [paramdump](paramdump.md) | socket, http | ALL_AUTHORITY |
+| [statdump](statdump.md) | socket, http | ALL_AUTHORITY |
+| [unloaddbinfo](unloaddbinfo.md) | socket, http | ALL_AUTHORITY |
+| [backupvolinfo](backupvolinfo.md) | socket, http | ALL_AUTHORITY |
+| [getdiagdata](getdiagdata.md) | socket, http | ALL_AUTHORITY |
+| [getstandbyserverstat](getstandbyserverstat.md) | socket, http | ALL_AUTHORITY |
+| [login](login.md) | socket, http | ALL_AUTHORITY |
+| [logout](logout.md) | socket, http | ALL_AUTHORITY |
+| [getcmsenv](getcmsenv.md) | socket, http | ALL_AUTHORITY |
+| [shard_start](shard_start.md) | socket, http | DBC, DBO, BRK |
+| [shard_stop](shard_stop.md) | socket, http | DBC, DBO, BRK |
