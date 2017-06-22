@@ -517,11 +517,6 @@ uCheckSystemConfig (char *progname)
     {
       return -1;
     }
-  /* check web manager path when user set it: szCWMPath */
-  if (check_path (sco.szCWMPath, progname) < 0)
-    {
-      return -1;
-    }
 
   return 1;
 }

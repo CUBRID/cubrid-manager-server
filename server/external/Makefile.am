@@ -19,23 +19,3 @@
 AUTOMAKE_OPTIONS = foreign
 
 EXTRA_DIST = openssl jsoncpp libevent
-
-all:
-	@echo "All OK"
-install: all
-	@echo "Make install for web manager"; \
-		(cp -rf $(srcdir)/../share $(DESTDIR)${prefix}/); \
-		(chmod -R +w $(DESTDIR)${prefix}/share/webmanager); \
-		(find $(DESTDIR)${prefix}/share -name '.svn' | xargs rm -rf); \
-		(echo "Install OK")
-        
-uninstall: clean-local-check
-	@echo "Making uninstall for web manager";\
-		(chmod -R +w $(DESTDIR)${prefix}/share/webmanager); \
-		(rm -rf $(DESTDIR)${prefix}/share/webmanager); \
-		(echo "Uninstall OK")
-
-clean-local: clean-local-check
-.PHONY: clean-local-check
-clean-local-check:
-	@echo "clean OK"
