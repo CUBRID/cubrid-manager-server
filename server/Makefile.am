@@ -20,4 +20,4 @@
 AUTOMAKE_OPTIONS = foreign
 SUBDIRS = cmserver external
 
-EXTRA_DIST = BUILD_NUMBER autogen.sh build_internal.bat build.bat build_server.bat build_external.sh test win src share
+EXTRA_DIST = BUILD_NUMBER autogen.sh build_internal.bat build.bat build_server.bat build_external.sh test win src
