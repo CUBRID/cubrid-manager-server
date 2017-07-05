@@ -535,7 +535,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
-      free (pstmt);
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to execute task");
     }
@@ -554,7 +554,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   CloseHandle (hHandles);
   response = pstmt->response;
-  free (pstmt);
+  delete (pstmt);
   return ERR_NO_ERROR;
 }
 #else
@@ -644,7 +644,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
-      free (pstmt);
+      delete (pstmt);
       pthread_mutex_destroy (&mutex);
       pthread_cond_destroy (&cond);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
@@ -670,7 +670,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pthread_mutex_destroy (&mutex);
   pthread_cond_destroy (&cond);
   response = pstmt->response;
-  free (pstmt);
+  delete (pstmt);
   return ERR_NO_ERROR;
 }
 #endif
