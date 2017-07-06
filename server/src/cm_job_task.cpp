@@ -15841,7 +15841,6 @@ release_src:
   CRYPTO_cleanup_all_ex_data ();
   if (pub_key != NULL)
     {
-      CRYPTO_mem_leaks (bio_err);
       BIO_free (bio_err);
     }
   return ret_val;

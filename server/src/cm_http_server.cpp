@@ -425,7 +425,10 @@ struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg)
   if (r == NULL)
     {
       LOG_ERROR ("-- Web server: Failed to create SSL connection.");
+      return NULL;
     }
+
+  bufferevent_openssl_set_allow_dirty_shutdown(r, 1);
   return r;
 }
 
@@ -575,7 +578,7 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   SSL_library_init ();
   /* We just use SSLv3,do not support SSLv2. */
 
-  ctx = SSL_CTX_new (SSLv23_server_method ());
+  ctx = SSL_CTX_new (TLSv1_server_method ());
   if (!ctx)
     {
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
@@ -583,6 +586,7 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   SSL_CTX_set_options (ctx,
                        SSL_OP_SINGLE_DH_USE |
                        SSL_OP_SINGLE_ECDH_USE |
+		       SSL_OP_NO_SSLv3 |
                        SSL_OP_NO_SSLv2);
 
   /* Find and set up our server certificate. */
