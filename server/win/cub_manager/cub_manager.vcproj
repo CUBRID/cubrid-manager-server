@@ -65,7 +65,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib ssleay32.lib libeay32.lib libevent.lib libevent_openssl.lib psapi.lib"
+				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib libcrypto.lib libssl.lib libevent.lib libevent_openssl.lib psapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;$(cubrid_libdir)&quot;;..\..\external\openssl\win_32\lib;..\..\external\libevent\lib"
 				IgnoreDefaultLibraryNames=""
@@ -142,7 +142,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib ssleay32.lib libeay32.lib libevent.lib libevent_openssl.lib psapi.lib"
+				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib libcrypto.lib libssl.lib libevent.lib libevent_openssl.lib psapi.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;$(cubrid_libdir)&quot;;..\..\external\openssl\win_64\lib;..\..\external\libevent\lib64"
 				GenerateDebugInformation="true"
@@ -220,7 +220,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib ssleay32.lib libeay32.lib libevent.lib libevent_openssl.lib psapi.lib"
+				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib libcrypto.lib libssl.lib libevent.lib libevent_openssl.lib psapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;$(cubrid_libdir)&quot;;..\..\external\openssl\win_32\lib;..\..\external\libevent\lib"
 				IgnoreDefaultLibraryNames=""
@@ -302,7 +302,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib ssleay32.lib libeay32.lib libevent.lib libevent_openssl.lib psapi.lib"
+				AdditionalDependencies="ws2_32.lib cascci.lib cmstat.lib cmdep.lib libcrypto.lib libssl.lib libevent.lib libevent_openssl.lib psapi.lib"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;$(cubrid_libdir)&quot;;..\..\external\openssl\win_64\lib;..\..\external\libevent\lib64"
 				GenerateDebugInformation="true"
