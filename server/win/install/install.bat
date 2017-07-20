@@ -18,10 +18,6 @@ copy %SRC_DIR%\..\..\cmserver\conf\*.conf %DEST_DIR%\conf
 copy %SRC_DIR%\..\..\cmserver\conf\*.pass %DEST_DIR%\conf
 copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl_cert.* %DEST_DIR%\conf
 
-if "%BUILD_TARGET%" == "x64"   copy %SRC_DIR%\..\..\external\openssl\win_64\bin\*.DLL %DEST_DIR%\bin
-
-if "%BUILD_TARGET%" == "Win32" copy %SRC_DIR%\..\..\external\openssl\win_32\bin\*.DLL %DEST_DIR%\bin
-
 if errorlevel 1 (
 	exit /b 0
 	)
