@@ -246,7 +246,8 @@ else
     if test ! -d $CUBRID_INCLUDEDIR; then
         AC_MSG_ERROR([--with-cubrid-includedir option not set properly, direcoty "$CUBRID_INCLUDEDIR" is not exist.])
     fi
-    CMDEP_LIB="-L$CUBRID_LIBDIR -lcmdep"
+    CUBCS_LIB="-lcubridcs"
+    CMDEP_LIB="-L$CUBRID_LIBDIR -lcmdep $CUBCS_LIB"
     CMSTAT_LIB="-L$CUBRID_LIBDIR -lcmstat $CMSTAT_LIB"
     SRC_INC="-I$CUBRID_INCLUDEDIR"
 fi
