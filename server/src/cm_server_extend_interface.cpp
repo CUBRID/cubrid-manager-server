@@ -2560,6 +2560,7 @@ bool ext_ut_validate_auth (Json::Value &request)
   // the user doesn't exist
   if (!matches)
     {
+      dbmt_user_free (&dbmt_user);
       return false;
     }
 
@@ -2571,6 +2572,8 @@ bool ext_ut_validate_auth (Json::Value &request)
           break;
         }
     }
+
+  dbmt_user_free (&dbmt_user);
 
   // assign default authority to old users.
   if (auth_user == 0)
