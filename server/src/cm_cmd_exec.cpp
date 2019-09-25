@@ -27,6 +27,9 @@
 #include <signal.h>
 #include <string.h>
 #include <config.h>
+#include <syscall.h>
+#include <pthread.h>
+#define ATOI_S(arg)	((arg) ?  atoi(arg) : (-1))
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -158,7 +161,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
   char cmd_name[CUBRID_CMD_NAME_LEN];
 
   cubrid_cmd_name (cmd_name);
-  snprintf (tmpfile, PATH_MAX - 1, "%s/cub_admin_version", sco.dbmt_tmp_dir);
+  snprintf (tmpfile, PATH_MAX - 1, "%s/cub_admin_version.%d", sco.dbmt_tmp_dir, syscall(SYS_gettid));
   argv[0] = cmd_name;
   argv[1] = "--version";
   argv[2] = NULL;
@@ -172,9 +175,9 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
       sscanf (strbuf, "%*s %s", version);
 
       char *p = strtok (version, ".");
-      major_version = atoi (p);
+      major_version = ATOI_S (p);
       p = strtok (NULL, ".");
-      minor_version = atoi (p);
+      minor_version = ATOI_S (p);
 
       fclose (infile);
       unlink (tmpfile);
@@ -199,6 +202,11 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   cubrid_err_file[0] = '\0';
 
   find_and_parse_cub_admin_version (major_version, minor_version);
+
+  if (major_version < 0 || major_version < 0)
+    {
+      return NULL;
+    }
 
   if (major_version < 10 || (major_version == 10 && minor_version == 0))
     {
