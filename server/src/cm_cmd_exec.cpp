@@ -28,8 +28,6 @@
 #include <string.h>
 #include <config.h>
 #include <syscall.h>
-#include <pthread.h>
-#define ATOI_S(arg)	((arg) ?  atoi(arg) : (-1))
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -50,6 +48,7 @@
 
 #define new_servstat_result()        (T_SERVER_STATUS_RESULT*) new_cmd_result()
 #define new_csql_result()            (T_CSQL_RESULT*) new_cmd_result()
+#define ATOI_S(arg)                  ((arg) ?  atoi(arg) : (-1))
 
 static T_CMD_RESULT *new_cmd_result (void);
 static const char *get_cubrid_mode_opt (T_CUBRID_MODE mode);
