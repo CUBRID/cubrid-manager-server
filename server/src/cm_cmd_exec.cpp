@@ -40,6 +40,7 @@
 #include "cm_server_util.h"
 #include "cm_stat.h"
 #include "cm_autojob.h"
+#include "cm_log.h"
 
 #ifdef    _DEBUG_
 #include "deb.h"
@@ -166,8 +167,12 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
   run_child (argv, 1, NULL, tmpfile, NULL, NULL);
   if ((infile = fopen (tmpfile, "r")) != NULL)
     {
-      fgets (strbuf, sizeof (strbuf), infile);
-      fgets (strbuf, sizeof (strbuf), infile);
+      if (!fgets (strbuf, sizeof (strbuf), infile) || ! fgets (strbuf, sizeof (strbuf), infile))
+        {
+           LOG_ERROR ("Spacedb is skipped due to temporalily insufficient resources");
+           major_version = minor_version = -1;
+           return;
+        }
       char version[10];
       sscanf (strbuf, "%*s %s", version);
 
