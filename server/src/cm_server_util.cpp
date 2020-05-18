@@ -260,6 +260,8 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"isupdatesuccess", TS_IS_UPDATE_SUCCESS, 0, DEF_TASK_FUNC (ts_is_update_success), FSVR_NONE, AU_ADMIN},
   {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, ALL_AUTHORITY},
   {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, ALL_AUTHORITY},
+  {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, ALL_AUTHORITY},
+  {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, ALL_AUTHORITY},
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}
 };
 
