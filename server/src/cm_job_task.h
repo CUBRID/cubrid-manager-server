@@ -240,9 +240,7 @@ typedef enum
   TS_AUTO_UPDATE,
   TS_IS_UPDATE_SUCCESS,
   TS_MONITOR_PROCESS,
-  TS_GENERATE_CERT,
-  TS_START_STATDUMP,
-  TS_STOP_STATDUMP
+  TS_GENERATE_CERT
 } T_TASK_CODE;
 
 typedef enum
@@ -433,7 +431,5 @@ int ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error);
 int
 ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
                  int type);
-int ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
-int ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
 
 #endif /* _CM_JOB_TASK_H_ */
