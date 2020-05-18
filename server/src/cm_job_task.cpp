@@ -210,6 +210,18 @@ typedef struct
   int num_session;
 } T_BROKER_DIAGDATA;
 
+#define MAX_STATDUMP_PROC 16
+typedef struct
+{
+  int pid;
+  char dbname [DB_NAME_LEN];
+  int status;
+} T_STATDUMP_STAT;
+
+static T_STATDUMP_STAT *statdump_daemon = NULL;
+
+#define	STATD_IDLE	0
+#define	STATD_RUNNING	1
 
 #if defined(WINDOWS)
 static void replace_colon (char *path);
@@ -324,6 +336,9 @@ static int _is_default_cert (char *_dbmt_error);
 static int _is_exist_default_backup_cert (char *_dbmt_error);
 static int _backup_cert (char *_dbmt_error);
 static int _recover_cert (char *_dbmt_error);
+
+static int find_statdumpd_info (char *dbname);
+static int find_new_statdumpd_info ();
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -15862,6 +15877,135 @@ release_src:
       BIO_free (bio_err);
     }
   return ret_val;
+}
+
+int
+ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
+{
+  int ret_val = ERR_NO_ERROR;
+  char *db_name, *interval_str;
+  int interval = 0;
+  char *argv [10];
+  char path [512];
+  int argc = 0;
+  char note [20];
+  int slot = -1;
+
+  db_name = nv_get_val (req, "_DBNAME");
+  interval_str = nv_get_val (req, "interval");
+
+  if (!interval_str || !db_name)
+   {
+     nv_update_val (res, "note", "no sufficient arguments");
+     LOG_ERROR ("start_statdump: dbname or interval was not specified");
+     return -1;
+   }
+
+  if (find_statdumpd_info (db_name) >= 0)
+    {
+      nv_update_val (res, "note", "Already Running");
+      return -1;
+    }
+
+  slot = find_new_statdumpd_info ();
+  if (slot < 0)
+    {
+      nv_update_val (res, "note", "Memory ERROR");
+      return -1;
+    }
+  statdump_daemon[slot].status = STATD_RUNNING;
+  strcpy (statdump_daemon[slot].dbname, db_name);
+  interval = atoi (interval_str);
+  sprintf (path, "%s/bin/cubrid", sco.szCubrid);
+  LOG_ERROR ("start_statdump: path = %s", path);
+  argv[argc++] = path;
+  argv[argc++] = "statdump";
+  argv[argc++] = "-i";
+  argv[argc++] = interval_str;
+  argv[argc++] = db_name;
+  argv[argc++] = NULL;
+
+  ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", NULL);
+  if (ret_val < 0)
+    {
+      nv_update_val (res, "note", "Could not execute statdump");
+      return -1;
+    }
+  statdump_daemon[slot].pid = ret_val;
+  sprintf (note, "pid = %d", ret_val);
+  nv_update_val (res, "note", note);
+  return 0;
+}
+
+int
+ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
+{
+  int ret_val = ERR_NO_ERROR;
+  char *db_name;
+  int slot;
+  char cmd [1024];
+
+  db_name = nv_get_val (req, "_DBNAME");
+  if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
+   {
+     nv_update_val (res, "note", "NO statdump Running");
+     return -1;
+   }
+
+  sprintf (cmd, "/bin/ps -o pid --ppid %d | grep -v PID | xargs kill", statdump_daemon[slot].pid);
+  ret_val = system (cmd);
+  statdump_daemon[slot].status = STATD_IDLE;
+  return ret_val;
+}
+
+int
+find_new_statdumpd_info ()
+{
+  int i;
+
+  if (statdump_daemon == NULL)
+    {
+       statdump_daemon = (T_STATDUMP_STAT *) calloc (sizeof(T_STATDUMP_STAT), MAX_STATDUMP_PROC);
+       if (statdump_daemon == NULL)
+         {
+           return -1;
+         }
+         else
+          {
+            return 0;
+          }
+    }
+
+  for (i = 0; i < MAX_STATDUMP_PROC; i++)
+    {
+      if (statdump_daemon[i].status == 0)
+        {
+          return i;
+        }
+    }
+
+  return -3;
+}
+
+int
+find_statdumpd_info (char *dbname)
+{
+  int i;
+
+  if (statdump_daemon == NULL)
+    {
+      return -1;
+    }
+
+  for (i = 0; i < MAX_STATDUMP_PROC; i++)
+    {
+      if (statdump_daemon[i].status == STATD_RUNNING && strcmp (statdump_daemon[i].dbname, dbname) == 0)
+        {
+          return i;
+        }
+    }
+
+  return -1;
 }
 
 static int
