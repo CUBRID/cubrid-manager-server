@@ -6838,6 +6838,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   int retval = 0;
   int tmp = 0;
   T_DB_SERVICE_MODE db_mode;
+  char *sqltext;
 
   cmd_name[0] = '\0';
   buf[0] = '\0';
@@ -6875,6 +6876,8 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_TRANLIST;
+
+  argv[argc++] = "-f";
 
   argv[argc++] = "--" TRANLIST_USER_L;
   argv[argc++] = user;
@@ -6970,6 +6973,20 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
       else
 	{
 	  nv_add_nvp (res, "SQL_ID", tok[8]);
+
+          sqltext = tok[8] + strlen (tok[8]) + 1;
+          while (sqltext && *sqltext)
+            {
+              if (*sqltext == ' ')
+                {
+                  sqltext++;
+                }
+              else
+                {
+                  break;
+                }
+            }
+          nv_add_nvp (res, "SQL_Text", sqltext);
 	}
       nv_add_nvp (res, "close", "transaction");
     }
