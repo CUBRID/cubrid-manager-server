@@ -15898,15 +15898,17 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
      LOG_ERROR ("start_statdump: dbname or interval was not specified");
      return -1;
    }
+
   if (find_statdumpd_info (db_name) >= 0)
     {
-      nv_update_val (res, "note", "Already Running");
+      nv_update_val (res, "note", "already running");
       return -1;
     }
- slot = find_new_statdumpd_info ();
+
+  slot = find_new_statdumpd_info ();
   if (slot < 0)
     {
-      nv_update_val (res, "note", "Memory ERROR");
+      nv_update_val (res, "note", "memory allocation error");
       return -1;
     }
   strcpy (statdump_daemon[slot].dbname, db_name);
@@ -15928,16 +15930,20 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (ret_val < 0)
     {
-      nv_update_val (res, "note", "Could not execute statdump");
+      nv_update_val (res, "note", "could not execute statdump");
       return -1;
     }
 
   statdump_daemon[slot].status = STATD_RUNNING;
   statdump_daemon[slot].pid = ret_val;
-  sprintf (note, "pid = %d", ret_val);
-  nv_update_val (res, "note", note);
+  nv_update_val (res, "note", db_name);
+  nv_update_val (res, "status", "success");
+  nv_add_nvp_int (res, "pid", ret_val);
+
   return 0;
 }
+
+extern int errno;
 
 int
 ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
@@ -15946,12 +15952,17 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char *db_name;
   int slot;
   char cmd [1024];
+  int ret;
+
   db_name = nv_get_val (req, "_DBNAME");
   if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
    {
-     nv_update_val (res, "note", "NO statdump Running");
+     nv_update_val (res, "note", "no statdump running");
+     nv_update_val (res, "status", "failed");
      return -1;
    }
+
+  nv_update_val (res, "note", db_name);
 
 #if defined (WINDOWS)
   sprintf (cmd, "taskkill /T /F /PID %d", statdump_daemon[slot].pid);
@@ -15960,7 +15971,35 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
 
   ret_val = system (cmd);
+
+#if !defined (WINDOWS)
+  /*
+   * Double check if the process is still running.
+   */
+  if (ret_val < 0)
+    {
+      sprintf (cmd, "/bin/ps -p %d", statdump_daemon[slot].pid);
+      ret = system (cmd);
+      if (ret < 0)
+        {
+          ret_val = 0;
+        }
+      else
+        {
+          nv_add_nvp (res, "Linux_error", strerror (errno));
+        }
+   }
+#endif
+
+  if (ret_val < 0)
+      {
+        nv_add_nvp_int (res, "pid", statdump_daemon[slot].pid);
+        nv_update_val (res, "status", "failed");
+        return ret_val;
+      }
+
   statdump_daemon[slot].status = STATD_IDLE;
+  nv_update_val (res, "status", "success");
   return ret_val;
 }
 
