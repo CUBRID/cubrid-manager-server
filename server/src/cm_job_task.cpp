@@ -15888,7 +15888,6 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char *argv [10];
   char path [512];
   int argc = 0;
-  char note [20];
   int slot = -1;
 
   db_name = nv_get_val (req, "_DBNAME");
@@ -15903,21 +15902,20 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (find_statdumpd_info (db_name) >= 0)
     {
-      nv_update_val (res, "note", "Already Running");
+      nv_update_val (res, "note", "already running");
       return -1;
     }
 
   slot = find_new_statdumpd_info ();
   if (slot < 0)
     {
-      nv_update_val (res, "note", "Memory ERROR");
+      nv_update_val (res, "note", "memory allocation error");
       return -1;
     }
-  statdump_daemon[slot].status = STATD_RUNNING;
   strcpy (statdump_daemon[slot].dbname, db_name);
   interval = atoi (interval_str);
-  sprintf (path, "%s/bin/cubrid", sco.szCubrid);
-  LOG_ERROR ("start_statdump: path = %s", path);
+  cubrid_cmd_name (path);
+
   argv[argc++] = path;
   argv[argc++] = "statdump";
   argv[argc++] = "-i";
@@ -15925,18 +15923,27 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = db_name;
   argv[argc++] = NULL;
 
-  ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", NULL);
+#if defined (WINDOWS)
+   ret_val = run_child (argv, 0, NULL, NULL, NULL, NULL);
+#else
+   ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", NULL);
+#endif
+
   if (ret_val < 0)
     {
-      nv_update_val (res, "note", "Could not execute statdump");
+      nv_update_val (res, "note", "could not execute statdump");
       return -1;
     }
+
+  statdump_daemon[slot].status = STATD_RUNNING;
   statdump_daemon[slot].pid = ret_val;
-  sprintf (note, "pid = %d", ret_val);
-  nv_update_val (res, "note", note);
+  nv_update_val (res, "note", db_name);
+  nv_update_val (res, "status", "success");
+  nv_add_nvp_int (res, "pid", ret_val);
   return 0;
 }
 
+extern int errno;
 int
 ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -15944,17 +15951,54 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char *db_name;
   int slot;
   char cmd [1024];
+  int ret;
 
   db_name = nv_get_val (req, "_DBNAME");
   if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
    {
-     nv_update_val (res, "note", "NO statdump Running");
+     nv_update_val (res, "note", "no statdump running");
+     nv_update_val (res, "status", "failed");
      return -1;
    }
 
-  sprintf (cmd, "/bin/ps -o pid --ppid %d | grep -v PID | xargs kill", statdump_daemon[slot].pid);
+   nv_update_val (res, "note", db_name);
+
+#if defined (WINDOWS)
+   sprintf (cmd, "taskkill /T /F /PID %d", statdump_daemon[slot].pid);
+#else
+   sprintf (cmd, "/bin/ps -o pid --ppid %d | grep -v PID | xargs kill", statdump_daemon[slot].pid);
+#endif
+
   ret_val = system (cmd);
+
+#if !defined (WINDOWS)
+  /*
+   * Double check if the process is still running.
+   */
+  if (ret_val < 0)
+    {
+      sprintf (cmd, "/bin/ps -p %d", statdump_daemon[slot].pid);
+      ret = system (cmd);
+      if (ret < 0)
+        {
+          ret_val = 0;
+        }
+      else
+        {
+          nv_add_nvp (res, "Linux_error", strerror (errno));
+        }
+   }
+#endif
+
+  if (ret_val < 0)
+    {
+      nv_add_nvp_int (res, "pid", statdump_daemon[slot].pid);
+      nv_update_val (res, "status", "failed");
+      return ret_val;
+    }
+
   statdump_daemon[slot].status = STATD_IDLE;
+  nv_update_val (res, "status", "success");
   return ret_val;
 }
 
@@ -15978,7 +16022,7 @@ find_new_statdumpd_info ()
 
   for (i = 0; i < MAX_STATDUMP_PROC; i++)
     {
-      if (statdump_daemon[i].status == 0)
+      if (statdump_daemon[i].status == STATD_IDLE)
         {
           return i;
         }
