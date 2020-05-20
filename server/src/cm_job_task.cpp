@@ -15940,10 +15940,12 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_update_val (res, "note", db_name);
   nv_update_val (res, "status", "success");
   nv_add_nvp_int (res, "pid", ret_val);
+
   return 0;
 }
 
 extern int errno;
+
 int
 ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -15999,6 +16001,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   statdump_daemon[slot].status = STATD_IDLE;
   nv_update_val (res, "status", "success");
+
   return ret_val;
 }
 
