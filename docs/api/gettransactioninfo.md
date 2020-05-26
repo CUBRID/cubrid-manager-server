@@ -9,6 +9,8 @@ The gettransactioninfo interface fetches databases transactions information.
 | task | task name |
 | token | token string encrypted. |
 | dbname | database name |
+| dbuser | database username |
+| dbpasswd | password for dbuser |
 
 ## Request Sample
 
@@ -17,6 +19,8 @@ The gettransactioninfo interface fetches databases transactions information.
   "task": "gettransactioninfo",
   "token": "cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
   "dbname": "demodb"
+  "dbuser": "dba"
+  "dbpasswd": ""
 }
 ```
 
@@ -51,8 +55,12 @@ The gettransactioninfo interface fetches databases transactions information.
             {
                "@user" : "DBA",
                "host" : "huangqiyu-VirtualBox",
+               "SQL_ID" : "82353eb5cc51f",
+               "SQL_Text" : "select dept.department_id, dept.employee_name where dept.employee_id = 100",
                "pid" : "6632",
                "program" : "query_editor_cub_cas_1",
+               "query_time" : "0.40",
+               "tran_time" : "0.40",
                "tranindex" : "1(ACTIVE)"
             }
       }
