@@ -1,6 +1,6 @@
 # stop_statdump
 
-Deactivate running statdump process
+Deactivate the previously started *statdump* process
 
 ## Request Json Syntax
 
