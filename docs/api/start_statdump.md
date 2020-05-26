@@ -1,6 +1,6 @@
 # start_statdump
 
-Activate statdump process to accumulated values per secons
+Activate *background* statdump process to accumulated values per secons
 
 ## Request Json Syntax
 
