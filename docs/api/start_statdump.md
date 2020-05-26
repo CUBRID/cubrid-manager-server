@@ -1,4 +1,4 @@
-# addvoldb
+# start_statdump
 
 Activate statdump process to accumulated values per secons
 
@@ -8,10 +8,10 @@ Activate statdump process to accumulated values per secons
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
-| dbname | database name |
+| dbname | database name to activate statdump|
 | dbuser | database username |
 | dbpasswd | password of dbuser |
-| interval | interval of seconds of dumping statistics |
+| interval | interval as seconds for periodic dumping statistics |
 
 ## Request Sample
 

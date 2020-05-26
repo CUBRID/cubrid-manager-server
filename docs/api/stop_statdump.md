@@ -1,4 +1,4 @@
-# addvoldb
+# stop_statdump
 
 Deactivate running statdump process
 
@@ -8,7 +8,7 @@ Deactivate running statdump process
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
-| dbname | database name |
+| dbname | database name to stop statdump process running on the dbname |
 | dbuser | database username |
 | dbpasswd | password of dbuser |
 
