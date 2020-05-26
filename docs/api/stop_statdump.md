@@ -1,6 +1,6 @@
 # stop_statdump
 
-Deactivate the previously started *statdump* process
+Related with [start_statdump](start_statdump.md), deactivate the previously started *statdump* process
 
 ## Request Json Syntax
 

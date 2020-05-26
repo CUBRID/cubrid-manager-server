@@ -1,6 +1,6 @@
 # start_statdump
 
-Activate *background* statdump process to accumulate values per seconds
+Activate *background* statdump process to accumulate values per seconds, to stop it use [stop_statdump](stop_statdump.md)
 
 ## Request Json Syntax
 
