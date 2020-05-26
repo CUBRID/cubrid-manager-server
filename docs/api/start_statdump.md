@@ -1,6 +1,6 @@
 # start_statdump
 
-Activate *background* statdump process to accumulated values per secons
+Activate *background* statdump process to accumulate values per seconds
 
 ## Request Json Syntax
 
@@ -11,7 +11,7 @@ Activate *background* statdump process to accumulated values per secons
 | dbname | database name to activate statdump|
 | dbuser | database username |
 | dbpasswd | password of dbuser |
-| interval | interval as seconds for periodic dumping statistics |
+| interval | interval as seconds for dumping statistics periodically |
 
 ## Request Sample
 
