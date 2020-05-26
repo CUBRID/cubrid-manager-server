@@ -110,6 +110,8 @@ CMs Interfaces are conposed by Json and is used for communication between CMS an
 | [class](class.md) | socket, http | ALL_AUTHORITY |
 | [classinfo](classinfo.md) | socket, http | ALL_AUTHORITY |
 | [updateattribute](updateattribute.md) | socket, http | ALL_AUTHORITY |
+| [start_statdump](start_statdump.md) | socket, http | DBO |
+| [stop_statdump](stop_statdump.md) | socket, http | DBO |
 
 ### DB User
 
