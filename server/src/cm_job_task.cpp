@@ -7117,7 +7117,7 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
   if (dbpasswd != NULL)
     {
       if (strcmp (type, "i") == 0 || strcmp (type, "u") == 0 || strcmp (type, "h") == 0 || strcmp (type, "p") == 0
-          || strcmp (type, "s") == 0 || strcmp (type, "q") == 0)
+          || strcmp (type, "s") == 0)
         {
           argv[argc++] = "--" KILLTRAN_DBA_PASSWORD_L;
           argv[argc++] = dbpasswd;
