@@ -10,17 +10,12 @@ to managing CUBRID system, and also provides monitoring information about CUBRID
 - CUBRID Official Site: http://www.cubrid.org and http://www.cubrid.com
 
 ## DOWNLOADS and FILE REPOSITORIES
-
 CMS is distributed within CUBRID distribution which can be found here:
 
 - http://www.cubrid.org/downloads
 - http://ftp.cubrid.org
 
 ## HOW TO BUILD/INSTALL CMS
-
-### you can refer to the wiki page
-
-- http://www.cubrid.org/wiki_tools/entry/cms-build-and-install
 
 ### build and install on Linux
 
