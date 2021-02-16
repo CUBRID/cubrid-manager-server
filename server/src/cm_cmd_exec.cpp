@@ -169,7 +169,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
     {
       if (!fgets (strbuf, sizeof (strbuf), infile) || ! fgets (strbuf, sizeof (strbuf), infile))
         {
-           LOG_ERROR ("Spacedb is skipped due to temporalily insufficient resources");
+           LOG_ERROR ("Spacedb is skipped due to temporarily insufficient resources");
            major_version = minor_version = -1;
            return;
         }
