@@ -193,7 +193,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				AdditionalIncludeDirectories="..\..\win;..\..\src;$(cubrid_includedir);$(libevent_include)"
+				AdditionalIncludeDirectories="..\..\win;..\..\src;$(cubrid_includedir)"
 				PreprocessorDefinitions="WIN;WINDOWS;WIN32;NDEBUG;_CRT_SECURE_NO_WARNINGS;DIAG_DEVEL;_USE_32BIT_TIME_T"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -213,7 +213,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="ws2_32.lib cmstat.lib cmdep.lib psapi.lib"
-				AdditionalLibraryDirectories="$(cubrid_libdir);$(libevent_lib)"
+				AdditionalLibraryDirectories="$(cubrid_libdir)"
 				GenerateDebugInformation="true"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

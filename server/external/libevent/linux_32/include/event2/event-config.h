@@ -24,7 +24,7 @@
 /* #undef EVENT__DISABLE_THREAD_SUPPORT */
 
 /* Define to 1 if you have the `accept4' function. */
-/* #undef EVENT__HAVE_ACCEPT4 */
+#define EVENT__HAVE_ACCEPT4 1
 
 /* Define to 1 if you have the `arc4random' function. */
 /* #undef EVENT__HAVE_ARC4RANDOM */
@@ -64,13 +64,19 @@
 #define EVENT__HAVE_EPOLL 1
 
 /* Define to 1 if you have the `epoll_create1' function. */
-/* #undef EVENT__HAVE_EPOLL_CREATE1 */
+#define EVENT__HAVE_EPOLL_CREATE1 1
 
 /* Define to 1 if you have the `epoll_ctl' function. */
 #define EVENT__HAVE_EPOLL_CTL 1
 
+/* Define to 1 if you have the <errno.h> header file. */
+#define EVENT__HAVE_ERRNO_H 1
+
+/* Define to 1 if you have ERR_remove_thread_stat(). */
+#define EVENT__HAVE_ERR_REMOVE_THREAD_STATE 1
+
 /* Define to 1 if you have the `eventfd' function. */
-/* #undef EVENT__HAVE_EVENTFD */
+#define EVENT__HAVE_EVENTFD 1
 
 /* Define if your system supports event ports */
 /* #undef EVENT__HAVE_EVENT_PORTS */
@@ -115,7 +121,7 @@
 #define EVENT__HAVE_GETPROTOBYNUMBER 1
 
 /* Define to 1 if you have the `getservbyname' function. */
-/* #undef EVENT__HAVE_GETSERVBYNAME */
+#define EVENT__HAVE_GETSERVBYNAME 1
 
 /* Define to 1 if you have the `gettimeofday' function. */
 #define EVENT__HAVE_GETTIMEOFDAY 1
@@ -139,7 +145,7 @@
 /* #undef EVENT__HAVE_KQUEUE */
 
 /* Define if the system has zlib */
-#define EVENT__HAVE_LIBZ 1
+/* #undef EVENT__HAVE_LIBZ */
 
 /* Define to 1 if you have the `mach_absolute_time' function. */
 /* #undef EVENT__HAVE_MACH_ABSOLUTE_TIME */
@@ -175,7 +181,7 @@
 #define EVENT__HAVE_PIPE 1
 
 /* Define to 1 if you have the `pipe2' function. */
-/* #undef EVENT__HAVE_PIPE2 */
+#define EVENT__HAVE_PIPE2 1
 
 /* Define to 1 if you have the `poll' function. */
 #define EVENT__HAVE_POLL 1
@@ -298,7 +304,7 @@
 #define EVENT__HAVE_SYS_EPOLL_H 1
 
 /* Define to 1 if you have the <sys/eventfd.h> header file. */
-/* #undef EVENT__HAVE_SYS_EVENTFD_H */
+#define EVENT__HAVE_SYS_EVENTFD_H 1
 
 /* Define to 1 if you have the <sys/event.h> header file. */
 /* #undef EVENT__HAVE_SYS_EVENT_H */
@@ -334,7 +340,7 @@
 #define EVENT__HAVE_SYS_SYSCTL_H 1
 
 /* Define to 1 if you have the <sys/timerfd.h> header file. */
-/* #undef EVENT__HAVE_SYS_TIMERFD_H */
+#define EVENT__HAVE_SYS_TIMERFD_H 1
 
 /* Define to 1 if you have the <sys/time.h> header file. */
 #define EVENT__HAVE_SYS_TIME_H 1
@@ -361,7 +367,7 @@
 #define EVENT__HAVE_TIMERCMP 1
 
 /* Define to 1 if you have the `timerfd_create' function. */
-/* #undef EVENT__HAVE_TIMERFD_CREATE */
+#define EVENT__HAVE_TIMERFD_CREATE 1
 
 /* Define if timerisset is defined in <sys/time.h> */
 #define EVENT__HAVE_TIMERISSET 1
@@ -396,21 +402,20 @@
 /* Define to 1 if you have the `vasprintf' function. */
 #define EVENT__HAVE_VASPRINTF 1
 
+/* Define if waitpid() supports WNOWAIT */
+/* #undef EVENT__HAVE_WAITPID_WITH_WNOWAIT */
+
 /* Define if kqueue works correctly with pipes */
 /* #undef EVENT__HAVE_WORKING_KQUEUE */
 
 /* Define to 1 if you have the <zlib.h> header file. */
 #define EVENT__HAVE_ZLIB_H 1
 
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
+/* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define EVENT__LT_OBJDIR ".libs/"
 
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-/* #undef EVENT__NO_MINUS_C_MINUS_O */
-
 /* Numeric representation of the version */
-#define EVENT__NUMERIC_VERSION 0x02010400
+#define EVENT__NUMERIC_VERSION 0x02010800
 
 /* Name of package */
 #define EVENT__PACKAGE "libevent"
@@ -422,7 +427,7 @@
 #define EVENT__PACKAGE_NAME "libevent"
 
 /* Define to the full name and version of this package. */
-#define EVENT__PACKAGE_STRING "libevent 2.1.4-alpha"
+#define EVENT__PACKAGE_STRING "libevent 2.1.8-stable"
 
 /* Define to the one symbol short name of this package. */
 #define EVENT__PACKAGE_TARNAME "libevent"
@@ -431,7 +436,7 @@
 #define EVENT__PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define EVENT__PACKAGE_VERSION "2.1.4-alpha"
+#define EVENT__PACKAGE_VERSION "2.1.8-stable"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */
@@ -441,7 +446,7 @@
 #define EVENT__SIZEOF_INT 4
 
 /* The size of `long', as computed by sizeof. */
-#define EVENT__SIZEOF_LONG 8
+#define EVENT__SIZEOF_LONG 4
 
 /* The size of `long long', as computed by sizeof. */
 #define EVENT__SIZEOF_LONG_LONG 8
@@ -450,16 +455,16 @@
 #define EVENT__SIZEOF_OFF_T 8
 
 /* The size of `pthread_t', as computed by sizeof. */
-#define EVENT__SIZEOF_PTHREAD_T 8
+#define EVENT__SIZEOF_PTHREAD_T 4
 
 /* The size of `short', as computed by sizeof. */
 #define EVENT__SIZEOF_SHORT 2
 
 /* The size of `size_t', as computed by sizeof. */
-#define EVENT__SIZEOF_SIZE_T 8
+#define EVENT__SIZEOF_SIZE_T 4
 
 /* The size of `void *', as computed by sizeof. */
-#define EVENT__SIZEOF_VOID_P 8
+#define EVENT__SIZEOF_VOID_P 4
 
 /* Define to 1 if you have the ANSI C header files. */
 #define EVENT__STDC_HEADERS 1
@@ -490,7 +495,7 @@
 
 
 /* Version number of package */
-#define EVENT__VERSION "2.1.4-alpha"
+#define EVENT__VERSION "2.1.8-stable"
 
 /* Enable large inode numbers on Mac OS X 10.5.  */
 #ifndef EVENT___DARWIN_USE_64_BIT_INODE
@@ -498,7 +503,7 @@
 #endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-/* #undef EVENT___FILE_OFFSET_BITS */
+#define EVENT___FILE_OFFSET_BITS 64
 
 /* Define for large files, on AIX-style hosts. */
 /* #undef EVENT___LARGE_FILES */
