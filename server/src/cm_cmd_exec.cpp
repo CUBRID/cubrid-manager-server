@@ -61,6 +61,9 @@ static int read_start_server_output (char *stdout_log_file,
 
 static int _size_to_byte_by_unit (double orgin_num, char unit);
 
+static int cubrid_version_major = -1;
+static int cubrid_version_minor = -1;
+
 char *
 cubrid_cmd_name (char *buf)
 {
@@ -169,7 +172,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
     {
       if (!fgets (strbuf, sizeof (strbuf), infile) || ! fgets (strbuf, sizeof (strbuf), infile))
         {
-           LOG_ERROR ("Spacedb is skipped due to temporarily insufficient resources");
+           LOG_ERROR ("Spacedb is skipped due to temporalily insufficient resources");
            major_version = minor_version = -1;
            return;
         }
@@ -203,9 +206,14 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   int argc = 0;
   cubrid_err_file[0] = '\0';
 
-  find_and_parse_cub_admin_version (major_version, minor_version);
+  if (cubrid_version_minor <= 0)
+    {
+      find_and_parse_cub_admin_version (major_version, minor_version);
+      cubrid_version_major = major_version;
+      cubrid_version_minor = minor_version;
+    }
 
-  if (major_version < 10 || (major_version == 10 && minor_version == 0))
+  if (cubrid_version_major < 10 || (cubrid_version_minor == 10 && cubrid_version_minor == 0))
     {
       res = new SpaceDbResultOldFormat();
     }
