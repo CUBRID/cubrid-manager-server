@@ -206,7 +206,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   int argc = 0;
   cubrid_err_file[0] = '\0';
 
-  if (cubrid_version_minor <= 0)
+  if (cubrid_version_major <= 0)
     {
       find_and_parse_cub_admin_version (major_version, minor_version);
       cubrid_version_major = major_version;
