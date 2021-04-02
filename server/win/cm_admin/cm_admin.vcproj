@@ -139,7 +139,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="ws2_32.lib cmstat.lib cmdep.lib psapi.lib"
-				AdditionalLibraryDirectories="$(cubrid_lib64dir)"
+				AdditionalLibraryDirectories="$(cubrid_libdir)"
 				GenerateDebugInformation="true"
 				TargetMachine="17"
 			/>
