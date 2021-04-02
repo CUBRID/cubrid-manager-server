@@ -61,9 +61,6 @@ static int read_start_server_output (char *stdout_log_file,
 
 static int _size_to_byte_by_unit (double orgin_num, char unit);
 
-static int cubrid_version_major = -1;
-static int cubrid_version_minor = -1;
-
 char *
 cubrid_cmd_name (char *buf)
 {
@@ -206,8 +203,9 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   int argc = 0;
   cubrid_err_file[0] = '\0';
 
-  if (cubrid_version_major <= 0)
+  if (IS_INVALID_CUBRID_VERS_MAJOR (cubrid_version_major))
     {
+      LOG_ERROR ("Invalid CUBRID Engine Version: %d.%d", cubrid_version_major, cubrid_version_minor);
       find_and_parse_cub_admin_version (major_version, minor_version);
       cubrid_version_major = major_version;
       cubrid_version_minor = minor_version;

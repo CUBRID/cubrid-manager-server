@@ -613,6 +613,11 @@ extern const char *autounicas_conf_entry[AUTOUNICAS_CONF_ENTRY_NUM];
 extern const char *autobackup_period_type[AUTOBACKUP_PERIOD_TYPE_NUM];
 extern const char *autobackup_period_week[AUTOBACKUP_PERIOD_WEEK_NUM];
 
+extern int cubrid_version_major;
+extern int cubrid_version_minor;
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version);
+#define IS_INVALID_CUBRID_VERS_MAJOR(major)	(major <= 0)
+
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
                              char *dest_dbname);
