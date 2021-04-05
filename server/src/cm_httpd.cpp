@@ -116,6 +116,9 @@ struct worker_context
 #endif
 };
 
+int cubrid_version_major = -1;
+int cubrid_version_minor = -1;
+
 int
 bind_socket (int port)
 {
@@ -908,6 +911,9 @@ main (int argc, char **argv)
     }
 
   start_auto_thread ();
+
+  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor);
+  LOG_INFO ("started '%s' with Engine Version: %d.%d", argv[0], cubrid_version_major, cubrid_version_minor);
 
   start_service ();
 
