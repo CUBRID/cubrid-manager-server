@@ -1434,7 +1434,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 
 }
 
-static int _read_apply_info_cmd_output (const string &stdout_file, const string &stderr_file, string (& str_result)[4])
+static int _read_apply_info_cmd_output (const string &stdout_file, const string &stderr_file, string (& str_result)[8])
 {
   ifstream in_file;
   string line_buf;
@@ -1453,6 +1453,7 @@ static int _read_apply_info_cmd_output (const string &stdout_file, const string 
   in_file.open (stdout_file.c_str(), ios::in);
 
   int i = 0;
+  int j = 4;
   while (getline (in_file, line_buf))
     {
       if (line_buf.find ("Delay in Applying Copied Log") != string::npos)
@@ -1482,6 +1483,23 @@ static int _read_apply_info_cmd_output (const string &stdout_file, const string 
             }
           continue;
         }
+
+      if (line_buf.find ("*** Active") != string::npos)
+        {
+          j = 6;
+          continue;
+        }
+
+      if (line_buf.find ("EOF LSA") != string::npos)
+        {
+          found = (unsigned int) line_buf.find (":");
+          str_result[j] = line_buf.substr (found+2);
+          found = (unsigned int) str_result [j].find (" ");
+          str_result [j++].erase (found);
+
+          found = (unsigned int) line_buf.find ("|");
+          str_result[j++] = line_buf.substr (found+2);
+        }
     }
 
   return ERR_NO_ERROR;
@@ -1497,7 +1515,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   string copy_log_path;
   string remote_host_name;
   string dbname;
-  string str_result[4];
+  string str_result[8];
 
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[9];
@@ -1505,6 +1523,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   char stderr_log_file[512];
 
   int retval;
+
+  Json::Value copied_active_eof_lsa, active_eof_lsa;
 
   JSON_FIND_V (request, "copylogpath",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(copylogpath) missing in the request"));
@@ -1543,6 +1563,17 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   response["copyinglog_estimated_time"] = str_result[1];
   response["applyinglog_count"] = str_result[2];
   response["applyinglog_estimated_time"] = str_result[3];
+
+  copied_active_eof_lsa.clear ();
+  active_eof_lsa.clear ();
+
+  copied_active_eof_lsa ["pageid"] = str_result[4];
+  copied_active_eof_lsa ["offset"] = str_result[5];
+  active_eof_lsa ["pageid"] = str_result[6];
+  active_eof_lsa ["offset"] = str_result[7];
+
+  response["copied_active_eof_lsa"] = copied_active_eof_lsa;
+  response["active_eof_lsa"] = active_eof_lsa;
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
