@@ -127,7 +127,7 @@ bind_socket (int port)
   struct sockaddr_in addr;
   int one = 1;
   int flags = 1;
-  nfd = (int) socket (AF_INET, SOCK_STREAM, 0);
+  nfd = (int) socket (AF_INET, SOCK_STREAM|O_CLOEXEC, 0);
   if (nfd < 0)
     {
       return -1;
