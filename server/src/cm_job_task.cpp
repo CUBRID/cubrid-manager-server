@@ -6949,15 +6949,23 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       query_p = (char *) calloc (1, query_file_size); //kshan
       sql_info = (TS_SQL_INFO *) calloc (num_queries, sizeof (TS_SQL_INFO));
-    }
+      retval = get_sql_text (tmpfile, query_p, sql_info, query_file_size);
 
-  retval = get_sql_text (tmpfile, query_p, sql_info, query_file_size);	//kshan
+      if (retval != num_queries)
+        {
+          num_queries = 0;
+          if (query_p)
+            {
+              free (query_p);
+              query_p = NULL;
+            }
 
-  if (retval != num_queries)
-    {
-      free (query_p); query_p = NULL;
-      free (sql_info); sql_info = NULL;
-      num_queries = 0;
+          if (sql_info)
+            {
+	      free (sql_info);
+	      sql_info = NULL;
+            }
+        }
     }
 
   if ((infile = fopen (tmpfile, "rt")) == NULL)
