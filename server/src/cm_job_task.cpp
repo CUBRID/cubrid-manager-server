@@ -218,6 +218,13 @@ typedef struct
    int status;
  } T_STATDUMP_STAT;
 
+typedef struct
+{
+  char sql_id [128];
+  int offset;
+  int len;
+} TS_SQL_INFO;
+
  static T_STATDUMP_STAT *statdump_daemon = NULL;
 
  #define	STATD_IDLE	0
@@ -340,6 +347,10 @@ static int _recover_cert (char *_dbmt_error);
 
 static int find_statdumpd_info (char *dbname);
 static int find_new_statdumpd_info ();
+
+static int get_sql_info (char *dbmt_file, int *file_size);
+static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
+static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_file_size);
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -6855,6 +6866,10 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   int tmp = 0;
   T_DB_SERVICE_MODE db_mode;
   char *sqltext;
+  int num_queries = 0;
+  char *query_p = NULL;
+  int query_file_size;
+  TS_SQL_INFO *sql_info;
 
   cmd_name[0] = '\0';
   buf[0] = '\0';
@@ -6884,8 +6899,6 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_TRANLIST;
-
-  argv[argc++] = "-f";
 
   if (ha_mode != 0)
     {
@@ -6932,6 +6945,21 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
   fclose (infile);
 
+  if ((num_queries = get_sql_info (tmpfile, &query_file_size)) > 0)
+    {
+      query_p = (char *) calloc (1, query_file_size); //kshan
+      sql_info = (TS_SQL_INFO *) calloc (num_queries, sizeof (TS_SQL_INFO));
+    }
+
+  retval = get_sql_text (tmpfile, query_p, sql_info, query_file_size);	//kshan
+
+  if (retval != num_queries)
+    {
+      free (query_p); query_p = NULL;
+      free (sql_info); sql_info = NULL;
+      num_queries = 0;
+    }
+
   if ((infile = fopen (tmpfile, "rt")) == NULL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -6971,31 +6999,225 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       else
 	{
+	  int i;
+	  char *qbuf;
+
 	  nv_add_nvp (res, "SQL_ID", tok[8]);
 
-          sqltext = tok[8] + strlen (tok[8]) + 1;
-          while (sqltext && *sqltext)
-            {
-              if (*sqltext == ' ')
-                {
-                  sqltext++;
-                }
-              else
-                {
-                  break;
-                }
-            }
-          nv_add_nvp (res, "SQL_Text", sqltext);
+	  for (i = 0; i < num_queries; i++)
+	    {
+	      if (strncmp (sql_info[i].sql_id, tok[8], strlen (tok[8])) == 0)
+	        {
+	          qbuf = (char *) calloc (1, sql_info[i].len + 1);
+	          if (qbuf != NULL)
+	            {
+	              strncpy (qbuf, query_p + sql_info[i].offset, sql_info[i].len);
+	              nv_add_nvp (res, "SQL_Text", qbuf);
+
+	              free (qbuf);
+	            }
+	        }
+	    }
 	}
       nv_add_nvp (res, "close", "transaction");
     }
   nv_add_nvp (res, "close", "transactioninfo");
+
+  if (query_p)
+    {
+      free (query_p);
+    }
+
+  if (sql_info)
+    {
+      free (sql_info);
+    }
+
   fclose (infile);
   unlink (tmpfile);
   unlink (errfile);
 
   return ERR_NO_ERROR;
 }
+
+/*
+ * Find file size of output file from 'cubrid tranlist database'
+ * and number of SQL inside in it. (for calloc info)
+ */
+
+static int
+get_sql_info (char *dbmt_file, int *file_size)
+{
+  int num_queries = 0;
+  struct stat sb;
+  FILE *qry_fp;
+  char buf[4096];
+  const char *sql_id_mark = "SQL_ID:";
+  int sql_id_mark_len = strlen (sql_id_mark);
+
+  if (stat (dbmt_file, &sb) < 0)
+    {
+      return -1;
+    }
+
+  if ((qry_fp = fopen (dbmt_file, "r")) == NULL)
+    {
+      return -1;
+    }
+
+  while (fgets (buf, sizeof (buf), qry_fp))
+    {
+      if (strncmp (buf, sql_id_mark, sql_id_mark_len) == 0)
+      {
+        num_queries++;
+      }
+    }
+
+  *file_size = sb.st_size;
+  fclose (qry_fp);
+
+  return num_queries;
+}
+
+/*
+ * Mainiatin single dimension arrary to store all SQL_Text
+ * And keep offset, length info for each SQL text in TS_SQL_INFO array
+ * on query_p array.
+ */
+
+static int
+get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *sql_info, int query_file_size)
+{
+  FILE *qry_fp;
+  int num_queries = 0;
+  int sql_index = 0;
+  int idx = 0;
+  int offset = 0;
+  int ret = -1;
+  char buf[4096];
+  char *sqlid_p;
+  char *newline_p;
+  const char *sql_id_mark = "SQL_ID:";
+  int sql_id_mark_len = strlen (sql_id_mark);
+
+
+  if ((qry_fp = fopen (tmpfile, "r")) == NULL)
+    {
+      return -1;
+    }
+
+  while (fgets (buf, sizeof (buf), qry_fp))
+    {
+      if (strncmp (buf, sql_id_mark, sql_id_mark_len) != 0)
+      {
+        continue;
+      }
+
+      sqlid_p = strchr (buf, ':');
+      if (sqlid_p == NULL || strlen (sqlid_p) < 2)
+      {
+        continue;
+      }
+
+      sqlid_p+= 2; /* example tranlit output look like: SQL_ID: 5d5807aaab63c */
+
+      newline_p = strchr (sqlid_p, '\n');
+      if (newline_p)
+      {
+        *newline_p = '\0';
+      }
+
+      num_queries++;
+      strncpy (sql_info[sql_index].sql_id, sqlid_p, strlen (sqlid_p));
+
+      ret = get_next_sqltext (qry_fp, query_p, offset, query_file_size);
+      if (ret > 0)
+        {
+          sql_info[sql_index].offset = offset;
+          sql_info[sql_index].len = ret - offset;
+          offset = ret;
+        }
+
+      sql_index++;
+
+    }
+
+  fclose (qry_fp);
+
+  return num_queries;
+}
+
+/*
+ * A SQLText from tranlist output:
+ *
+ * 1. From 'Tran index : ..' to <newline> <EOF>
+ * 2. From 'Tran index : ..' to <newline> and Before Next SQL ('SQL_ID:', ...)
+ */
+
+static int
+get_next_sqltext (FILE * qfp, char *qry_buf, int offset_v, int query_file_size)
+{
+  bool found = false;
+  bool end_of_query = false;
+  const char *tran_index_mark = "Tran index :";
+  const char *sql_id_mark = "SQL_ID:";
+  char buf[4096];
+  int offset = offset_v;
+  int tran_index_mark_len = strlen (tran_index_mark);
+  int line_length;
+
+  if (qfp == NULL || qry_buf == NULL)
+    {
+      return -1;
+    }
+
+  while (fgets (buf, sizeof (buf), qfp))
+    {
+      if (found == false)         /* skip util we meet 'Tran Index :' line */
+      {
+        if (strncmp (buf, tran_index_mark, tran_index_mark_len) == 0)
+          {
+            found = true;
+            continue;
+          }
+      }
+
+      line_length = strlen (buf);
+
+      if (line_length == 1)      /* it could be only newline */
+      {
+        char sbuf[4096];
+
+        if (fgets (sbuf, sizeof (sbuf), qfp) == NULL || strncmp (sbuf, sql_id_mark, strlen (sql_id_mark)) == 0)
+          {
+            qry_buf[offset - 1] = '\0';
+            end_of_query = true;
+
+            if (!feof (qfp))
+              {
+                fseek (qfp, -1 * strlen (sbuf), SEEK_CUR); /* push back to iostream */
+              }
+            break;
+          }
+      }
+
+      if ((offset + line_length) >= query_file_size)
+      {
+        return -1;
+      }
+
+      strncpy (qry_buf + offset, buf, line_length);     /* copy a SQL text into qry_buf */
+
+      offset += line_length;
+      if (end_of_query)
+      {
+        break;
+      }
+    }
+
+  return offset;
+}
+
 
 /*
  *  read stdout and stderr files as error message.
