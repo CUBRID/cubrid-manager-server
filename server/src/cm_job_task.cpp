@@ -6947,7 +6947,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((num_queries = get_sql_info (tmpfile, &query_file_size)) > 0)
     {
-      query_p = (char *) calloc (1, query_file_size); //kshan
+      query_p = (char *) calloc (1, query_file_size);
       sql_info = (TS_SQL_INFO *) calloc (num_queries, sizeof (TS_SQL_INFO));
       retval = get_sql_text (tmpfile, query_p, sql_info, query_file_size);
 
