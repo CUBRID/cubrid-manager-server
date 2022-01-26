@@ -6883,6 +6883,14 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if ((user = nv_get_val (req, "dbuser")) == NULL)
+    {
+      strncpy (_dbmt_error, "dbuser", DBMT_ERROR_MSG_SIZE);
+      return ERR_PARAM_MISSING;
+    }
+
+  dbpasswd = nv_get_val (req, "dbpasswd");
+
   /* get database mode. */
   db_mode = uDatabaseMode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
@@ -6899,6 +6907,15 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_TRANLIST;
+
+  argv[argc++] = "--" TRANLIST_USER_L;
+  argv[argc++] = user;
+
+  if (dbpasswd != NULL)
+    {
+      argv[argc++] = "--" TRANLIST_PASSWORD_L;
+      argv[argc++] = dbpasswd;
+    }
 
   if (ha_mode != 0)
     {
