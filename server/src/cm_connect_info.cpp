@@ -128,7 +128,7 @@ dbmt_con_delete (const char *ip, const char *port)
   char *strbuf;
   int buf_len, get_len;
   FILE *infile, *outfile;
-  char tmpfile[512];
+  char tmpfile[PATH_MAX];
   char conn_list_file[512];
   int lock_fd, retval;
 
@@ -141,7 +141,7 @@ dbmt_con_delete (const char *ip, const char *port)
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
   infile = fopen (conn_list_file, "r");
-  sprintf (tmpfile, "%s/DBMT_util_014.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", 14, PATH_MAX);
   outfile = fopen (tmpfile, "w");
 
   if (infile == NULL || outfile == NULL)
@@ -323,7 +323,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
 {
   FILE *infile, *outfile;
   int lfd, retval = -1;
-  char tmpfile[512], conn_list_file[512];
+  char tmpfile[PATH_MAX], conn_list_file[512];
   char date[15], time[10];
   char *prev, *next, *tok[2];
   char *strbuf = NULL;
@@ -341,7 +341,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
-  sprintf (tmpfile, "%s/DBMT_util_014.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", 14, PATH_MAX);
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
   outfile = fopen (tmpfile, "w");

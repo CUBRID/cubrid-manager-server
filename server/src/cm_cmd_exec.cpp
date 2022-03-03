@@ -128,13 +128,12 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
   argv[argc++] = NULL;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (out_file, "%s/tmp/DBMT_util_003.%d", sco.szCubrid,
-           (int) getpid ());
+  make_temp_filepath (out_file, sco.szCubrid, "DBMT_util", 3, sizeof (out_file));
 #else
-  sprintf (out_file, "%s/DBMT_util_003.%d", CUBRID_TMPDIR, (int) getpid ());
+  make_temp_filepath (out_file, CUBRID_TMPDIR, "DBMT_util", 3, sizeof (out_file));
 #endif
-  snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
-            sco.dbmt_tmp_dir, "cmd_csql", getpid ());
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_csql_err", 3, PATH_MAX);
+
   SET_TRANSACTION_NO_WAIT_MODE_ENV ();
 
   run_child (argv, 1, NULL, NULL, out_file, NULL);    /* csql */
@@ -159,7 +158,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
   char cmd_name[CUBRID_CMD_NAME_LEN];
 
   cubrid_cmd_name (cmd_name);
-  snprintf (tmpfile, PATH_MAX - 1, "%s/cub_admin_version", sco.dbmt_tmp_dir);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", 0, PATH_MAX);
   argv[0] = cmd_name;
   argv[1] = "--version";
   argv[2] = NULL;

@@ -563,7 +563,7 @@ conf_get_dbmt_file2 (T_DBMT_FILE_ID dbmt_fid, char *buf)
 int
 auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
 {
-  char conf_file[PATH_MAX], tmpfile[512];
+  char conf_file[PATH_MAX], tmpfile[PATH_MAX];
   char conf_dbname[128];
   char strbuf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   FILE *infp, *outfp;
@@ -573,7 +573,7 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
     {
       return -1;
     }
-  sprintf (tmpfile, "%s/DBMT_task_ac_del.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_del", 208, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -604,7 +604,7 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
 int
 auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
 {
-  char conf_file[PATH_MAX], tmpfile[512];
+  char conf_file[PATH_MAX], tmpfile[PATH_MAX];
   char conf_dbname[128];
   char strbuf[1024], *p;
   FILE *infp, *outfp;
@@ -614,7 +614,7 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
     {
       return -1;
     }
-  sprintf (tmpfile, "%s/DBMT_task_ac_ren.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_ren", 209, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -664,7 +664,7 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
     {
       return -1;
     }
-  sprintf (tmpfile_path, "%s/DBMT_task_ac_swit.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_swit", 210, PATH_MAX);
   if ((tmpfile = fopen (tmpfile_path, "w")) == NULL)
     {
       fclose (conf_file);
@@ -729,7 +729,7 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
     {
       return -1;
     }
-  sprintf (tmpfile_path, "%s/DBMT_task_ac_del_user.%d", sco.dbmt_tmp_dir, (int) getpid ());
+  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_del_user", TS_DELETEDBMTUSER, PATH_MAX);
   if ((tmpfile = fopen (tmpfile_path, "w")) == NULL)
     {
       fclose (conf_file);

@@ -413,9 +413,8 @@ record_iostat (nvplist *res)
 {
   FILE *infile;
   char buf[1024], d[256], rs[16], ws[16], krs[16], kws[16], wait[16],
-       actv[16], svc_t[16], w[16], b[16], tmpfile[256];
-  sprintf (tmpfile, "%s/DBMT_rec_iostat.%d", sco.dbmt_tmp_dir,
-           (int) getpid ());
+       actv[16], svc_t[16], w[16], b[16], tmpfile[PATH_MAX];
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_rec_iostat", 200, PATH_MAX);
   sprintf (buf, "/usr/bin/iostat -x > %s", tmpfile);
 
   if (system (buf) != 0)	/* iostat */

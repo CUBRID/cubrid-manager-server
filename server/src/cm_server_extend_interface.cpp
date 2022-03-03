@@ -1295,7 +1295,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
     }
 
   // open a temp file for new auto query config.
-  snprintf (tmp_conf_file, PATH_MAX-1, "%s/DBMT_task_045.%d", sco.dbmt_tmp_dir, static_cast<int> (getpid()));
+  make_temp_filepath (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", 45, PATH_MAX);
   tmp_file.open (tmp_conf_file, ios::out);
   if (!tmp_file.good())
     {
@@ -1519,8 +1519,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
 
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[9];
-  char stdout_log_file[512];
-  char stderr_log_file[512];
+  char stdout_log_file[PATH_MAX];
+  char stderr_log_file[PATH_MAX];
 
   int retval;
 
@@ -1533,8 +1533,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   JSON_FIND_V (request, "dbname",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
 
-  sprintf (stdout_log_file, "%s/cmhastop.%d.out", sco.dbmt_tmp_dir,  (int)getpid());
-  sprintf (stderr_log_file, "%s/cmhastop.%d.err", sco.dbmt_tmp_dir,  (int)getpid());
+  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
+  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   copy_log_path = request["copylogpath"].asString();
   remote_host_name = request["remotehostname"].asString();

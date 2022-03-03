@@ -330,15 +330,15 @@ int
 dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
   FILE *fp;
-  char tmpfile[512];
+  char tmpfile[PATH_MAX];
   int i, j;
   char strbuf[1024];
   int lock_fd;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (tmpfile, "%s/tmp/DBMT_util_pass.%d", sco.szCubrid, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", 201, PATH_MAX);
 #else
-  sprintf (tmpfile, "%s/DBMT_util_pass.%d", CUBRID_TMPDIR, (int) getpid ());
+  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", 201, PATH_MAX);
 #endif
   fp = fopen (tmpfile, "w");
   if (fp == NULL)
@@ -452,14 +452,14 @@ dbmt_user_search (T_DBMT_USER_INFO *user_info, const char *dbname)
 int
 dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
-  char tmpfile[512], strbuf[1024];
+  char tmpfile[PATH_MAX], strbuf[1024];
   FILE *fp;
   int i, lock_fd;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (tmpfile, "%s/tmp/DBMT_util_pass.%d", sco.szCubrid, (int) getpid ());
+  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", 202, PATH_MAX);
 #else
-  sprintf (tmpfile, "%s/DBMT_util_pass.%d", CUBRID_TMPDIR, (int) getpid ());
+  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", 202, PATH_MAX);
 #endif
 
   fp = fopen (tmpfile, "w");
