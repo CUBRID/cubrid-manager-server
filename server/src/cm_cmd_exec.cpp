@@ -158,7 +158,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
   char cmd_name[CUBRID_CMD_NAME_LEN];
 
   cubrid_cmd_name (cmd_name);
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", 0, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", TS_GET_SERVER_VERSION, PATH_MAX);
   argv[0] = cmd_name;
   argv[1] = "--version";
   argv[2] = NULL;
