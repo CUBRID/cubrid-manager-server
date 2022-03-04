@@ -141,7 +141,7 @@ dbmt_con_delete (const char *ip, const char *port)
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
   infile = fopen (conn_list_file, "r");
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", 14, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_DELETE, PATH_MAX);
   outfile = fopen (tmpfile, "w");
 
   if (infile == NULL || outfile == NULL)
@@ -341,7 +341,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", 14, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_WRITE_DBINFO, PATH_MAX);
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
   outfile = fopen (tmpfile, "w");

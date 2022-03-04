@@ -573,7 +573,7 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_del", 208, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_del", TS_AUTOCONF_DELETE, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -614,7 +614,7 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_ren", 209, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_ren", TS_AUTOCONF_RENAME, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -664,7 +664,7 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
     {
       return -1;
     }
-  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_swit", 210, PATH_MAX);
+  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_swit", TS_AUTOCONF_SWIT, PATH_MAX);
   if ((tmpfile = fopen (tmpfile_path, "w")) == NULL)
     {
       fclose (conf_file);

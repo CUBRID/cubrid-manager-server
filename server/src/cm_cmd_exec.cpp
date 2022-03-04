@@ -78,7 +78,7 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
           char *infile, char *command, char *error_continue)
 {
   char cubrid_err_file[PATH_MAX];
-  char out_file[512];
+  char out_file[PATH_MAX];
   T_CSQL_RESULT *res;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[15];
@@ -128,11 +128,11 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
   argv[argc++] = NULL;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  make_temp_filepath (out_file, sco.szCubrid, "DBMT_util", 3, sizeof (out_file));
+  make_temp_filepath (out_file, sco.szCubrid, "DBMT_util", TS_CSQL_CMD, PATH_MAX);
 #else
-  make_temp_filepath (out_file, CUBRID_TMPDIR, "DBMT_util", 3, sizeof (out_file));
+  make_temp_filepath (out_file, CUBRID_TMPDIR, "DBMT_util", TS_CSQL_CMD, PATH_MAX);
 #endif
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_csql_err", 3, PATH_MAX);
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_csql_err", TS_CSQL_CMD, PATH_MAX);
 
   SET_TRANSACTION_NO_WAIT_MODE_ENV ();
 

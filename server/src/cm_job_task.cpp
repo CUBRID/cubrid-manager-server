@@ -398,14 +398,14 @@ _run_child (const char *const argv[], int wait_flag, char *task_name,
   if (stdout_file == NULL)
     {
       snprintf (buf, PATH_MAX - 1, "%s_out_tmp", task_name);
-      make_temp_filepath (tmp_out_file, sco.dbmt_tmp_dir, buf, 300, PATH_MAX);
+      make_temp_filepath (tmp_out_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
     }
   else
     {
       snprintf (tmp_out_file, PATH_MAX, stdout_file);
     }
   snprintf (buf, PATH_MAX - 1, "%s_err_tmp", task_name);
-  make_temp_filepath (tmp_err_file, sco.dbmt_tmp_dir, buf, 300, PATH_MAX);
+  make_temp_filepath (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
 
   if (run_child
       (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, &exit_code) < 0)
@@ -4650,7 +4650,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
   /* makeup upload class list file */
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 101, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
   if ((outfile = fopen (tmpfile, "w")) == NULL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -4881,7 +4881,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 102, PATH_MAX);
+      make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
       outfile = fopen (tmpfile, "w");
       if (outfile == NULL)
 	{
@@ -5555,7 +5555,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "CUBRID_DATABASES", sco.szCubrid_databases);
   nv_add_nvp (res, "CUBRID_DBMT", sco.szCubrid);
   //  nv_add_nvp (res, "CUBRID_CHARSET", getenv ("CUBRID_CHARSET"));
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 15, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GETENV, PATH_MAX);
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
@@ -5580,7 +5580,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
       nv_add_nvp (res, "CUBRIDVER", "version information not available");
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 15, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_BROKER_VERSION, PATH_MAX);
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/bin/cubrid_broker%s",
 	    sco.szCubrid, DBMT_EXE_EXT);
 
@@ -6769,7 +6769,7 @@ ts_set_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
       strcpy (_dbmt_error, auto_addvol_conf_file);
       return ERR_FILE_OPEN_FAIL;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 45, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SETAUTOADDVOL, PATH_MAX);
   outfile = fopen (tmpfile, "w");
   if (outfile == NULL)
     {
@@ -8245,7 +8245,7 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "trigger_operation_err_tmp", 207, PATH_MAX);
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "trigger_operation_err_tmp", TS_GETTRIGGERINFO, PATH_MAX);
   SET_TRANSACTION_NO_WAIT_MODE_ENV ();
 
   retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* csql - trigger */
@@ -8325,7 +8325,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_FILE_OPEN_FAIL;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", 45, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SET_AUTO_EXEC_QRY, PATH_MAX);
   if ((temp_file = fopen (tmpfile, "w")) == NULL)
     {
       fclose (conf_file);
@@ -9122,7 +9122,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	}
     }
   argv[arg_index++] = NULL;
-  make_temp_filepath (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", 203, PATH_MAX);
+  make_temp_filepath (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", TS_ANALYZECASLOG, PATH_MAX);
 
   retval = run_child (argv, 1, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
   if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
@@ -9148,7 +9148,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
       return ERR_SYSTEM_CALL;
     }
 
-  make_temp_filepath (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", 203, PATH_MAX);
+  make_temp_filepath (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", TS_ANALYZECASLOG, PATH_MAX);
   fdAnalyzeResult = fopen (tmpfileanalyzeresult, "w+");
   if (fdAnalyzeResult == NULL)
     {
@@ -9163,7 +9163,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
     {
       int log_init_flag, log_index;
 
-      make_temp_filepath (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", 204, PATH_MAX);
+      make_temp_filepath (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
       rename ("./log_top.t", tmpfileT);
 
       fdT = fopen (tmpfileT, "r");
@@ -9242,8 +9242,8 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 #else
       th_id = getpid ();
 #endif
-      make_temp_filepath (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", 204, PATH_MAX);
-      make_temp_filepath (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", 204, PATH_MAX);
+      make_temp_filepath (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
+      make_temp_filepath (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
 
       rename ("./log_top.q", tmpfileQ);
       rename ("./log_top.res", tmpfileRes);
@@ -13535,7 +13535,7 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 
   snprintf (dblocation_info_path, PATH_MAX - 1, "%s/%s",
 	    sco.szCubrid_databases, CUBRID_DATABASE_TXT);
-  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", 206, PATH_MAX);
+  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", TS_ALTER_DB_LOC, PATH_MAX);
 
   dblocation_info = fopen (dblocation_info_path, "r");
   tmpfile = fopen (tmpfile_path, "w");

@@ -336,9 +336,9 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   int lock_fd;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", 201, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", TS_USER_WRITE_AUTH, PATH_MAX);
 #else
-  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", 201, PATH_MAX);
+  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", TS_USER_WRITE_AUTH, PATH_MAX);
 #endif
   fp = fopen (tmpfile, "w");
   if (fp == NULL)
@@ -457,9 +457,9 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   int i, lock_fd;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", 202, PATH_MAX);
+  make_temp_filepath (tmpfile, sco.szCubrid, "DBMT_util_pass", TS_USER_WRITE_PASS, PATH_MAX);
 #else
-  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", 202, PATH_MAX);
+  make_temp_filepath (tmpfile, CUBRID_TMPDIR, "DBMT_util_pass", TS_USER_WRITE_PASS, PATH_MAX);
 #endif
 
   fp = fopen (tmpfile, "w");

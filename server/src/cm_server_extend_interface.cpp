@@ -1295,7 +1295,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
     }
 
   // open a temp file for new auto query config.
-  make_temp_filepath (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", 45, PATH_MAX);
+  make_temp_filepath (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", TS_EXT_SET_AUTO_EXEC_QRY, PATH_MAX);
   tmp_file.open (tmp_conf_file, ios::out);
   if (!tmp_file.good())
     {
