@@ -185,7 +185,7 @@ ts_get_server_version (nvplist *req, nvplist *res)
   const char *argv[5];
 
   nv_update_val (res, "task", "getversion");
-  snprintf (tmpfile, PATH_MAX - 1, "%s/DBMT_task_015", sco.dbmt_tmp_dir);
+  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_SERVER_VERSION, PATH_MAX);
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
