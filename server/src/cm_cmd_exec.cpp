@@ -219,8 +219,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
       res = new SpaceDbResultNewFormat();
     }
 
-  sprintf (out_file, "%s/DBMT_util_002.%d", sco.dbmt_tmp_dir,
-           (int) getpid ());
+  make_temp_filepath (out_file, sco.dbmt_tmp_dir, "DBMT_util", TS_DB_SPACE_INFO, PATH_MAX);
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_SPACEDB;
@@ -233,8 +232,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   argv[argc++] = "-p";
   argv[argc++] = NULL;
 
-  snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
-            sco.dbmt_tmp_dir, "cmd_spacedb", getpid ());
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_spacedb_err", TS_DB_SPACE_INFO, PATH_MAX);
   run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* spacedb */
   read_error_file (cubrid_err_file, err_message, ERR_MSG_SIZE);
   res->set_err_msg (err_message);
@@ -251,8 +249,8 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
 int
 cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 {
-  char stdout_log_file[512];
-  char stderr_log_file[512];
+  char stdout_log_file[PATH_MAX];
+  char stderr_log_file[PATH_MAX];
   int pid;
   int ret_val;
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -263,11 +261,8 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 #endif
 
   cmd_start_master ();
-  sprintf (stdout_log_file, "%s/cmserverstart.%d.err", sco.dbmt_tmp_dir,
-           (int) getpid ());
-  sprintf (stderr_log_file, "%s/cmserverstart2.%d.err", sco.dbmt_tmp_dir,
-           (int) getpid ());
-
+  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
+  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
 
   /* unset CUBRID_ERROR_LOG environment variable, using default value */
 #if defined(WINDOWS)
