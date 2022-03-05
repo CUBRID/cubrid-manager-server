@@ -1226,7 +1226,7 @@ aj_execquery (autoexecquery_node *c)
   int error_code;
   char error_buffer[1024];
   char cubrid_err_file[PATH_MAX];
-  char input_filename[256];
+  char input_filename[PATH_MAX];
   FILE *input_file;
 
   cubrid_err_file[0] = '\0';
@@ -1270,8 +1270,7 @@ aj_execquery (autoexecquery_node *c)
       break;
     }
 
-  sprintf (input_filename, "%s/dbmt_auto_execquery_%d", sco.dbmt_tmp_dir,
-           (int) getpid ());
+  make_temp_filepath (input_filename, sco.dbmt_tmp_dir, "dbmt_auto_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
   argv[argc++] = "--" CSQL_INPUT_FILE_L;
   argv[argc++] = input_filename;
 
@@ -1303,8 +1302,7 @@ aj_execquery (autoexecquery_node *c)
       return;
     }
 
-  snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
-            sco.dbmt_tmp_dir, "aj_execquery", getpid ());
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "aj_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
   retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* csql auto-execute */
   unlink (input_filename);
   if (retval != 0)
