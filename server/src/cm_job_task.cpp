@@ -1325,6 +1325,7 @@ ts2_get_add_broker_info (nvplist *in, nvplist *out, char *_dbmt_error)
 
   if (access (broker_conf_path, F_OK) < 0)
     {
+      strcpy (_dbmt_error, conf_path);
       return ERR_FILE_OPEN_FAIL;
     }
 
@@ -1662,6 +1663,7 @@ ts_get_all_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (access (conf_path, F_OK) < 0)
     {
+      strcpy (_dbmt_error, conf_path);
       return ERR_FILE_OPEN_FAIL;
     }
 
