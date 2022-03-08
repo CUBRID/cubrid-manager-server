@@ -115,7 +115,7 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"optimizedb", TS_OPTIMIZEDB, 1, DEF_TASK_FUNC (ts_optimizedb), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"plandump", TS_PLANDUMP, 1, DEF_TASK_FUNC (ts_plandump), FSVR_CS, ALL_AUTHORITY},
   {"paramdump", TS_PARAMDUMP, 1, DEF_TASK_FUNC (ts_paramdump), FSVR_SA_CS, ALL_AUTHORITY},
-  {"statdump", TS_STATDUMP, 1, DEF_TASK_FUNC (ts_statdump), FSVR_CS, ALL_AUTHORITY},
+  {"statdump", TS_STATDUMP, 0, DEF_TASK_FUNC (ts_statdump), FSVR_CS, ALL_AUTHORITY},
   {"checkdb", TS_CHECKDB, 0, DEF_TASK_FUNC (ts_checkdb), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"compactdb", TS_COMPACTDB, 1, DEF_TASK_FUNC (ts_compactdb), FSVR_SA, AU_DBC | AU_DBO},
   {"backupdbinfo", TS_BACKUPDBINFO, 0, DEF_TASK_FUNC (ts_backupdb_info), FSVR_NONE, ALL_AUTHORITY},
