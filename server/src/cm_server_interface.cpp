@@ -593,6 +593,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
                                   "failed to run task.");
     }
 
+  time_out = 30;
   pstmt->request = request;
   pstmt->status = 0;
 
@@ -654,14 +655,19 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pthread_mutex_lock (&mutex);
   to.tv_sec = time (NULL) + time_out;
   to.tv_nsec = 0;
-  //err = pthread_cond_timedwait (&cond, &mutex, &to);
-  err = pthread_cond_wait (&cond, &mutex);
+  err = pthread_cond_timedwait (&cond, &mutex, &to);
+//  err = pthread_cond_wait (&cond, &mutex);
   pthread_mutex_unlock (&mutex);
   if (err == ETIMEDOUT)
     {
-      request_list.push_back (pstmt);
+      string dbname, task_name;
+
+      task_name = request.get ("task", "unknown").asString();
+      dbname = request.get ("dbname", "").asString();
+
       response["uuid"] = pstmt->uuid;
-      LOG_ERROR ("cm_execute_request_async : Timeout for running task.");
+      LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
+		time_out, task_name.c_str(), dbname.c_str ());
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
