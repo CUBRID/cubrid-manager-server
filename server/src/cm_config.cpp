@@ -235,7 +235,7 @@ uReadSystemConfig (void)
   sco.iAllow_AdminMultiCon = DEFAULT_ALLOW_MULTI_CON;
   sco.iSupportWebManager = FALSE;
   sco.iSupportMonStat = FALSE;
-  sco.iHttpTimeout = 500;
+  sco.iHttpTimeout = 30;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
