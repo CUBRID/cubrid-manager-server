@@ -593,7 +593,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
                                   "failed to run task.");
     }
 
-  time_out = 30;
   pstmt->request = request;
   pstmt->status = 0;
 
