@@ -423,10 +423,9 @@ class CLog
 
       bool shouldBackupFiles = false;
 
+      mutex_lock (m_cs);
       if (isErrorLog == true)
         {
-          mutex_lock (m_cs);
-
           fprintf (m_pErrFile, "[%s] [%s] [%6d] %s\n",
                    _get_format_time ().c_str (), strLevel, getpid (), buffer);
           fflush (m_pErrFile);
@@ -435,12 +434,9 @@ class CLog
             {
               shouldBackupFiles = true;
             }
-          mutex_unlock (m_cs);
         }
       else
         {
-          mutex_lock (m_cs);
-
           fprintf (m_pLogFile, "[%s] [%s] [%6d] %s\n",
                    _get_format_time ().c_str (), strLevel, getpid (), buffer);
 
@@ -450,14 +446,11 @@ class CLog
             {
               shouldBackupFiles = true;
             }
-          mutex_unlock (m_cs);
         }
 
       // backup log when the file grow too large
       if (shouldBackupFiles == true)
         {
-          mutex_lock (m_cs);
-
           // init open file - close them firstly
           _init_file_hander ();
 
@@ -476,8 +469,8 @@ class CLog
             {
               _remove_oldest_file (log_files_list);
             }
-          mutex_unlock (m_cs);
         }
+      mutex_unlock (m_cs);
       delete[]buffer;
     }
 
