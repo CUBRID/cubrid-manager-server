@@ -132,6 +132,8 @@ using namespace std;
     } while (0)
 #endif /* !WINDOWS */
 
+#define        ER_FEATURE_DEPRECATED   -2
+
 extern T_EMGR_VERSION CLIENT_VERSION;
 extern T_USER_TOKEN_INFO *user_token_info;
 
@@ -1647,6 +1649,7 @@ ts_get_all_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
   FILE *infile;
   char conf_path[PATH_MAX], strbuf[1024 * 200];
   char *conf_name;
+  int ret = 0;
 
   conf_name = nv_get_val (req, "confname");
   if (conf_name == NULL)
@@ -1655,9 +1658,11 @@ ts_get_all_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (_get_confpath_by_name (conf_name, conf_path, sizeof (conf_path)) < 0)
+  ret = _get_confpath_by_name (conf_name, conf_path, sizeof (conf_path));
+  if (ret < 0)
     {
-      strcpy (_dbmt_error, "confname error");
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "(%s): %s.", conf_name,
+		ret == ER_FEATURE_DEPRECATED ? "deprecated" : "conf name error");
       return ERR_WITH_MSG;
     }
 
@@ -1712,6 +1717,10 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen)
     {
       snprintf (conf_path, buflen - 1, "%s/%s", sco.szCubrid_databases,
 		CUBRID_DATABASE_TXT);
+    }
+  else if (uStringEqual (conf_name, "shard.conf"))
+    {
+      retval = ER_FEATURE_DEPRECATED;
     }
   else
     {
