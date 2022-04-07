@@ -15022,7 +15022,7 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
+  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_err", TS_HA_COPYLOGDB, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
