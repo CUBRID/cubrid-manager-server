@@ -8,6 +8,10 @@ Delete transactions, and return the rest of trasactions infomation.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
+| dbuser | database username, must have dba Privileges |
+| dbpasswd | password for dbuser |
+| \_DBPASSWD | DBA password for dbname |
 | type | options from killtransaction command. |
 | parameter | a paramter according to the option in "type" field |
 
@@ -31,6 +35,9 @@ other letters should cause an error. 
   "task": "killtransaction",
   "token": "cdfb4c5717170c5eb159540c0384c7424ea3fcd68c6ea615f538801cd09c6f3a7926f07dd201b6aa",
   "dbname": "demodb",
+  "dbuser": "dbuser1",
+  "dbpasswd": "1234",
+  "_DBPASSWD": "abcd",
   "type": "i",
   "parameter": "2(+)"
 }
