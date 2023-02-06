@@ -4176,114 +4176,114 @@ ts_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   ts_add_nvp_time (res, "time", time (NULL), "%04d/%02d/%02d %02d:%02d:%02d", TIME_STR_FMT_DATE_TIME);
 
   /* Execution statistics for the file io */
-  nv_add_nvp_int (res, "num_file_creates", exec_stat.file_num_creates);
-  nv_add_nvp_int (res, "num_file_removes", exec_stat.file_num_removes);
-  nv_add_nvp_int (res, "num_file_ioreads", exec_stat.file_num_ioreads);
-  nv_add_nvp_int (res, "num_file_iowrites", exec_stat.file_num_iowrites);
-  nv_add_nvp_int (res, "num_file_iosynches", exec_stat.file_num_iosynches);
-  nv_add_nvp_int (res, "num_file_page_allocs", exec_stat.file_num_page_allocs);
-  nv_add_nvp_int (res, "num_file_page_deallocs", exec_stat.file_num_page_deallocs);
+  nv_add_nvp_int64 (res, "num_file_creates", exec_stat.file_num_creates);
+  nv_add_nvp_int64 (res, "num_file_removes", exec_stat.file_num_removes);
+  nv_add_nvp_int64 (res, "num_file_ioreads", exec_stat.file_num_ioreads);
+  nv_add_nvp_int64 (res, "num_file_iowrites", exec_stat.file_num_iowrites);
+  nv_add_nvp_int64 (res, "num_file_iosynches", exec_stat.file_num_iosynches);
+  nv_add_nvp_int64 (res, "num_file_page_allocs", exec_stat.file_num_page_allocs);
+  nv_add_nvp_int64 (res, "num_file_page_deallocs", exec_stat.file_num_page_deallocs);
 
   /* Execution statistics for the page buffer manager */
-  nv_add_nvp_int (res, "num_data_page_fetches", exec_stat.pb_num_fetches);
-  nv_add_nvp_int (res, "num_data_page_dirties", exec_stat.pb_num_dirties);
-  nv_add_nvp_int (res, "num_data_page_ioreads", exec_stat.pb_num_ioreads);
-  nv_add_nvp_int (res, "num_data_page_iowrites", exec_stat.pb_num_iowrites);
+  nv_add_nvp_int64 (res, "num_data_page_fetches", exec_stat.pb_num_fetches);
+  nv_add_nvp_int64 (res, "num_data_page_dirties", exec_stat.pb_num_dirties);
+  nv_add_nvp_int64 (res, "num_data_page_ioreads", exec_stat.pb_num_ioreads);
+  nv_add_nvp_int64 (res, "num_data_page_iowrites", exec_stat.pb_num_iowrites);
 
   /* Execution statistics for the log manager */
-  nv_add_nvp_int (res, "num_log_page_ioreads", exec_stat.log_num_ioreads);
-  nv_add_nvp_int (res, "num_log_page_iowrites", exec_stat.log_num_iowrites);
-  nv_add_nvp_int (res, "num_log_append_records", exec_stat.log_num_appendrecs);
-  nv_add_nvp_int (res, "num_log_archives", exec_stat.log_num_archives);
+  nv_add_nvp_int64 (res, "num_log_page_ioreads", exec_stat.log_num_ioreads);
+  nv_add_nvp_int64 (res, "num_log_page_iowrites", exec_stat.log_num_iowrites);
+  nv_add_nvp_int64 (res, "num_log_append_records", exec_stat.log_num_appendrecs);
+  nv_add_nvp_int64 (res, "num_log_archives", exec_stat.log_num_archives);
 #if 0                //no use
   nv_add_nvp_int (res, "num_log_start_checkpoints", exec_stat.log_num_start_checkpoints);
   nv_add_nvp_int (res, "num_log_end_checkpoints", exec_stat.log_num_end_checkpoints);
 #endif
-  nv_add_nvp_int (res, "num_log_wals", exec_stat.log_num_wals);
+  nv_add_nvp_int64 (res, "num_log_wals", exec_stat.log_num_wals);
 
   /* Execution statistics for the lock manager */
-  nv_add_nvp_int (res, "num_page_locks_acquired", exec_stat.lk_num_acquired_on_pages);
-  nv_add_nvp_int (res, "num_object_locks_acquired", exec_stat.lk_num_acquired_on_objects);
-  nv_add_nvp_int (res, "num_page_locks_converted", exec_stat.lk_num_converted_on_pages);
-  nv_add_nvp_int (res, "num_object_locks_converted", exec_stat.lk_num_converted_on_objects);
-  nv_add_nvp_int (res, "num_page_locks_re_requested", exec_stat.lk_num_re_requested_on_pages);
-  nv_add_nvp_int (res, "num_object_locks_re_requested", exec_stat.lk_num_re_requested_on_objects);
-  nv_add_nvp_int (res, "num_page_locks_waits", exec_stat.lk_num_waited_on_pages);
-  nv_add_nvp_int (res, "num_object_locks_waits", exec_stat.lk_num_waited_on_objects);
+  nv_add_nvp_int64 (res, "num_page_locks_acquired", exec_stat.lk_num_acquired_on_pages);
+  nv_add_nvp_int64 (res, "num_object_locks_acquired", exec_stat.lk_num_acquired_on_objects);
+  nv_add_nvp_int64 (res, "num_page_locks_converted", exec_stat.lk_num_converted_on_pages);
+  nv_add_nvp_int64 (res, "num_object_locks_converted", exec_stat.lk_num_converted_on_objects);
+  nv_add_nvp_int64 (res, "num_page_locks_re_requested", exec_stat.lk_num_re_requested_on_pages);
+  nv_add_nvp_int64 (res, "num_object_locks_re_requested", exec_stat.lk_num_re_requested_on_objects);
+  nv_add_nvp_int64 (res, "num_page_locks_waits", exec_stat.lk_num_waited_on_pages);
+  nv_add_nvp_int64 (res, "num_object_locks_waits", exec_stat.lk_num_waited_on_objects);
 
   /* Execution statistics for transactions */
-  nv_add_nvp_int (res, "num_tran_commits", exec_stat.tran_num_commits);
-  nv_add_nvp_int (res, "num_tran_rollbacks", exec_stat.tran_num_rollbacks);
-  nv_add_nvp_int (res, "num_tran_savepoints", exec_stat.tran_num_savepoints);
-  nv_add_nvp_int (res, "num_tran_start_topops", exec_stat.tran_num_start_topops);
-  nv_add_nvp_int (res, "num_tran_end_topops", exec_stat.tran_num_end_topops);
-  nv_add_nvp_int (res, "num_tran_interrupts", exec_stat.tran_num_interrupts);
+  nv_add_nvp_int64 (res, "num_tran_commits", exec_stat.tran_num_commits);
+  nv_add_nvp_int64 (res, "num_tran_rollbacks", exec_stat.tran_num_rollbacks);
+  nv_add_nvp_int64 (res, "num_tran_savepoints", exec_stat.tran_num_savepoints);
+  nv_add_nvp_int64 (res, "num_tran_start_topops", exec_stat.tran_num_start_topops);
+  nv_add_nvp_int64 (res, "num_tran_end_topops", exec_stat.tran_num_end_topops);
+  nv_add_nvp_int64 (res, "num_tran_interrupts", exec_stat.tran_num_interrupts);
 
   /* Execution statistics for the btree manager */
-  nv_add_nvp_int (res, "num_btree_inserts", exec_stat.bt_num_inserts);
-  nv_add_nvp_int (res, "num_btree_deletes", exec_stat.bt_num_deletes);
-  nv_add_nvp_int (res, "num_btree_updates", exec_stat.bt_num_updates);
-  nv_add_nvp_int (res, "num_btree_covered", exec_stat.bt_num_covered);
-  nv_add_nvp_int (res, "num_btree_noncovered", exec_stat.bt_num_noncovered);
-  nv_add_nvp_int (res, "num_btree_resumes", exec_stat.bt_num_resumes);
-  nv_add_nvp_int (res, "num_btree_multirange_optimization", exec_stat.bt_num_multi_range_opt);
-  nv_add_nvp_int (res, "num_btree_splits", exec_stat.bt_num_splits);
-  nv_add_nvp_int (res, "num_btree_merges", exec_stat.bt_num_merges);
-  nv_add_nvp_int (res, "num_btree_get_stats", exec_stat.bt_num_get_stats);
+  nv_add_nvp_int64 (res, "num_btree_inserts", exec_stat.bt_num_inserts);
+  nv_add_nvp_int64 (res, "num_btree_deletes", exec_stat.bt_num_deletes);
+  nv_add_nvp_int64 (res, "num_btree_updates", exec_stat.bt_num_updates);
+  nv_add_nvp_int64 (res, "num_btree_covered", exec_stat.bt_num_covered);
+  nv_add_nvp_int64 (res, "num_btree_noncovered", exec_stat.bt_num_noncovered);
+  nv_add_nvp_int64 (res, "num_btree_resumes", exec_stat.bt_num_resumes);
+  nv_add_nvp_int64 (res, "num_btree_multirange_optimization", exec_stat.bt_num_multi_range_opt);
+  nv_add_nvp_int64 (res, "num_btree_splits", exec_stat.bt_num_splits);
+  nv_add_nvp_int64 (res, "num_btree_merges", exec_stat.bt_num_merges);
+  nv_add_nvp_int64 (res, "num_btree_get_stats", exec_stat.bt_num_get_stats);
 
   /* Execution statistics for the query manager */
-  nv_add_nvp_int (res, "num_query_selects", exec_stat.qm_num_selects);
-  nv_add_nvp_int (res, "num_query_inserts", exec_stat.qm_num_inserts);
-  nv_add_nvp_int (res, "num_query_deletes", exec_stat.qm_num_deletes);
-  nv_add_nvp_int (res, "num_query_updates", exec_stat.qm_num_updates);
-  nv_add_nvp_int (res, "num_query_sscans", exec_stat.qm_num_sscans);
-  nv_add_nvp_int (res, "num_query_iscans", exec_stat.qm_num_iscans);
-  nv_add_nvp_int (res, "num_query_lscans", exec_stat.qm_num_lscans);
-  nv_add_nvp_int (res, "num_query_setscans", exec_stat.qm_num_setscans);
-  nv_add_nvp_int (res, "num_query_methscans", exec_stat.qm_num_methscans);
-  nv_add_nvp_int (res, "num_query_nljoins", exec_stat.qm_num_nljoins);
-  nv_add_nvp_int (res, "num_query_mjoins", exec_stat.qm_num_mjoins);
-  nv_add_nvp_int (res, "num_query_objfetches", exec_stat.qm_num_objfetches);
-  nv_add_nvp_int (res, "num_query_holdable_cursors", exec_stat.qm_num_holdable_cursors);
+  nv_add_nvp_int64 (res, "num_query_selects", exec_stat.qm_num_selects);
+  nv_add_nvp_int64 (res, "num_query_inserts", exec_stat.qm_num_inserts);
+  nv_add_nvp_int64 (res, "num_query_deletes", exec_stat.qm_num_deletes);
+  nv_add_nvp_int64 (res, "num_query_updates", exec_stat.qm_num_updates);
+  nv_add_nvp_int64 (res, "num_query_sscans", exec_stat.qm_num_sscans);
+  nv_add_nvp_int64 (res, "num_query_iscans", exec_stat.qm_num_iscans);
+  nv_add_nvp_int64 (res, "num_query_lscans", exec_stat.qm_num_lscans);
+  nv_add_nvp_int64 (res, "num_query_setscans", exec_stat.qm_num_setscans);
+  nv_add_nvp_int64 (res, "num_query_methscans", exec_stat.qm_num_methscans);
+  nv_add_nvp_int64 (res, "num_query_nljoins", exec_stat.qm_num_nljoins);
+  nv_add_nvp_int64 (res, "num_query_mjoins", exec_stat.qm_num_mjoins);
+  nv_add_nvp_int64 (res, "num_query_objfetches", exec_stat.qm_num_objfetches);
+  nv_add_nvp_int64 (res, "num_query_holdable_cursors", exec_stat.qm_num_holdable_cursors);
 
   /* Execution statistics for external sort */
-  nv_add_nvp_int (res, "num_sort_io_pages", exec_stat.sort_num_io_pages);
-  nv_add_nvp_int (res, "num_sort_data_pages", exec_stat.sort_num_data_pages);
+  nv_add_nvp_int64 (res, "num_sort_io_pages", exec_stat.sort_num_io_pages);
+  nv_add_nvp_int64 (res, "num_sort_data_pages", exec_stat.sort_num_data_pages);
 
   /* Execution statistics for network communication */
-  nv_add_nvp_int (res, "num_network_requests", exec_stat.net_num_requests);
+  nv_add_nvp_int64 (res, "num_network_requests", exec_stat.net_num_requests);
 
   /* flush control stat */
-  nv_add_nvp_int (res, "num_adaptive_flush_pages", exec_stat.fc_num_pages);
-  nv_add_nvp_int (res, "num_adaptive_flush_log_pages", exec_stat.fc_num_log_pages);
-  nv_add_nvp_int (res, "num_adaptive_flush_max_pages", exec_stat.fc_tokens);
+  nv_add_nvp_int64 (res, "num_adaptive_flush_pages", exec_stat.fc_num_pages);
+  nv_add_nvp_int64 (res, "num_adaptive_flush_log_pages", exec_stat.fc_num_log_pages);
+  nv_add_nvp_int64 (res, "num_adaptive_flush_max_pages", exec_stat.fc_tokens);
 
   /* prior lsa info */
-  nv_add_nvp_int (res, "num_prior_lsa_list_size", exec_stat.prior_lsa_list_size);
-  nv_add_nvp_int (res, "num_prior_lsa_list_maxed", exec_stat.prior_lsa_list_maxed);
-  nv_add_nvp_int (res, "num_prior_lsa_list_removed", exec_stat.prior_lsa_list_removed);
+  nv_add_nvp_int64 (res, "num_prior_lsa_list_size", exec_stat.prior_lsa_list_size);
+  nv_add_nvp_int64 (res, "num_prior_lsa_list_maxed", exec_stat.prior_lsa_list_maxed);
+  nv_add_nvp_int64 (res, "num_prior_lsa_list_removed", exec_stat.prior_lsa_list_removed);
 
   /* best space info */
-  nv_add_nvp_int (res, "num_heap_stats_bestspace_entries", exec_stat.hf_stats_bestspace_entries);
-  nv_add_nvp_int (res, "num_heap_stats_bestspace_maxed", exec_stat.hf_stats_bestspace_maxed);
+  nv_add_nvp_int64 (res, "num_heap_stats_bestspace_entries", exec_stat.hf_stats_bestspace_entries);
+  nv_add_nvp_int64 (res, "num_heap_stats_bestspace_maxed", exec_stat.hf_stats_bestspace_maxed);
 
   /* HA replication delay */
-  nv_add_nvp_int (res, "time_ha_replication_delay", exec_stat.ha_repl_delay);
+  nv_add_nvp_int64 (res, "time_ha_replication_delay", exec_stat.ha_repl_delay);
 
   /* Execution statistics for Plan cache */
-  nv_add_nvp_int (res, "num_plan_cache_add", exec_stat.pc_num_add);
-  nv_add_nvp_int (res, "num_plan_cache_lookup", exec_stat.pc_num_lookup);
-  nv_add_nvp_int (res, "num_plan_cache_hit", exec_stat.pc_num_hit);
-  nv_add_nvp_int (res, "num_plan_cache_miss", exec_stat.pc_num_miss);
-  nv_add_nvp_int (res, "num_plan_cache_full", exec_stat.pc_num_full);
-  nv_add_nvp_int (res, "num_plan_cache_delete", exec_stat.pc_num_delete);
-  nv_add_nvp_int (res, "num_plan_cache_invalid_xasl_id", exec_stat.pc_num_invalid_xasl_id);
-  nv_add_nvp_int (res, "num_plan_cache_query_string_hash_entries", exec_stat.pc_num_query_string_hash_entries);
-  nv_add_nvp_int (res, "num_plan_cache_xasl_id_hash_entries", exec_stat.pc_num_xasl_id_hash_entries);
-  nv_add_nvp_int (res, "num_plan_cache_class_oid_hash_entries", exec_stat.pc_num_class_oid_hash_entries);
+  nv_add_nvp_int64 (res, "num_plan_cache_add", exec_stat.pc_num_add);
+  nv_add_nvp_int64 (res, "num_plan_cache_lookup", exec_stat.pc_num_lookup);
+  nv_add_nvp_int64 (res, "num_plan_cache_hit", exec_stat.pc_num_hit);
+  nv_add_nvp_int64 (res, "num_plan_cache_miss", exec_stat.pc_num_miss);
+  nv_add_nvp_int64 (res, "num_plan_cache_full", exec_stat.pc_num_full);
+  nv_add_nvp_int64 (res, "num_plan_cache_delete", exec_stat.pc_num_delete);
+  nv_add_nvp_int64 (res, "num_plan_cache_invalid_xasl_id", exec_stat.pc_num_invalid_xasl_id);
+  nv_add_nvp_int64 (res, "num_plan_cache_query_string_hash_entries", exec_stat.pc_num_query_string_hash_entries);
+  nv_add_nvp_int64 (res, "num_plan_cache_xasl_id_hash_entries", exec_stat.pc_num_xasl_id_hash_entries);
+  nv_add_nvp_int64 (res, "num_plan_cache_class_oid_hash_entries", exec_stat.pc_num_class_oid_hash_entries);
 
   /* Other statistics */
-  nv_add_nvp_int (res, "data_page_buffer_hit_ratio", exec_stat.pb_hit_ratio);
+  nv_add_nvp_int64 (res, "data_page_buffer_hit_ratio", exec_stat.pb_hit_ratio);
 
   retval = ERR_NO_ERROR;
 
