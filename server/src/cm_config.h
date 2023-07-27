@@ -324,6 +324,8 @@
 #define LOAD_SA_MODE_L                          "SA-mode"
 #define LOAD_CS_MODE_S                          11815
 #define LOAD_CS_MODE_L                          "CS-hidden"
+#define LOAD_NO_USER_SPECIFIED_NAME_L           "no-user-specified-name"
+#define LOAD_SCHEMA_FILE_LIST_L                 "schema-file-list"
 
 /* unloaddb option list */
 #define UNLOAD_INPUT_CLASS_FILE_S               'i'
