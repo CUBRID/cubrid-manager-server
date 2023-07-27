@@ -362,7 +362,7 @@
 #define UNLOAD_PASSWORD_L                       "password"
 #define UNLOAD_AS_DBA_L                         "as-dba"
 #define UNLOAD_SPLIT_SCHEMA_L                   "split-schema-files"
-#define UNLOAD_SKIP_IDX_DETAIL_L                "skip_index_detail"
+#define UNLOAD_SKIP_IDX_DETAIL_L                "skip-index-detail"
 
 /* compactdb option list */
 #define COMPACT_VERBOSE_S                       'v'
