@@ -5089,6 +5089,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[32];
   int argc = 0;
+  char *no_user_specified_name = NULL;
+  char *schema_file_list = NULL;
 
   cubrid_err_file[0] = '\0';
 
@@ -5115,6 +5117,9 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   oiduse = nv_get_val (req, "oiduse");
   nolog = nv_get_val (req, "nolog");
   statisticsuse = nv_get_val (req, "statisticsuse");
+
+  no_user_specified_name = nv_get_val (req, "no-user-specified-name");
+  schema_file_list = nv_get_val (req, "schema-file-list");
 
   db_mode = uDatabaseMode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
@@ -5223,6 +5228,15 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       argv[argc++] = "--" LOAD_IGNORE_CLASS_L;
       argv[argc++] = ignore_class_file;
+    }
+  if (uStringEqual (no_user_specified_name, "yes"))
+    {
+      argv[argc++] = "--" LOAD_NO_USER_SPECIFIED_NAME_L;
+    }
+  if (schema_file_list != NULL && uStringEqual (schema_file_list, "none"))
+    {
+      argv[argc++] = "--" LOAD_SCHEMA_FILE_LIST_L;
+      argv[argc++] = schema_file_list;
     }
   argv[argc++] = dbname;
   argv[argc++] = NULL;
