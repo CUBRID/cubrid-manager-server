@@ -5092,6 +5092,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char *no_user_specified_name = NULL;
   char *schema_file_list = NULL;
   char schema_file_list_opt [PATH_MAX];
+  bool schema_file_list_opt_flag = false;
 
   cubrid_err_file[0] = '\0';
 
@@ -5236,6 +5237,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
+      schema_file_list_opt_flag = true;
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
@@ -5244,7 +5246,18 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
+  if (schema_file_list_opt_flag)
+    {
+      char loaddb_exe_path[PATH_MAX];
+
+      snprintf (loaddb_exe_path, PATH_MAX, "%s", schema_file_list);
+      retval = run_child_cwd (argv, dirname(loaddb_exe_path), 1, NULL, tmpfile, cubrid_err_file, NULL);
+    }
+  else
+    {
+      retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
+    }
+
   if (retval < 0)
     {
       if (access (cubrid_err_file, F_OK) == 0)
