@@ -5091,6 +5091,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   char *no_user_specified_name = NULL;
   char *schema_file_list = NULL;
+  char schema_file_list_opt [PATH_MAX];
 
   cubrid_err_file[0] = '\0';
 
@@ -5235,8 +5236,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      argv[argc++] = "--" LOAD_SCHEMA_FILE_LIST_L;
-      argv[argc++] = schema_file_list;
+      snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
+      argv[argc++] = schema_file_list_opt;
     }
   argv[argc++] = dbname;
   argv[argc++] = NULL;
