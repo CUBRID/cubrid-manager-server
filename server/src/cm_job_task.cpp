@@ -5233,7 +5233,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       argv[argc++] = "--" LOAD_NO_USER_SPECIFIED_NAME_L;
     }
-  if (schema_file_list != NULL && uStringEqual (schema_file_list, "none"))
+  if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
       argv[argc++] = "--" LOAD_SCHEMA_FILE_LIST_L;
       argv[argc++] = schema_file_list;
