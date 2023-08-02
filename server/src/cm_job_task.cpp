@@ -56,6 +56,7 @@
 #endif
 #endif
 
+
 #include "cm_log.h"
 #include "cm_stat.h"
 #include "cm_porting.h"
@@ -5085,7 +5086,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   T_DB_SERVICE_MODE db_mode;
   char *dbuser, *dbpasswd;
   char cubrid_err_file[PATH_MAX];
-  int retval;
+  int retval = -1;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[32];
   int argc = 0;
@@ -5249,13 +5250,23 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (schema_file_list_opt_flag)
     {
       char loaddb_exe_path[PATH_MAX];
+      char drive [_MAX_DRIVE];
+      char dir[PATH_MAX];
 
+#if defined (WINDOWS)
+      if (_splitpath_s(schema_file_list, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+        {
+          snprintf (loaddb_exe_path, PATH_MAX, "%s%s", drive, dir);
+          retval = run_child_cwd (argv, loaddb_exe_path, 1, NULL, tmpfile, cubrid_err_file, NULL);
+        }
+#else
       snprintf (loaddb_exe_path, PATH_MAX, "%s", schema_file_list);
       retval = run_child_cwd (argv, dirname(loaddb_exe_path), 1, NULL, tmpfile, cubrid_err_file, NULL);
+#endif
     }
   else
     {
-      retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
+      retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);
     }
 
   if (retval < 0)

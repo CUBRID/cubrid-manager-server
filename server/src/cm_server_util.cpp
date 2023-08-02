@@ -329,7 +329,11 @@ run_child_cwd (const char *const argv[], const char * dir, int wait_flag,
                  const char *stdin_file, char *stdout_file, char *stderr_file,
                  int *exit_status)
 {
+#if defined (WINDOWS)
+  if (_chdir (dir) < 0)
+#else
   if (chdir (dir) < 0)
+#endif
     {
       return -1;
     }
