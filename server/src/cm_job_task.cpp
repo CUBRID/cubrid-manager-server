@@ -5250,10 +5250,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (schema_file_list_opt_flag)
     {
       char loaddb_exe_path[PATH_MAX];
+
+#if defined (WINDOWS)
       char drive [_MAX_DRIVE];
       char dir[PATH_MAX];
 
-#if defined (WINDOWS)
       if (_splitpath_s(schema_file_list, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
         {
           snprintf (loaddb_exe_path, PATH_MAX, "%s%s", drive, dir);
