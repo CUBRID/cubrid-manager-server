@@ -324,6 +324,8 @@
 #define LOAD_SA_MODE_L                          "SA-mode"
 #define LOAD_CS_MODE_S                          11815
 #define LOAD_CS_MODE_L                          "CS-hidden"
+#define LOAD_NO_USER_SPECIFIED_NAME_L           "no-user-specified-name"
+#define LOAD_SCHEMA_FILE_LIST_L                 "schema-file-list"
 
 /* unloaddb option list */
 #define UNLOAD_INPUT_CLASS_FILE_S               'i'
@@ -360,6 +362,9 @@
 #define UNLOAD_USER_L                           "user"
 #define UNLOAD_PASSWORD_S                       "p"
 #define UNLOAD_PASSWORD_L                       "password"
+#define UNLOAD_AS_DBA_L                         "as-dba"
+#define UNLOAD_SPLIT_SCHEMA_L                   "split-schema-files"
+#define UNLOAD_SKIP_IDX_DETAIL_L                "skip-index-detail"
 
 /* compactdb option list */
 #define COMPACT_VERBOSE_S                       'v'

@@ -20,6 +20,8 @@ The loaddb interface will load database from files.
 | index | index file path |
 | errorcontrolfile | FILE to control error(s) during loading |
 | ignoreclassfile | input file of class names that skip load |
+| no-user-specified-name | Find classes, serials, and triggers by their object names without their owner names |
+| schema-file-list | name of schema-file-list, list of schema file names to be used in loaddb |
 | delete_orignal_files | delete original file after load |
 
 ## Request Sample

@@ -56,6 +56,7 @@
 #endif
 #endif
 
+
 #include "cm_log.h"
 #include "cm_stat.h"
 #include "cm_porting.h"
@@ -353,6 +354,8 @@ static int find_new_statdumpd_info ();
 static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
 static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_file_size);
+
+static void unlink_schema_files (const char *path, const char *schema_list_file);
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -4586,6 +4589,9 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char dba_user[32] = "dba";
   char *dbuser = NULL;
   char *dbpasswd = NULL;
+  char *skip_index_detail = NULL;
+  char *split_schema_files = NULL;
+  char *as_dba = NULL;
 
   cubrid_err_file[0] = '\0';
 
@@ -4609,6 +4615,9 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   lofile = nv_get_val (req, "lofile");
   dbuser = nv_get_val (req, "dbuser");
   dbpasswd = nv_get_val (req, "dbpasswd");
+  skip_index_detail = nv_get_val (req, "skip-index-detail");
+  split_schema_files = nv_get_val (req, "split-schema-files");
+  as_dba = nv_get_val (req, "as-dba");
 
   if (target == NULL)
     {
@@ -4759,6 +4768,18 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       argv[argc++] = "--" UNLOAD_LO_COUNT_L;
       argv[argc++] = lofile;
+    }
+  if (uStringEqual (as_dba, "yes"))
+    {
+      argv[argc++] = "--" UNLOAD_AS_DBA_L;
+    }
+  if (uStringEqual (split_schema_files, "yes"))
+    {
+      argv[argc++] = "--" UNLOAD_SPLIT_SCHEMA_L;
+    }
+  if (uStringEqual (skip_index_detail, "yes"))
+    {
+      argv[argc++] = "--" UNLOAD_SKIP_IDX_DETAIL_L;
     }
 
   if (ha_mode != 0)
@@ -5067,10 +5088,15 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   T_DB_SERVICE_MODE db_mode;
   char *dbuser, *dbpasswd;
   char cubrid_err_file[PATH_MAX];
-  int retval;
+  int retval = -1;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[32];
   int argc = 0;
+  char *no_user_specified_name = NULL;
+  char *schema_file_list = NULL;
+  char schema_file_list_opt [PATH_MAX];
+  bool schema_file_list_opt_flag = false;
+  char loaddb_exe_path[PATH_MAX];
 
   cubrid_err_file[0] = '\0';
 
@@ -5097,6 +5123,9 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   oiduse = nv_get_val (req, "oiduse");
   nolog = nv_get_val (req, "nolog");
   statisticsuse = nv_get_val (req, "statisticsuse");
+
+  no_user_specified_name = nv_get_val (req, "no-user-specified-name");
+  schema_file_list = nv_get_val (req, "schema-file-list");
 
   db_mode = uDatabaseMode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
@@ -5206,12 +5235,42 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = "--" LOAD_IGNORE_CLASS_L;
       argv[argc++] = ignore_class_file;
     }
+  if (uStringEqual (no_user_specified_name, "yes"))
+    {
+      argv[argc++] = "--" LOAD_NO_USER_SPECIFIED_NAME_L;
+    }
+  if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
+    {
+      schema_file_list_opt_flag = true;
+      snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
+      argv[argc++] = schema_file_list_opt;
+    }
   argv[argc++] = dbname;
   argv[argc++] = NULL;
 
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
+  if (schema_file_list_opt_flag)
+    {
+#if defined (WINDOWS)
+      char drive [_MAX_DRIVE];
+      char dir[PATH_MAX];
+
+      if (_splitpath_s(schema_file_list, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+        {
+          snprintf (loaddb_exe_path, PATH_MAX, "%s%s", drive, dir);
+          retval = run_child_cwd (argv, loaddb_exe_path, 1, NULL, tmpfile, cubrid_err_file, NULL);
+        }
+#else
+      snprintf (loaddb_exe_path, PATH_MAX, "%s", schema_file_list);
+      retval = run_child_cwd (argv, dirname(loaddb_exe_path), 1, NULL, tmpfile, cubrid_err_file, NULL);
+#endif
+    }
+  else
+    {
+      retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);
+    }
+
   if (retval < 0)
     {
       if (access (cubrid_err_file, F_OK) == 0)
@@ -5254,9 +5313,40 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  unlink (index);
 	}
+      if (schema_file_list)
+	{
+	  unlink_schema_files (loaddb_exe_path, schema_file_list);
+	}
     }
 
   return ERR_NO_ERROR;
+}
+
+static void
+unlink_schema_files (const char *path, const char *schema_list_file)
+{
+  FILE *fp;
+  char *p, filename[PATH_MAX] = { 0, };
+  char path_name[PATH_MAX*2];
+
+  if (path == NULL || schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
+    {
+      return;
+    }
+
+  while (fgets (filename, PATH_MAX, fp))
+    {
+      p = strchr (filename, '\n');
+      if (p)
+	{
+	  *p = '\0';
+	}
+      snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
+      unlink (path_name);
+    }
+
+  fclose (fp);
+  unlink (schema_list_file);
 }
 
 int

@@ -210,6 +210,9 @@ int ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error);
 int ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid);
 int ut_record_cubrid_utility_log_stderr (const char *msg);
 int ut_record_cubrid_utility_log_stdout (const char *msg);
+int run_child_cwd (const char *const argv[], const char *dir, int wait_flag,
+                     const char *stdin_file, char *stdout_file, char *stderr_file,
+                     int *exit_status);
 int run_child_linux (const char *pname, const char *const argv[], int wait_flag,
                      const char *stdin_file, char *stdout_file, char *stderr_file,
                      int *exit_status);
