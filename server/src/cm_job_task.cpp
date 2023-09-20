@@ -4834,7 +4834,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   unlink (tmpfile);
 
   /* makeup upload result information in unload.log file */
-  snprintf (buf, sizeof (buf) - 1, "%s_unloaddb.log", dbname);
+  snprintf (buf, sizeof (buf) - 1, "%s/%s_unloaddb.log", fullpath, dbname);
   nv_add_nvp (res, "open", "result");
   if ((infile = fopen (buf, "rt")) != NULL)
     {
