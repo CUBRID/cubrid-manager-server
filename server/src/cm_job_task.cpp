@@ -355,7 +355,7 @@ static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
 static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_file_size);
 
-static void unlink_schema_files (const char *path, const char *schema_list_file);
+static void unlink_schema_files (const char *schema_list_file);
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -5095,8 +5095,6 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char *no_user_specified_name = NULL;
   char *schema_file_list = NULL;
   char schema_file_list_opt [PATH_MAX];
-  bool schema_file_list_opt_flag = false;
-  char loaddb_exe_path[PATH_MAX];
 
   cubrid_err_file[0] = '\0';
 
@@ -5241,7 +5239,6 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      schema_file_list_opt_flag = true;
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
@@ -5250,26 +5247,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
 
-  if (schema_file_list_opt_flag)
-    {
-#if defined (WINDOWS)
-      char drive [_MAX_DRIVE];
-      char dir[PATH_MAX];
-
-      if (_splitpath_s(schema_file_list, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
-        {
-          snprintf (loaddb_exe_path, PATH_MAX, "%s%s", drive, dir);
-          retval = run_child_cwd (argv, loaddb_exe_path, 1, NULL, tmpfile, cubrid_err_file, NULL);
-        }
-#else
-      snprintf (loaddb_exe_path, PATH_MAX, "%s", schema_file_list);
-      retval = run_child_cwd (argv, dirname(loaddb_exe_path), 1, NULL, tmpfile, cubrid_err_file, NULL);
-#endif
-    }
-  else
-    {
-      retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);
-    }
+  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
 
   if (retval < 0)
     {
@@ -5315,7 +5293,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       if (schema_file_list)
 	{
-	  unlink_schema_files (loaddb_exe_path, schema_file_list);
+	  unlink_schema_files (schema_file_list);
 	}
     }
 
@@ -5323,16 +5301,39 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 }
 
 static void
-unlink_schema_files (const char *path, const char *schema_list_file)
+unlink_schema_files (const char *schema_list_file)
 {
   FILE *fp;
   char *p, filename[PATH_MAX] = { 0, };
   char path_name[PATH_MAX*2];
+  char path[PATH_MAX];
 
-  if (path == NULL || schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
+  if (schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
     {
       return;
     }
+
+#if defined (WINDOWS)
+  {
+    char drive[_MAX_DRIVE];
+    char dir[PATH_MAX];
+
+    if (_splitpath_s(schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+      {
+	snprintf (path, PATH_MAX, "%s%s", drive, dir);
+      }
+    else
+      {
+	return;
+      }
+  }
+#else
+  snprintf (path, PATH_MAX, "%s", schema_list_file);
+  if (dirname(path) == NULL)
+    {
+      return;
+    }
+#endif
 
   while (fgets (filename, PATH_MAX, fp))
     {
