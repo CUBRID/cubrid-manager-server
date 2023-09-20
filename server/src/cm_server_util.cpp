@@ -324,22 +324,6 @@ is_process_running (const char *process_name, unsigned int sleep_time)
   return true;
 }
 
-int
-run_child_cwd (const char *const argv[], const char * dir, int wait_flag,
-                 const char *stdin_file, char *stdout_file, char *stderr_file,
-                 int *exit_status)
-{
-#if defined (WINDOWS)
-  if (_chdir (dir) < 0)
-#else
-  if (chdir (dir) < 0)
-#endif
-    {
-      return -1;
-    }
-
-  return run_child (argv, wait_flag, stdin_file, stdout_file, stderr_file, exit_status);
-}
 #if !defined(WINDOWS)
 int
 run_child_linux (const char *pname, const char *const argv[], int wait_flag,
