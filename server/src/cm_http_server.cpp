@@ -576,9 +576,12 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   SSL_CTX *ctx = NULL;
   /* init SSL libray is must. */
   SSL_library_init ();
-  /* We just use SSLv3,do not support SSLv2. */
-
-  ctx = SSL_CTX_new (TLSv1_server_method ());
+  /*
+   * We support upto TLS_v1.2,
+   * The actual protocol version used will be negotiated to the highest version
+   * mutually supported by the client and the server. 
+   */
+  ctx = SSL_CTX_new (TLS_server_method ());
   if (!ctx)
     {
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
