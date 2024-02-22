@@ -576,11 +576,7 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   SSL_CTX *ctx = NULL;
   /* init SSL libray is must. */
   SSL_library_init ();
-  /*
-   * We support upto TLS_v1.2,
-   * The actual protocol version used will be negotiated to the highest version
-   * mutually supported by the client and the server. 
-   */
+  /* Currently, we support upto TLS_v1.2 */
   ctx = SSL_CTX_new (TLS_server_method ());
   if (!ctx)
     {
