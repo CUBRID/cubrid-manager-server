@@ -578,7 +578,12 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   SSL_library_init ();
   /* Currently, we support upto TLS_v1.2 */
 
+#if !defined (WINDOWS)
   ctx = SSL_CTX_new (TLS_server_method ());
+#else
+  ctx = SSL_CTX_new (TLSv1_server_method ());
+#endif
+
   if (!ctx)
     {
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
