@@ -51,6 +51,8 @@
 #include <arpa/inet.h>
 #include <sys/utsname.h>
 #include <pthread.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 #if !defined(HPUX)
 #include <sys/procfs.h>
 #endif
@@ -134,6 +136,8 @@ using namespace std;
 #endif /* !WINDOWS */
 
 #define        ER_FEATURE_DEPRECATED   -2
+
+#define	IPC_MSG_SIZE 256
 
 extern T_EMGR_VERSION CLIENT_VERSION;
 extern T_USER_TOKEN_INFO *user_token_info;
@@ -1538,6 +1542,19 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
 {
   char *bname;
   T_CM_ERROR error;
+  struct {
+    long mtype;
+    char msg[IPC_MSG_SIZE];
+  } queue_msg;
+  int qid, nbytes, pid, gpid = getpid ();
+  key_t key = 33000000 + gpid;
+  int retry_count = 5;
+  enum
+  {
+    CMS_NO_ERROR = ERR_NO_ERROR,
+    CMS_ER_FORK_FAIL,
+    CMS_ER_CMS
+  } ret = CMS_NO_ERROR;
 
   if ((bname = nv_get_val (in, "bname")) == NULL)
     {
@@ -1545,12 +1562,77 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (cm_broker_on (bname, &error) < 0)
+  memset (&queue_msg, 0, sizeof (queue_msg));
+  queue_msg.mtype = gpid;
+  qid = msgget(key, IPC_CREAT | 0600);
+
+  if ((pid = fork ()) < 0)
     {
-      strcpy (_dbmt_error, error.err_msg);
-      return ERR_WITH_MSG;
+      ret = CMS_ER_FORK_FAIL;
+      goto fin;
     }
-  return ERR_NO_ERROR;
+
+  if (pid == 0)
+    {
+      int child_pid, cm_ret;
+
+      if ((child_pid = fork ()) < 0)
+        {
+          if (qid > 0)
+            {
+	            snprintf (queue_msg.msg, IPC_MSG_SIZE - 1, "fork failed");
+              msgsnd(qid, (void *) &queue_msg, IPC_MSG_SIZE, 0);
+            }
+          exit (255);
+        }
+
+      if (child_pid)
+        {
+          exit (0);
+        }
+
+      setsid();
+      for (int i = 3; i < 1024; i++)
+        {
+          close (i);
+        }
+
+      cm_ret = cm_broker_on (bname, &error);
+      snprintf (queue_msg.msg, IPC_MSG_SIZE - 1, "%s", cm_ret < 0 ? error.err_msg : "OK");
+      msgsnd(qid, (void *) &queue_msg, IPC_MSG_SIZE, 0);
+      exit (0);
+    }
+
+  for (int i = 0; i < retry_count; i++)
+    {
+      SLEEP_MILISEC (0, 200);
+      waitpid(-1, NULL, WNOHANG);
+      if (msgrcv(qid, &queue_msg, IPC_MSG_SIZE, gpid, IPC_NOWAIT) > 0)
+        {
+          LOG_ERROR ("broker start: %s", queue_msg.msg);
+          ret = strcmp (queue_msg.msg, "OK") == 0 ? CMS_NO_ERROR : CMS_ER_CMS;
+        }
+    }
+
+fin:
+  if (qid > 0)
+    {
+      msgctl (qid, IPC_RMID, NULL);
+    }
+
+  switch (ret)
+    {
+    case CMS_ER_FORK_FAIL:
+      strcpy (_dbmt_error, "fork failed.");
+      break;
+    case CMS_ER_CMS:
+      strcpy (_dbmt_error, queue_msg.msg);
+      break;
+    default:
+      break;
+    }
+
+   return ret == CMS_NO_ERROR ? ERR_NO_ERROR : ERR_WITH_MSG;
 }
 
 int
