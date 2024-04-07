@@ -1542,6 +1542,8 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
 {
   char *bname;
   T_CM_ERROR error;
+
+#if !defined (WINDOWS)
   struct {
     long mtype;
     char msg[IPC_MSG_SIZE];
@@ -1555,6 +1557,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
     CMS_ER_FORK_FAIL,
     CMS_ER_CMS
   } ret = CMS_NO_ERROR;
+#endif
 
   if ((bname = nv_get_val (in, "bname")) == NULL)
     {
@@ -1562,6 +1565,14 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+#if defined (WINDOWS)
+  if (cm_broker_on (bname, &error) < 0)
+    {
+      strcpy (_dbmt_error, error.err_msg);
+      return ERR_WITH_MSG;
+    }
+  return ERR_NO_ERROR;
+#else
   memset (&queue_msg, 0, sizeof (queue_msg));
   queue_msg.mtype = gpid;
   qid = msgget(key, IPC_CREAT | 0600);
@@ -1633,6 +1644,7 @@ fin:
     }
 
    return ret == CMS_NO_ERROR ? ERR_NO_ERROR : ERR_WITH_MSG;
+#endif
 }
 
 int
