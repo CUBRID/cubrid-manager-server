@@ -1622,6 +1622,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
         {
           LOG_ERROR ("broker start: %s", queue_msg.msg);
           ret = strcmp (queue_msg.msg, "OK") == 0 ? CMS_NO_ERROR : CMS_ER_CMS;
+          break;
         }
     }
 
