@@ -1548,7 +1548,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
     long mtype;
     char msg[IPC_MSG_SIZE];
   } queue_msg;
-  int qid, nbytes, pid, gpid = getpid ();
+  int qid, pid, gpid = getpid ();
   key_t key = 33000000 + gpid;
   int retry_count = 5;
   enum
