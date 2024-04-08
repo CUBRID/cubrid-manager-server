@@ -1591,7 +1591,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
         {
           if (qid > 0)
             {
-	            snprintf (queue_msg.msg, IPC_MSG_SIZE - 1, "fork failed");
+	      snprintf (queue_msg.msg, IPC_MSG_SIZE - 1, "fork failed");
               msgsnd(qid, (void *) &queue_msg, IPC_MSG_SIZE, 0);
             }
           exit (255);
