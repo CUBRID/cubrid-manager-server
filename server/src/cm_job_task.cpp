@@ -1550,11 +1550,13 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
   } queue_msg;
   int qid, pid, gpid = getpid ();
   key_t key = 33000000 + gpid;
-  int retry_count = 5;
+  int retry_count;
+  int retry_count_max = 5;
   enum
   {
     CMS_NO_ERROR = ERR_NO_ERROR,
     CMS_ER_FORK_FAIL,
+    CMS_ER_IPC_TIMEOUT,
     CMS_ER_CMS
   } ret = CMS_NO_ERROR;
 #endif
@@ -1614,7 +1616,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
       exit (0);
     }
 
-  for (int i = 0; i < retry_count; i++)
+  for (retry_count = 0; retry_count < retry_count_max; retry_count++)
     {
       SLEEP_MILISEC (0, 200);
       waitpid(-1, NULL, WNOHANG);
@@ -1623,6 +1625,11 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
           ret = strcmp (queue_msg.msg, "OK") == 0 ? CMS_NO_ERROR : CMS_ER_CMS;
           break;
         }
+    }
+
+  if (retry_count == retry_count_max)
+    {
+      ret = CMS_ER_IPC_TIMEOUT;
     }
 
 fin:
@@ -1638,6 +1645,9 @@ fin:
       break;
     case CMS_ER_CMS:
       strcpy (_dbmt_error, queue_msg.msg);
+      break;
+    case CMS_ER_IPC_TIMEOUT:
+      strcpy (_dbmt_error, "failed to receive IPC message from cub_manager (timeout)");
       break;
     default:
       break;
