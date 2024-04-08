@@ -1532,12 +1532,20 @@ ts2_set_broker_conf (nvplist *in, nvplist *out, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
-
 int
 ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
 {
   char *bname;
   T_CM_ERROR error;
+
+#if !defined (WINDOWS)
+  const char *argv[4];
+  char cubrid_err_file[PATH_MAX];
+  char cmd_name[CUBRID_CMD_NAME_LEN];
+  int retval = ERR_NO_ERROR;
+  int argc = 0;
+  int rc = 0;
+#endif
 
   if ((bname = nv_get_val (in, "bname")) == NULL)
     {
@@ -1545,12 +1553,39 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+#if defined (WINDOWS)
   if (cm_broker_on (bname, &error) < 0)
     {
       strcpy (_dbmt_error, error.err_msg);
       return ERR_WITH_MSG;
     }
   return ERR_NO_ERROR;
+#else
+
+#if !defined (DO_NOT_USE_CUBRIDENV)
+  sprintf (cmd_name, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, UTIL_BROKER_NAME);
+#else
+  sprintf (cmd_name, "%s/%s", CUBRID_BINDIR, UTIL_BROKER_NAME);
+#endif
+
+  argv[argc++] = cmd_name;
+  argv[argc++] = "on";
+  argv[argc++] = bname;
+  argv[argc++] = NULL;
+
+  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
+
+  if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
+    {
+      if (read_error_file3 (cubrid_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
+        {
+          retval = ERR_WITH_MSG;
+        }
+    }
+
+  unlink (cubrid_err_file);
+  return retval;
+#endif
 }
 
 int
