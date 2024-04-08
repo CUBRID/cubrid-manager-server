@@ -651,6 +651,96 @@ read_error_file2 (char *err_file, char *err_buf, int err_buf_size,
   return -1;
 }
 
+int
+read_error_file3 (const char *err_file, char *err_buf, int err_buf_size)
+{
+  FILE *fp;
+  char buf[1024];
+  int msg_size = 0;
+  char rm_prev_flag = 0;
+  char is_debug = 0;
+  size_t i;
+
+  if (err_buf == NULL || err_file == NULL || err_file[0] == '\0'
+      || err_buf_size == 0)
+    {
+      return 0;
+    }
+
+  memset (err_buf, 0, err_buf_size);
+
+  fp = fopen (err_file, "r");
+  if (fp == NULL)
+    {
+      return 0;
+    }
+
+  while (1)
+    {
+      memset (buf, 0, sizeof (buf));
+      if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
+        {
+          break;
+        }
+      for (i = 0; i < sizeof (buf) - 2; i++)
+        {
+          if (buf[i] == '\0')
+            {
+              if (buf[i + 1] == '\0')
+                {
+                  break;
+                }
+
+              buf[i] = ' ';
+            }
+        }
+      ut_trim (buf);
+      if (buf[0] == '\0')
+        {
+          continue;
+        }
+      if (strncmp (buf, "---", 3) == 0 ||
+          strncmp (buf, "***", 3) == 0 ||
+          strncmp (buf, "<<<", 3) == 0 || strncmp (buf, "Time:", 5) == 0)
+        {
+          if (strstr (buf, "- DEBUG") != NULL)
+            {
+              is_debug = 1;
+            }
+          else
+            {
+              is_debug = 0;
+              rm_prev_flag = 1;
+            }
+          continue;
+        }
+      /* ignore all the debug information, until find new line start with "---"|"***"|"<<<"|"Time:". */
+      if (is_debug != 0)
+        {
+          continue;
+        }
+
+      if (rm_prev_flag != 0)
+        {
+          msg_size = 0;
+        }
+
+      if ((err_buf_size - msg_size - 1) > 0)
+        {
+          strncpy (err_buf + msg_size, buf, err_buf_size - msg_size - 1);
+        }
+      else
+        {
+          break;
+        }
+        msg_size += (int) strlen (buf);
+      rm_prev_flag = 0;
+    }
+  err_buf[err_buf_size - 1] = '\0';
+  fclose (fp);
+  return (msg_size > 0 ? -1 : 0);
+}
+
 static T_CMD_RESULT *
 new_cmd_result (void)
 {
