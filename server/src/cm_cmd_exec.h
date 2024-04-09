@@ -273,7 +273,6 @@ int cmd_stop_server (char *dbname, char *err_buf, int err_buf_size);
 void cmd_start_master (void);
 char *cubrid_cmd_name (char *buf);
 int read_error_file (const char *err_file, char *err_buf, int err_buf_size);
-int read_error_file3 (const char *err_file, char *err_buf, int err_buf_size);
 int read_error_file2 (char *err_file, char *err_buf, int err_buf_size, int *err_code);
 int read_csql_error_file (char *err_file, char *err_buf, int err_buf_size);
 

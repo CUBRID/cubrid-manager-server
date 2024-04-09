@@ -1074,7 +1074,7 @@ ts2_start_unicas (nvplist *in, nvplist *out, char *_dbmt_error)
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
   if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
     {
-      if (read_error_file3 (cubrid_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
+      if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
         {
           retval = ERR_WITH_MSG;
         }
@@ -1610,7 +1610,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
 
   if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
     {
-      if (read_error_file3 (cubrid_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
+      if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
         {
           retval = ERR_WITH_MSG;
         }
