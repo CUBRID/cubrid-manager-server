@@ -466,11 +466,18 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
   char rm_prev_flag = 0;
   char is_debug = 0;
   size_t i;
+  int append_end = 1;
 
   if (err_buf == NULL || err_file == NULL || err_file[0] == '\0'
       || err_buf_size == 0)
     {
       return 0;
+    }
+
+  if (err_buf_size < 0)
+    {
+      err_buf_size = DBMT_ERROR_MSG_SIZE;
+      append_end = 0;
     }
 
   memset (err_buf, 0, err_buf_size);
@@ -530,7 +537,12 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
         {
           msg_size = 0;
         }
-      strcat (buf, "<end>");
+
+      if (append_end)
+        {
+          strcat (buf, "<end>");
+        }
+
       if ((err_buf_size - msg_size - 1) > 0)
         {
           strncpy (err_buf + msg_size, buf, err_buf_size - msg_size - 1);
