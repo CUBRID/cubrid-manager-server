@@ -542,7 +542,6 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
           strcat (buf, "<end>");
         }
 
-      strcat (buf, "<end>");
       if ((err_buf_size - msg_size - 1) > 0)
         {
           strncpy (err_buf + msg_size, buf, err_buf_size - msg_size - 1);
