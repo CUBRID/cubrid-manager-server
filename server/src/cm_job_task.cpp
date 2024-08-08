@@ -1136,7 +1136,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
   T_CM_BROKER_CONF uc_conf;
   char logdir[PATH_MAX], err_logdir[PATH_MAX], access_logdir[PATH_MAX];
   const char *v;
-  char *bname, *from, buf[1024], scriptdir[PATH_MAX];
+  char *bname, *from, buf[1024];
   char *cur_file;
   T_CM_ERROR error;
 
@@ -1290,6 +1290,10 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 		{
 		  nv_add_nvp (out, "type", "access");
 		}
+	      else if (strstr (cur_file, "log") != NULL)
+		{
+		  nv_add_nvp (out, "type", "sql_log");
+		}
 	      snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
 	      nv_add_nvp (out, "path", buf);
 	      stat (buf, &statbuf);
@@ -1305,49 +1309,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       closedir (dp);
 #endif
     }
-  snprintf (scriptdir, PATH_MAX - 1, "%s", logdir);
-#if defined(WINDOWS)
-  snprintf (find_file, PATH_MAX - 1, "%s/*", scriptdir);
-  handle = FindFirstFile (find_file, &data);
-  if (handle != INVALID_HANDLE_VALUE)
-#else
-  dp = opendir (scriptdir);
-  if (dp != NULL)
-#endif
-    {
 
-      sprintf (bname, "%s_", bname);
-#if defined(WINDOWS)
-      for (found = 1; found; found = FindNextFile (handle, &data))
-#else
-      while ((dirp = readdir (dp)) != NULL)
-#endif
-	{
-#if defined(WINDOWS)
-	  cur_file = data.cFileName;
-#else
-	  cur_file = dirp->d_name;
-#endif
-
-	  if (strstr (cur_file, bname) != NULL)
-	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      nv_add_nvp (out, "type", "script");
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", scriptdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
-	    }
-	}
-#if defined(WINDOWS)
-      FindClose (handle);
-#else
-      closedir (dp);
-#endif
-    }
   nv_add_nvp (out, "close", "logfileinfo");
 
   return ERR_NO_ERROR;
