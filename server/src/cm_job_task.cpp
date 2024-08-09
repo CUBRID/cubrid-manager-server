@@ -14589,6 +14589,8 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
   return ret_val;
 }
 
+#define NUM_NODES 10
+
 static int
 handle_ha_status_output (nvplist *res, char *_dbmt_error)
 {
@@ -14601,6 +14603,8 @@ handle_ha_status_output (nvplist *res, char *_dbmt_error)
   int len_tmp;
   int num_dbs = 0;
   int i;
+  int ret = ERR_NO_ERROR;
+  static char node_index [NUM_NODES] = {'A', 'B', 'C', 'E', 'F', 'G', 'H', 'I', 'J', 'K'};
 
   // "current_node"
   iter1 = strstr (_dbmt_error, "current");
@@ -14633,111 +14637,54 @@ handle_ha_status_output (nvplist *res, char *_dbmt_error)
   value[len_tmp] = '\0';
   nv_add_nvp (res, "current_node_state", value);
 
-  // "nodeA"
-  iter1 = strstr (iter1, "Node");
-  if (iter1 == NULL)
+  for (i = 0; i < NUM_NODES; i++)
     {
-      return ERR_WITH_MSG;
-    }
+      char buf[32];
+      const char *buf_p = (const char *) buf;
 
-  iter2 = strstr (iter1, "(");
-  if (iter2 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
+      iter1 = strstr (iter1, "Node");
+      if (iter1 == NULL)
+	{
+	  break;
+	}
 
-  len_tmp = (int) (iter2 - iter1 - 6);
-  strncpy (value, iter1 + 5, len_tmp);
-  value[len_tmp] = '\0';
-  nv_add_nvp (res, "nodeA", value);
-
-  // "nodeA_state"
-  iter1 = strstr (iter2, "state");
-  if (iter1 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  iter2 = strstr (iter1, ")");
-  if (iter2 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  len_tmp = (int) (iter2 - iter1 - 6);
-  strncpy (value, iter1 + 6, len_tmp);
-  value[len_tmp] = '\0';
-  nv_add_nvp (res, "nodeA_state", value);
-
-  // "nodeB"
-  iter1 = strstr (iter2, "Node");
-  if (iter1 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  iter2 = strstr (iter1, "(");
-  if (iter2 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  len_tmp = (int) (iter2 - iter1 - 6);
-  strncpy (value, iter1 + 5, len_tmp);
-  value[len_tmp] = '\0';
-  nv_add_nvp (res, "nodeB", value);
-
-  // "nodeB_state"
-  iter1 = strstr (iter2, "state");
-  if (iter1 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  iter2 = strstr (iter1, ")");
-  if (iter2 == NULL)
-    {
-      return ERR_WITH_MSG;
-    }
-
-  len_tmp = (int) (iter2 - iter1 - 6);
-  strncpy (value, iter1 + 6, len_tmp);
-  value[len_tmp] = '\0';
-  nv_add_nvp (res, "nodeB_state", value);
-
-  // "nodeC"
-
-  iter1 = strstr (iter2, "Node");
-  if (iter1 != NULL)
-    {
       iter2 = strstr (iter1, "(");
       if (iter2 == NULL)
 	{
-	  return ERR_WITH_MSG;
+	  ret = ERR_WITH_MSG;
+	  break;
 	}
 
       len_tmp = (int) (iter2 - iter1 - 6);
       strncpy (value, iter1 + 5, len_tmp);
       value[len_tmp] = '\0';
-      nv_add_nvp (res, "nodeC", value);
+      snprintf (buf, sizeof (buf), "node%c", node_index[i]);
+      nv_add_nvp (res, buf_p, value);
 
-  // "nodeC_state"
       iter1 = strstr (iter2, "state");
       if (iter1 == NULL)
 	{
-      return ERR_WITH_MSG;
+	  ret = ERR_WITH_MSG;
+	  break;
 	}
 
       iter2 = strstr (iter1, ")");
       if (iter2 == NULL)
 	{
-      return ERR_WITH_MSG;
+	  ret = ERR_WITH_MSG;
+	  break;
 	}
 
       len_tmp = (int) (iter2 - iter1 - 6);
       strncpy (value, iter1 + 6, len_tmp);
       value[len_tmp] = '\0';
-      nv_add_nvp (res, "nodeC_state", value);
+      snprintf (buf, sizeof (buf), "node%c_state", node_index[i]);
+      nv_add_nvp (res, buf_p, value);
+  }
+
+  if (i < 2 || ret != ERR_NO_ERROR)
+    {
+      return ret;
     }
 
   // count dbs
