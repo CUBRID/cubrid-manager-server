@@ -14705,6 +14705,41 @@ handle_ha_status_output (nvplist *res, char *_dbmt_error)
   value[len_tmp] = '\0';
   nv_add_nvp (res, "nodeB_state", value);
 
+  // "nodeC"
+
+  iter1 = strstr (iter2, "Node");
+  if (iter1 != NULL)
+    {
+      iter2 = strstr (iter1, "(");
+      if (iter2 == NULL)
+	{
+	  return ERR_WITH_MSG;
+	}
+
+      len_tmp = (int) (iter2 - iter1 - 6);
+      strncpy (value, iter1 + 5, len_tmp);
+      value[len_tmp] = '\0';
+      nv_add_nvp (res, "nodeC", value);
+
+  // "nodeC_state"
+      iter1 = strstr (iter2, "state");
+      if (iter1 == NULL)
+	{
+      return ERR_WITH_MSG;
+	}
+
+      iter2 = strstr (iter1, ")");
+      if (iter2 == NULL)
+	{
+      return ERR_WITH_MSG;
+	}
+
+      len_tmp = (int) (iter2 - iter1 - 6);
+      strncpy (value, iter1 + 6, len_tmp);
+      value[len_tmp] = '\0';
+      nv_add_nvp (res, "nodeC_state", value);
+    }
+
   // count dbs
 
   iter1 = strstr (iter2, "Applylogdb");
