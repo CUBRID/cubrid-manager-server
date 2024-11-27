@@ -1292,7 +1292,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 		}
 	      else if (strstr (cur_file, "log") != NULL)
 		{
-		  nv_add_nvp (out, "type", "sql_log");
+		  nv_add_nvp (out, "type", "script");
 		}
 	      snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
 	      nv_add_nvp (out, "path", buf);
