@@ -14,7 +14,6 @@ FOR /F "tokens=4 delims=." %%i IN ('type BUILD_NUMBER') do (SET SERIAL=%%i)
 if not ERRORLEVEL 0 (exit /b %ERRORLEVEL%)
 
 FOR /F "tokens=*" %%i IN ('git rev-list --count HEAD') do (SET COMMIT_COUNT=%%i)
-
 if "%COMMIT_COUNT%" == "" (SET COMMIT_COUNT=%SERIAL%)
 
 FOR /F "tokens=* delims=0" %%i IN ('echo %COMMIT_COUNT%') do (SET COMMIT_COUNT=%%i)
@@ -28,7 +27,6 @@ echo #define MINOR_VERSION %MINOR% >> %VERS%
 echo #define PATCH_VERSION %PATCH% >> %VERS%
 echo #define BUILD_SERIAL_NUMBER %COMMIT_COUNT% >> %VERS%
 echo #define VERSION_STRING "%MAJOR%.%MINOR%.%PATCH%.%COMMIT_COUNT%" >> %VERS%
-
 
 echo Start build cm_server ...
 cd win
