@@ -86,6 +86,8 @@
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
 
+#define MAX_COMMA_OUNT 1000
+
 static T_FSERVER_TASK_INFO task_info[] =
 {
   {"startinfo", TS_STARTINFO, 0, DEF_TASK_FUNC (ts_startinfo), FSVR_SA, ALL_AUTHORITY},
@@ -1738,6 +1740,79 @@ string_tokenize2 (char *str, char *tok[], int num_tok, int c)
     }
   p = strchr (tok[num_tok - 1], c);
   if (p)
+    {
+      *p = '\0';
+    }
+
+  return 0;
+}
+
+int
+string_tokenize3 (char *str, char *tok[], int num_tok)
+{
+  int i, j;
+  char *p;
+  char *ptr, *ptr2;
+
+  tok[0] = str;
+  for (i = 1; i < num_tok; i++)
+    {
+      ptr = strpbrk (tok[i - 1], " \t");
+      if (ptr == NULL)
+        {
+          return -1;
+        }
+
+      if (*(ptr - 1) == ',')
+        {
+          for (j = 0; j < MAX_COMMA_OUNT; j++)
+           {
+             ptr++;
+             ptr2 = strpbrk (ptr, " \t");
+
+             if (ptr2 == NULL)
+               {
+		 return -1;
+               }
+
+             if (*(ptr2 - 1) == ',')
+               {
+		 ptr = ptr2;
+               }
+             else
+                {
+		  break;
+                }
+
+           }
+
+          if (j == MAX_COMMA_OUNT)
+            {
+	      return -1;
+            }
+
+          *ptr2 = '\0';
+          tok[i] = ptr2;
+        }
+      else
+        {
+          tok[i] = ptr;
+          *(tok[i]) = '\0';
+        }
+
+      p = (tok[i]) + 1;
+      for (; *p && (*p == ' ' || *p == '\t'); p++)
+	{
+	  ;
+	}
+      if (*p == '\0')
+	{
+	  return -1;
+	}
+      tok[i] = p;
+    }
+  p = strpbrk (tok[num_tok - 1], " \t");
+  if (p != NULL)
     {
       *p = '\0';
     }

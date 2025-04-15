@@ -7119,7 +7119,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  break;
 	}
-      if (string_tokenize (buf, tok, 9) < 0)
+      if (string_tokenize3 (buf, tok, 9) < 0)
 	{
 	  continue;
 	}
