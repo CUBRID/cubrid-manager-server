@@ -1780,9 +1780,9 @@ string_tokenize3 (char *str, char *tok[], int num_tok)
 		 ptr = ptr2;
                }
              else
-                {
-		  break;
-                }
+               {
+		 break;
+               }
 
            }
 
