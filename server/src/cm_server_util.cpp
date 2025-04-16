@@ -86,8 +86,6 @@
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
 
-#define MAX_COMMA_OUNT 1000
-
 static T_FSERVER_TASK_INFO task_info[] =
 {
   {"startinfo", TS_STARTINFO, 0, DEF_TASK_FUNC (ts_startinfo), FSVR_SA, ALL_AUTHORITY},
@@ -1765,7 +1763,7 @@ string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[])
 
       if (has_comma[i - 1] && *(ptr - 1) == ',')
         {
-          for (j = 0; j < MAX_COMMA_OUNT; j++)
+          for (;;)
            {
              ptr++;
              ptr2 = strpbrk (ptr, " \t");
@@ -1783,13 +1781,7 @@ string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[])
                {
 		 break;
                }
-
            }
-
-          if (j == MAX_COMMA_OUNT)
-            {
-	      return -1;
-            }
 
           *ptr2 = '\0';
           tok[i] = ptr2;
