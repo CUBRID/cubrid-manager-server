@@ -1763,7 +1763,7 @@ string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[])
           return -1;
         }
 
-      if (has_comma[i - 1 ] && *(ptr - 1) == ',')
+      if (has_comma[i - 1] && *(ptr - 1) == ',')
         {
           for (j = 0; j < MAX_COMMA_OUNT; j++)
            {
