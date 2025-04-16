@@ -1748,7 +1748,7 @@ string_tokenize2 (char *str, char *tok[], int num_tok, int c)
 int
 string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[])
 {
-  int i, j;
+  int i;
   char *p;
   char *ptr, *ptr2;
 
