@@ -6981,6 +6981,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *query_p = NULL;
   int query_file_size;
   TS_SQL_INFO *sql_info;
+  int has_comma[]={0, 0, 0, 0, 0, 0, 0, 1, 0};
 
   cmd_name[0] = '\0';
   buf[0] = '\0';
@@ -7119,7 +7120,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  break;
 	}
-      if (string_tokenize3 (buf, tok, 9) < 0)
+      if (string_tokenize3 (buf, tok, 9, has_comma) < 0)
 	{
 	  continue;
 	}

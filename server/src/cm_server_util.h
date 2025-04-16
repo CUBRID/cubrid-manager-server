@@ -165,7 +165,7 @@ int ut_disk_free_space (char *path);
 char *ip2str (unsigned char *ip, char *ip_str);
 int string_tokenize (char *str, char *tok[], int num_tok);
 int string_tokenize2 (char *str, char *tok[], int num_tok, int c);
-int string_tokenize3 (char *str, char *tok[], int num_tok);
+int string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[]);
 int ut_get_task_info (const char *task, char *access_log_flag,
                       T_TASK_FUNC *task_func, T_USER_AUTH *auth);
 char *time_to_str (time_t t, const char *fmt, char *buf, int type);
