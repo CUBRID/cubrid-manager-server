@@ -50,7 +50,7 @@ MACHINE_TYPE="$host_cpu"
 export SYSTEM_TYPE MACHINE_TYPE
 
 case $SYSTEM_TYPE in
-    *linux*) SYS_DEFS="-DGCC -DLINUX -D_GNU_SOURCE -DI386"
+    *linux*) SYS_DEFS="-DGCC -DLINUX -D_GNU_SOURCE -DI386 -D_GLIBCXX_USE_CXX11_ABI=0"
          SYS_LIBS="" 
          CMSTAT_LIB=""
         if test "$bit_model" = "yes"
