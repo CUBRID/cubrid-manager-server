@@ -26,7 +26,6 @@ Get databases' information in cubrid.
 
 | **Key** | **Description** |
 | --- | --- |
-
 | task | task name |
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
