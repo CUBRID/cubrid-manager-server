@@ -4006,6 +4006,11 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = "--" PARAMDUMP_BOTH_L;
     }
 
+  if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor >= 1105))
+    {
+      argv[argc++] = "--" PLANDUMP_FOR_CM;
+    }
+
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, dbname, sizeof (dbname_at_hostname));

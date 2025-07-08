@@ -386,6 +386,9 @@
 #define PLANDUMP_DROP_S                        'd'
 #define PLANDUMP_DROP_L                        "drop"
 
+/* plandump for CM compat */
+#define PLANDUMP_FOR_CM                        "for-cm"
+
 /* lockdb option list */
 #define LOCK_OUTPUT_FILE_S                      'o'
 #define LOCK_OUTPUT_FILE_L                      "output-file"
@@ -622,6 +625,7 @@ extern int cubrid_version_major;
 extern int cubrid_version_minor;
 void find_and_parse_cub_admin_version (int &major_version, int &minor_version);
 #define IS_INVALID_CUBRID_VERS_MAJOR(major)	(major <= 0)
+#define CUBRID_VERS(major,minor)	(major*100 + minor)
 
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
