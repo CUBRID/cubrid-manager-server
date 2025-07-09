@@ -102,8 +102,6 @@ using namespace std;
 
 #define QUERY_BUFFER_MAX        4096
 
-#define	MAX_NUM_OBJ_LOCKS_IN_HASH_TABLE	"10000"
-
 #if !defined(WINDOWS)
 #define STRING_APPEND(buffer_p, avail_size_holder, ...)                      \
     do {                                                                     \
@@ -12935,14 +12933,28 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      nv_add_nvp (res, "numlocked", s1);
 
 	      fgets (buf, sizeof (buf), infile);
-	      scan_matched = CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1104) ?
-		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %255s", s2) :
-		      sscanf (MAX_NUM_OBJ_LOCKS_IN_HASH_TABLE, "%255s", s2);
-	      if (scan_matched != 1)
+	      if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1104))
 		{
-		  return -1;
+		  scan_matched =
+		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+		  if (scan_matched != 1)
+		    {
+		      return -1;
+		    }
+		  nv_add_nvp (res, "maxnumlock", s2);
 		}
-	      nv_add_nvp (res, "maxnumlock", s2);
+	      else
+		{
+	          fgets (buf, sizeof (buf), infile);
+		  scan_matched =
+		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+		  if (scan_matched != 1)
+		    {
+		      return -1;
+		    }
+		  nv_add_nvp (res, "sizelock", s2);
+		  nv_add_nvp (res, "maxnumlock", "-1");
+		}
 	      flag = 2;
 	    }
 	}            /* end of if (flag == 1) */
