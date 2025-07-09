@@ -12945,6 +12945,14 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 		}
 	      else
 		{
+		  scan_matched =
+		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+		  if (scan_matched != 1)
+		    {
+		      return -1;
+		    }
+		  nv_add_nvp (res, "numallocated", s2);
+
 	          fgets (buf, sizeof (buf), infile);
 		  scan_matched =
 		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
