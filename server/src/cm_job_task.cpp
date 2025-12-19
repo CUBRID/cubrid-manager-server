@@ -357,6 +357,8 @@ static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_fi
 
 static void unlink_schema_files (const char *schema_list_file);
 
+static int is_filename_matched (const char *fname, const char *pattern);
+
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
 		     char *_dbmt_error)
@@ -1195,7 +1197,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (strstr (cur_file, bname) != NULL)
+	  if (is_filename_matched (cur_file, bname))
 	    {
 	      nv_add_nvp (out, "open", "logfile");
 	      if (strstr (cur_file, "access") != NULL)
@@ -1237,7 +1239,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (strstr (cur_file, bname) != NULL)
+	  if (is_filename_matched (cur_file, bname))
 	    {
 	      nv_add_nvp (out, "open", "logfile");
 	      if (strstr (cur_file, "access") != NULL)
@@ -1283,7 +1285,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (strstr (cur_file, bname) != NULL)
+	  if (is_filename_matched (cur_file, bname))
 	    {
 	      nv_add_nvp (out, "open", "logfile");
 	      if (strstr (cur_file, "access") != NULL)
@@ -16463,4 +16465,15 @@ _is_exist_default_backup_cert (char *_dbmt_error)
 	    "(%s) is not default backup SSL certification file.",
 	    default_backup_cert_path);
   return 0;
+}
+
+static int
+is_filename_matched (const char *fname, const char *pattern)
+{
+  if (fname == NULL || pattern == NULL || memcmp (fname, pattern, strlen (pattern)) || isalnum (fname[strlen (pattern)]))
+    {
+      return 0;
+    }
+
+    return 1;
 }
