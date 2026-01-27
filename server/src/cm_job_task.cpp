@@ -2437,6 +2437,9 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   const char *argv[20];
   int argc = 0;
   int gen_dir_created, log_dir_created, ext_dir_created;
+  char *overwrite_exvol_file = NULL;
+  bool donot_overwrite_exvol = false;
+  bool extvol_file_exists = false;
 
   targetdir[0] = '\0';
   extvolfile[0] = '\0';
@@ -2489,6 +2492,12 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   genvolpath = nv_get_val (req, "genvolpath");
   logvolpath = nv_get_val (req, "logvolpath");
   overwrite_config_file = nv_get_val (req, "overwrite_config_file");
+  overwrite_exvol_file = nv_get_val (req, "overwrite_exvol_file");
+
+  if (overwrite_exvol_file != NULL && strcasecmp (overwrite_exvol_file, "no") == 0)
+    {
+      donot_overwrite_exvol = true;
+    }
 
   if (genvolpath == NULL)
     {
@@ -2672,6 +2681,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined(WINDOWS)
       char val2_buf[1024];
 #endif
+      char extvol_path[PATH_MAX];
 
       snprintf (extvolfile, PATH_MAX - 1, "%s/extvol.spec", targetdir);
       outfile = fopen (extvolfile, "w");
@@ -2714,8 +2724,31 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		  ext_dir_created = 1;
 		}
 	    }
+
+	  snprintf (extvol_path, PATH_MAX - 1, "%s/%s", val[2], tn);
+
+	  if (donot_overwrite_exvol && access (extvol_path, F_OK) == 0)
+	    {
+	      if (!extvol_file_exists)
+		{
+		  sprintf (_dbmt_error, "ext volume files exists: %s", tn);
+		}
+	      else
+		{
+		  strcat (_dbmt_error, ", ");
+		  strcat (_dbmt_error, tn);
+		}
+
+	      extvol_file_exists = true;
+	    }
 	}
+
       fclose (outfile);
+    }
+
+  if (extvol_file_exists)
+    {
+      return ERR_WITH_MSG;
     }
 
   /* construct command */
