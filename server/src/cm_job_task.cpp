@@ -2732,14 +2732,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      if (!extvol_file_exists)
 		{
 		  sprintf (_dbmt_error, "ext volume files exists: %s", tn);
+		  extvol_file_exists = true;
 		}
 	      else
 		{
 		  strcat (_dbmt_error, ", ");
 		  strcat (_dbmt_error, tn);
 		}
-
-	      extvol_file_exists = true;
 	    }
 	}
 
