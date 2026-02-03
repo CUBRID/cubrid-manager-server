@@ -5164,6 +5164,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char *no_user_specified_name = NULL;
   char *schema_file_list = NULL;
   char schema_file_list_opt [PATH_MAX];
+  int exit_status = 0;
 
   cubrid_err_file[0] = '\0';
 
@@ -5316,7 +5317,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, NULL);    /* loaddb */
+  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, &exit_status);    /* loaddb */
 
   if (retval < 0)
     {
@@ -5364,6 +5365,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  unlink_schema_files (schema_file_list);
 	}
+    }
+
+  if (exit_status != 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", WEXITSTATUS (exit_status));
+      return ERR_WITH_MSG;
     }
 
   return ERR_NO_ERROR;
