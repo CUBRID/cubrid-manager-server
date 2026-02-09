@@ -257,8 +257,8 @@ if test -e "$srcdir/build_external.sh"; then
     external_dir=`readlink -f $srcdir`
     if test "$bit_model" = "yes"; then
         case $SYSTEM_TYPE in
-            *linux*) EXTERNAL_LIB="$external_dir/external/jsoncpp/linux_64/lib/libjson.a $external_dir/external/libevent/linux_64/lib/libevent.a $external_dir/external/libevent/linux_64/lib/libevent_openssl.a"
-                EXTERNAL_INC="-I$external_dir/external/jsoncpp/linux_64/include -I$external_dir/external/libevent/linux_64/include -I$external_dir/external/openssl/linux_64/include" ;;
+            *linux*) EXTERNAL_LIB="$external_dir/external/jsoncpp/lib/libjson.a $external_dir/external/libevent/lib/libevent.a $external_dir/external/libevent/lib/libevent_openssl.a"
+                EXTERNAL_INC="-I$external_dir/external/jsoncpp/include -I$external_dir/external/libevent/include -I$external_dir/external/openssl/include" ;;
             *aix*)   EXTERNAL_LIB="$external_dir/external/jsoncpp/aix_64/lib/libjson.a $external_dir/external/openssl/aix_64/lib/libssl.a $external_dir/external/openssl/aix_64/lib/libcrypto.a $external_dir/external/libevent/aix_64/lib/libevent.a $external_dir/external/libevent/aix_64/lib/libevent_openssl.a"
                 EXTERNAL_INC="-I$external_dir/external/jsoncpp/aix_64/include -I$external_dir/external/libevent/aix_64/include -I$external_dir/external/openssl/aix_64/include" ;;
             *)       EXTERNAL_LIB=""
