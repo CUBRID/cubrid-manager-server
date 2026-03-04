@@ -13082,6 +13082,11 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 		{
 		  fgets (buf, sizeof (buf), infile);
 		}
+
+	      if (strncmp (buf, "MVCC", 4) == 0)
+		{
+		  fgets (buf, sizeof (buf), infile);
+		}
 	      /* already get  scan_matched value, don't sscanf */
 	      if (scan_matched == 0)
 		scan_matched =
