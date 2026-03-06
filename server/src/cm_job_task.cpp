@@ -7033,6 +7033,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   buf[0] = '\0';
   tmpfile[0] = '\0';
   errfile[0] = '\0';
+
   dbname_at_hostname[0] = '\0';
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
@@ -7486,11 +7487,24 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char task_name[TASKNAME_LEN];
   const char *argv[10];
+  char *key, *value;
   int ha_mode = 0;
   int argc = 0;
   int is_need_param = 1;
   int retval = 0;
+  int i;
   T_DB_SERVICE_MODE db_mode;
+  bool dba_pw_not_present = true;
+
+  for (i = 0; i < req->nvplist_leng; i++)
+    {
+      nv_lookup (req, i, &key, &value);
+      if ((key != NULL) && (strcmp (key, "_DBPASSWD") == 0))
+        {
+          dba_pw_not_present = false;
+          break;
+        }
+    }
 
   task_name[0] = '\0';
   dbname_at_hostname[0] = '\0';
@@ -7510,6 +7524,11 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (dbpasswd == NULL && dba_pw_not_present == false)
+    {
+      dbpasswd = "";
+    }
+
   param = nv_get_val (req, "parameter");
 
   db_mode = uDatabaseMode (dbname, &ha_mode);
@@ -7522,14 +7541,19 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_KILLTRAN;
-  if (dbpasswd != NULL)
+
+  if (strcmp (type, "i") == 0 || strcmp (type, "u") == 0 || strcmp (type, "h") == 0 || strcmp (type, "p") == 0
+     || strcmp (type, "s") == 0)
     {
-      if (strcmp (type, "i") == 0 || strcmp (type, "u") == 0 || strcmp (type, "h") == 0 || strcmp (type, "p") == 0
-          || strcmp (type, "s") == 0)
-        {
-          argv[argc++] = "--" KILLTRAN_DBA_PASSWORD_L;
-          argv[argc++] = dbpasswd;
-        }
+      if (dba_pw_not_present)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "missing DBA password ('_DBPASSWD')");
+	  return ERR_WITH_MSG;
+	}
+
+      argv[argc++] = "--" KILLTRAN_DBA_PASSWORD_L;
+      argv[argc++] = dbpasswd;
+      argv[argc++] = "--" KILLTRAN_FORCE_L;
     }
 
   if (strcmp (type, "i") == 0)
