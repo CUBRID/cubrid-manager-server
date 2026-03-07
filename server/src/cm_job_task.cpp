@@ -5165,6 +5165,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char *schema_file_list = NULL;
   char schema_file_list_opt [PATH_MAX];
   int exit_status = 0;
+  char *trigger = NULL;
 
   cubrid_err_file[0] = '\0';
 
@@ -5174,8 +5175,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  dbuser = nv_get_val (req, "_DBID");
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  dbuser = nv_get_val (req, "dbuser");
+  dbpasswd = nv_get_val (req, "dbpasswd");
   checkoption = nv_get_val (req, "checkoption");
   period = nv_get_val (req, "period");
   user = nv_get_val (req, "user");
@@ -5184,9 +5185,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   index = nv_get_val (req, "index");
   error_control_file = nv_get_val (req, "errorcontrolfile");
   ignore_class_file = nv_get_val (req, "ignoreclassfile");
-#if 0                /* will be added */
   trigger = nv_get_val (req, "trigger");
-#endif
+
   estimated = nv_get_val (req, "estimated");
   oiduse = nv_get_val (req, "oiduse");
   nolog = nv_get_val (req, "nolog");
@@ -5262,13 +5262,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = index;
     }
 
-#if 0                /* will be added */
   if (trigger != NULL && !uStringEqual (trigger, "none"))
     {
-      argv[argc++] = "-tf";
+      argv[argc++] = "--" LOAD_TRIGGER_FILE_L;
       argv[argc++] = trigger;
     }
-#endif
 
   if (estimated != NULL && !uStringEqual (estimated, "none"))
     {
