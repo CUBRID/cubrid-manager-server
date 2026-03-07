@@ -9,15 +9,17 @@ The loaddb interface will load a database from files.
 | task | task name |
 | token | token string encrypted. |
 | dbname | a name of the database |
+| dbuser | database username |
+| dbpasswd | password for dbuser |
 | checkoption | check syntax for data file or not |
 | period | insertion COUNT for periodic commit |
-| user | load databases user name |
 | estimated | estimated NUMBER of instances; default:none |
 | oiduse | use OID |
 | nolog | don’t create log |
 | schema | schema file path |
 | object | object file path |
 | index | index file path |
+| trigger | trigger file path |
 | errorcontrolfile | FILE to control error(s) during loading |
 | ignoreclassfile | input file of class names that skip load |
 | no-user-specified-name | Find classes, serials, and triggers by their object names without their owner names |
@@ -30,16 +32,18 @@ The loaddb interface will load a database from files.
 {
   "task": "loaddb",
   "token": "cdfb4c5717170c5e34919b640249979f8375a218acf865b0b8100f0f25c069587926f07dd201b6aa",
-  "dbname": "alatestdb",
+  "dbname": "testdb",
+  "dbuser": "john",
+  "dbpasswd": "1234",
   "checkoption": "both",
   "period": "none",
-  "user": "dba",
   "estimated": "none",
   "oiduse": "yes",
   "nolog": "no",
   "schema": "$CUBRID_DATABASES/demodb/demodb_schema",
   "object": "$CUBRID_DATABASES/demodb/demodb_objects",
   "index": "none",
+  "trigger": "none",
   "errorcontrolfile": "none",
   "ignoreclassfile": "none",
   "delete_orignal_files": "y"
