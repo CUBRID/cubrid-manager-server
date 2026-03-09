@@ -3084,10 +3084,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char tmpfile[PATH_MAX];
+  bool vol_file_does_not_exist = false;
+  char err_buf[DBMT_ERROR_MSG_SIZE];
 
   cmd_name[0] = '\0';
   tmpfile[0] = '\0';
   task_name[0] = '\0';
+  err_buf[0] = '\0';
 
   if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
     {
@@ -3198,11 +3201,31 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      n = nt_style_path (n, n_buf);
 	      v = nt_style_path (v, v_buf);
 #endif
+	      if (access (n, F_OK) != 0)
+		{
+		  if (vol_file_does_not_exist)
+		    {
+		      int len = strlen (err_buf);
+		      snprintf (err_buf + len, DBMT_ERROR_MSG_SIZE - len, ", %s", n);
+		    }
+		  else
+		    {
+		      snprintf (err_buf, DBMT_ERROR_MSG_SIZE, "volume files does not exist: %s", n);
+		      vol_file_does_not_exist = true;
+		    }
+		}
 	      fprintf (outfile, "%d %s %s\n", line++, n, v);
 
 	    }            /* close "else if (flag == 1)" */
 	}            /* close "for" loop */
       fclose (outfile);
+
+      if (vol_file_does_not_exist)
+	{
+	  DBMT_ERR_MSG_SET (_dbmt_error, err_buf);
+	  return ERR_WITH_MSG;
+	}
+
       argv[argc++] = "--" RENAME_CONTROL_FILE_L;
       argv[argc++] = tmpfile;
     }                /* close "if (adv_flag != NULL)" */
