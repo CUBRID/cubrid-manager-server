@@ -3152,18 +3152,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       for (i = 0; i < req->nvplist_leng; i++)
 	{
 	  nv_lookup (req, i, &n, &v);
-	  if (n == NULL || v == NULL)
+	  if (n == NULL)
 	    {
 	      fclose (outfile);
 	      if (v != NULL)
 		{
 		  strcpy (_dbmt_error, v);
 		  return ERR_DIR_CREATE_FAIL;
-		}
-	      else
-		{
-		  strcpy (_dbmt_error, "Lost all parameters.");
-		  return ERR_WITH_MSG;
 		}
 	    }
 
