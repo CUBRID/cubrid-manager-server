@@ -3173,6 +3173,11 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  else if (flag == 1)
 	    {
+	      if (v == NULL)
+		{
+		  strcpy (_dbmt_error, "Lost all parameters.");
+		  return ERR_WITH_MSG;
+		}
 #if defined(WINDOWS)
 	      replace_colon (n);
 	      replace_colon (v);
