@@ -259,10 +259,7 @@ ch_process_request (nvplist *req, nvplist *res)
           memset (dbpasswd, 0, 80);
           _ut_get_dbaccess (req, dbid, dbpasswd);
           nv_add_nvp (req, "_DBID", dbid);
-	  if (task_code != TS_KILLTRAN)
-	    {
-	      nv_add_nvp (req, "_DBPASSWD", dbpasswd);
-	    }
+          nv_add_nvp (req, "_DBPASSWD", dbpasswd);
           nv_add_nvp (req, "_DBNAME", dbname);
         }
     }
