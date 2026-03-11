@@ -3208,6 +3208,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		      snprintf (err_buf, DBMT_ERROR_MSG_SIZE, "volume files does not exist: %s", n);
 		      vol_file_does_not_exist = true;
 		    }
+		  continue;
 		}
 	      fprintf (outfile, "%d %s %s\n", line++, n, v);
 
