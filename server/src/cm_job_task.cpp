@@ -7033,7 +7033,6 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   buf[0] = '\0';
   tmpfile[0] = '\0';
   errfile[0] = '\0';
-
   dbname_at_hostname[0] = '\0';
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
