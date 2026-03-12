@@ -3172,6 +3172,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      if (v == NULL)
 		{
+		  fclose (outfile);
 		  strcpy (_dbmt_error, "invalid volume parameters");
 		  return ERR_WITH_MSG;
 		}
