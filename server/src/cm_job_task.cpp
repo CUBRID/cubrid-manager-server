@@ -3155,6 +3155,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	  if (n == NULL)
 	    {
 	      fclose (outfile);
+	      unlink (tmpfile);
 	      if (v != NULL)
 		{
 		  strcpy (_dbmt_error, v);
@@ -3181,6 +3182,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      if (v == NULL)
 		{
 		  fclose (outfile);
+		  unlink (tmpfile);
 		  strcpy (_dbmt_error, "invalid volume parameters");
 		  return ERR_WITH_MSG;
 		}
@@ -3229,6 +3231,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (vol_file_does_not_exist)
 	{
+	  unlink (tmpfile);
 	  DBMT_ERR_MSG_SET (_dbmt_error, err_buf);
 	  return ERR_WITH_MSG;
 	}
@@ -3258,6 +3261,9 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   strncpy (task_name, "renamedb", TASKNAME_LEN);
   retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
+
+  unlink (tmpfile);
+
   if (retval != ERR_NO_ERROR)
     {
       return retval;
