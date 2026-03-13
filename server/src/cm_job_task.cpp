@@ -3155,8 +3155,16 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	  if (n == NULL)
 	    {
 	      fclose (outfile);
-	      strcpy (_dbmt_error, v != NULL ? v : "Lost all parameters.");
-	      return ERR_DIR_CREATE_FAIL;
+	      if (v != NULL)
+		{
+		  strcpy (_dbmt_error, v);
+		  return ERR_DIR_CREATE_FAIL;
+		}
+	      else
+		{
+		  strcpy (_dbmt_error, "Lost all parameters.");
+		  return ERR_WITH_MSG;
+		}
 	    }
 
 	  if (!strcmp (n, "open") && !strcmp (v, "volume"))
