@@ -3262,7 +3262,10 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
   strncpy (task_name, "renamedb", TASKNAME_LEN);
   retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
 
-  unlink (tmpfile);
+  if (tmpfile[0] != '\0')
+    {
+      unlink (tmpfile);
+    }
 
   if (retval != ERR_NO_ERROR)
     {
