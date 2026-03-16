@@ -5750,8 +5750,8 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   closedir (dirp);
 #endif
 
-  snprintf (strbuf, sizeof (strbuf) - 1, "%d",
-	    cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size());
+  snprintf (strbuf, sizeof (strbuf) - 1, "%lld",
+	    (int64_t) ((int64_t) cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size()));
   nv_add_nvp (res, "dbsize", strbuf);
 
   return ERR_NO_ERROR;
