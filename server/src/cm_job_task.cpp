@@ -5659,7 +5659,8 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
   char strbuf[PATH_MAX], dbdir[PATH_MAX];
-  int no_tpage = 0, log_size = 0, baselen;
+  int no_tpage = 0, baselen;
+  long long log_size = 0;
   struct stat statbuf;
   GeneralSpacedbResult *cmd_res;
   T_CUBRID_MODE cubrid_mode;
@@ -5751,7 +5752,7 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
 
   snprintf (strbuf, sizeof (strbuf) - 1, "%lld",
-	    (int64_t) ((int64_t) cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size()));
+	    (long long) cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size() + log_size);
   nv_add_nvp (res, "dbsize", strbuf);
 
   return ERR_NO_ERROR;
