@@ -7542,7 +7542,13 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  if (key_not_exist (req, "dbuser") || key_not_exist (req, "dbpassword"))
+    {
+      sprintf (_dbmt_error, "%s", "key \'dbuser\' or \'dbpassword\' does not exist");
+      return ERR_WITH_MSG;
+    }
+
+  dbpasswd = nv_get_val (req, "dbpassword");
 
   if ((type = nv_get_val (req, "type")) == NULL)
     {
