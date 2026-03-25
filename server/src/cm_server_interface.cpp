@@ -251,17 +251,6 @@ ch_process_request (nvplist *req, nvplist *res)
       return 0;
       }
       */
-
-      /* if database name is specified */
-      if (dbname)
-        {
-          memset (dbid, 0, 32);
-          memset (dbpasswd, 0, 80);
-          _ut_get_dbaccess (req, dbid, dbpasswd);
-          nv_add_nvp (req, "_DBID", dbid);
-          nv_add_nvp (req, "_DBPASSWD", dbpasswd);
-          nv_add_nvp (req, "_DBNAME", dbname);
-        }
     }
 
   /* set CLIENT_VERSION */
