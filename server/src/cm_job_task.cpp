@@ -819,7 +819,7 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 
   new_db_user_name = nv_get_val (req, "username");
   new_db_user_pass = nv_get_val (req, "userpass");
-  db_name = nv_get_val (req, "_DBNAME");
+  db_name = nv_get_val (req, "dbname");
 
   if (new_db_user_pass)
     {
