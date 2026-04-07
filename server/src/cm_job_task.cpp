@@ -3092,7 +3092,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
   task_name[0] = '\0';
   err_buf[0] = '\0';
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "dbname");
       return ERR_PARAM_MISSING;
