@@ -3508,7 +3508,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   err_file[0] = '\0';
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
