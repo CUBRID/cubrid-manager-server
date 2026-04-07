@@ -7,6 +7,7 @@ Set auto addvol option.
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
+| dbname | database name |
 | token | token string encrypted. |
 
 ## Request Sample
