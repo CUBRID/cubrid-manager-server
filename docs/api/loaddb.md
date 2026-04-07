@@ -9,6 +9,8 @@ The loaddb interface will load a database from files.
 | task | task name |
 | token | token string encrypted. |
 | dbname | a name of the database |
+| dbuser | database username |
+| dbpasswd | password for dbuser |
 | checkoption | check syntax for data file or not |
 | period | insertion COUNT for periodic commit |
 | user | load databases user name |

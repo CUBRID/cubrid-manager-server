@@ -5207,14 +5207,14 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   cubrid_err_file[0] = '\0';
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
     }
 
-  dbuser = nv_get_val (req, "_DBID");
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  dbuser = nv_get_val (req, "dbuser");
+  dbpasswd = nv_get_val (req, "dbpassword");
   checkoption = nv_get_val (req, "checkoption");
   period = nv_get_val (req, "period");
   user = nv_get_val (req, "user");
