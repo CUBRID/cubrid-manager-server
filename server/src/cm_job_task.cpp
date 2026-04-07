@@ -16293,7 +16293,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   char note [20];
   int slot = -1;
-  db_name = nv_get_val (req, "_DBNAME");
+  db_name = nv_get_val (req, "dbname");
   interval_str = nv_get_val (req, "interval");
   if (!interval_str || !db_name)
    {
