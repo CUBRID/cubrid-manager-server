@@ -3374,7 +3374,7 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
   T_DB_SERVICE_MODE db_mode;
 
   /* get dbname */
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
