@@ -16357,7 +16357,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd [1024];
   int ret;
 
-  db_name = nv_get_val (req, "_DBNAME");
+  db_name = nv_get_val (req, "dbname");
   if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
    {
      nv_update_val (res, "note", "no statdump running");
