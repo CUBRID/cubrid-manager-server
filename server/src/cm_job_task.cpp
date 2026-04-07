@@ -6373,7 +6373,7 @@ ts_get_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *conf_item[AUTOBACKUP_CONF_ENTRY_NUM];
   int i;
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       strcpy (_dbmt_error, "database name");
       return ERR_PARAM_MISSING;
