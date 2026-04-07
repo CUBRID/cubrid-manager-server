@@ -6681,7 +6681,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char find_file[PATH_MAX];
   char *fname;
 
-  dbname = nv_get_val (req, "_DBNAME");
+  dbname = nv_get_val (req, "dbname");
 
   if ((dbname == NULL)
       || (uRetrieveDBDirectory (dbname, log_dir) != ERR_NO_ERROR))
