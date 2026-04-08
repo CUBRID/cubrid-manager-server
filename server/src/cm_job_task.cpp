@@ -7026,7 +7026,7 @@ ts_get_addvol_status (nvplist *req, nvplist *res, char *_dbmt_error)
   char *dbname = NULL;
   char dbdir[PATH_MAX];
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
