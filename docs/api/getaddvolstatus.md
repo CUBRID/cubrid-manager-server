@@ -8,6 +8,7 @@ Get volume status.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
 
 ## Request Sample
 
