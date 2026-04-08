@@ -6892,7 +6892,7 @@ ts_get_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
   char *conf_item[AUTOADDVOL_CONF_ENTRY_NUM];
   int i;
 
-  if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
+  if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
