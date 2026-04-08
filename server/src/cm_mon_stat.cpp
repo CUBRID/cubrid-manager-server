@@ -1014,7 +1014,6 @@ static bool get_volume_list (string dbname, Json::Value &vol_list)
 {
   Json::Value req, res;
   req["dbname"] = dbname;
-  req["_DBNAME"] = dbname;
   string errmsg;
   if (false == call_task (req, res, tsDbspaceInfo, errmsg))
     {
