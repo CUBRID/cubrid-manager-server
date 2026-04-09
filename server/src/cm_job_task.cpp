@@ -8395,9 +8395,9 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
-  dbname = nv_get_val (req, "_DBNAME");
-  dbuser = nv_get_val (req, "_DBID");
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  dbname = nv_get_val (req, "dbname");
+  dbuser = nv_get_val (req, "dbuser");
+  dbpasswd = nv_get_val (req, "dbpassword");
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
