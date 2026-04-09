@@ -13423,7 +13423,7 @@ op_make_triggerinput_file_add (nvplist *req, char *input_filename)
     {
       fprintf (input_file, "%s\t", actiontime);
     }
-  fprintf (input_file, "%s\n", action);
+  fprintf (input_file, "%s;\n", action);
   fprintf (input_file, "\n\ncommit;\n\n");
 
   fclose (input_file);
