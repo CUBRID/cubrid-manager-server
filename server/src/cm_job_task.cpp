@@ -13450,7 +13450,7 @@ op_make_triggerinput_file_drop (nvplist *req, char *input_filename)
 
   trigger_name = nv_get_val (req, "triggername");
   /*            fprintf(input_file, ";autocommit off\n"); */
-  fprintf (input_file, "drop trigger\t%s\n", trigger_name);
+  fprintf (input_file, "drop trigger\t%s;\n", trigger_name);
   fprintf (input_file, "\n\n\ncommit;\n\n");
 
   fclose (input_file);
@@ -13491,7 +13491,7 @@ op_make_triggerinput_file_alter (nvplist *req, char *input_filename)
       fprintf (input_file, "priority %s\t", priority);
     }
 
-  fprintf (input_file, "\n\n\ncommit;\n\n");
+  fprintf (input_file, ";\n\n\ncommit;\n\n");
   fclose (input_file);
 
   return 1;
