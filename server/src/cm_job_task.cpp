@@ -8731,8 +8731,9 @@ ts_get_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   nv_add_nvp (res, "open", "planlist");
-  dbname = nv_get_val (req, "_DBNAME");
+  dbname = nv_get_val (req, "dbname");
   dbmt_uid = nv_get_val (req, "_ID");
+
   if (dbname == NULL || dbmt_uid == NULL)
     {
       goto err_ts_get_autoexec_query;
