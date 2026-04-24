@@ -19,5 +19,6 @@
 
 confdir = ${prefix}/conf
 dist_conf_DATA = autohistory.conf cmdb.pass autoaddvoldb.conf diagactivitytemplate.conf autobackupdb.conf cm.conf diagstatustemplate.conf autoexecquery.conf cm.pass \
-		cm_ssl_cert.crt cm_ssl_cert.key
+	cm_ssl_cert_2048.crt cm_ssl_cert_2048.key \
+	cm_ssl_cert_1024.crt cm_ssl_cert_1024.key
 
