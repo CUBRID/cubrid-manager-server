@@ -324,6 +324,32 @@ is_process_running (const char *process_name, unsigned int sleep_time)
   return true;
 }
 
+#if !defined(WINDOWS)
+int
+run_child_w_check_exit (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file, char *stderr_file,
+	   int *exit_status)
+{
+  int exit_code = 0;
+  int rc;
+
+  rc = run_child (argv, wait_flag, stdin_file, stdout_file, stderr_file, &exit_code);
+  if (exit_status != NULL)
+    {
+      *exit_status = exit_code;
+    }
+
+  if (rc == 0)
+    {
+      if (WIFEXITED (exit_code))
+	{
+	  rc = WEXITSTATUS (exit_code) * (-1) - 10000;
+	}
+    }
+
+  return rc;
+}
+#endif
+
 int
 _op_check_is_localhost (char *token, char *hname)
 {

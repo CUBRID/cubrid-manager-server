@@ -200,6 +200,8 @@ int gettimeofday (struct timeval *tp, void *tzp);
 int ut_run_child (const char *bin_path, const char *const argv[],
                   int wait_flag, const char *stdin_file,
                   const char *stdout_file, const char *stderr_file, int *exit_status);
+int run_child_w_check_exit (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+		  char *stderr_file, int *exit_status);
 
 int IsValidUserName (const char *pUserName);
 int ut_validate_auth (nvplist *req);
