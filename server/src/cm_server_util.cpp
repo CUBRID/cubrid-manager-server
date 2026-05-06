@@ -342,7 +342,7 @@ run_child_w_check_exit (const char *const argv[], int wait_flag, const char *std
     {
       if (WIFEXITED (exit_code))
 	{
-	  rc = WEXITSTATUS (exit_code) * (-1) - 10000;
+	  rc = WEXITSTATUS (exit_code) * (-1);
 	}
     }
 
