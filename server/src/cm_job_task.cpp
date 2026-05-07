@@ -9643,6 +9643,8 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   T_THREAD th_id;
 #endif
   char use_tmplogfile = FALSE;
+  int status = EXIT_SUCCESS;
+  int ret;
 
   brokername = nv_get_val (cli_request, "brokername");
   dbname = nv_get_val (cli_request, "dbname");
@@ -9751,7 +9753,12 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
+#if defined (WINDOWS)
+  ret = run_child (argv, 1, NULL, NULL, NULL, NULL);
+#else
+  ret = run_child (argv, 1, NULL, NULL, NULL, &status);
+#endif
+  if (ret < 0 || status != EXIT_SUCCESS)
     {
       /* broker_log_converter */
       strcpy (diag_error, argv[0]);
@@ -9793,7 +9800,14 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
 	    "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
   putenv (out_msg_file_env);
 
-  if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
+#if defined (WINDOWS)
+  status = EXIT_SUCCESS;
+  ret = run_child (argv, 1, NULL, NULL, NULL, NULL);
+#else
+  ret = run_child (argv, 1, NULL, NULL, NULL, &status);
+#endif
+
+  if (ret < 0 || status != EXIT_SUCCESS)
     {
       /* broker_log_runner */
       return ERR_SYSTEM_CALL;
