@@ -11407,6 +11407,8 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   char *n, *v;
   int retval = ERR_NO_ERROR;
   int i;
+  int status = EXIT_SUCCESS;
+  int ret;
 
   make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
   make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
@@ -11431,7 +11433,12 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = NULL;
 
   /* run *.bat or *.sh. */
-  if (run_child (argv, 1, NULL, outfile, errfile, NULL) < 0)
+#if defined (WINDOWS)
+  ret = run_child (argv, 1, NULL, outfile, errfile, NULL);
+#else
+  ret = run_child (argv, 1, NULL, outfile, errfile, &status);
+#endif
+  if (ret < 0 || status != EXIT_SUCCESS)
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       retval = ERR_SYSTEM_CALL;
