@@ -16347,6 +16347,8 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   char note [20];
   int slot = -1;
+  int status = EXIT_SUCCESS;
+
   db_name = nv_get_val (req, "_DBNAME");
   interval_str = nv_get_val (req, "interval");
   if (!interval_str || !db_name)
@@ -16382,10 +16384,10 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined (WINDOWS)
   ret_val = run_child (argv, 0, NULL, NULL, NULL, NULL);
 #else
-  ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", NULL);
+  ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", &status);
 #endif
 
-  if (ret_val < 0)
+  if (ret_val < 0 || status != EXIT_SUCCESS)
     {
       nv_update_val (res, "note", "could not execute statdump");
       return -1;
