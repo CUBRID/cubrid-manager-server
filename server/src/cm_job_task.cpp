@@ -5584,6 +5584,7 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[10];
   int argc = 0;
+  int status = EXIT_SUCCESS;
 
   dbname = nv_get_val (req, "dbname");
   make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPVOLINFO, PATH_MAX);
@@ -5626,7 +5627,7 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined(WINDOWS)
   ret = run_child (argv, 1, NULL, tmpfile, NULL, NULL);    /* restoredb -t */
 #else
-  ret = run_child (argv, 1, "/dev/null", tmpfile, NULL, NULL);    /* restoredb -t */
+  ret = run_child (argv, 1, "/dev/null", tmpfile, NULL, &status);    /* restoredb -t */
 #endif
   if (ret < 0)
     {
@@ -5649,7 +5650,15 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   fclose (infile);
   unlink (tmpfile);
 
-  return ERR_NO_ERROR;
+  if (status == EXIT_SUCCESS)
+    {
+      return ERR_NO_ERROR;
+    }
+  else
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "failed to get backup info");
+      return ERR_WITH_MSG;
+    }
 }
 
 int
