@@ -15274,6 +15274,7 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   int pid = -1;
   int ret_val = 0;
+  int status = EXIT_SUCCESS;
 
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
@@ -15318,7 +15319,11 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat copylogdb <start|stop> dbname peer_node"
+#if defined (WINDOWS)
   pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+#else
+  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, &status);
+#endif
 
   if (pid < 0)
     {
@@ -15335,6 +15340,12 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   unlink (stdout_log_file);
   unlink (stderr_log_file);
+
+  if (status != EXIT_SUCCESS)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "heartbeat command failed.");
+      ret_val = ERR_WITH_MSG;
+    }
 
   return ret_val;
 
