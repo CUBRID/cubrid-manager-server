@@ -216,5 +216,6 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [login](login.md) | socket, http | ALL_AUTHORITY |
 | [logout](logout.md) | socket, http | ALL_AUTHORITY |
 | [getcmsenv](getcmsenv.md) | socket, http | ALL_AUTHORITY |
+| [getenv](getenv.md) | socket, http | ALL_AUTHORITY |
 | [shard_start](shard_start.md) | socket, http | DBC, DBO, BRK |
 | [shard_stop](shard_stop.md) | socket, http | DBC, DBO, BRK |

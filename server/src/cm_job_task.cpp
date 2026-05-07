@@ -5766,6 +5766,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   FILE *infile;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[5];
+  int rc = ERR_NO_ERROR;
 
   nv_add_nvp (res, "CUBRID", sco.szCubrid);
   nv_add_nvp (res, "CUBRID_DATABASES", sco.szCubrid_databases);
@@ -5794,6 +5795,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   else
     {
       nv_add_nvp (res, "CUBRIDVER", "version information not available");
+      rc = ERR_WITH_MSG;
     }
 
   make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_BROKER_VERSION, PATH_MAX);
@@ -5817,6 +5819,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   else
     {
       nv_add_nvp (res, "BROKERVER", "version information not available");
+      rc = ERR_WITH_MSG;
     }
 
   if (sco.hmtab1 == 1)
@@ -5868,7 +5871,12 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "osinfo", "unknown");
 #endif
 
-  return ERR_NO_ERROR;
+  if (rc == ERR_WITH_MSG)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "some CUBRID Environments are not available");
+    }
+
+  return rc;
 }
 
 int
