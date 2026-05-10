@@ -9831,7 +9831,6 @@ int
 ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
 			   char *diag_error)
 {
-  char command[PATH_MAX];
   char filename[PATH_MAX];
   char cubrid_tmp_path[PATH_MAX];
   char *fullpath_with_filename = NULL;
@@ -9843,7 +9842,6 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
   unsigned int i = 0;
   int valid_casrunnertmpfile = 0;
 
-  command[0] = '\0';
   filename[0] = '\0';
   cubrid_tmp_path[0] = '\0';
 
@@ -9891,19 +9889,11 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PERMISSION;
     }
 
-#if defined(WINDOWS)
-  snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-	    DEL_FILE_OPT, fullpath_with_filename);
-#else
-  snprintf (command, sizeof (command), "%s %s %s", DEL_DIR, DEL_DIR_OPT,
-	    fullpath_with_filename);
-#endif
-
-  if (system (command) == -1)
+  if (unlink (fullpath_with_filename) < 0)
     {
-      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
+      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "fail to remove: %s",
 		fullpath_with_filename);
-      return ERR_DIR_REMOVE_FAIL;
+      return ERR_WITH_MSG;
     }
   return ERR_NO_ERROR;
 }
@@ -10144,15 +10134,11 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
   int sect_len = 0;
   int as_id = 0;
   char broker_name[PATH_MAX];
-  char command[PATH_MAX];
   char full_path_buf[PATH_MAX];
-  char buf[PATH_MAX];
   T_CM_ERROR error = { 0, {0} };
 
   broker_name[0] = '\0';
-  command[0] = '\0';
   full_path_buf[0] = '\0';
-  buf[0] = '\0';
 
   nv_locate (req, "files", &sect, &sect_len);
   if (sect < 0)
@@ -10173,32 +10159,19 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_WITH_MSG;
 	}
 
-      snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-		DEL_FILE_OPT, path);
-
-      output = popen (command, "r");
-      memset (buf, '\0', sizeof (buf));
-      if (output != NULL)
+      if (unlink (path) < 0)
 	{
-	  if (fgets (buf, PATH_MAX, output) != NULL)
-	    {
 #if defined(WINDOWS)
-	      pclose (output);
-	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove %s",
-			full_path_buf);
-	      return ERR_WITH_MSG;
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove %s", full_path_buf);
+	  return ERR_WITH_MSG;
 #endif
-	      if (get_broker_info_from_filename (path, broker_name, &as_id) < 0
-		  || cm_del_cas_log (broker_name, as_id, &error) < 0)
-		{
-		  pclose (output);
-		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
-			    error.err_msg);
-		  return ERR_WITH_MSG;
-		}
+	  if (get_broker_info_from_filename (path, broker_name, &as_id) < 0
+	        || cm_del_cas_log (broker_name, as_id, &error) < 0)
+	    {
+	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", error.err_msg);
+	      return ERR_WITH_MSG;
 	    }
 	}
-      pclose (output);
     }                /* end of for */
 
   return ERR_NO_ERROR;
