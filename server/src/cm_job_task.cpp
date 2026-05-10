@@ -9852,6 +9852,12 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (fullpath_with_filename))
+    {
+      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "not allowed filename: %s", fullpath_with_filename);
+      return ERR_WITH_MSG;
+    }
+
   /* check permission : must under $CUBRID/tmp/ */
 #if defined(WINDOWS)
   snprintf (cubrid_tmp_path, PATH_MAX, "%s\\", sco.dbmt_tmp_dir);
