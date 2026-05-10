@@ -217,4 +217,6 @@ int run_child_linux (const char *pname, const char *const argv[], int wait_flag,
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 
+bool is_invalid_filename (const char *filename);
+
 #endif                /* _CM_SERVER_UTIL_H_ */

@@ -265,6 +265,13 @@ static T_FSERVER_TASK_INFO task_info[] =
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}
 };
 
+static char invalid_filename_charset [] =
+{
+  '&', '|', ';', '>', '<', '$', '(', ')', '\n', '\r'
+};
+
+int invalid_filename_charset_len = sizeof (invalid_filename_charset);
+
 #if defined(WINDOWS)
 
 typedef BOOL (WINAPI *GET_SYSTEM_TIMES) (LPFILETIME, LPFILETIME, LPFILETIME);
@@ -3854,4 +3861,28 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
   cm_util_log_write_errstr (msg);
 
   return 0;
+}
+
+bool
+is_invalid_filename (const char *filename)
+{
+  int i, j;
+
+  if (filename == NULL)
+    {
+      return true;
+    }
+
+  for (i = 0; i < strlen (filename); i++)
+    {
+      for (j = 0; j < invalid_filename_charset_len; j++)
+	{
+	  if (filename[i] == invalid_filename_charset [j])
+	    {
+	      return true;
+	    }
+	}
+    }
+
+  return false;
 }
