@@ -726,7 +726,6 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
   mutex_lock (cm_mutex);
 
 
-  // leave a back door for testing...
   if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
     {
       response["task"] = request["task"].asString();
@@ -734,7 +733,6 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
       return 1;
     }
 
-  // leave a back door for testing...
   if (!ext_ut_validate_auth (request))
     {
       response["status"] = STATUS_FAILURE;
