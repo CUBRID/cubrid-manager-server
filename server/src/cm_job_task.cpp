@@ -135,6 +135,12 @@ using namespace std;
 
 #define        ER_FEATURE_DEPRECATED   -2
 
+#define ERR_FILENAME_NOT_ALLOWED(buf,filename)                               \
+    do {                                                                     \
+        snprintf (buf, DBMT_ERROR_MSG_SIZE,                                  \
+		  "filename is not allowed: %s", filename);                  \
+    } while (0)
+
 extern T_EMGR_VERSION CLIENT_VERSION;
 extern T_USER_TOKEN_INFO *user_token_info;
 
@@ -2491,6 +2497,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   genvolpath = nv_get_val (req, "genvolpath");
   logvolpath = nv_get_val (req, "logvolpath");
+
   overwrite_config_file = nv_get_val (req, "overwrite_config_file");
   overwrite_exvol_file = nv_get_val (req, "overwrite_exvol_file");
 
@@ -9854,7 +9861,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
 
   if (is_invalid_filename (fullpath_with_filename))
     {
-      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "not allowed filename: %s", fullpath_with_filename);
+      ERR_FILENAME_NOT_ALLOWED (diag_error, fullpath_with_filename);
       return ERR_WITH_MSG;
     }
 
