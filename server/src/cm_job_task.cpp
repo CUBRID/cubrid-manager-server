@@ -11455,6 +11455,12 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (script_path))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, script_path);
+      return ERR_WITH_MSG;
+    }
+
   argv[argc++] = script_path;
   argv[argc++] = NULL;
 
