@@ -11466,6 +11466,12 @@ ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (filepath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, filepath);
+      return ERR_WITH_MSG;
+    }
+
   if ((fp = fopen (filepath, "r")) == NULL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
