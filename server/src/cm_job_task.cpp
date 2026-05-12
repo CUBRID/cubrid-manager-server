@@ -8248,6 +8248,10 @@ ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      nv_add_nvp (res, "existfile", v);
 	    }
+	  else if (is_invalid_filename (v))
+	    {
+	      nv_add_nvp (res, "filename is not allowed", v);
+	    }
 	}
     }
 
