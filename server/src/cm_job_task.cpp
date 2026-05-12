@@ -11297,6 +11297,12 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (conf_path))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, conf_path);
+      return ERR_WITH_MSG;
+    }
+
   /* if conf_path exsit, backup it at the current path. */
   if (access (conf_path, F_OK) == 0)
     {
