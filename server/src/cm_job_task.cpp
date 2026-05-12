@@ -6869,6 +6869,12 @@ ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (path))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, path);
+      return ERR_WITH_MSG;
+    }
+
   outfile = fopen (path, "w");
   if (outfile == NULL)
     {
