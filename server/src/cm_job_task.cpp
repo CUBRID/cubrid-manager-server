@@ -9996,6 +9996,12 @@ ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (filename))
+    {
+      ERR_FILENAME_NOT_ALLOWED (diag_error, filename);
+      return ERR_WITH_MSG;
+    }
+
   qindex = nv_get_val (cli_request, "qindex");
   if (qindex == NULL)
     {
