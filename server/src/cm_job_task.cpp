@@ -6019,6 +6019,13 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	  return ERR_WITH_MSG;
 	}
     }
+
+  if (is_invalid_filename (conf_item[2]))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, conf_item[2]);
+      return ERR_WITH_MSG;
+    }
+
   /* check the validation of path */
   snprintf (path_item, PATH_MAX, "%s", conf_item[2]);
   if (access (path_item, F_OK) < 0)
