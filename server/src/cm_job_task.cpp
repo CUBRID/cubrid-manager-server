@@ -9366,6 +9366,12 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
   logfile = nv_get_val (cli_request, "logfile");
   option_t = nv_get_val (cli_request, "option_t");
 
+  if (is_invalid_filename (logfile))
+    {
+      ERR_FILENAME_NOT_ALLOWED (diag_error, logfile);
+      return ERR_WITH_MSG;
+    }
+
   /* set prarameter with logfile and execute broker_log_top */
   /* execute at current directory and copy result to $CUBRID/tmp directory */
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/bin/broker_log_top%s",
