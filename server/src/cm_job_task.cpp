@@ -4725,6 +4725,12 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   split_schema_files = nv_get_val (req, "split-schema-files");
   as_dba = nv_get_val (req, "as-dba");
 
+  if (is_invalid_filename (targetdir) || is_invalid_filename (hashdir) || is_invalid_filename (lofile))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "targetdir or hashdir or lofile");
+      return ERR_WITH_MSG;
+    }
+
   if (target == NULL)
     {
       strcpy (_dbmt_error, "target");
