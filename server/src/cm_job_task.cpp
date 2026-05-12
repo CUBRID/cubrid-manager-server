@@ -3698,6 +3698,12 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (logpath) || is_invalid_filename (destdbpath) || is_invalid_filename (exvolpath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "for logpath or destdbpath or exvolpath");
+      return ERR_WITH_MSG;
+    }
+
   db_mode = uDatabaseMode (srcdbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
