@@ -3516,6 +3516,12 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
   volpath = nv_get_val (req, "path");
   volname = nv_get_val (req, "volname");
 
+  if (is_invalid_filename (volpath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, volpath);
+      return ERR_WITH_MSG;
+    }
+
   if ((dbvolsize = nv_get_val (req, "size_need_mb")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "size_nee_mb");
