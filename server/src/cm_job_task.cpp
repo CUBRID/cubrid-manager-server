@@ -5299,6 +5299,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = index;
     }
 
+  if (is_invalid_filename (schema) || is_invalid_filename (object) || is_invalid_filename (index))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "schema or object or index");
+      return ERR_WITH_MSG;
+    }
+
 #if 0                /* will be added */
   if (trigger != NULL && !uStringEqual (trigger, "none"))
     {
@@ -5346,6 +5352,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
+      if (is_invalid_filename (schema_file_list))
+	{
+	  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, schema_file_list);
+	  return ERR_WITH_MSG;
+	}
+
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
