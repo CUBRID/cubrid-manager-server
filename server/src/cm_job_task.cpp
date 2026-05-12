@@ -6808,6 +6808,12 @@ ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (filepath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, filepath);
+      return ERR_WITH_MSG;
+    }
+
   startline = nv_get_val (req, "start");
   endline = nv_get_val (req, "end");
 
