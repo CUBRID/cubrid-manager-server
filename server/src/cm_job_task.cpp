@@ -15688,6 +15688,12 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (nvp_path))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, nvp_path);
+      return ERR_WITH_MSG;
+    }
+
   if (0 == strncmp (nvp_path, "../", strlen ("../")))
     {
       strcpy (_dbmt_error, "path parameter includes invalid dirctories!");
