@@ -11342,6 +11342,12 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
   infile = nv_get_val (req, "infile");
   command = nv_get_val (req, "command");
 
+  if (is_invalid_filename (infile))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, infile);
+      return ERR_WITH_MSG;
+    }
+
   uid = nv_get_val (req, "uid");
   passwd = nv_get_val (req, "passwd");
   error_continue = nv_get_val (req, "error_continue");
