@@ -11621,6 +11621,12 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      snprintf (fullpath, sizeof (fullpath) - 1, "%s/tmp/%s",
 			sco.szCubrid, (path + 2));
+
+	      if (is_invalid_filename (path + 2))
+		{
+		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, path + 2);
+		  ERR_WITH_MSG;
+		}
 	    }
 	  else
 	    {
