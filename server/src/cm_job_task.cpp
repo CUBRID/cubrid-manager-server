@@ -2498,6 +2498,18 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   genvolpath = nv_get_val (req, "genvolpath");
   logvolpath = nv_get_val (req, "logvolpath");
 
+  if (is_invalid_filename (genvolpath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, genvolpath);
+      return ERR_WITH_MSG;
+    }
+
+  if (is_invalid_filename (logvolpath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, logvolpath);
+      return ERR_WITH_MSG;
+    }
+
   overwrite_config_file = nv_get_val (req, "overwrite_config_file");
   overwrite_exvol_file = nv_get_val (req, "overwrite_exvol_file");
 
