@@ -11245,10 +11245,17 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "srcdir");
       return ERR_PARAM_MISSING;
     }
+
   if ((dest_dir = nv_get_val (req, "destdir")) == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "destdir");
       return ERR_PARAM_MISSING;
+    }
+
+  if (is_invalid_filename (src_dir) || is_invalid_filename (dest_dir))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "srcdir or destdir");
+      return ERR_WITH_MSG;
     }
 
   if (folder_copy (src_dir, dest_dir) < 0)
