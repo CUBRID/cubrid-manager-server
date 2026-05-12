@@ -5496,6 +5496,12 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   partial = nv_get_val (req, "partial");
   recovery_path = nv_get_val (req, "recoverypath");
 
+  if (is_invalid_filename (pathname) || is_invalid_filename (recovery_path))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "pathname or recoverypath");
+      return ERR_WITH_MSG;
+    }
+
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_RESTOREDB;
