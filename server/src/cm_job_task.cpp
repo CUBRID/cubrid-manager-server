@@ -11406,6 +11406,12 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (is_invalid_filename (search_folder))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, search_folder);
+      return ERR_WITH_MSG;
+    }
+
   if ((keyword = nv_get_val (req, "keyword")) == NULL)
     {
       strcpy_limit (_dbmt_error, "keyword", DBMT_ERROR_MSG_SIZE);
