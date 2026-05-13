@@ -5244,6 +5244,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   no_user_specified_name = nv_get_val (req, "no-user-specified-name");
   schema_file_list = nv_get_val (req, "schema-file-list");
 
+  if (is_invalid_filename (schema) || is_invalid_filename (object) || is_invalid_filename (index))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "schema or object or index");
+      return ERR_WITH_MSG;
+    }
+
   db_mode = uDatabaseMode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
@@ -5309,12 +5315,6 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       argv[argc++] = "--" LOAD_INDEX_FILE_L;
       argv[argc++] = index;
-    }
-
-  if (is_invalid_filename (schema) || is_invalid_filename (object) || is_invalid_filename (index))
-    {
-      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "schema or object or index");
-      return ERR_WITH_MSG;
     }
 
 #if 0                /* will be added */
