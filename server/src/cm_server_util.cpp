@@ -3866,14 +3866,16 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 bool
 is_invalid_filename (const char *filename)
 {
-  int i, j;
+  int i, j, len;
 
   if (filename == NULL)
     {
       return false;
     }
 
-  for (i = 0; i < strlen (filename); i++)
+  len = strlen (filename);
+
+  for (i = 0; i < len; i++)
     {
       for (j = 0; j < invalid_filename_charset_len; j++)
 	{
