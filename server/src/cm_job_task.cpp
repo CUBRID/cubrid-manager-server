@@ -11687,7 +11687,7 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	      if (is_invalid_filename (path + 2))
 		{
 		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, path + 2);
-		  ERR_WITH_MSG;
+		  return ERR_WITH_MSG;
 		}
 	    }
 	  else
