@@ -3870,7 +3870,7 @@ is_invalid_filename (const char *filename)
 
   if (filename == NULL)
     {
-      return true;
+      return false;
     }
 
   for (i = 0; i < strlen (filename); i++)
