@@ -2504,12 +2504,6 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if (is_invalid_filename (logvolpath))
-    {
-      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, logvolpath);
-      return ERR_WITH_MSG;
-    }
-
   overwrite_config_file = nv_get_val (req, "overwrite_config_file");
   overwrite_exvol_file = nv_get_val (req, "overwrite_exvol_file");
 
@@ -2538,6 +2532,12 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       && (retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
     {
       return retval;
+    }
+
+  if (is_invalid_filename (logvolpath))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, logvolpath);
+      return ERR_WITH_MSG;
     }
 
   /* caculate dbvolsize & logvolsize */
