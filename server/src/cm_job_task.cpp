@@ -5250,6 +5250,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  if (schema_file_list && CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1103))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "split-schema-files option is not supported in this version");
+      return ERR_WITH_MSG;
+    }
+
   db_mode = uDatabaseMode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
