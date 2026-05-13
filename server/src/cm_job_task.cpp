@@ -4731,6 +4731,12 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  if (split_schema_files && CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1103))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "split-schema-files option is not supported in this version");
+      return ERR_WITH_MSG;
+    }
+
   if (target == NULL)
     {
       strcpy (_dbmt_error, "target");
