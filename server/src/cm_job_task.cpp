@@ -9435,6 +9435,13 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
   for (i = 0; i < sect_len; i++)
     {
       nv_lookup (cli_request, sect + i, NULL, &logfile);
+
+      if (is_invalid_filename (logfile))
+	{
+	  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, logfile);
+	  return ERR_WITH_MSG;
+	}
+
       if (logfile)
 	{
 	  argv[arg_index++] = logfile;
