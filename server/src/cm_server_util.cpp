@@ -1287,7 +1287,7 @@ uRemoveDir (char *dir, int remove_file_in_dir)
   memset (command, '\0', sizeof (command));
   ut_trim (path);
 
-  if (is_invalid_filename (path));
+  if (is_invalid_filename (path))
     {
       return ERR_DIR_REMOVE_FAIL;
     }
