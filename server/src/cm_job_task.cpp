@@ -3523,9 +3523,9 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
   volpath = nv_get_val (req, "path");
   volname = nv_get_val (req, "volname");
 
-  if (is_invalid_filename (volpath))
+  if (is_invalid_filename (volpath) || is_invalid_filename (volname))
     {
-      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, volpath);
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "path or volname");
       return ERR_WITH_MSG;
     }
 
