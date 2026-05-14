@@ -86,6 +86,8 @@
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
 
+#define	WIN_ARGS_LEN	1024
+
 static T_FSERVER_TASK_INFO task_info[] =
 {
   {"startinfo", TS_STARTINFO, 0, DEF_TASK_FUNC (ts_startinfo), FSVR_SA, ALL_AUTHORITY},
@@ -2638,7 +2640,7 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   PROCESS_INFORMATION proc_info;
   BOOL res;
   int i, cmd_arg_len;
-  char cmd_arg[1024];
+  char cmd_arg[WIN_ARGS_LEN];
   BOOL inherit_flag = FALSE;
   HANDLE hStdIn = INVALID_HANDLE_VALUE;
   HANDLE hStdOut = INVALID_HANDLE_VALUE;
@@ -3874,6 +3876,13 @@ is_invalid_filename (const char *filename)
     }
 
   len = strlen (filename);
+
+#if defined (WINDOWS)
+  if (len > WIN_ARGS_LEN)
+    {
+      return true;
+    }
+#endif
 
   for (i = 0; i < len; i++)
     {
