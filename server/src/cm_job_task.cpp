@@ -8262,13 +8262,15 @@ ts_check_dir (nvplist *req, nvplist *res, char *_dbmt_error)
       nv_lookup (req, i, &n, &v);
       if ((n != NULL) && (strcmp (n, "dir") == 0))
 	{
+	  if (is_invalid_filename (v))
+	    {
+	      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, v);
+	      return ERR_WITH_MSG;
+	    }
+
 	  if ((v == NULL) || (access (v, F_OK) < 0))
 	    {
 	      nv_add_nvp (res, "noexist", v);
-	    }
-	  else if (is_invalid_filename (v))
-	    {
-	      nv_add_nvp (res, "filename is not allowed", v);
 	    }
 	}
     }
