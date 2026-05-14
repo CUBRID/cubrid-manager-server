@@ -362,6 +362,7 @@ static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, in
 static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_file_size);
 
 static void unlink_schema_files (const char *schema_list_file);
+static int check_schema_files (const char *schema_list_file);
 
 static int is_filename_matched (const char *fname, const char *pattern);
 
@@ -5388,6 +5389,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_WITH_MSG;
 	}
 
+      if (check_schema_files (schema_file_list) != ERR_NO_ERROR)
+	{
+	  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "check all schema filename");
+	  return ERR_WITH_MSG;
+	}
+
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
@@ -5497,12 +5504,44 @@ unlink_schema_files (const char *schema_list_file)
 	{
 	  *p = '\0';
 	}
+
       snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
       unlink (path_name);
     }
 
   fclose (fp);
   unlink (schema_list_file);
+}
+
+static int
+check_schema_files (const char *schema_list_file)
+{
+  FILE *fp;
+  char *p, filename[PATH_MAX] = { 0, };
+
+  if (schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
+    {
+      return ERR_NO_ERROR;
+    }
+
+  while (fgets (filename, PATH_MAX, fp))
+    {
+      p = strchr (filename, '\n');
+      if (p)
+	{
+	  *p = '\0';
+	}
+
+      if (is_invalid_filename (filename))
+	{
+	  fclose (fp);
+	  return ERR_GENERAL_ERROR;
+	}
+    }
+
+  fclose (fp);
+
+  return ERR_NO_ERROR;
 }
 
 int
