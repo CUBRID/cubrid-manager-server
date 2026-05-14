@@ -267,7 +267,7 @@ static T_FSERVER_TASK_INFO task_info[] =
 
 static char invalid_filename_charset [] =
 {
-  '&', '|', ';', '>', '<', '$', '(', ')', '\n', '\r'
+  '&', '|', ';', '>', '<', '$', '(', ')', '\n', '\r', '\"', '\''
 };
 
 int invalid_filename_charset_len = sizeof (invalid_filename_charset);
