@@ -3201,9 +3201,9 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  else if (flag == 1)
 	    {
-	      if (is_invalid_filename (v))
+	      if (is_invalid_filename (n) || is_invalid_filename (v))
 		{
-		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, v);
+		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "volume file");
 		  fclose (outfile);
 		  return ERR_WITH_MSG;
 		}
@@ -3770,7 +3770,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      if (is_invalid_filename (n) || is_invalid_filename (v))
 		{
-		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, v);
+		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "volume file");
 		  fclose (outfile);
 		  return ERR_WITH_MSG;
 		}
