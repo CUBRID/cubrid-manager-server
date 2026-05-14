@@ -3870,14 +3870,14 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
   return 0;
 }
 
-bool
+int
 is_invalid_filename (const char *filename)
 {
   int i, j, len;
 
   if (filename == NULL)
     {
-      return false;
+      return FALSE;
     }
 
   len = strlen (filename);
@@ -3885,7 +3885,7 @@ is_invalid_filename (const char *filename)
 #if defined (WINDOWS)
   if (len > WIN_ARGS_LEN)
     {
-      return true;
+      return TRUE;
     }
 #endif
 
@@ -3895,10 +3895,10 @@ is_invalid_filename (const char *filename)
 	{
 	  if (filename[i] == invalid_filename_charset [j])
 	    {
-	      return true;
+	      return TRUE;
 	    }
 	}
     }
 
-  return false;
+  return FALSE;
 }
