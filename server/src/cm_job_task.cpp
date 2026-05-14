@@ -3174,13 +3174,6 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       for (i = 0; i < req->nvplist_leng; i++)
 	{
 	  nv_lookup (req, i, &n, &v);
-	  if (is_invalid_filename (n) || is_invalid_filename (v))
-	    {
-	      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "advanced volume control file");
-	      fclose (outfile);
-	      return ERR_WITH_MSG;
-	    }
-
 	  if (n == NULL || v == NULL)
 	    {
 	      fclose (outfile);
@@ -3207,6 +3200,12 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  else if (flag == 1)
 	    {
+	      if (is_invalid_filename (v))
+		{
+		  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, v);
+		  fclose (outfile);
+		  return ERR_WITH_MSG;
+		}
 #if defined(WINDOWS)
 	      replace_colon (n);
 	      replace_colon (v);
