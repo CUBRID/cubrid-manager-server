@@ -5689,6 +5689,12 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   lv = nv_get_val (req, "level");
   pathname = nv_get_val (req, "pathname");
 
+  if (is_invalid_filename (pathname))
+    {
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, pathname);
+      return ERR_WITH_MSG;
+    }
+
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_RESTOREDB;
