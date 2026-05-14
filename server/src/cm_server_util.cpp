@@ -3877,7 +3877,7 @@ is_invalid_filename (const char *filename)
 
   if (filename == NULL)
     {
-      return FALSE;
+      return 0;
     }
 
   len = strlen (filename);
@@ -3885,7 +3885,7 @@ is_invalid_filename (const char *filename)
 #if defined (WINDOWS)
   if (len > WIN_ARGS_LEN)
     {
-      return TRUE;
+      return 1;
     }
 #endif
 
@@ -3895,10 +3895,10 @@ is_invalid_filename (const char *filename)
 	{
 	  if (filename[i] == invalid_filename_charset [j])
 	    {
-	      return TRUE;
+	      return 1;
 	    }
 	}
     }
 
-  return FALSE;
+  return 0;
 }
