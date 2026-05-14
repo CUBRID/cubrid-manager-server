@@ -9438,7 +9438,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 
       if (is_invalid_filename (logfile))
 	{
-	  ERR_FILENAME_NOT_ALLOWED (_dbmt_error, logfile);
+	  ERR_FILENAME_NOT_ALLOWED (diag_error, logfile);
 	  return ERR_WITH_MSG;
 	}
 
