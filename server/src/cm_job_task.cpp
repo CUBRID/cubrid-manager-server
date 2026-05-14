@@ -5257,9 +5257,10 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   no_user_specified_name = nv_get_val (req, "no-user-specified-name");
   schema_file_list = nv_get_val (req, "schema-file-list");
 
-  if (is_invalid_filename (schema) || is_invalid_filename (object) || is_invalid_filename (index))
+  if (is_invalid_filename (schema) || is_invalid_filename (object) || is_invalid_filename (index)
+      || is_invalid_filename (error_control_file) || is_invalid_filename (ignore_class_file))
     {
-      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "schema or object or index");
+      ERR_FILENAME_NOT_ALLOWED (_dbmt_error, "check filenames");
       return ERR_WITH_MSG;
     }
 
