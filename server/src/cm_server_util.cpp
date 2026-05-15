@@ -3870,22 +3870,30 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
   return 0;
 }
 
-int
-is_invalid_filename (const char *filename)
+bool
+is_invalid_filename (const char *path)
 {
   int i, j, len;
+  int offset = strlen ("$CUBRID");	/* We do not allow $xxx style filename except $CUBRID */
+  const char *filename;
 
-  if (filename == NULL)
+  if (path == NULL)
     {
-      return 0;
+      return false;
     }
 
-  len = strlen (filename);
+  len = strlen (path);
+  if (strncmp (path, "$CUBRID", offset) != 0)
+    {
+      offset = 0;
+    }
+
+  filename = path + offset;
 
 #if defined (WINDOWS)
   if (len > WIN_ARGS_LEN)
     {
-      return 1;
+      return true;
     }
 #endif
 
@@ -3895,10 +3903,10 @@ is_invalid_filename (const char *filename)
 	{
 	  if (filename[i] == invalid_filename_charset [j])
 	    {
-	      return 1;
+	      return true;
 	    }
 	}
     }
 
-  return 0;
+  return false;
 }
