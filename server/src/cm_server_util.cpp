@@ -3894,7 +3894,7 @@ is_invalid_filename (const char *filename)
     }
 #endif
 
-  for (i = offset; i < len - offset; i++)
+  for (i = offset; i < len; i++)
     {
       for (j = 0; j < invalid_filename_charset_len; j++)
 	{
