@@ -416,6 +416,7 @@ int ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_folders_with_keyword (nvplist *req, nvplist *res,
                                  char *_dbmt_error);
+int ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_file_total_line_num (nvplist *req, nvplist *res,
@@ -445,9 +446,6 @@ int ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_is_update_success (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error);
-#if defined (ENABLE_UNUSED_FUNCTION)
-int ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error);
-#endif
 int
 ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
                  int type);

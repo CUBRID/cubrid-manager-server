@@ -11535,7 +11535,6 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
   return retval;
 }
 
-#if defined (ENABLE_UNUSED_FUNCTION)
 int
 ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -11588,7 +11587,6 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 
   return retval;
 }
-#endif
 
 int
 ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)

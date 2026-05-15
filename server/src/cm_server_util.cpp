@@ -230,6 +230,7 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"runsqlstatement", TS_RUN_SQL_STATEMENT, 0, DEF_TASK_FUNC (ts_run_sql_statement), FSVR_SA_CS, ALL_AUTHORITY},
   {"writeandsaveconf", TS_WRITE_AND_SAVE_CONF, 0, DEF_TASK_FUNC (ts_write_and_save_conf), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"getfiletotallinenum", TS_GET_FILE_TOTAL_LINE_NUM, 0, DEF_TASK_FUNC (ts_get_file_total_line_num), FSVR_SA_CS, ALL_AUTHORITY},
+  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, ALL_AUTHORITY},
   {"copyfolder", TS_COPY_FOLDER, 0, DEF_TASK_FUNC (ts_copy_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"deletefolder", TS_DELETE_FOLDER, 0, DEF_TASK_FUNC (ts_delete_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {
@@ -263,9 +264,6 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, ALL_AUTHORITY},
   {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, ALL_AUTHORITY},
   {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, ALL_AUTHORITY},
-#if defined (ENABLE_UNUSED_FUNCTION)
-  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, ALL_AUTHORITY},
-#endif
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}
 };
 
