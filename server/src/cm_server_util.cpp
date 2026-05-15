@@ -3882,9 +3882,11 @@ is_invalid_filename (const char *filename)
     }
 
   len = strlen (filename);
-  if (strncmp (filename, "$CUBRID", offset) != 0)
+  if (strncmp (filename, "$CUBRID", offset) == 0)
     {
-      offset = 0;
+      char n = *(filename + offset);
+
+      offset = (n == '/' || n == '\\' || n == '\0') ? offset : 0;
     }
 
 #if defined (WINDOWS)
