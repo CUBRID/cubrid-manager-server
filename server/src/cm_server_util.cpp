@@ -3876,7 +3876,7 @@ is_invalid_filename (const char *filename)
   int i, j, len;
   int offset = strlen ("$CUBRID");	/* We do not allow $xxx style filename except $CUBRID */
 
-  if (path == NULL)
+  if (filename == NULL)
     {
       return false;
     }
