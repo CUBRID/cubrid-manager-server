@@ -87,6 +87,7 @@
 #define MIN_CHUNK 4096
 
 #define	WIN_ARGS_LEN	1024
+#define	WIN_PATH_LEN	1024
 
 static T_FSERVER_TASK_INFO task_info[] =
 {
@@ -1275,7 +1276,7 @@ uRemoveLockFile (int outfd)
 int
 uRemoveDir (char *dir, int remove_file_in_dir)
 {
-  char path[1024];
+  char path[WIN_PATH_LEN];
   char command[2048];
 
   if (dir == NULL)
@@ -1283,7 +1284,7 @@ uRemoveDir (char *dir, int remove_file_in_dir)
       return ERR_DIR_REMOVE_FAIL;
     }
 
-  strcpy (path, dir);
+  snprintf (path, WIN_PATH_LEN, "%s", dir);
   memset (command, '\0', sizeof (command));
   ut_trim (path);
 
