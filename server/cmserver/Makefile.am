@@ -65,5 +65,10 @@ cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt -l
 
 install-exec-hook:
 	$(RM) $(prefix)/conf/cm_ssl_cert.key $(prefix)/conf/cm_ssl_cert.crt
+ifeq ($(OS), Windows_NT)
+	$(CP) cm_ssl_cert_$(SSL_RSA_BITS).key $(prefix)/conf/cm_ssl_cert.key
+	$(CP) cm_ssl_cert_$(SSL_RSA_BITS).crt $(prefix)/conf/cm_ssl_cert.crt
+else
 	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).key $(prefix)/conf/cm_ssl_cert.key
 	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).crt $(prefix)/conf/cm_ssl_cert.crt
+endif
