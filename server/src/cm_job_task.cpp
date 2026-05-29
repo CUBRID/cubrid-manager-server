@@ -5285,18 +5285,33 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((schema != NULL) && (strcmp (schema, "none") != 0))
     {
+      if (access (schema, F_OK) != 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "schema file does not exists: %s", schema);
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" LOAD_SCHEMA_FILE_L;
       argv[argc++] = schema;
     }
 
   if ((object != NULL) && (strcmp (object, "none") != 0))
     {
+      if (access (object, F_OK) != 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "object file does not exists: %s", object);
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" LOAD_DATA_FILE_L;
       argv[argc++] = object;
     }
 
   if ((index != NULL) && (strcmp (index, "none") != 0))
     {
+      if (access (index, F_OK) != 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "index file does not exists: %s", index);
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" LOAD_INDEX_FILE_L;
       argv[argc++] = index;
     }
@@ -5339,6 +5354,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (ignore_class_file != NULL && !uStringEqual (ignore_class_file, "none"))
     {
+      if (access (ignore_class_file, F_OK) != 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "ignore_class_file file does not exists: %s", ignore_class_file);
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" LOAD_IGNORE_CLASS_L;
       argv[argc++] = ignore_class_file;
     }
@@ -5348,6 +5368,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
+      if (access (schema_file_list, F_OK) != 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "schema_file_list file does not exists: %s", schema_file_list);
+	  return ERR_WITH_MSG;
+	}
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
