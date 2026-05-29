@@ -16648,7 +16648,6 @@ file_not_exist (char *path, char *_dbmt_error)
   int allowed_env_len = sizeof (allowed_env) / sizeof (char *);
   int not_allowed = 1;
   int i;
-  int len;
 
   if (path == NULL || strcmp (path, "none") == 0)
     {
@@ -16669,11 +16668,9 @@ file_not_exist (char *path, char *_dbmt_error)
 	  *p = '\0';
 	}
 
-      len = strlen (buf);
-
       for (i = 0; i < allowed_env_len; i++)
 	{
-	  if (strncmp (buf, allowed_env[i], len) == 0)
+	  if (strcmp (buf, allowed_env[i]) == 0)
 	    {
 	      not_allowed = 0;
 	      break;
