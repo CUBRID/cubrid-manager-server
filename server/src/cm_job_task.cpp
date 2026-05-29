@@ -16683,13 +16683,20 @@ file_not_exist (char *path, char *_dbmt_error)
 	  return 1;
 	}
 
+      char *env_value = getenv (buf + 1);
+      if (env_value == NULL)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", path);
+	  return 1;
+	}
+
       if (p)
 	{
-	  snprintf (new_path, PATH_MAX, "%s/%s", getenv (buf + 1), p + 1);
+	  snprintf (new_path, PATH_MAX, "%s/%s", env_value, p + 1);
 	}
       else
 	{
-	  snprintf (new_path, PATH_MAX, "%s", getenv (buf + 1));
+	  snprintf (new_path, PATH_MAX, "%s", env_value);
 	}
 
       ret = access (new_path, F_OK) != 0 ? 1 : 0;
