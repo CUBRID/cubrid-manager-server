@@ -358,6 +358,7 @@ static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_fi
 static void unlink_schema_files (const char *schema_list_file);
 
 static int is_filename_matched (const char *fname, const char *pattern);
+static int file_not_exist (char *path);
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -5285,7 +5286,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((schema != NULL) && (strcmp (schema, "none") != 0))
     {
-      if (access (schema, F_OK) != 0)
+      if (file_not_exist (schema))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "schema file does not exists: %s", schema);
 	  return ERR_WITH_MSG;
@@ -5296,7 +5297,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((object != NULL) && (strcmp (object, "none") != 0))
     {
-      if (access (object, F_OK) != 0)
+      if (file_not_exist (object))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "object file does not exists: %s", object);
 	  return ERR_WITH_MSG;
@@ -5307,7 +5308,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((index != NULL) && (strcmp (index, "none") != 0))
     {
-      if (access (index, F_OK) != 0)
+      if (file_not_exist (index))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "index file does not exists: %s", index);
 	  return ERR_WITH_MSG;
@@ -5354,7 +5355,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (ignore_class_file != NULL && !uStringEqual (ignore_class_file, "none"))
     {
-      if (access (ignore_class_file, F_OK) != 0)
+      if (file_not_exist (ignore_class_file))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "ignore_class_file file does not exists: %s", ignore_class_file);
 	  return ERR_WITH_MSG;
@@ -5368,7 +5369,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (access (schema_file_list, F_OK) != 0)
+      if (file_not_exist (schema_file_list))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "schema_file_list file does not exists: %s", schema_file_list);
 	  return ERR_WITH_MSG;
@@ -16647,4 +16648,41 @@ is_filename_matched (const char *fname, const char *pattern)
     }
 
     return 1;
+}
+
+static int
+file_not_exist (char *path)
+{
+  char buf[PATH_MAX];
+  char new_path[PATH_MAX];
+  char *p;
+  int ret = 0;
+
+  if (path == NULL)
+    {
+      return 1;
+    }
+
+  if (path[0] != '$')
+    {
+      ret = access (path, F_OK) != 0 ? 1 : 0;
+    }
+  else
+    {
+      snprintf (buf, PATH_MAX, "%s", path);
+      p = strchr (buf, '/');
+      if (p)
+	{
+	  *p = '\0';
+	  snprintf (new_path, PATH_MAX, "%s/%s", getenv (buf + 1), p + 1);
+	}
+      else
+	{
+	  snprintf (new_path, PATH_MAX, "%s", buf);
+	}
+
+      ret = access (new_path, F_OK) != 0 ? 1 : 0;
+    }
+
+  return ret;
 }
