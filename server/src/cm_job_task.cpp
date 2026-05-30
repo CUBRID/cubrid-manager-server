@@ -358,7 +358,8 @@ static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_fi
 static void unlink_schema_files (const char *schema_list_file);
 
 static int is_filename_matched (const char *fname, const char *pattern);
-static int file_not_exist (char *path, char *_dbmt_error);
+static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
+static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -5353,9 +5354,9 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = schema_file_list_opt;
     }
 
-  if (file_not_exist (schema, _dbmt_error) || file_not_exist (object, _dbmt_error)
-     || file_not_exist (index, _dbmt_error) || file_not_exist (ignore_class_file, _dbmt_error)
-     || file_not_exist (schema_file_list, _dbmt_error))
+  if (file_not_exist (schema, "none", _dbmt_error) || file_not_exist (object, "none", _dbmt_error)
+     || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
+     || file_not_exist (schema_file_list, "none", _dbmt_error) || schema_file_not_exist (schema_file_list, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -16634,7 +16635,7 @@ is_filename_matched (const char *fname, const char *pattern)
 }
 
 static int
-file_not_exist (char *path, char *_dbmt_error)
+file_not_exist (char *path, char *skip_code, char *_dbmt_error)
 {
   char buf[PATH_MAX];
   char new_path[PATH_MAX];
@@ -16649,7 +16650,7 @@ file_not_exist (char *path, char *_dbmt_error)
   int not_allowed = 1;
   int i;
 
-  if (path == NULL || strcmp (path, "none") == 0)
+  if (path == NULL || (skip_code != NULL && strcmp (path, skip_code) == 0))
     {
       return 0;
     }
@@ -16708,4 +16709,70 @@ file_not_exist (char *path, char *_dbmt_error)
     }
 
   return ret;
+}
+
+static int
+schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
+{
+  FILE *fp;
+  char *p, filename[PATH_MAX] = { 0, };
+  char path_name[PATH_MAX*2];
+  char path[PATH_MAX];
+
+  if (schema_list_file == NULL || strcmp (schema_list_file, "none") == 0)
+    {
+      return 0;
+    }
+
+  if ((fp = fopen (schema_list_file, "r")) == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+      return 1;
+    }
+
+#if defined (WINDOWS)
+  {
+    char drive[_MAX_DRIVE];
+    char dir[PATH_MAX];
+
+    if (_splitpath_s(schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+      {
+	snprintf (path, PATH_MAX, "%s%s", drive, dir);
+      }
+    else
+      {
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+	fclose (fp);
+	return 1;
+      }
+  }
+#else
+  snprintf (path, PATH_MAX, "%s", schema_list_file);
+  if (dirname(path) == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+      fclose (fp);
+      return 1;
+    }
+#endif
+
+  while (fgets (filename, PATH_MAX, fp))
+    {
+      p = strchr (filename, '\n');
+      if (p)
+	{
+	  *p = '\0';
+	}
+      snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
+
+      if (file_not_exist (path_name, NULL, _dbmt_error))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", path_name);
+	  fclose (fp);
+	  return 1;
+	}
+    }
+
+  fclose (fp);
+  return 0;
 }
