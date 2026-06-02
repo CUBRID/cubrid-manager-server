@@ -360,6 +360,20 @@ static void unlink_schema_files (const char *schema_list_file);
 static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
 static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
+static int expand_path (const char *src, char *dst, int dest_len);
+
+static char *allowed_env[]=
+{
+  "$CUBRID",
+  "$CUBRID_DATABASES"
+};
+static int allowed_env_len = sizeof (allowed_env) / sizeof (char *);
+
+enum allowed_env_num
+{
+  ENV_CUBRID = 0,
+  ENV_CUBRID_DATABASES = 1
+};
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -16641,14 +16655,9 @@ file_not_exist (char *path, char *skip_code, char *_dbmt_error)
   char new_path[PATH_MAX];
   char *p = NULL;
   int ret = 0;
-  char *allowed_env[]=
-  {
-    "$CUBRID",
-    "$CUBRID_DATABASES",
-  };
-  int allowed_env_len = sizeof (allowed_env) / sizeof (char *);
   int not_allowed = 1;
   int i;
+
 
   if (path == NULL || (skip_code != NULL && strcmp (path, skip_code) == 0))
     {
@@ -16668,7 +16677,6 @@ file_not_exist (char *path, char *skip_code, char *_dbmt_error)
 	{
 	  *p = '\0';
 	}
-
       for (i = 0; i < allowed_env_len; i++)
 	{
 	  if (strcmp (buf, allowed_env[i]) == 0)
@@ -16718,13 +16726,14 @@ schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
   char *p, filename[PATH_MAX] = { 0, };
   char path_name[PATH_MAX*2];
   char path[PATH_MAX];
+  char full_filename[PATH_MAX];
 
   if (schema_list_file == NULL || strcmp (schema_list_file, "none") == 0)
     {
       return 0;
     }
 
-  if ((fp = fopen (schema_list_file, "r")) == NULL)
+  if (expand_path (schema_list_file, full_filename, PATH_MAX) || (fp = fopen (full_filename, "r")) == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
       return 1;
@@ -16774,5 +16783,53 @@ schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
     }
 
   fclose (fp);
+  return 0;
+}
+
+static int
+expand_path (const char *src, char *dst, int dest_len)
+{
+  int i;
+  int env_num = -1;
+  char buf[PATH_MAX];
+  char *p;
+
+  if (src == NULL || dst == NULL || dest_len <= 0)
+    {
+      return 0;
+    }
+
+  if (src[0] == '$')
+    {
+      for (i = 0; i < allowed_env_len; i++)
+	{
+	  if (strcmp (buf, allowed_env[i]) == 0)
+	    {
+	      env_num = i;
+	      break;
+	    }
+	}
+
+      if (env_num < 0)
+	{
+	  return 1;
+	}
+
+      snprintf (buf, PATH_MAX, "%s", src);
+      p = strchr (buf, '/');
+      if (p)
+	{
+	  snprintf (dst, dest_len, "%s/%s", env_num == 0 ? sco.szCubrid : sco.szCubrid_databases, p + 1);
+	}
+      else
+	{
+	  snprintf (dst, dest_len, "%s", buf);
+	}
+    }
+  else
+    {
+      snprintf (dst, dest_len, "%s", src);
+    }
+
   return 0;
 }
