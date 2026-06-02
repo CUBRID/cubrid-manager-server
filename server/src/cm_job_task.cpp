@@ -16801,6 +16801,13 @@ expand_path (const char *src, char *dst, int dest_len)
 
   if (src[0] == '$')
     {
+      snprintf (buf, PATH_MAX, "%s", src);
+      p = strchr (buf, '/');
+      if (p)
+	{
+	  *p = '\0';
+	}
+
       for (i = 0; i < allowed_env_len; i++)
 	{
 	  if (strcmp (buf, allowed_env[i]) == 0)
@@ -16815,8 +16822,10 @@ expand_path (const char *src, char *dst, int dest_len)
 	  return 1;
 	}
 
-      snprintf (buf, PATH_MAX, "%s", src);
-      p = strchr (buf, '/');
+      if (p)
+	{
+	  *p = '/';
+	}
       if (p)
 	{
 	  snprintf (dst, dest_len, "%s/%s", env_num == 0 ? sco.szCubrid : sco.szCubrid_databases, p + 1);
