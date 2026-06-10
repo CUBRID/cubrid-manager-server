@@ -4082,7 +4082,7 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = "--" PARAMDUMP_BOTH_L;
     }
 
-  if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor >= 1105))
+  if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor) >= 1105)
     {
       argv[argc++] = "--" PLANDUMP_FOR_CM;
     }
@@ -10125,7 +10125,7 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   dbuser = nv_get_val (in, "dbuser");
   dbpasswd = nv_get_val (in, "dbpasswd");
 
-  snprintf (query, 1024, statement, CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1105) ? "db_user" : "_db_user");
+  snprintf (query, 1024, statement, CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ? "db_user" : "_db_user");
 
   if (dbname == NULL)
     {
@@ -13058,7 +13058,7 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      nv_add_nvp (res, "numlocked", s1);
 
 	      fgets (buf, sizeof (buf), infile);
-	      if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor < 1104))
+	      if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1104)
 		{
 		  scan_matched =
 		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
