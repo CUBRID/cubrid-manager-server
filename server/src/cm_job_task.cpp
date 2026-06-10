@@ -10117,15 +10117,16 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   char outfile[PATH_MAX];
   static int cmdid = 0;
   const char *statement =
-	  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from %s u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
+	  "SELECT COUNT( * ) FROM %s d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from %s u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
   char query[1024];
+  const char *dbuser_nm = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ? "db_user" : "_db_user";
 
   targetid = nv_get_val (in, "targetid");
   dbname = nv_get_val (in, "dbname");
   dbuser = nv_get_val (in, "dbuser");
   dbpasswd = nv_get_val (in, "dbpasswd");
 
-  snprintf (query, 1024, statement, CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ? "db_user" : "_db_user");
+  snprintf (query, 1024, statement, dbuser_nm, dbuser_nm);
 
   if (dbname == NULL)
     {
