@@ -365,10 +365,7 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
 {
   int retval = ERR_NO_ERROR;
 
-  /*
-   * All users of version 11.5 or higher can access the _db_user table,
-   * while versions lower than that can access the db_user table.
-   */
+  /* every user can access db_user view. */
   const char *sql_stat = "select 1 from db_root";
 
   if (dbname == NULL)
@@ -10116,17 +10113,12 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   int isdba = 0;
   char outfile[PATH_MAX];
   static int cmdid = 0;
-  const char *statement =
-	  "SELECT COUNT( * ) FROM %s d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from %s u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
-  char query[1024];
-  const char *dbuser_nm = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ? "db_user" : "_db_user";
+  const char *statement ="SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
 
   targetid = nv_get_val (in, "targetid");
   dbname = nv_get_val (in, "dbname");
   dbuser = nv_get_val (in, "dbuser");
   dbpasswd = nv_get_val (in, "dbpasswd");
-
-  snprintf (query, 1024, statement, dbuser_nm, dbuser_nm);
 
   if (dbname == NULL)
     {
@@ -10146,7 +10138,7 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   snprintf (outfile, sizeof (outfile) - 1, "%s/tmp/DBMT_user_login.%d",
 	    sco.szCubrid, cmdid++);
   errcode =
-	  run_csql_statement (query, dbname, dbuser, dbpasswd, outfile, _dbmt_error);
+	  run_csql_statement (statement, dbname, dbuser, dbpasswd, outfile, _dbmt_error);
   if (errcode != ERR_NO_ERROR)
     {
       return errcode;
