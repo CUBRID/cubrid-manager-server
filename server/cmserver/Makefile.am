@@ -58,10 +58,9 @@ cub_manager_SOURCES = \
         $(DBMT_DIR)/cm_http_server.cpp \
         $(DBMT_DIR)/cm_server_extend_interface.cpp \
         $(DBMT_DIR)/cm_server_interface.cpp \
-        $(DBMT_DIR)/cm_cci_interface.cpp \
 		$(DBMT_DIR)/cm_server_autoupdate.cpp
 cub_manager_CPPFLAGS = $(AM_CFLAGS) -DFSERVER_SLAVE -DJSON_SUPPORT -DEVENT__HAVE_OPENSSL -D_FILE_OFFSET_BITS=64 @EXTERNAL_INC@
-cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt -lcascci
+cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt
 
 install-exec-hook:
 	$(RM) $(prefix)/conf/cm_ssl_cert.key $(prefix)/conf/cm_ssl_cert.crt
