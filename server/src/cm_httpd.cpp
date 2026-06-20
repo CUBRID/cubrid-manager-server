@@ -62,7 +62,6 @@
 #include "cm_config.h"
 #include "cm_autojob.h"
 #include "cm_auto_task.h"
-#include "cm_cci_interface.h"
 #include "cm_server_interface.h"
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
@@ -271,23 +270,17 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
 
   cub_add_private_param (req, root);
 
-  if (!strcmp ((char *) arg, "cci"))
+  if (strcmp ((char *) arg, "cm_api") != 0)
     {
-      cub_cci_request_handler (root, response);
-    }
-  else if (!strcmp ((char *) arg, "cm_api"))
-    {
-      cub_cm_request_handler (root, response);
+      free (body);
+      return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
     }
 
-  //outustr = utf8_encode(writer.write(response).c_str());
-  //printf("---------------------\n%s\n", outustr);
+  cub_cm_request_handler (root, response);
   evb = evbuffer_new ();
   if (NULL == evb)
     {
       free (body);
-      //utf8_clean(inustr);
-      //utf8_clean(outustr);
       return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
     }
 
@@ -301,8 +294,6 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
   evhttp_send_reply (req, HTTP_OK, "OK", evb);
   evbuffer_free (evb);
   free (body);
-  //utf8_clean(inustr);
-  //utf8_clean(outustr);
 
   return;
 }
@@ -549,8 +540,6 @@ start_service ()
           evhttp_set_timeout (start_ctx[i]->httpd, DEFAULT_HTTP_TIMEOUT);
           /* This is the magic that lets evhttp use SSL. */
           evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
-          evhttp_set_cb (start_ctx[i]->httpd, "/cci",
-                         cub_generic_request_handler, (void *) "cci");
           evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
           evhttp_set_cb (start_ctx[i]->httpd, "/ctrl", cub_ctrl_request_handler, NULL);
           evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
