@@ -5369,7 +5369,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (exit_status != 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", WEXITSTATUS (exit_status));
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", (exit_status));
       return ERR_WITH_MSG;
     }
 
