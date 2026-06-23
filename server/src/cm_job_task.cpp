@@ -371,7 +371,7 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
 {
   int retval = ERR_NO_ERROR;
 
-  /* every user can access db_user table. */
+  /* every user can access db_user view. */
   const char *sql_stat = "select 1 from db_root";
 
   if (dbname == NULL)
@@ -10171,8 +10171,9 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   int isdba = 0;
   char outfile[PATH_MAX];
   static int cmdid = 0;
-  const char *statement =
-	  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
+  const char *statement = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ?
+	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;" :
+	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
 
   targetid = nv_get_val (in, "targetid");
   dbname = nv_get_val (in, "dbname");
