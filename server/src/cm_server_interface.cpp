@@ -564,9 +564,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 {
   int err = 0;
   pthread_t async_thrd;
-#if defined(AIX)
-  pthread_attr_t thread_attr;
-#endif
   pthread_cond_t cond;
   pthread_mutex_t mutex;
   timespec to;
@@ -601,46 +598,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->mutex = &mutex;
   pstmt->cond = &cond;
 
-#if defined(AIX)
-  err = pthread_attr_init (&thread_attr);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread attribute.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_attr_setdetachstate (&thread_attr, PTHREAD_CREATE_DETACHED);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread detach state.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  /* AIX's pthread is slightly different from other systems.
-  Its performance highly depends on the pthread's scope and it's related
-  kernel parameters. */
-  err = pthread_attr_setscope (&thread_attr, PTHREAD_SCOPE_PROCESS);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread scope.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_attr_setstacksize (&thread_attr, AIX_STACKSIZE_PER_THREAD);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread stack size.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_create (&async_thrd, &thread_attr, cm_async_request_handler, pstmt);
-#else /* except AIX */
   err = pthread_create (&async_thrd, NULL, cm_async_request_handler, pstmt);
-#endif
 
   if (err != 0)
     {
