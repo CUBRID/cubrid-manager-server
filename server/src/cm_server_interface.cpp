@@ -462,9 +462,10 @@ class async_request
     Json::Value request;
     Json::Value response;
     int status;
+    int is_timeout;
 #ifndef WINDOWS
-    pthread_mutex_t *mutex;
-    pthread_cond_t *cond;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
 #endif
 };
 
@@ -504,9 +505,19 @@ cm_async_request_handler (void *lpArg)
   nv_destroy (cli_response);
 
 #ifndef WINDOWS
-  pthread_mutex_lock (async_param->mutex);
-  pthread_cond_broadcast (async_param->cond);
-  pthread_mutex_unlock (async_param->mutex);
+  pthread_mutex_lock (&async_param->mutex);
+  if (async_param->is_timeout)
+    {
+      pthread_mutex_destroy (&async_param->mutex);
+      pthread_cond_destroy (&async_param->cond);
+      pthread_mutex_unlock(&async_param->mutex);
+      delete async_param;
+
+      return NULL;
+    }
+
+  pthread_cond_broadcast (&async_param->cond);
+  pthread_mutex_unlock (&async_param->mutex);
 #endif
 
   return NULL;
@@ -564,17 +575,16 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 {
   int err = 0;
   pthread_t async_thrd;
-  pthread_cond_t cond;
-  pthread_mutex_t mutex;
   timespec to;
   static unsigned int req_id = 0;
-  async_request *pstmt = (async_request *) new (async_request);
+  async_request *pstmt = new async_request ();
+
   if (pstmt == NULL)
     {
       return ERR_MEM_ALLOC;
     }
 
-  err = pthread_mutex_init (&mutex, NULL);
+  err = pthread_mutex_init (&pstmt->mutex, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
@@ -582,7 +592,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
                                   "failed to run task.");
     }
 
-  err = pthread_cond_init (&cond, NULL);
+  err = pthread_cond_init (&pstmt->cond, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
@@ -592,29 +602,29 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->is_timeout = 0;
 
   pstmt->uuid = req_id++;
 
-  pstmt->mutex = &mutex;
-  pstmt->cond = &cond;
+  response["uuid"] = pstmt->uuid;
+  build_server_header (response, ERR_WITH_MSG, "timeout");
 
   err = pthread_create (&async_thrd, NULL, cm_async_request_handler, pstmt);
 
   if (err != 0)
     {
+      pthread_mutex_destroy (&pstmt->mutex);
+      pthread_cond_destroy (&pstmt->cond);
       delete (pstmt);
-      pthread_mutex_destroy (&mutex);
-      pthread_cond_destroy (&cond);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
-  pthread_mutex_lock (&mutex);
+  pthread_mutex_lock (&pstmt->mutex);
   to.tv_sec = time (NULL) + time_out;
   to.tv_nsec = 0;
-  err = pthread_cond_timedwait (&cond, &mutex, &to);
-//  err = pthread_cond_wait (&cond, &mutex);
-  pthread_mutex_unlock (&mutex);
+  err = pthread_cond_timedwait (&pstmt->cond, &pstmt->mutex, &to);
+
   if (err == ETIMEDOUT)
     {
       string dbname, task_name;
@@ -622,16 +632,21 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       task_name = request.get ("task", "unknown").asString();
       dbname = request.get ("dbname", "").asString();
 
-      response["uuid"] = pstmt->uuid;
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
 		time_out, task_name.c_str(), dbname.c_str ());
-      return build_server_header (response, ERR_WITH_MSG, "timeout");
+
+      pstmt->is_timeout = 1;
+      pthread_mutex_unlock (&pstmt->mutex);
+      pthread_detach (async_thrd);
+
+      return ERR_WITH_MSG;
     }
 
+  pthread_mutex_unlock (&pstmt->mutex);
   pthread_join (async_thrd, NULL);
 
-  pthread_mutex_destroy (&mutex);
-  pthread_cond_destroy (&cond);
+  pthread_mutex_destroy (&pstmt->mutex);
+  pthread_cond_destroy (&pstmt->cond);
   response = pstmt->response;
   delete (pstmt);
   return ERR_NO_ERROR;
