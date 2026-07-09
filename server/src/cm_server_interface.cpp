@@ -508,9 +508,9 @@ cm_async_request_handler (void *lpArg)
   pthread_mutex_lock (&async_param->mutex);
   if (async_param->is_timeout)
     {
-      pthread_mutex_destroy (&async_param->mutex);
+      pthread_mutex_unlock (&async_param->mutex);
       pthread_cond_destroy (&async_param->cond);
-      pthread_mutex_unlock(&async_param->mutex);
+      pthread_mutex_destroy (&async_param->mutex);
       delete async_param;
 
       return NULL;
