@@ -87,6 +87,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
 };
 
 static int num_word (string str);
+static int is_positive_number (const char *str);
 
 static bool
 ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
@@ -1418,10 +1419,10 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       if (conf_item[6].c_str()[0] == 'i')
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
-	  string interval = conf_iterm[6];
+	  string interval = conf_item[6];
 
 	  interval.erase (0, 1);
-	  if (atoi(interval.c_str()) <= 0)
+	  if (is_positive_number (interval.c_str()))
 	    {
 	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", conf_item[6].c_str());
 	      tmp_file.close();
@@ -2742,4 +2743,26 @@ static int num_word (string str)
     }
 
   return count;
+}
+
+static int is_positive_number (const char *str)
+{
+  int len, i;
+
+  if (str == NULL)
+    {
+      return 0;
+    }
+
+  len = strlen (str);
+
+  for (i = 0; i < len; i++)
+    {
+      if (!isdigit (str[i]))
+	{
+	  return 0;
+	}
+    }
+
+  return 1;
 }
