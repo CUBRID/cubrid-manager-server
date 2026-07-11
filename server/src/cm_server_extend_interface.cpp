@@ -1418,9 +1418,10 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       if (conf_item[6].c_str()[0] == 'i')
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
-	  int interval = atoi (conf_item[6].c_str()[1]);
+	  string interval = conf_iterm[6];
 
-	  if (interval <= 0)
+	  interval.erase (0, 1);
+	  if (atoi(interval.c_str()) <= 0)
 	    {
 	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", conf_item[6].c_str());
 	      tmp_file.close();
