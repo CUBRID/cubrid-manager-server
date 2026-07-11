@@ -1415,6 +1415,19 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
           return build_server_header (response, ERR_WITH_MSG, tmp);
 	}
 
+      if (conf_item[6].c_str()[0] == 'i')
+	{
+          char tmp[DBMT_ERROR_MSG_SIZE];
+	  int interval = atoi (conf_item[6].c_str()[1]);
+
+	  if (interval <= 0)
+	    {
+	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", conf_item[6].c_str());
+	      tmp_file.close();
+	      return build_server_header (response, ERR_WITH_MSG, tmp);
+	    }
+	}
+
       // get sql script, checking its length
       sql_script = queryplan[index]["query_string"].asString();
       if (sql_script.length() == 0 || sql_script.length() > MAX_AUTOQUERY_SCRIPT_SIZE)
