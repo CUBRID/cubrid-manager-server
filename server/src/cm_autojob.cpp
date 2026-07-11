@@ -49,6 +49,7 @@
 #include "cm_cmd_exec.h"
 #include "cm_text_encryption.h"
 #include "cm_stat.h"
+#include "cm_log.h"
 
 #ifdef _DEBUG_
 #include "deb.h"
@@ -57,7 +58,12 @@
 
 #define MIN_AUTOBACKUPDB_DELAY         600
 #define MAX_AUTOADD_FREE_SPACE_RATE    0.5
+#define MAX_LOG_LINE                   10
 
+/*
+ * To prevent repetitive logging
+ */
+static int log_cnt = 0;
 
 typedef struct backup_period_details_t
 {
@@ -164,7 +170,7 @@ typedef enum
 static void aj_load_execquery_conf (ajob *p_aj);
 static void aj_execquery_handler (void *hd, time_t prev_check_time,
                                   time_t cur_time);
-static void aj_execquery_get_exec_time (autoexecquery_node *c,
+static int aj_execquery_get_exec_time (autoexecquery_node *c,
                                         query_period_details *d,
                                         struct tm *exec_tm,
                                         time_t prev_check_time);
@@ -1094,7 +1100,11 @@ aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
 
       while (detail1 != NULL)
         {
-          aj_execquery_get_exec_time (c, detail1, &exec_tm, prev_check_time);
+          if (aj_execquery_get_exec_time (c, detail1, &exec_tm, prev_check_time) == 0)
+	    {
+              detail1 = detail1->next;
+              continue;
+	    }
 
           // backup tm_wday, since mktime can change tm_wday field.
           tm_wday = exec_tm.tm_wday;
@@ -1121,11 +1131,13 @@ aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
   return;
 }
 
-static void
+static int
 aj_execquery_get_exec_time (autoexecquery_node *c,
                             query_period_details *d,
                             struct tm *exec_tm, time_t prev_check_time)
 {
+  int ret = -1;
+
   switch (c->period)
     {
     case AEQT_ONE:
@@ -1177,18 +1189,26 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
 
   if ('i' == c->detail2[0])    // time interval for auto execute query
     {
-      int interval;
+      int interval = 0;
       time_t prev_day_sec = 0;
       struct tm prev_tm, *tm_p;
 
       tm_p = localtime (&prev_check_time);
       if (tm_p == NULL)
         {
-          return;
+          return 0;
         }
       prev_tm = *tm_p;
 
-      sscanf (c->detail2, "i%d", &interval);
+      ret = sscanf (c->detail2, "i%d", &interval);
+      if (ret <= 0)
+	{
+	  if (log_cnt++ < MAX_LOG_LINE)
+	    {
+	      LOG_ERROR ("invalid interval (aj_execquery_get_exec_time): %s", c->detail2);
+	    }
+	  return 0;
+	}
 
       prev_day_sec =
         prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
@@ -1207,9 +1227,20 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
     }
   else                // specific time for auto execute query
     {
-      sscanf (c->detail2, "%d:%d", & (exec_tm->tm_hour), & (exec_tm->tm_min));
+      exec_tm->tm_hour = exec_tm->tm_min = -1;
+      ret = sscanf (c->detail2, "%d:%d", & (exec_tm->tm_hour), & (exec_tm->tm_min));
+      if (ret == 0 || exec_tm->tm_hour < 0 || exec_tm->tm_min < 0)
+	{
+	  if (log_cnt++ < MAX_LOG_LINE)
+	    {
+	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time): %s", c->detail2);
+	    }
+	}
+      return 0;
     }
   exec_tm->tm_sec = 0;
+
+  return 1;
 }
 
 static void
