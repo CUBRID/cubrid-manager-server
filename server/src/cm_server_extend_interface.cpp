@@ -75,7 +75,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"automail", 0, ext_exec_auto_mail, AU_DBC | AU_DBO | AU_MON},
   {"readprivatedata", 0, ext_read_private_data, ALL_AUTHORITY},
   {"writeprivatedata", 0, ext_write_private_data, AU_DBC | AU_DBO | AU_BRK},
-  {"setautoexecquery", 0, ext_set_autoexec_query, AU_DBC | AU_DBO | AU_JOB},
+  {"setautoexecquery", 0, ext_set_autoexec_query, FSVR_SA_CS | AU_DBC | AU_DBO | AU_JOB},
   {"gethaapplyinfo", 0, ext_get_ha_apply_info, ALL_AUTHORITY},
   {"adddbmtuser_new", 0, ext_add_dbmt_user_new, AU_DBC},
   {"updatedbmtuser_new", 0, ext_update_dbmt_user_new, AU_DBC | AU_DBO},
