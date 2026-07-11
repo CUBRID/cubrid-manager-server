@@ -378,7 +378,6 @@ int tsGetAutoaddvolLog (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_triggerinfo (nvplist *req, nvplist *res, char *_dbmt_error);
-int ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_diagdata (nvplist *req, nvplist *res, char *diag_error);
 int ts_get_broker_diagdata (nvplist *req, nvplist *res, char *diag_error);

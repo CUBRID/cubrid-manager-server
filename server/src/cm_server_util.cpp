@@ -183,10 +183,6 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"droptrigger", TS_DROPTRIGGER, 1, DEF_TASK_FUNC (ts_trigger_operation), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"gettriggerinfo", TS_GETTRIGGERINFO, 0, DEF_TASK_FUNC (ts_get_triggerinfo), FSVR_SA_CS, ALL_AUTHORITY},
   {"getautoexecquery", TS_GETAUTOEXECQUERY, 0, DEF_TASK_FUNC (ts_get_autoexec_query), FSVR_SA_CS, ALL_AUTHORITY},
-  {
-    "setautoexecquery", TS_SETAUTOEXECQUERY, 1, DEF_TASK_FUNC (ts_set_autoexec_query),
-    FSVR_SA_CS, AU_DBC | AU_DBO | AU_JOB
-  },
   {"getdiagdata", TS_GET_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_diagdata), FSVR_NONE, ALL_AUTHORITY},
   {"getbrokerdiagdata", TS_GET_BROKER_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_broker_diagdata), FSVR_NONE, ALL_AUTHORITY},
   {
