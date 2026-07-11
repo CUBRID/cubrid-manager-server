@@ -1229,14 +1229,15 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
     {
       exec_tm->tm_hour = exec_tm->tm_min = -1;
       ret = sscanf (c->detail2, "%d:%d", & (exec_tm->tm_hour), & (exec_tm->tm_min));
-      if (ret == 0 || exec_tm->tm_hour < 0 || exec_tm->tm_min < 0)
+      if (ret != 2 || exec_tm->tm_hour < 0 || exec_tm->tm_hour > 23
+	  || exec_tm->tm_min < 0 || exec_tm->tm_min > 59)
 	{
 	  if (log_cnt++ < MAX_LOG_LINE)
 	    {
 	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time): %s", c->detail2);
 	    }
+	  return 0;
 	}
-      return 0;
     }
   exec_tm->tm_sec = 0;
 
