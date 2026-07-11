@@ -1407,7 +1407,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // details of period
       conf_item[6] = queryplan[index]["detail"].asString();
 
-      if (num_word (conf_item[6]) < 2)
+      if (num_word (conf_item[6]) < 2 && conf_item[6].c_str()[0] != 'i')
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
           snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail AUTO_QUERY_TIMEi (at least 2 words expected): %s", conf_item[6].c_str());
