@@ -1422,7 +1422,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 	  string interval = conf_item[6];
 
 	  interval.erase (0, 1);
-	  if (is_positive_number (interval.c_str()))
+	  if (!is_positive_number (interval.c_str()))
 	    {
 	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", conf_item[6].c_str());
 	      tmp_file.close();
@@ -2749,7 +2749,7 @@ static int is_positive_number (const char *str)
 {
   int len, i;
 
-  if (str == NULL)
+  if (str == NULL || atoi (str) == 0)
     {
       return 0;
     }
