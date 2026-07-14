@@ -63,8 +63,6 @@
 /*
  * To prevent repetitive logging
  */
-static int log_cnt = 0;
-
 typedef struct backup_period_details_t
 {
   int date;
@@ -140,6 +138,8 @@ typedef struct autoexecquery_t
   char detail2[16];
   char query_string[MAX_AUTOQUERY_SCRIPT_SIZE];
   int db_mode;
+  int line_num;
+  int log_cnt;
   struct autoexecquery_t *next;
 } autoexecquery_node;
 
@@ -977,6 +977,7 @@ aj_load_execquery_conf (ajob *p_aj)
   char *conf_item[AUTOEXECQUERY_CONF_ENTRY_NUM];
   char buf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   autoexecquery_node *c;
+  int line_num = 0;
 
   p_aj->is_on = 0;
 
@@ -1009,6 +1010,7 @@ aj_load_execquery_conf (ajob *p_aj)
 
   while (fgets (buf, sizeof (buf), infile))
     {
+      line_num++;
       ut_trim (buf);
       if (buf[0] == '#' || buf[0] == '\0')
         {
@@ -1070,6 +1072,8 @@ aj_load_execquery_conf (ajob *p_aj)
       snprintf (c->query_string, sizeof (c->query_string) - 1, "%s",
                 conf_item[8]);
       c->db_mode = 2;
+      c->line_num = line_num;
+      c->log_cnt = 0;
       c->next = NULL;
     }                /* end of while */
   fclose (infile);
@@ -1203,9 +1207,10 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
       ret = sscanf (c->detail2, "i%d", &interval);
       if (ret != 1 || interval <= 0)
 	{
-	  if (log_cnt++ < MAX_LOG_LINE)
+	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {
-	      LOG_ERROR ("invalid interval (aj_execquery_get_exec_time): %s", c->detail2);
+	      LOG_ERROR ("invalid interval (aj_execquery_get_exec_time DB = %s): LINE = %d, detail2 = %s, query = %s",
+			 c->dbname, c->line_num, c->detail2, c->query_string);
 	    }
 	  return 0;
 	}
@@ -1232,9 +1237,10 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
       if (ret != 2 || exec_tm->tm_hour < 0 || exec_tm->tm_hour > 23
 	  || exec_tm->tm_min < 0 || exec_tm->tm_min > 59)
 	{
-	  if (log_cnt++ < MAX_LOG_LINE)
+	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {
-	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time): %s", c->detail2);
+	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time DB = %s): LINE = %d, detail2 = %s, query = %s",
+			 c->dbname, c->line_num, c->detail2, c->query_string);
 	    }
 	  return 0;
 	}
