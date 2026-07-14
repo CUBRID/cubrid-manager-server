@@ -3767,3 +3767,26 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 
   return 0;
 }
+
+int
+is_positive_number (const char *str)
+{
+  int len, i;
+
+  if (str == NULL || atoi (str) == 0)
+    {
+      return 0;
+    }
+
+  len = strlen (str);
+
+  for (i = 0; i < len; i++)
+    {
+      if (!isdigit (str[i]))
+	{
+	  return 0;
+	}
+    }
+
+  return 1;
+}

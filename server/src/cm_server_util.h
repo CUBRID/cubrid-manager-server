@@ -173,6 +173,8 @@ int read_from_socket (SOCKET fd, char *buf, int size);
 int write_to_socket (SOCKET fd, const char *buf, int size);
 int is_cmserver_process (int pid, const char *module_name);
 int make_default_env (void);
+int is_positive_number (const char *str);
+
 #if defined(WINDOWS)
 void remove_end_of_dir_ch (char *path);
 #endif

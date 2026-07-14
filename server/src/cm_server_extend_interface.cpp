@@ -87,7 +87,6 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
 };
 
 static int num_word (string str);
-static int is_positive_number (const char *str);
 
 static bool
 ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
@@ -1408,7 +1407,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // details of period
       conf_item[6] = queryplan[index]["detail"].asString();
 
-      if (num_word (conf_item[6]) < 2 && conf_item[6].c_str()[0] != 'i')
+      if (num_word (conf_item[6]) < 2)
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
           snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail AUTO_QUERY_TIME (at least 2 words expected): %s", conf_item[6].c_str());
@@ -2743,26 +2742,4 @@ static int num_word (string str)
     }
 
   return count;
-}
-
-static int is_positive_number (const char *str)
-{
-  int len, i;
-
-  if (str == NULL || atoi (str) == 0)
-    {
-      return 0;
-    }
-
-  len = strlen (str);
-
-  for (i = 0; i < len; i++)
-    {
-      if (!isdigit (str[i]))
-	{
-	  return 0;
-	}
-    }
-
-  return 1;
 }

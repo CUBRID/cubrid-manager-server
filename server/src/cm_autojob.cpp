@@ -1205,12 +1205,12 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
       prev_tm = *tm_p;
 
       ret = sscanf (c->detail2, "i%d", &interval);
-      if (ret != 1 || interval <= 0)
+      if (ret != 1 || interval <= 0 || !is_positive_number (c->detail2))
 	{
 	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {
-	      LOG_ERROR ("invalid interval (aj_execquery_get_exec_time DB = %s): LINE = %d, detail2 = %s, query = %s",
-			 c->dbname, c->line_num, c->detail2, c->query_string);
+	      LOG_ERROR ("invalid interval (aj_execquery_get_exec_time DB = %s): QID (%s) #%d, detail2 = %s",
+			 c->dbname, c->query_id, c->line_num, c->detail2);
 	    }
 	  return 0;
 	}
@@ -1239,8 +1239,8 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
 	{
 	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {
-	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time DB = %s): LINE = %d, detail2 = %s, query = %s",
-			 c->dbname, c->line_num, c->detail2, c->query_string);
+	      LOG_ERROR ("invalid time spec (aj_execquery_get_exec_time DB = %s): QID (%s) #%d, detail2 = %s",
+			 c->dbname, c->query_id, c->line_num, c->detail2);
 	    }
 	  return 0;
 	}
