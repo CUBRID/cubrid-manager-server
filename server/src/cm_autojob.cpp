@@ -1232,9 +1232,11 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
     }
   else                // specific time for auto execute query
     {
+      int matched_len = 0;
       exec_tm->tm_hour = exec_tm->tm_min = -1;
-      ret = sscanf (c->detail2, "%d:%d", & (exec_tm->tm_hour), & (exec_tm->tm_min));
-      if (ret != 2 || exec_tm->tm_hour < 0 || exec_tm->tm_hour > 23
+      ret = sscanf (c->detail2, "%d:%d%n", & (exec_tm->tm_hour), & (exec_tm->tm_min), &matched_len);
+      if (ret != 2 || c->detail2[matched_len] != '\0'
+	  || exec_tm->tm_hour < 0 || exec_tm->tm_hour > 23
 	  || exec_tm->tm_min < 0 || exec_tm->tm_min > 59)
 	{
 	  if (c->log_cnt++ < MAX_LOG_LINE)
