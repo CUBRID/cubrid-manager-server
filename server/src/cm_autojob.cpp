@@ -1205,7 +1205,7 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
       prev_tm = *tm_p;
 
       ret = sscanf (c->detail2, "i%d", &interval);
-      if (ret != 1 || interval <= 0 || !is_positive_number (c->detail2))
+      if (ret != 1 || interval <= 0 || !is_positive_number (&c->detail2[1]))
 	{
 	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {
