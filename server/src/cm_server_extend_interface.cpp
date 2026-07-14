@@ -86,6 +86,8 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {NULL, 0, NULL, 0}
 };
 
+static int num_word (string str);
+
 static bool
 ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
 {
@@ -1405,6 +1407,14 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // details of period
       conf_item[6] = queryplan[index]["detail"].asString();
 
+      if (num_word (conf_item[6]) < 2)
+	{
+          char tmp[DBMT_ERROR_MSG_SIZE];
+          snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail AUTO_QUERY_TIME (at least 2 words expected): %s", conf_item[6].c_str());
+          tmp_file.close();
+          return build_server_header (response, ERR_WITH_MSG, tmp);
+	}
+
       if (conf_item[6].c_str()[0] == 'i')
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
@@ -2718,4 +2728,18 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &response)
     {
       return build_server_header (response, ERR_WITH_MSG, errmsg.c_str());
     }
+}
+
+static int num_word (string str)
+{
+  stringstream ss(str);
+  string word;
+  int count = 0;
+
+  while (ss >> word)
+    {
+      count++;
+    }
+
+  return count;
 }
