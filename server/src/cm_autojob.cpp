@@ -1193,7 +1193,7 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
 
   if ('i' == c->detail2[0])    // time interval for auto execute query
     {
-      int interval = 0;
+      int interval = is_positive_number (&c->detail2[1]);
       time_t prev_day_sec = 0;
       struct tm prev_tm, *tm_p;
 
@@ -1204,8 +1204,7 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
         }
       prev_tm = *tm_p;
 
-      ret = sscanf (c->detail2, "i%d", &interval);
-      if (ret != 1 || interval <= 0 || !is_positive_number (&c->detail2[1]))
+      if (interval == 0)
 	{
 	  if (c->log_cnt++ < MAX_LOG_LINE)
 	    {

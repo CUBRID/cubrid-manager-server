@@ -3781,10 +3781,10 @@ is_positive_number (const char *str)
 
   errno = 0;
   num = strtol (str, &endptr, 10);
-  if (errno == ERANGE || (endptr != NULL && strlen (endptr) > 0) || num <= 0)
+  if (errno == ERANGE || (endptr != NULL && strlen (endptr) > 0) || num <= 0 || num > INT_MAX)
     {
       return 0;
     }
 
-  return 1;
+  return (int) num;
 }
