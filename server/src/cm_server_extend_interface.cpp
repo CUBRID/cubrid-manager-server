@@ -86,7 +86,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {NULL, 0, NULL, 0}
 };
 
-static int num_word (string str);
+static int count_and_get_last_word (string str, char *word);
 
 static bool
 ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
@@ -1269,6 +1269,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   string conf_item[AUTOEXECQUERY_CONF_ENTRY_NUM];
   fstream conf_file;
   ofstream tmp_file;
+  char interval[TOKEN_LENGTH];
 
 
   autoexecquery_conf_file[0] = '\0';
@@ -1407,23 +1408,21 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // details of period
       conf_item[6] = queryplan[index]["detail"].asString();
 
-      if (num_word (conf_item[6]) < 2)
+      if (count_and_get_last_word (conf_item[6], interval) != 2)
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
-          snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail AUTO_QUERY_TIME (at least 2 words expected): %s", conf_item[6].c_str());
+          snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail: %s", conf_item[6].c_str());
           tmp_file.close();
           return build_server_header (response, ERR_WITH_MSG, tmp);
 	}
 
-      if (conf_item[6].c_str()[0] == 'i')
+      if (interval[0] == 'i')
 	{
           char tmp[DBMT_ERROR_MSG_SIZE];
-	  string interval = conf_item[6];
 
-	  interval.erase (0, 1);
-	  if (!is_positive_number (interval.c_str()))
+	  if (!is_positive_number (&interval[1]))
 	    {
-	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", conf_item[6].c_str());
+	      snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid interval: %s", interval);
 	      tmp_file.close();
 	      return build_server_header (response, ERR_WITH_MSG, tmp);
 	    }
@@ -2730,10 +2729,9 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &response)
     }
 }
 
-static int num_word (string str)
+static int count_and_get_last_word (string str, char *word)
 {
   stringstream ss(str);
-  string word;
   int count = 0;
 
   while (ss >> word)
