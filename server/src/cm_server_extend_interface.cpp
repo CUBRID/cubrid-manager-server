@@ -2732,12 +2732,21 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &response)
 static int count_and_get_last_word (string str, char *word)
 {
   stringstream ss(str);
+  string token;
   int count = 0;
 
-  while (ss >> word)
+  while (ss >> token)
     {
       count++;
     }
+
+  if (token.length () >= TOKEN_LENGTH)
+    {
+      word[0] = '\0';
+      return -1;
+    }
+
+  snprintf (word, TOKEN_LENGTH, "%s", token.c_str ());
 
   return count;
 }
