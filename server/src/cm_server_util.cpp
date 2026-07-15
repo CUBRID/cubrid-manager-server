@@ -3779,6 +3779,7 @@ is_positive_number (const char *str)
       return 0;
     }
 
+  errno = 0;
   num = strtol (str, &endptr, 10);
   if (errno == ERANGE || (endptr != NULL && strlen (endptr) > 0) || num <= 0)
     {
