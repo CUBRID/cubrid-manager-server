@@ -3771,21 +3771,18 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 int
 is_positive_number (const char *str)
 {
-  int len, i;
+  char *endptr;
+  long num;
 
-  if (str == NULL || atoi (str) == 0)
+  if (str == NULL)
     {
       return 0;
     }
 
-  len = strlen (str);
-
-  for (i = 0; i < len; i++)
+  num = strtol (str, &endptr, 10);
+  if (errno == ERANGE || (endptr != NULL && strlen (endptr) > 0) || num <= 0)
     {
-      if (!isdigit (str[i]))
-	{
-	  return 0;
-	}
+      return 0;
     }
 
   return 1;
