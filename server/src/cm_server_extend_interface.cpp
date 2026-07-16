@@ -1556,6 +1556,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
 
   if ((retval=_read_apply_info_cmd_output (stdout_log_file, stderr_log_file, str_result)) != ERR_NO_ERROR)
     {
+      unlink (stdout_log_file);
+      unlink (stderr_log_file);
       return build_server_header (response, retval, "Invalid options or command format!");
     }
 
@@ -1574,6 +1576,9 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
 
   response["copied_active_eof_lsa"] = copied_active_eof_lsa;
   response["active_eof_lsa"] = active_eof_lsa;
+
+  unlink (stdout_log_file);
+  unlink (stderr_log_file);
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
