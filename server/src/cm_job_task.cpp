@@ -81,6 +81,10 @@
 
 #include <list>
 #include <string>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
 #include<assert.h>
 
@@ -361,6 +365,8 @@ static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
 static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
 static int expand_path (const char *src, char *dst, int dest_len);
+
+static int is_ha_updates_disabled (char *dbname, char *_dbmt_error);
 
 static char *allowed_env[]=
 {
@@ -4424,10 +4430,12 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char out_file[PATH_MAX];
   char err_file[PATH_MAX];
+  char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
 
   const char *argv[10];
   T_DB_SERVICE_MODE db_mode;
 
+  int ha_mode = 0;
   int exit_code = 0;
   int argc = 0;
   int retval = ERR_NO_ERROR;
@@ -4459,7 +4467,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = uDatabaseMode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4484,7 +4492,16 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = "--" COMPACT_SA_MODE_L;
     }
 
-  argv[argc++] = dbname;
+  if (ha_mode)
+    {
+      if (is_ha_updates_disabled (dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+    }
+
+  snprintf (dbname_at_hostname, sizeof (dbname_at_hostname), "%s%s", dbname, ha_mode ? "@127.0.0.1" : "");
+  argv[argc++] = dbname_at_hostname;
   argv[argc++] = NULL;
 
   if (createtmpfile != 0)
@@ -16842,4 +16859,69 @@ expand_path (const char *src, char *dst, int dest_len)
     }
 
   return 0;
+}
+
+#define	NUM_WORDS_EXPECTED 6
+#define	MSG_HA_MASTER_AND_ACTIVE "registered_and_active)"
+
+static int
+is_ha_updates_disabled (char *dbname, char *_dbmt_error)
+{
+  char outfile[PATH_MAX];
+  char cmd_name[PATH_MAX];
+  char *argv [4];
+  int argc = 0;
+
+  sprintf (cmd_name, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, "cubrid");
+  make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
+
+  argv[argc++] = cmd_name;
+  argv[argc++] = "heartbeat";
+  argv[argc++] = "status";
+  argv[argc++] = NULL;
+
+  unsetenv ("CUBRID_ERROR_LOG");
+
+  if (run_child (argv, 1, NULL, outfile, NULL, NULL) < 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "command failed: cubrid heartbeat status");
+      unlink (outfile);
+      return 1;
+    }
+
+  ifstream file (outfile);
+  if (!file.is_open ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot open temporary file: %s", outfile);
+      unlink (outfile);
+      return 1;
+    }
+
+  string line;
+
+  while (getline (file, line))
+    {
+      stringstream ss (line);
+      string word;
+      vector <string> words;
+
+	while (ss >> word)
+	  {
+	    words.push_back (word);
+	  }
+
+	if (words.size () == NUM_WORDS_EXPECTED && words[0] == "Server" && words[1] == dbname
+	    && words[5] == MSG_HA_MASTER_AND_ACTIVE)
+	  {
+	    file.close ();
+	    unlink (outfile);
+	    return 0;
+	  }
+    }
+
+  file.close ();
+  unlink (outfile);
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "update the database are disabled: %s", dbname);
+
+  return 1;
 }
