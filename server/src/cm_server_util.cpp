@@ -3747,7 +3747,8 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 }
 
 #if defined (WINDOWS)
-bool delete_directory (const std::string& rawPath)
+static bool
+delete_directory (const std::string& rawPath)
 {
   char abs_path[MAX_PATH + 1];
   if (GetFullPathNameA(rawPath.c_str(), MAX_PATH, abs_path, NULL) == 0)
