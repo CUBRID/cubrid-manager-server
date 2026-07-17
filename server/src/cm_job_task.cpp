@@ -16919,7 +16919,7 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
 
   file.close ();
   unlink (outfile);
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "update the database are disabled: %s", dbname);
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "database updates are disabled: %s", dbname);
 
   return 1;
 }
