@@ -16873,7 +16873,7 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
   int argc = 0;
   int exit_code = 0;
 
-  sprintf (cmd_name, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, "cubrid");
+  snprintf (cmd_name, sizeof (cmd_name), "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, "cubrid");
   make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
 
   argv[argc++] = cmd_name;
