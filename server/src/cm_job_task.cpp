@@ -16911,18 +16911,18 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
       string word;
       vector <string> words;
 
-	while (ss >> word)
-	  {
-	    words.push_back (word);
-	  }
+      while (ss >> word)
+        {
+          words.push_back (word);
+        }
 
-	if (words.size () == NUM_WORDS_EXPECTED && words[0] == "Server" && words[1] == dbname
-	    && words[5] == MSG_HA_MASTER_AND_ACTIVE)
-	  {
-	    file.close ();
-	    unlink (outfile);
-	    return 0;
-	  }
+      if (words.size () == NUM_WORDS_EXPECTED && words[0] == "Server" && words[1] == dbname
+	  && words[5] == MSG_HA_MASTER_AND_ACTIVE)
+	{
+	  file.close ();
+	  unlink (outfile);
+	  return 0;
+	}
     }
 
   file.close ();
