@@ -3768,7 +3768,7 @@ bool delete_directory (const std::string& rawPath)
     file_op.hwnd = NULL;
     file_op.wFunc = FO_DELETE;
     file_op.pFrom = abs_path;
-    file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
+    file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
 
     int result = SHFileOperationA(&file_op);
 
