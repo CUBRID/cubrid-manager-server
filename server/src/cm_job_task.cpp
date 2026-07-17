@@ -16871,6 +16871,7 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
   char cmd_name[PATH_MAX];
   char *argv [4];
   int argc = 0;
+  int exit_code = 0;
 
   sprintf (cmd_name, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, "cubrid");
   make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
@@ -16880,9 +16881,16 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
   argv[argc++] = "status";
   argv[argc++] = NULL;
 
-  if (run_child (argv, 1, NULL, outfile, NULL, NULL) < 0)
+  if (run_child (argv, 1, NULL, outfile, NULL, &exit_code) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "command failed: cubrid heartbeat status");
+      unlink (outfile);
+      return 1;
+    }
+
+  if (exit_code != 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "HA heartbeat daemon is not running");
       unlink (outfile);
       return 1;
     }
