@@ -3743,36 +3743,34 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 #if defined (WINDOWS)
 bool delete_directory (const std::string& rawPath)
 {
-  TCHAR abs_path[MAX_PATH];
-
+  char abs_path[MAX_PATH];
   if (GetFullPathNameA(rawPath.c_str(), MAX_PATH, abs_path, NULL) == 0)
     {
       return false;
     }
-
   std::string path (abs_path);
-
   for (size_t i = 0; i < path.length(); ++i)
     {
-      if (abs_path[i] == '/')
+      if (path[i] == '/')
 	{
 	  path[i] = '\\';
 	}
     }
 
-    _tcscpy (abs_path, path.c_str ());
-    abs_path [_tcslen (abs_path) + 1 ] = _T ('\0');
+  strncpy (abs_path, path.c_str (), MAX_PATH - 1);
+  abs_path[path.length()] = '\0';
+  abs_path[path.length() + 1] = '\0';
 
-    SHFILEOPSTRUCTA file_op = { 0 };
+  SHFILEOPSTRUCTA file_op = { 0 };
 
-    file_op.hwnd = NULL;
-    file_op.wFunc = FO_DELETE;
-    file_op.pFrom = abs_path;
-    file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
+  file_op.hwnd = NULL;
+  file_op.wFunc = FO_DELETE;
+  file_op.pFrom = abs_path;
+  file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
 
-    int result = SHFileOperationA(&file_op);
+  int result = SHFileOperationA(&file_op);
 
-    return (result == 0);
+  return (result == 0);
 }
 #else
 static bool
