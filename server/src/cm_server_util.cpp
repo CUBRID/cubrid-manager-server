@@ -1185,7 +1185,7 @@ uRemoveLockFile (int outfd)
 int
 uRemoveDir (char *dir, int remove_file_in_dir)
 {
-  return delete_directory (dir) ? 1 : 0;
+  return delete_directory (dir) ? ERR_NO_ERROR  : ERR_DIR_REMOVE_FAIL;
 }
 
 #if defined(WINDOWS)
