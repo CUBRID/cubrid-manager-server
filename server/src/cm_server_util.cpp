@@ -3799,7 +3799,11 @@ delete_directory (const std::string& path)
       std::string fullPath = path + "/" + name;
       struct stat statbuf;
 
+#if defined (WINDOWS)
       if (stat(fullPath.c_str(), &statbuf) == 0)
+#else
+      if (lstat(fullPath.c_str(), &statbuf) == 0)
+#endif
 	{
 	  if (S_ISDIR(statbuf.st_mode))
 	    {
