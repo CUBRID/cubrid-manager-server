@@ -16880,8 +16880,6 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
   argv[argc++] = "status";
   argv[argc++] = NULL;
 
-  unsetenv ("CUBRID_ERROR_LOG");
-
   if (run_child (argv, 1, NULL, outfile, NULL, NULL) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "command failed: cubrid heartbeat status");
