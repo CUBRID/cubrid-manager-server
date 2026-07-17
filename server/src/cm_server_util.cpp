@@ -30,6 +30,9 @@
 #include <fcntl.h>
 #include <ctype.h>            /* isalpha()        */
 
+#include <iostream>
+#include <string>
+
 #if defined(WINDOWS)
 #include <process.h>
 #include <winsock2.h>
@@ -38,6 +41,9 @@
 #include <Tlhelp32.h>
 #include <sys/timeb.h>
 #include <winternl.h>
+#include <windows.h>
+#include <shellapi.h>
+#include <tchar.h>
 #else
 #include <sys/types.h>        /* umask()          */
 #include <sys/stat.h>         /* umask(), stat()  */
@@ -286,6 +292,7 @@ static int _ip_equal_hostent (struct hostent *hp, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool is_process_running (const char *process_name, unsigned int sleep_time);
+static bool delete_directory (const std::string& path);
 
 /**
 * is_process_running is to check process running or not by checking pid
@@ -323,94 +330,6 @@ is_process_running (const char *process_name, unsigned int sleep_time)
 
   return true;
 }
-
-#if !defined(WINDOWS)
-int
-run_child_linux (const char *pname, const char *const argv[], int wait_flag,
-                 const char *stdin_file, char *stdout_file, char *stderr_file,
-                 int *exit_status)
-{
-  int pid = 0;
-
-  if (exit_status != NULL)
-    {
-      *exit_status = 0;
-    }
-
-  if (wait_flag)
-    {
-      signal (SIGCHLD, SIG_DFL);
-    }
-  else
-    {
-      signal (SIGCHLD, SIG_IGN);
-    }
-
-  pid = fork ();
-  if (pid == 0)
-    {
-      FILE *fp = NULL;
-
-      close_all_fds (3);
-
-      if (stdin_file != NULL)
-        {
-          fp = fopen (stdin_file, "r");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 0);
-              fclose (fp);
-            }
-        }
-
-      if (stdout_file != NULL)
-        {
-          unlink (stdout_file);
-          fp = fopen (stdout_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 1);
-              fclose (fp);
-            }
-        }
-
-
-      if (stderr_file != NULL)
-        {
-          unlink (stderr_file);
-          fp = fopen (stderr_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 2);
-              fclose (fp);
-            }
-        }
-
-      execv (pname, (char *const *) argv);
-      exit (0);
-    }
-
-  if (pid < 0)
-    {
-      return -1;
-    }
-
-  if (wait_flag)
-    {
-      int status = 0;
-      waitpid (pid, &status, 0);
-      if (exit_status != NULL)
-        {
-          *exit_status = status;
-        }
-      return 0;
-    }
-  else
-    {
-      return pid;
-    }
-}
-#endif
 
 int
 _op_check_is_localhost (char *token, char *hname)
@@ -1266,42 +1185,7 @@ uRemoveLockFile (int outfd)
 int
 uRemoveDir (char *dir, int remove_file_in_dir)
 {
-  char path[1024];
-  char command[2048];
-
-  if (dir == NULL)
-    {
-      return ERR_DIR_REMOVE_FAIL;
-    }
-
-  strcpy (path, dir);
-  memset (command, '\0', sizeof (command));
-  ut_trim (path);
-
-#if defined(WINDOWS)
-  unix_style_path (path);
-#endif
-
-  if (access (path, F_OK) == 0)
-    {
-      if (remove_file_in_dir == REMOVE_DIR_FORCED)
-        {
-          sprintf (command, "%s %s \"%s\"", DEL_DIR, DEL_DIR_OPT, path);
-          if (system (command) == -1)
-            {
-              return ERR_DIR_REMOVE_FAIL;
-            }
-        }
-      else
-        {
-          if (rmdir (path) == -1)
-            {
-              return ERR_DIR_REMOVE_FAIL;
-            }
-        }
-    }
-
-  return ERR_NO_ERROR;
+  return delete_directory (dir) ? 1 : 0;
 }
 
 #if defined(WINDOWS)
@@ -3855,3 +3739,88 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 
   return 0;
 }
+
+#if defined (WINDOWS)
+bool delete_directory (const std::string& rawPath)
+{
+  TCHAR abs_path[MAX_PATH];
+
+  if (GetFullPathNameA(rawPath.c_str(), MAX_PATH, abs_path, NULL) == 0)
+    {
+      return false;
+    }
+
+  std::string path (abs_path);
+
+  for (size_t i = 0; i < path.length(); ++i)
+    {
+      if (abs_path[i] == '/')
+	{
+	  path[i] = '\\';
+	}
+    }
+
+    _tcscpy (abs_path, path.c_str ());
+    abs_path [_tcslen (abs_path) + 1 ] = _T ('\0');
+
+    SHFILEOPSTRUCTA file_op = { 0 };
+
+    file_op.hwnd = NULL;
+    file_op.wFunc = FO_DELETE;
+    file_op.pFrom = abs_path;
+    file_op.fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
+
+    int result = SHFileOperationA(&file_op);
+
+    return (result == 0);
+}
+#else
+static bool
+delete_directory (const std::string& path)
+{
+  DIR* dir = opendir(path.c_str());
+  if (!dir) return false;
+
+  struct dirent* entry;
+  bool success = true;
+
+  while ((entry = readdir(dir)) != nullptr)
+    {
+      std::string name = entry->d_name;
+      if (name == "." || name == "..")
+	{
+	  continue;
+	}
+
+      std::string fullPath = path + "/" + name;
+      struct stat statbuf;
+
+      if (stat(fullPath.c_str(), &statbuf) == 0)
+	{
+	  if (S_ISDIR(statbuf.st_mode))
+	    {
+	      if (!delete_directory (fullPath))
+		{
+		  success = false;
+		}
+            }
+	  else
+	    {
+	      if (unlink(fullPath.c_str()) != 0)
+		{
+		  success = false;
+		}
+	    }
+	}
+    }
+
+  closedir(dir);
+
+  if (success && rmdir(path.c_str()) == 0)
+    {
+      return true;
+    }
+
+  return false;
+}
+#endif
