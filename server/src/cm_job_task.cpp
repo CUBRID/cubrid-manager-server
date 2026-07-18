@@ -9839,6 +9839,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
   char filename[PATH_MAX];
   char cubrid_tmp_path[PATH_MAX];
   char *fullpath_with_filename = NULL;
+  int ret = 0;
 
   const char *casrunnertmp_short[] =
   { "log_converted", "cas_log_tmp", "log_run" };
@@ -9896,14 +9897,12 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
     }
 
 #if defined(WINDOWS)
-  snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-	    DEL_FILE_OPT, fullpath_with_filename);
+  ret = _unlink (fullpath_with_filename);
 #else
-  snprintf (command, sizeof (command), "%s %s %s", DEL_DIR, DEL_DIR_OPT,
-	    fullpath_with_filename);
+  ret = unlink (fullpath_with_filename);
 #endif
 
-  if (system (command) == -1)
+  if (ret != 0)
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
 		fullpath_with_filename);
@@ -15505,6 +15504,10 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
   pid_t pid = 0;
 #endif
 
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "We do not support autoupdate anymore");
+  return ERR_WITH_MSG;
+
+#if 0
   patch_name = nv_get_val (req, "patch_name");
   if (patch_name == NULL)
     {
@@ -15557,6 +15560,7 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
 
   return ERR_NO_ERROR;
+#endif
 }
 
 int
