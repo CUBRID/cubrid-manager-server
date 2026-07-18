@@ -3873,7 +3873,7 @@ is_valid_filename (char *str)
       return false;
     }
 
-  string input = str;
+  std::string input = str;
   size_t i = 0;
   size_t len = input.length();
 
