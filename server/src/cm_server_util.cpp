@@ -3967,6 +3967,11 @@ attempt_to_access_parent_dir (char *path)
 
   std::string filename = path;
 
+  if (filename.empty ())
+    {
+      return false;
+    }
+
   if (filename.front() == '/' || filename.front() == '\\')
     {
       return true;
