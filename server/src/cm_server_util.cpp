@@ -3757,10 +3757,11 @@ static bool
 delete_directory (const std::string& rawPath)
 {
   char abs_path[MAX_PATH + 1];
-  if (GetFullPathNameA(rawPath.c_str(), MAX_PATH, abs_path, NULL) == 0)
+  if (GetFullPathNameA (rawPath.c_str (), MAX_PATH, abs_path, NULL) == 0)
     {
       return false;
     }
+
   std::string path (abs_path);
   for (size_t i = 0; i < path.length(); ++i)
     {
@@ -3771,8 +3772,8 @@ delete_directory (const std::string& rawPath)
     }
 
   strncpy (abs_path, path.c_str (), MAX_PATH - 1);
-  abs_path[path.length()] = '\0';
-  abs_path[path.length() + 1] = '\0';
+  abs_path[path.length ()] = '\0';
+  abs_path[path.length () + 1] = '\0';
 
   SHFILEOPSTRUCTA file_op = { 0 };
 
@@ -3781,7 +3782,7 @@ delete_directory (const std::string& rawPath)
   file_op.pFrom = abs_path;
   file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
 
-  int result = SHFileOperationA(&file_op);
+  int result = SHFileOperationA (&file_op);
 
   return (result == 0);
 }
@@ -3789,13 +3790,13 @@ delete_directory (const std::string& rawPath)
 static bool
 delete_directory (const std::string& path)
 {
-  DIR* dir = opendir(path.c_str());
+  DIR* dir = opendir (path.c_str ());
   if (!dir) return false;
 
   struct dirent* entry;
   bool success = true;
 
-  while ((entry = readdir(dir)) != nullptr)
+  while ((entry = readdir (dir)) != nullptr)
     {
       std::string name = entry->d_name;
       if (name == "." || name == "..")
@@ -3807,12 +3808,12 @@ delete_directory (const std::string& path)
       struct stat statbuf;
 
 #if defined (WINDOWS)
-      if (stat(fullPath.c_str(), &statbuf) == 0)
+      if (stat (fullPath.c_str (), &statbuf) == 0)
 #else
-      if (lstat(fullPath.c_str(), &statbuf) == 0)
+      if (lstat (fullPath.c_str (), &statbuf) == 0)
 #endif
 	{
-	  if (S_ISDIR(statbuf.st_mode))
+	  if (S_ISDIR (statbuf.st_mode))
 	    {
 	      if (!delete_directory (fullPath))
 		{
@@ -3821,7 +3822,7 @@ delete_directory (const std::string& path)
             }
 	  else
 	    {
-	      if (unlink(fullPath.c_str()) != 0)
+	      if (unlink (fullPath.c_str ()) != 0)
 		{
 		  success = false;
 		}
@@ -3829,9 +3830,9 @@ delete_directory (const std::string& path)
 	}
     }
 
-  closedir(dir);
+  closedir (dir);
 
-  if (success && rmdir(path.c_str()) == 0)
+  if (success && rmdir (path.c_str ()) == 0)
     {
       return true;
     }
@@ -3841,13 +3842,13 @@ delete_directory (const std::string& path)
 #endif
 
 bool
-isValidEnvChar(char c)
+isValidEnvChar (char c)
 {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '_');
 }
 
 bool
-isEnvVarAllowed(const std::string& var_name)
+isEnvVarAllowed (const std::string& var_name)
 {
   for (size_t i = 0; i < ALLOWED_ENV_VARS_COUNT; ++i)
     {
@@ -3875,9 +3876,9 @@ is_valid_filename (char *str)
 
   std::string input = str;
   size_t i = 0;
-  size_t len = input.length();
+  size_t len = input.length ();
 
-  if (input.find_first_of(FORBIDDEN_CHARS) != std::string::npos)
+  if (input.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
     {
       return false;
     }
@@ -3890,12 +3891,12 @@ is_valid_filename (char *str)
 	  size_t next_percent = input.find('%', i + 1);
 	  if (next_percent != std::string::npos && next_percent > i + 1)
 	    {
-	      std::string var_name = input.substr(i + 1, next_percent - i - 1);
+	      std::string var_name = input.substr (i + 1, next_percent - i - 1);
 
 	      bool valid_chars = true;
-	      for (size_t k = 0; k < var_name.length(); ++k)
+	      for (size_t k = 0; k < var_name.length (); ++k)
 		{
-		  if (!isValidEnvChar(var_name[k]))
+		  if (!isValidEnvChar (var_name[k]))
 		    {
 		      valid_chars = false;
 		      break;
@@ -3904,7 +3905,7 @@ is_valid_filename (char *str)
 
 	      if (valid_chars)
 		{
-		  if (!isEnvVarAllowed(var_name))
+		  if (!isEnvVarAllowed (var_name))
 		    {
 		      return false;
                     }
@@ -3922,7 +3923,7 @@ is_valid_filename (char *str)
 
 	  if (input[i + 1] == '{')
 	    {
-	      size_t close_bracket = input.find('}', i + 2);
+	      size_t close_bracket = input.find ('}', i + 2);
 	      if (close_bracket != std::string::npos && close_bracket > i + 2)
 		{
 		  var_name = input.substr(i + 2, close_bracket - i - 2);
@@ -3932,7 +3933,7 @@ is_valid_filename (char *str)
 	  else
 	    {
 	      size_t j = i + 1;
-	      while (j < len && isValidEnvChar(input[j]))
+	      while (j < len && isValidEnvChar (input[j]))
 		{
 		  var_name += input[j];
 		  j++;
@@ -3940,9 +3941,9 @@ is_valid_filename (char *str)
 	      token_len = j - i;
 	    }
 
-            if (!var_name.empty())
+            if (!var_name.empty ())
 	      {
-		if (!isEnvVarAllowed(var_name))
+		if (!isEnvVarAllowed (var_name))
 		  {
 		    return false;
 		  }
@@ -3972,17 +3973,17 @@ attempt_to_access_parent_dir (char *path)
       return false;
     }
 
-  if (filename.front() == '/' || filename.front() == '\\')
+  if (filename.front () == '/' || filename.front () == '\\')
     {
       return true;
     }
 
-  if (filename.length() >= 2 && filename[1] == ':' && std::isalpha(static_cast<unsigned char>(filename[0])))
+  if (filename.length () >= 2 && filename[1] == ':' && std::isalpha (static_cast <unsigned char> (filename[0])))
     {
       return true;
     }
 
-  if (filename.find("..") != std::string::npos)
+  if (filename.find ("..") != std::string::npos)
     {
       return true;
     }
