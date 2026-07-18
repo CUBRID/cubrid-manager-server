@@ -3868,14 +3868,14 @@ is_invalid_filename (char *str)
 bool
 is_valid_filename (char *str)
 {
-  string input = str;
-  size_t i = 0;
-  size_t len = input.length();
-
   if (str == NULL)
     {
       return true;
     }
+
+  string input = str;
+  size_t i = 0;
+  size_t len = input.length();
 
   if (input.find_first_of(FORBIDDEN_CHARS) != std::string::npos)
     {
