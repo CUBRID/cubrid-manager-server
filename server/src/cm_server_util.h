@@ -218,6 +218,7 @@ void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 bool is_valid_filename (char *str);
 bool is_invalid_filename (char *str);
+bool attempt_to_access_parent_dir (char *path);
 
 
 

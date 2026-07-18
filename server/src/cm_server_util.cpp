@@ -3956,3 +3956,31 @@ is_valid_filename (char *str)
 
     return true;
 }
+
+bool
+attempt_to_access_parent_dir (char *path)
+{
+  if (path == NULL)
+    {
+      return false;
+    }
+
+  std::string filename = path;
+
+  if (filename.front() == '/' || filename.front() == '\\')
+    {
+      return true;
+    }
+
+  if (filename.length() >= 2 && filename[1] == ':' && std::isalpha(static_cast<unsigned char>(filename[0])))
+    {
+      return true;
+    }
+
+  if (filename.find("..") != std::string::npos)
+    {
+      return true;
+    }
+
+  return false;
+}
