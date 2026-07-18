@@ -3870,7 +3870,7 @@ is_valid_filename (char *str)
 {
   if (str == NULL)
     {
-      return true;
+      return false;
     }
 
   string input = str;
