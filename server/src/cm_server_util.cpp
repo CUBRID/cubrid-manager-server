@@ -32,6 +32,8 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
+#include <algorithm>
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -293,6 +295,10 @@ static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool is_process_running (const char *process_name, unsigned int sleep_time);
 static bool delete_directory (const std::string& path);
+
+const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
+const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
+const std::string FORBIDDEN_CHARS = "&(|)>< \n\r;";
 
 /**
 * is_process_running is to check process running or not by checking pid
@@ -3833,3 +3839,120 @@ delete_directory (const std::string& path)
   return false;
 }
 #endif
+
+bool
+isValidEnvChar(char c)
+{
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '_');
+}
+
+bool
+isEnvVarAllowed(const std::string& var_name)
+{
+  for (size_t i = 0; i < ALLOWED_ENV_VARS_COUNT; ++i)
+    {
+      if (ALLOWED_ENV_VARS[i] == var_name)
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool
+is_invalid_filename (char *str)
+{
+  return is_valid_filename (str) ? false : true;
+}
+
+bool
+is_valid_filename (char *str)
+{
+  string input = str;
+  size_t i = 0;
+  size_t len = input.length();
+
+  if (str == NULL)
+    {
+      return true;
+    }
+
+  if (input.find_first_of(FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  while (i < len)
+    {
+#if defined(_WIN32) || defined(_WIN64)
+      if (input[i] == '%')
+	{
+	  size_t next_percent = input.find('%', i + 1);
+	  if (next_percent != std::string::npos && next_percent > i + 1)
+	    {
+	      std::string var_name = input.substr(i + 1, next_percent - i - 1);
+
+	      bool valid_chars = true;
+	      for (size_t k = 0; k < var_name.length(); ++k)
+		{
+		  if (!isValidEnvChar(var_name[k]))
+		    {
+		      valid_chars = false;
+		      break;
+		    }
+		}
+
+	      if (valid_chars)
+		{
+		  if (!isEnvVarAllowed(var_name))
+		    {
+		      return false;
+                    }
+
+		  i = next_percent + 1; // Skip past the closing '%'
+		  continue;
+                }
+	    }
+	}
+#else
+      if (input[i] == '$' && i + 1 < len)
+	{
+	  std::string var_name = "";
+	  size_t token_len = 0;
+
+	  if (input[i + 1] == '{')
+	    {
+	      size_t close_bracket = input.find('}', i + 2);
+	      if (close_bracket != std::string::npos && close_bracket > i + 2)
+		{
+		  var_name = input.substr(i + 2, close_bracket - i - 2);
+		  token_len = close_bracket - i + 1;
+		}
+	    }
+	  else
+	    {
+	      size_t j = i + 1;
+	      while (j < len && isValidEnvChar(input[j]))
+		{
+		  var_name += input[j];
+		  j++;
+		}
+	      token_len = j - i;
+	    }
+
+            if (!var_name.empty())
+	      {
+		if (!isEnvVarAllowed(var_name))
+		  {
+		    return false;
+		  }
+		i += token_len;
+		continue;
+	      }
+	}
+#endif
+      i++;
+    }
+
+    return true;
+}
