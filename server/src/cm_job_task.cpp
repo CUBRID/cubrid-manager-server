@@ -2534,6 +2534,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       retval = uCreateDir (genvolpath);
       if (retval != ERR_NO_ERROR)
 	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", genvolpath);
 	  return retval;
 	}
       else
@@ -2547,6 +2548,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       retval = uCreateDir (logvolpath);
       if (retval != ERR_NO_ERROR)
 	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", logvolpath);
 	  return retval;
 	}
       else
@@ -2716,6 +2718,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      retval = uCreateDir (val[2]);
 	      if (retval != ERR_NO_ERROR)
 		{
+		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", val[2]);
 		  fclose (outfile);
 		  return retval;
 		}
@@ -3519,7 +3522,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (uCreateDir (volpath) != ERR_NO_ERROR)
 	{
-	  sprintf (_dbmt_error, "%s", volpath);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", volpath);
 	  return ERR_DIR_CREATE_FAIL;
 	}
     }
@@ -5495,6 +5498,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
 	  retval = uCreateDir (recovery_path);
 	  if (retval != ERR_NO_ERROR)
 	    {
+	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", recovery_path);
 	      return retval;
 	    }
 	}
