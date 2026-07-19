@@ -5312,6 +5312,10 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
+      if (is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
@@ -9859,7 +9863,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename (fullpath_with_filename) || attempt_to_access_parent_dir (fullpath_with_filename))
+  if (is_invalid_filename (fullpath_with_filename))
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "not allowed filename: %s", fullpath_with_filename);
       return ERR_WITH_MSG;

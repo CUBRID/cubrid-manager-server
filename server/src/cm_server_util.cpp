@@ -296,6 +296,7 @@ static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool is_process_running (const char *process_name, unsigned int sleep_time);
 static bool delete_directory (const std::string& path);
+static bool attempt_to_access_parent_dir (char *path);
 
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
@@ -3959,7 +3960,7 @@ is_valid_filename (char *str)
     return true;
 }
 
-bool
+static bool
 attempt_to_access_parent_dir (char *path)
 {
   if (path == NULL)
@@ -4022,9 +4023,10 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
 	  continue;
 	}
 
-      if (attempt_to_access_parent_dir ((char *) line.c_str ()))
+      if (is_invalid_filename ((char *) line.c_str ()) || attempt_to_access_parent_dir ((char *) line.c_str ()))
 	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "attempt to access file in parent path: %s", line.c_str ());
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid filename or attempt to access file in parent path: %s",
+		    line.c_str ());
 	  ret = true;
 	  break;
 	}
