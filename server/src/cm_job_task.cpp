@@ -2504,15 +2504,34 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       strcpy (_dbmt_error, "volumn path");
       return ERR_PARAM_MISSING;
     }
+  else
+    {
+      if (!is_authorized_filename (genvolpath))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "genvolpath is not allowed: %s", genvolpath);
+	  return ERR_WITH_MSG;;
+	}
+    }
 
   if ((retval = check_dbpath (genvolpath, _dbmt_error)) != ERR_NO_ERROR)
     {
       return retval;
     }
 
-  if (logvolpath != NULL && logvolpath[0] == '\0')
+  if (logvolpath != NULL)
     {
-      logvolpath = NULL;
+      if (logvolpath[0] == '\0')
+	{
+	  logvolpath = NULL;
+	}
+      else
+	{
+	  if (!is_authorized_filename (logvolpath))
+	    {
+	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "logvolpath is not allowed: %s", logvolpath);
+	      return ERR_WITH_MSG;;
+	    }
+	}
     }
 
   if (logvolpath != NULL
@@ -9864,8 +9883,9 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (fullpath_with_filename, diag_error))
+  if (is_invalid_filename (fullpath_with_filename) || is_subpath (sco.dbmt_tmp_dir, fullpath_with_filename))
     {
+      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "invalid filename or path not allowed: %s", fullpath_with_filename);
       return ERR_WITH_MSG;
     }
 
