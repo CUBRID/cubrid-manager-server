@@ -32,6 +32,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -4046,4 +4047,115 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
     }
 
   return ret;
+}
+
+std::vector<std::string> split_path (const std::string& path, char seperator)
+{
+  std::vector<std::string> tokens;
+  std::stringstream ss(path);
+  std::string token;
+
+  while (std::getline(ss, token, seperator))
+    {
+      if (!token.empty ())
+	{
+	  tokens.push_back (token);
+        }
+    }
+
+    return tokens;
+}
+
+std::string clean_path (const std::string& path, char seperator)
+{
+  std::vector<std::string> tokens = split_path (path, seperator);
+  std::vector<std::string> cleaned;
+
+  for (const auto& token : tokens)
+    {
+      if (token == ".")
+	{
+	  continue;
+        }
+
+      if (token == "..")
+        {
+	  if (!cleaned.empty ())
+	    {
+	      cleaned.pop_back ();
+	    }
+	  continue;
+        }
+
+      cleaned.push_back (token);
+    }
+
+  std::string result;
+  for (const auto& token : cleaned)
+    {
+      result += seperator + token;
+    }
+
+  return result.empty () ? std::string (1, seperator) : result;
+}
+
+bool
+is_subpath (const char *allowd_path, const char *path)
+{
+#if defined (WINDOWS)
+  char seperator = '\\';
+#else
+  char seperator = '/';
+#endif
+
+  if (allowd_path == NULL || path == NULL)
+    {
+      return false;
+    }
+ 
+  std::string allowed_dir = allowd_path;
+  std::string user_path = path;
+
+#if defined (WINDOWS)
+  std::replace (allowed_dir.begin (), allowed_dir.end (), '/', '\\');
+  std::replace (user_path.begin (), user_path.end (), '/', '\\');
+
+  std::transform (allowed_dir.begin (), allowed_dir.end (), allowed_dir.begin (), ::tolower);
+  std::transform (user_path.begin (), user_path.end (), user_path.begin (), ::tolower);
+#endif
+
+  std::string clean_allowed = clean_path (allowed_dir, seperator);
+  std::string clean_user = clean_path (user_path, seperator);
+
+  if (clean_allowed.back () != seperator)
+    {
+      clean_allowed += seperator;
+    }
+
+#if defined (WINDOWS)
+  if (clean_allowed.substr (0, 2) != clean_user.substr (0, 2))
+    {
+      return false;
+    }
+#endif
+
+  return clean_user.rfind (clean_allowed, 0) == 0;
+}
+
+bool
+is_authorized_filename (char *path, char *_dbmt_error)
+{
+  if (is_invalid_filename_with_msg (path, _dbmt_error))
+    {
+      return false;
+    }
+
+  if (is_subpath (sco.szCubrid, path))
+    {
+      return true;
+    }
+
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, path);
+
+  return false;
 }

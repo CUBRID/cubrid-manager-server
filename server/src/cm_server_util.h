@@ -220,8 +220,6 @@ bool is_valid_filename (char *filename);
 bool is_invalid_filename (char *filename);
 bool is_invalid_filename_with_msg (char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
-
-
-
-
+bool is_subpath (const char *allowd_path, const char *path);
+bool is_authorized_filename (char *path, char *_dbmt_error);
 #endif                /* _CM_SERVER_UTIL_H_ */
