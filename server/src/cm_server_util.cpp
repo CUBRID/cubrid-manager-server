@@ -3863,20 +3863,33 @@ isEnvVarAllowed (const std::string& var_name)
 }
 
 bool
-is_invalid_filename (char *str)
+is_invalid_filename (char *filename)
 {
-  return is_valid_filename (str) ? false : true;
+  return is_valid_filename (filename) ? false : true;
 }
 
 bool
-is_valid_filename (char *str)
+is_invalid_filename_with_msg (char *filename, char *dbmt_error)
 {
-  if (str == NULL)
+  bool ret = is_valid_filename (filename) ? false : true;
+
+  if (ret)
+    {
+      snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", filename);
+    }
+
+  return ret;
+}
+
+bool
+is_valid_filename (char *filename)
+{
+  if (filename == NULL)
     {
       return false;
     }
 
-  std::string input = str;
+  std::string input = filename;
   size_t i = 0;
   size_t len = input.length ();
 

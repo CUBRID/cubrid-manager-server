@@ -216,8 +216,9 @@ int run_child_linux (const char *pname, const char *const argv[], int wait_flag,
                      int *exit_status);
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
-bool is_valid_filename (char *str);
-bool is_invalid_filename (char *str);
+bool is_valid_filename (char *filename);
+bool is_invalid_filename (char *filename);
+bool is_invalid_filename_with_msg (char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 
 

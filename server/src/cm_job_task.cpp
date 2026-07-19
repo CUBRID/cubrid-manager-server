@@ -5312,7 +5312,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
+      if (is_invalid_filename_with_msg (schema_file_list, _dbmt_error) ||
+	  is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
