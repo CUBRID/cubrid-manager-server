@@ -31,6 +31,7 @@
 #include <ctype.h>            /* isalpha()        */
 
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <algorithm>
@@ -3989,4 +3990,45 @@ attempt_to_access_parent_dir (char *path)
     }
 
   return false;
+}
+
+bool
+is_invalid_schema_file_lists (char *path, char *_dbmt_error)
+{
+  if (path == NULL)
+    {
+      return false;
+    }
+
+  bool ret = false;
+  std::ifstream file (path);
+
+  if (!file.is_open ())
+    {
+      return false;
+    }
+
+  std::string line;
+
+  while (std::getline (file, line))
+    {
+      if (!line.empty () && line.back () == '\r')
+	{
+	  line.pop_back ();
+	}
+
+      if (line.empty ())
+	{
+	  continue;
+	}
+
+      if (attempt_to_access_parent_dir ((char *) line.c_str ()))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "attempt to access file in parent path: %s", line.c_str ());
+	  ret = true;
+	  break;
+	}
+    }
+
+  return ret;
 }
