@@ -5312,7 +5312,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (is_invalid_filename_with_msg (schema_file_list, _dbmt_error) ||
+      if (!is_authorized_filename (schema_file_list, _dbmt_error) ||
 	  is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
@@ -9864,24 +9864,9 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename (fullpath_with_filename))
+  if (!is_authorized_filename (fullpath_with_filename, diag_error))
     {
-      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "not allowed filename: %s", fullpath_with_filename);
       return ERR_WITH_MSG;
-    }
-
-  /* check permission : must under $CUBRID/tmp/ */
-#if defined(WINDOWS)
-  snprintf (cubrid_tmp_path, PATH_MAX, "%s\\", sco.dbmt_tmp_dir);
-#else
-  snprintf (cubrid_tmp_path, PATH_MAX, "%s/", sco.dbmt_tmp_dir);
-#endif
-
-  if (strstr (fullpath_with_filename, cubrid_tmp_path) == NULL)
-    {
-      snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
-		fullpath_with_filename);
-      return ERR_PERMISSION;
     }
 
   if (ut_get_filename (fullpath_with_filename, 1, filename) != 0)
