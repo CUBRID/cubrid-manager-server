@@ -301,7 +301,12 @@ static bool attempt_to_access_parent_dir (char *path);
 
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
-const std::string FORBIDDEN_CHARS = "&(|)>< \n\r;";
+
+#if defined (WINDOWS)
+const std::string FORBIDDEN_CHARS = "$&(|)><\n\r;";
+#else
+const std::string FORBIDDEN_CHARS = "%&(|)><\n\r;";
+#endif
 
 /**
 * is_process_running is to check process running or not by checking pid
