@@ -3876,7 +3876,7 @@ is_invalid_filename_with_msg (char *filename, char *dbmt_error)
 
   if (ret)
     {
-      snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", filename);
+      snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", filename ? filename : "(null)");
     }
 
   return ret;
