@@ -5500,11 +5500,6 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   partial = nv_get_val (req, "partial");
   recovery_path = nv_get_val (req, "recoverypath");
 
-  if (!is_authorized_filename (pathname, _dbmt_error) || !is_authorized_filename (recovery_path, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
-    }
-
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_RESTOREDB;
@@ -5517,6 +5512,10 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = lv;
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
+      if (!is_authorized_filename (pathname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" RESTORE_BACKUP_FILE_PATH_L;
       argv[argc++] = pathname;
     }
@@ -5528,6 +5527,11 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (recovery_path != NULL && !uStringEqual (recovery_path, "")
       && !uStringEqual (recovery_path, "none"))
     {
+      if (!is_authorized_filename (recovery_path, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+
       /* use -u option to specify restore database path */
       argv[argc++] = "--" RESTORE_USE_DATABASE_LOCATION_PATH_L;
 
