@@ -4173,6 +4173,11 @@ is_subpath (const char *allowd_path, const char *path)
   std::string allowed_dir = allowd_path;
   std::string user_path = path;
 
+  if (allowed_dir.empty ())
+    {
+      return false;
+    }
+
 #if defined (WINDOWS)
   std::replace (allowed_dir.begin (), allowed_dir.end (), '/', '\\');
   std::replace (user_path.begin (), user_path.end (), '/', '\\');
