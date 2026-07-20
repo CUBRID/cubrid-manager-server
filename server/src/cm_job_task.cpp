@@ -6813,6 +6813,11 @@ ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (!is_authorized_filename (filepath, _dbmt_error))
+    {
+      return ERR_WITH_MSG;;
+    }
+
   startline = nv_get_val (req, "start");
   endline = nv_get_val (req, "end");
 
