@@ -59,6 +59,8 @@
 #include <sys/statvfs.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <wordexp.h>
+#include <cstdlib>
 #if defined(LINUX)
 #include <sys/wait.h>
 #endif /* LINUX */
@@ -3881,7 +3883,24 @@ is_invalid_filename_with_msg (char *filename, char *dbmt_error)
 
   if (ret)
     {
-      snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", filename ? filename : "(null)");
+      if (filename == NULL)
+	{
+	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: (null)");
+	}
+      else
+	{
+	  string path = filename;
+
+	  /*
+	   * we want to change % to * in reply message, for example, %CUBRID% to *CUBRID*
+	   */
+
+	  if (!path.empty ())
+	    {
+	      std::replace (path.begin (), path.end (), '%', '*');
+	    }
+	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path.c_str ());
+	}
     }
 
   return ret;
@@ -4104,6 +4123,39 @@ std::string clean_path (const std::string& path, char seperator)
   return result.empty () ? std::string (1, seperator) : result;
 }
 
+std::string expand_env_path (const std::string& path)
+{
+#ifdef _WIN32
+  DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
+  if (bufferSize == 0)
+    {
+      return path;
+    }
+
+  std::string expanded (bufferSize, '\0');
+  ExpandEnvironmentStringsA (path.c_str (), &expanded[0], bufferSize);
+
+  expanded.erase (std::find (expanded.begin (), expanded.end (), '\0'), expanded.end ());
+  return expanded;
+#else
+  wordexp_t p;
+
+  if (wordexp (path.c_str (), &p, WRDE_NOCMD) != 0)
+    {
+      return path;
+    }
+
+  std::string expanded = "";
+  if (p.we_wordc > 0)
+    {
+      expanded = p.we_wordv[0];
+    }
+
+  wordfree (&p);
+  return expanded;
+#endif
+}
+
 bool
 is_subpath (const char *allowd_path, const char *path)
 {
@@ -4155,12 +4207,15 @@ is_authorized_filename (char *path, char *_dbmt_error)
       return false;
     }
 
-  if (is_subpath (sco.szCubrid, path))
+  string origin_path = path;
+  string expanded_path = expand_env_path (origin_path);
+  if (is_subpath (sco.szCubrid, expanded_path.c_str ()))
     {
       return true;
     }
 
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, path);
+  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, origin_path.c_str ());
 
   return false;
 }
