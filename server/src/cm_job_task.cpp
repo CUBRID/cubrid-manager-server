@@ -3135,6 +3135,11 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (exvolpath != NULL && !is_authorized_filename (exvolpath, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   db_mode = uDatabaseMode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
