@@ -4214,7 +4214,7 @@ is_authorized_filename (char *path, char *_dbmt_error)
 
   string origin_path = path;
   string expanded_path = expand_env_path (origin_path);
-  if (is_subpath (sco.szCubrid, expanded_path.c_str ()))
+  if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
     {
       return true;
     }
