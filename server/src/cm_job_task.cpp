@@ -5500,6 +5500,11 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   partial = nv_get_val (req, "partial");
   recovery_path = nv_get_val (req, "recoverypath");
 
+  if (!is_authorized_filename (pathname, _dbmt_error) || !is_authorized_filename (recovery_path, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
   argv[argc++] = UTIL_OPTION_RESTOREDB;
