@@ -3697,7 +3697,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (logpath, _dbmt_error) || !is_authorized_filename (destdbpath, _dbmt_error)
+  if (!is_authorized_filename (logpath, _dbmt_error) || !is_authorized_filename (destdbpath, _dbmt_error) ||
       !is_authorized_filename (exvolpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
