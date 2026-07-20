@@ -3540,6 +3540,11 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       volpath = db_dir;
     }
 
+  if (!is_authorized_filename (volpath, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   if (access (volpath, F_OK) < 0)
     {
       if (uCreateDir (volpath) != ERR_NO_ERROR)
