@@ -1181,11 +1181,18 @@ int ext_read_private_data (Json::Value &request, Json::Value &response)
   FILE *infile;
   string confname;
   char conf_path[PATH_MAX], strbuf[1024 * 200];
+  char _dbmt_error[DBMT_ERROR_MSG_SIZE];
 
   JSON_FIND_V (request, "confname",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
 
   confname= request["confname"].asString();
+
+  if (!is_authorized_filename (confname.c_str (), _dbmt_error))
+    {
+      return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
+    }
+
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
   infile = fopen (conf_path, "r");
