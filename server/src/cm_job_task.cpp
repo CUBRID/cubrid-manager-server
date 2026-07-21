@@ -11357,6 +11357,11 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   infile = nv_get_val (req, "infile");
+  if (infile != NULL && !is_authorized_filename (infile, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   command = nv_get_val (req, "command");
 
   uid = nv_get_val (req, "uid");
