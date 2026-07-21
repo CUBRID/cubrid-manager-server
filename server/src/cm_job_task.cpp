@@ -11295,6 +11295,11 @@ ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (!is_authorized_filename (src_dir, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   force_flag = REMOVE_DIR_FORCED;
 
   if (uRemoveDir (src_dir, force_flag) != ERR_NO_ERROR)
