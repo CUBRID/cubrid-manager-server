@@ -3889,7 +3889,7 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
 	}
       else
 	{
-	  string path = filename;
+	  std::string path = filename;
 
 	  /*
 	   * we want to change % to * in reply message, for example, %CUBRID% to *CUBRID*
@@ -4212,8 +4212,8 @@ is_authorized_filename (const char *path, char *_dbmt_error)
       return false;
     }
 
-  string origin_path = path;
-  string expanded_path = expand_env_path (origin_path);
+  std::string origin_path = path;
+  std::string expanded_path = expand_env_path (origin_path);
   if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
     {
       return true;
