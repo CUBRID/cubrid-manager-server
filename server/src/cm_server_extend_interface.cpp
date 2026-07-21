@@ -1535,6 +1535,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   const char *argv[9];
   char stdout_log_file[PATH_MAX];
   char stderr_log_file[PATH_MAX];
+  char dbmt_error[DBMT_ERROR_MSG_SIZE];
 
   int retval;
 
@@ -1551,6 +1552,11 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   copy_log_path = request["copylogpath"].asString();
+  if (!is_authorized_filename (copy_log_path.c_str (), _dbmt_error))
+    {
+      return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
+    }
+
   remote_host_name = request["remotehostname"].asString();
   dbname = request["dbname"].asString();
 
