@@ -299,7 +299,7 @@ static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool is_process_running (const char *process_name, unsigned int sleep_time);
 static bool delete_directory (const std::string& path);
-static bool attempt_to_access_parent_dir (char *path);
+static bool attempt_to_access_parent_dir (const char *path);
 
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
@@ -3871,13 +3871,13 @@ isEnvVarAllowed (const std::string& var_name)
 }
 
 bool
-is_invalid_filename (char *filename)
+is_invalid_filename (const char *filename)
 {
   return is_valid_filename (filename) ? false : true;
 }
 
 bool
-is_invalid_filename_with_msg (char *filename, char *dbmt_error)
+is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
 {
   bool ret = is_valid_filename (filename) ? false : true;
 
@@ -3907,7 +3907,7 @@ is_invalid_filename_with_msg (char *filename, char *dbmt_error)
 }
 
 bool
-is_valid_filename (char *filename)
+is_valid_filename (const char *filename)
 {
   if (filename == NULL)
     {
@@ -3999,7 +3999,7 @@ is_valid_filename (char *filename)
 }
 
 static bool
-attempt_to_access_parent_dir (char *path)
+attempt_to_access_parent_dir (const char *path)
 {
   if (path == NULL)
     {
@@ -4061,7 +4061,7 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
 	  continue;
 	}
 
-      if (is_invalid_filename ((char *) line.c_str ()) || attempt_to_access_parent_dir ((char *) line.c_str ()))
+      if (is_invalid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid filename or attempt to access file in parent path: %s",
 		    line.c_str ());
@@ -4205,7 +4205,7 @@ is_subpath (const char *allowd_path, const char *path)
 }
 
 bool
-is_authorized_filename (char *path, char *_dbmt_error)
+is_authorized_filename (const char *path, char *_dbmt_error)
 {
   if (is_invalid_filename_with_msg (path, _dbmt_error))
     {
