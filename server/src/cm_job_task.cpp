@@ -10246,6 +10246,11 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined(WINDOWS)
       path = nt_style_path (path, full_path_buf);
 #endif
+      if (!is_authorized_filename (path, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;;
+	}
+
       if (access (path, F_OK) != 0)
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "No such file: %s",
