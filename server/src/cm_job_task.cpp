@@ -11532,6 +11532,11 @@ ts_error_trace (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (!is_authorized_filename (err_log_path, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   if ((eid = nv_get_val (req, "eid")) == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "eid");
