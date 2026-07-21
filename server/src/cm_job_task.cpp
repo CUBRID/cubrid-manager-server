@@ -11268,6 +11268,11 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  if (!is_authorized_filename (src_dir, _dbmt_error) || !is_authorized_filename (dest_dir, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   if (folder_copy (src_dir, dest_dir) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE - 1,
