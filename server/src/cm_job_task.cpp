@@ -9999,6 +9999,11 @@ ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
+  if (!is_authorized_filename (filename, diag_error))
+    {
+      return ERR_WITH_MSG;;
+    }
+
   qindex = nv_get_val (cli_request, "qindex");
   if (qindex == NULL)
     {
