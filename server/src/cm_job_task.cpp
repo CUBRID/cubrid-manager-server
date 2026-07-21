@@ -9397,6 +9397,10 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
       nv_lookup (cli_request, sect + i, NULL, &logfile);
       if (logfile)
 	{
+	  if (!is_authorized_filename (logfile, diag_error))
+	    {
+	      return ERR_WITH_MSG;;
+	    }
 	  argv[arg_index++] = logfile;
 	}
     }
