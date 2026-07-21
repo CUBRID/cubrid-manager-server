@@ -2508,7 +2508,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (!is_authorized_filename (genvolpath, _dbmt_error))
 	{
-	  return ERR_WITH_MSG;;
+	  return ERR_WITH_MSG;
 	}
     }
 
@@ -6580,7 +6580,7 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
 	    {
-	      return ERR_WITH_MSG;;
+	      return ERR_WITH_MSG;
 	    }
 	}
     }
@@ -6838,7 +6838,7 @@ ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (!is_authorized_filename (filepath, _dbmt_error))
     {
-      return ERR_WITH_MSG;;
+      return ERR_WITH_MSG;
     }
 
   startline = nv_get_val (req, "start");
@@ -8226,7 +8226,7 @@ ts_check_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      if (!is_authorized_filename (v, _dbmt_error))
 		{
-		  return ERR_WITH_MSG;;
+		  return ERR_WITH_MSG;
 		}
 	    }
 
@@ -8254,7 +8254,7 @@ ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      if (!is_authorized_filename (v, _dbmt_error))
 		{
-		  return ERR_WITH_MSG;;
+		  return ERR_WITH_MSG;
 		}
 	    }
 
@@ -9399,7 +9399,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	{
 	  if (!is_authorized_filename (logfile, diag_error))
 	    {
-	      return ERR_WITH_MSG;;
+	      return ERR_WITH_MSG;
 	    }
 	  argv[arg_index++] = logfile;
 	}
@@ -10001,7 +10001,7 @@ ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
 
   if (!is_authorized_filename (filename, diag_error))
     {
-      return ERR_WITH_MSG;;
+      return ERR_WITH_MSG;
     }
 
   qindex = nv_get_val (cli_request, "qindex");
@@ -10248,7 +10248,7 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
       if (!is_authorized_filename (path, _dbmt_error))
 	{
-	  return ERR_WITH_MSG;;
+	  return ERR_WITH_MSG;
 	}
 
       if (access (path, F_OK) != 0)
