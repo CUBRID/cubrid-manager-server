@@ -1535,7 +1535,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   const char *argv[9];
   char stdout_log_file[PATH_MAX];
   char stderr_log_file[PATH_MAX];
-  char dbmt_error[DBMT_ERROR_MSG_SIZE];
+  char _dbmt_error[DBMT_ERROR_MSG_SIZE];
 
   int retval;
 
