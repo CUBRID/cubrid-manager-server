@@ -11618,6 +11618,12 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 		       "Please inform file names to be deleted.");
 	      return ERR_WITH_MSG;
 	    }
+
+	  if (!is_authorized_filename (path, _dbmt_error))
+	    {
+	      return ERR_WITH_MSG;
+	    }
+
 	  path_len = (int) strlen (path);
 	  if (path_len <= 2 || strstr (path, "..") || strstr (path, "/")
 	      || strstr (path, "\\"))
