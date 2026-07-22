@@ -4500,7 +4500,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
-  snprintf (dbname_at_hostname, sizeof (dbname_at_hostname), "%s%s", dbname, ha_mode ? "@127.0.0.1" : "");
+  snprintf (dbname_at_hostname, sizeof (dbname_at_hostname), "%s%s", dbname, ha_mode ? "@localhost" : "");
   argv[argc++] = dbname_at_hostname;
   argv[argc++] = NULL;
 
