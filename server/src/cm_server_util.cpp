@@ -31,6 +31,7 @@
 #include <ctype.h>            /* isalpha()        */
 
 #include <iostream>
+#include <cctype>
 #include <fstream>
 #include <sstream>
 #include <string>
