@@ -1161,7 +1161,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
 
   confname= request["confname"].asString();
 
-  if (!is_authorized_filename (confname.c_str (), _dbmt_error))
+  if (is_invalid_filename_with_msg (confname.c_str (), _dbmt_error))
     {
       return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
     }
