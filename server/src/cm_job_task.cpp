@@ -10260,32 +10260,11 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_WITH_MSG;
 	}
 
-      snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-		DEL_FILE_OPT, path);
-
-      output = popen (command, "r");
-      memset (buf, '\0', sizeof (buf));
-      if (output != NULL)
+      if (UNLINK (path) != 0)
 	{
-	  if (fgets (buf, PATH_MAX, output) != NULL)
-	    {
-#if defined(WINDOWS)
-	      pclose (output);
-	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove %s",
-			full_path_buf);
-	      return ERR_WITH_MSG;
-#endif
-	      if (get_broker_info_from_filename (path, broker_name, &as_id) < 0
-		  || cm_del_cas_log (broker_name, as_id, &error) < 0)
-		{
-		  pclose (output);
-		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
-			    error.err_msg);
-		  return ERR_WITH_MSG;
-		}
-	    }
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove: %s", full_path_buf);
+	  return ERR_WITH_MSG;
 	}
-      pclose (output);
     }                /* end of for */
 
   return ERR_NO_ERROR;
