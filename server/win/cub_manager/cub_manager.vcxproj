@@ -167,7 +167,7 @@
       <AdditionalIncludeDirectories>..\..\win;..\..\src;$(cubrid_includedir);..\..\external\openssl\win_64\include;..\..\external\libevent\include;..\..\external\jsoncpp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN;WIN32;WINDOWS;_WIN64;NDEBUG;_CRT_SECURE_NO_WARNINGS;DIAG_DEVEL;FSERVER_SLAVE;JSON_SUPPORT;EVENT__HAVE_OPENSSL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <PrecompiledHeader />
       <WarningLevel>Level3</WarningLevel>
