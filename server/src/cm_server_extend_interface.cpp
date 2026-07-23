@@ -1165,7 +1165,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
     {
       if (attempt_to_access_parent_dir (confname.c_str ()))
 	{
-	  snprintf (_dbmt_error, "filename type is not allowed: %s", confname.c_str ());
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename type is not allowed: %s", confname.c_str ());
 	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
 	}
 
