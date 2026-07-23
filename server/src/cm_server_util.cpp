@@ -306,9 +306,9 @@ const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
 
 #if defined (WINDOWS)
-const std::string FORBIDDEN_CHARS = " \t$&(|)><\n\r*;";
+const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;";
 #else
-const std::string FORBIDDEN_CHARS = " \t%&(|)><\n\r;*";
+const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*";
 #endif
 
 /**
