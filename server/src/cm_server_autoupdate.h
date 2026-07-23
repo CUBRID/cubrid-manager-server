@@ -17,8 +17,6 @@
 
 #define MAX_LINE 1024
 
-int generate_update_script (char *patch_name, char *url, char *path,
-			    char *_dbmt_error);
 int unzip (const char *zip_file, const char *unzip_dir);
 
 #endif

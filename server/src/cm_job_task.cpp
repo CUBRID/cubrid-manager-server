@@ -15629,61 +15629,6 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
 
   snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "We do not support autoupdate anymore");
   return ERR_WITH_MSG;
-
-#if 0
-  patch_name = nv_get_val (req, "patch_name");
-  if (patch_name == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "patch_name");
-      return ERR_PARAM_MISSING;
-    }
-#ifdef WINDOWS
-  sprintf (path, "%s\\", sco.dbmt_tmp_dir);
-#else
-  sprintf (path, "%s/", sco.dbmt_tmp_dir);
-#endif
-
-  if ((ret_val =
-	       generate_update_script (patch_name, sco.szAutoUpdateURL, path,
-				       _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return ret_val;
-    }
-
-  sprintf (shell_name, "%s" SHELL_NAME, path);
-
-  argv[0] = shell_name;
-  argv[1] = NULL;
-
-  sprintf (err_log, "%scms.autoupdate.err", path);
-  sprintf (output_log, "%scms.autoupdate.log", path);
-
-#ifdef WINDOWS
-  ret_val = run_child (argv, 0, NULL, output_log, err_log, NULL);
-
-#else
-  sprintf (cmd, "%s >%s 2>%s", shell_name, output_log, err_log);
-
-  // As "system" fucntion will wait for the command return in parent process, fork a new procee to execute it in order to avoid blocking.
-  if ((pid = fork ()) > 0)
-    {
-      return ERR_NO_ERROR;
-    }
-  else if (pid == 0)
-    {
-      system (cmd);
-      exit (0);
-    }
-  else
-    {
-      sprintf (_dbmt_error, "fork()");
-      return ERR_SYSTEM_CALL;
-    }
-
-#endif
-
-  return ERR_NO_ERROR;
-#endif
 }
 
 int

@@ -298,7 +298,6 @@ static int _maybe_ip_addr (char *hostname);
 static int _ip_equal_hostent (struct hostent *hp, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
-static bool is_process_running (const char *process_name, unsigned int sleep_time);
 static bool delete_directory (const std::string& path);
 static bool attempt_to_access_parent_dir (const char *path);
 
@@ -310,43 +309,6 @@ const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;";
 #else
 const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*";
 #endif
-
-/**
-* is_process_running is to check process running or not by checking pid
-* process_name: the name of process that must be in $CUBRID/bin
-* sleep_time: millisecond
-*/
-static bool
-is_process_running (const char *process_name, unsigned int sleep_time)
-{
-  FILE *input = NULL;
-  char buf[16], cmd[PATH_MAX];
-
-  SLEEP_MILISEC (0, sleep_time);
-
-#if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (cmd, "%s/%s/%s getpid", sco.szCubrid, CUBRID_DIR_BIN,
-           process_name);
-#else
-  sprintf (cmd, "%s/%s getpid", CUBRID_BINDIR, process_name);
-#endif
-  input = popen (cmd, "r");
-  if (input == NULL)
-    {
-      return false;
-    }
-
-  memset (buf, '\0', sizeof (buf));
-  if ((fgets (buf, 16, input) == NULL) || atoi (buf) <= 0)
-    {
-      pclose (input);
-      return false;
-    }
-
-  pclose (input);
-
-  return true;
-}
 
 int
 _op_check_is_localhost (char *token, char *hname)
