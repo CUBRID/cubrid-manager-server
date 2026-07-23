@@ -299,7 +299,7 @@ static int _ip_equal_hostent (struct hostent *hp, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool delete_directory (const std::string& path);
-static bool attempt_to_access_parent_dir (const char *path);
+bool attempt_to_access_parent_dir (const char *path);
 
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
@@ -3961,7 +3961,7 @@ is_valid_filename (const char *filename)
     return true;
 }
 
-static bool
+bool
 attempt_to_access_parent_dir (const char *path)
 {
   if (path == NULL)
