@@ -3926,7 +3926,7 @@ is_valid_filename (const char *filename)
 
   while (i < len)
     {
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(WINDOWS)
       if (input[i] == '%')
 	{
 	  size_t next_percent = input.find('%', i + 1);
@@ -4126,7 +4126,7 @@ std::string clean_path (const std::string& path, char seperator)
 
 std::string expand_env_path (const std::string& path)
 {
-#ifdef _WIN32
+#if defined (WINDOS)
   DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
   if (bufferSize == 0)
     {
