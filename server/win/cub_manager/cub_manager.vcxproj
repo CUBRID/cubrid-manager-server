@@ -121,6 +121,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4274;4996;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <AdditionalDependencies>legacy_stdio_definitions.lib;ws2_32.lib;cmstat.lib;cmdep.lib;ssleay32.lib;libeay32.lib;libevent.lib;libevent_openssl.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
