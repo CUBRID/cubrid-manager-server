@@ -39,6 +39,12 @@
 
 static void _print_help (void);
 
+#if _MSC_VER >= 1900
+extern "C" {
+  FILE __iob_func[3] = { *stdin, *stdout, *stderr };
+}
+#endif
+
 int
 main (int argc, char *argv[])
 {

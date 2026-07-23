@@ -68,6 +68,12 @@
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 
+#if _MSC_VER >= 1900
+extern "C" {
+  FILE __iob_func[3] = { *stdin, *stdout, *stderr };
+}
+#endif
+
 //#include "cm_utf8.h"
 using namespace std;
 
