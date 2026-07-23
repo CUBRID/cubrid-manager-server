@@ -135,6 +135,12 @@ using namespace std;
 
 #define        ER_FEATURE_DEPRECATED   -2
 
+#if defined (WINDOWS)
+#define UNLINK(file) _unlink(file)
+#else
+#define UNLINK(file) unlink(file)
+#endif
+
 extern T_EMGR_VERSION CLIENT_VERSION;
 extern T_USER_TOKEN_INFO *user_token_info;
 
@@ -9968,11 +9974,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PERMISSION;
     }
 
-#if defined(WINDOWS)
-  ret = _unlink (fullpath_with_filename);
-#else
-  ret = unlink (fullpath_with_filename);
-#endif
+  ret = UNLINK (fullpath_with_filename);
 
   if (ret != 0)
     {
