@@ -1161,9 +1161,19 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
 
   confname= request["confname"].asString();
 
-  if (is_invalid_filename_with_msg (confname.c_str (), _dbmt_error))
+  if (std::isalpha (static_cast <unsigned char> (confname.c_str ()[0])))
     {
-      return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
+      if (is_invalid_filename_with_msg (confname.c_str (), _dbmt_error))
+	{
+	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
+	}
+    }
+  else
+    {
+      if (!is_authorized_filename  (confname.c_str (), _dbmt_error))
+	{
+	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
+	}
     }
 
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
