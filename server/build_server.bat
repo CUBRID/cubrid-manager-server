@@ -5,7 +5,7 @@ REM prepare vc environment
 SET VERS=win/version.h
 SET COMMIT_COUNT=
 
-call "%VS90COMNTOOLS%vsvars32.bat"
+call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
 
 FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET MAJOR=%%i)
 FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET MINOR=%%i)

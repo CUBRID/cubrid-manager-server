@@ -1,20 +1,15 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 10.00
-# Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "install", "install\install.vcproj", "{4767EEE0-220E-4FDE-8788-0E8BAE173CE1}"
-	ProjectSection(ProjectDependencies) = postProject
-		{9A6A101D-4569-4BC7-9010-9E4554D7E945} = {9A6A101D-4569-4BC7-9010-9E4554D7E945}
-		{1E764BE7-D450-4166-8F62-4FD1967F5AD8} = {1E764BE7-D450-4166-8F62-4FD1967F5AD8}
-	EndProjectSection
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1972
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "install", "install\install.vcxproj", "{4767EEE0-220E-4FDE-8788-0E8BAE173CE1}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cub_manager", "cub_manager\cub_manager.vcproj", "{1E764BE7-D450-4166-8F62-4FD1967F5AD8}"
-	ProjectSection(ProjectDependencies) = postProject
-		{FB6ECD68-F1C6-42A7-8EB7-5BCBF151D718} = {FB6ECD68-F1C6-42A7-8EB7-5BCBF151D718}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cub_manager", "cub_manager\cub_manager.vcxproj", "{1E764BE7-D450-4166-8F62-4FD1967F5AD8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jsoncpp", "..\external\jsoncpp\vs\jsoncpp.vcproj", "{FB6ECD68-F1C6-42A7-8EB7-5BCBF151D718}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jsoncpp", "..\external\jsoncpp\vs\jsoncpp.vcxproj", "{FB6ECD68-F1C6-42A7-8EB7-5BCBF151D718}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cm_admin", "cm_admin\cm_admin.vcproj", "{9A6A101D-4569-4BC7-9010-9E4554D7E945}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cm_admin", "cm_admin\cm_admin.vcxproj", "{9A6A101D-4569-4BC7-9010-9E4554D7E945}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,5 +54,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FA97FB49-ABEC-4A54-BAA6-34F87887ED12}
 	EndGlobalSection
 EndGlobal
