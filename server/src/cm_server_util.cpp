@@ -4088,7 +4088,7 @@ std::string clean_path (const std::string& path, char seperator)
 
 std::string expand_env_path (const std::string& path)
 {
-#if defined (WINDOS)
+#if defined (WINDOWS)
   DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
   if (bufferSize == 0)
     {

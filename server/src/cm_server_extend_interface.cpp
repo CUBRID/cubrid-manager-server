@@ -20,6 +20,9 @@
 #include "cm_log.h"
 
 #include <string.h>
+#include <string>
+#include <cctype>
+
 #ifdef WINDOWS
 #include <Psapi.h>
 #else

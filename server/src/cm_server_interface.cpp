@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <list>
+#include <cctype>
 
 #ifdef WINDOWS
 #include <process.h>
