@@ -11439,7 +11439,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (!is_allowed_script_env (v))
 	    {
-	      snprintf (_dbmt_error, "setting this environment variable is not permitted: %s", v);
+	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s", v);
 	      return ERR_WITH_MSG;
 	    }
 
