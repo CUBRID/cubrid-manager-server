@@ -37,6 +37,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <unordered_set>
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -98,6 +99,25 @@
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
+
+namespace
+{
+  const std::unordered_set <std::string>& allowed_script_env_names ()
+   {
+      static const std::unordered_set <std::string> kAllowed =
+	{
+	  "PATH",
+	  "HOME",
+	  "LANG",
+	  "TZ",
+	  "CUBRID",
+	  "CUBRID_DATABASES",
+	  "CUBRID_TMP",
+	};
+
+      return kAllowed;
+    }
+}
 
 static T_FSERVER_TASK_INFO task_info[] =
 {
@@ -4186,4 +4206,41 @@ is_authorized_filename (const char *path, char *_dbmt_error)
   snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, origin_path.c_str ());
 
   return false;
+}
+
+bool
+is_valid_env_name_format (const std::string& name)
+{
+  if (name.empty ())
+    {
+      return false;
+    }
+
+  if (!std::isalpha (static_cast <unsigned char> (name[0])) && name[0] != '_')
+    {
+      return false;
+    }
+
+  for (char c : name)
+    {
+      if (!std::isalnum (static_cast <unsigned char> (c)) && c != '_')
+	{
+	  return false;
+	}
+    }
+
+  return true;
+}
+
+bool
+is_allowed_script_env (const std::string& name)
+{
+  if (!is_valid_env_name_format (name))
+    {
+      return false;
+    }
+
+  const auto& allowed = allowed_script_env_names ();
+
+  return allowed.find (name) != allowed.end ();
 }

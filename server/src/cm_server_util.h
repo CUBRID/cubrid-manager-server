@@ -25,6 +25,8 @@
 #ifndef _CM_SERVER_UTIL_H_
 #define _CM_SERVER_UTIL_H_
 
+#include <string>
+
 #include "cm_porting.h"
 #include "cm_dep.h"
 #include "cm_cmd_exec.h"
@@ -223,4 +225,5 @@ bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 bool is_authorized_filename (const char *path, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
+bool is_allowed_script_env(const std::string& name);
 #endif                /* _CM_SERVER_UTIL_H_ */

@@ -11437,6 +11437,12 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       nv_lookup (req, i, &n, &v);
       if ((n != NULL) && (strcmp (n, "envvar") == 0))
 	{
+	  if (!is_allowed_script_env (v))
+	    {
+	      snprintf (_dbmt_error, "setting this environment variable is not permitted: %s", v);
+	      return ERR_WITH_MSG;
+	    }
+
 	  putenv (v);
 	}
     }
@@ -11445,6 +11451,11 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       strcpy_limit (_dbmt_error, "script_path", DBMT_ERROR_MSG_SIZE);
       return ERR_PARAM_MISSING;
+    }
+
+  if (!is_authorized_filename (script_path, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
     }
 
   argv[argc++] = script_path;
