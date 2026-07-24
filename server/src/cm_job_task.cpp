@@ -3703,8 +3703,9 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (logpath, _dbmt_error) || !is_authorized_filename (destdbpath, _dbmt_error) ||
-      !is_authorized_filename (exvolpath, _dbmt_error))
+  if (!is_authorized_filename (logpath, _dbmt_error) ||
+      (destdbpath != NULL && !is_authorized_filename (destdbpath, _dbmt_error)) ||
+      (exvolpath != NULL && !is_authorized_filename (exvolpath, _dbmt_error)))
     {
       return ERR_WITH_MSG;
     }
@@ -6486,6 +6487,7 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	      return ERR_WITH_MSG;
 	    }
 	}
+    }
 
   conf_item[AUTOBACKUP_CONF_ENTRY_NUM - 1] =
 	  nv_get_val (req, autobackup_conf_entry[AUTOBACKUP_CONF_ENTRY_NUM - 1]);
