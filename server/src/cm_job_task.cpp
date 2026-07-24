@@ -6478,7 +6478,14 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 		    autobackup_conf_entry[i]);
 	  return ERR_PARAM_MISSING;
 	}
-    }
+
+      if (strcmp (autobackup_conf_entry[i], "path") == 0)
+	{
+	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
+	    {
+	      return ERR_WITH_MSG;
+	    }
+	}
 
   conf_item[AUTOBACKUP_CONF_ENTRY_NUM - 1] =
 	  nv_get_val (req, autobackup_conf_entry[AUTOBACKUP_CONF_ENTRY_NUM - 1]);
