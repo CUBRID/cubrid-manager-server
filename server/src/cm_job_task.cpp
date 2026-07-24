@@ -4570,6 +4570,10 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
+  if (!is_authorized_filename (backupfilepath, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
 
   /* create directory */
   if (access (backupfilepath, F_OK) < 0)
