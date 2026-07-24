@@ -5649,6 +5649,10 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
+      if (!is_authorized_filename (pathname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
       argv[argc++] = "--" RESTORE_BACKUP_FILE_PATH_L;
       argv[argc++] = pathname;
     }
