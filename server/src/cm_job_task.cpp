@@ -9708,6 +9708,11 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   casrunnerwithFile = nv_get_val (cli_request, "executelogfile");
   logfilename = nv_get_val (cli_request, "logfile");
 
+  if (logfilename != NULL && !is_authorized_filename (logfilename, diag_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   if (brokername == NULL)
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s", "brokername");
