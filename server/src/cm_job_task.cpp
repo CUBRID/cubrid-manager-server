@@ -11437,7 +11437,10 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       nv_lookup (req, i, &n, &v);
       if ((n != NULL) && (strcmp (n, "envvar") == 0))
 	{
-	  if (!is_allowed_script_env (v))
+	  std::string entry = v;
+	  std::string env_name = extract_env_name(entry);;
+
+	  if (!is_allowed_script_env (env_name))
 	    {
 	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s", v);
 	      return ERR_WITH_MSG;

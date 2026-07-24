@@ -4244,3 +4244,16 @@ is_allowed_script_env (const std::string& name)
 
   return allowed.find (name) != allowed.end ();
 }
+
+std::string
+extract_env_name (const std::string& env_entry)
+{
+  size_t pos = env_entry.find('=');
+
+  if (pos == std::string::npos)
+    {
+      return "";
+    }
+
+  return env_entry.substr(0, pos);
+}
