@@ -4564,17 +4564,18 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   zip = nv_get_val (req, "zip");
   safe_replication = nv_get_val (req, "safereplication");
 
-  if (backupdir == NULL)
+  if (backupdir == NULL || strlen (backupdir) == 0)
     {
       strcpy (_dbmt_error, "backupdir");
       return ERR_PARAM_MISSING;
     }
 
-  snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
-  if (!is_authorized_filename (backupfilepath, _dbmt_error))
+  if (is_invalid_filename_with_msg (backupdir, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
+
+  snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
 
   /* create directory */
   if (access (backupfilepath, F_OK) < 0)
