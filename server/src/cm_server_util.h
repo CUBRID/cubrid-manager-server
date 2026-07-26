@@ -220,11 +220,13 @@ void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 bool is_valid_filename (const char *filename);
 bool is_invalid_filename (const char *filename);
+bool is_valid_filename (const char *filename, std::string& expanded_path);
 bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 bool is_authorized_filename (const char *path, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string& name);
+std::string expand_env_path (const std::string& path);
 std::string extract_env_name (const std::string& env_entry);
 #endif                /* _CM_SERVER_UTIL_H_ */

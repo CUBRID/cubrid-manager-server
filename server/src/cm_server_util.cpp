@@ -3890,92 +3890,39 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
 }
 
 bool
+is_valid_filename (const char *filename, std::string& expanded_path)
+{
+  if (filename == NULL || strlen (filename) == 0)
+    {
+      return false;
+    }
+
+  std::string origin_path = filename;
+
+  expanded_path = expand_env_path (origin_path);
+
+  if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+    return true;
+}
+
+bool
 is_valid_filename (const char *filename)
 {
-  if (filename == NULL)
+  if (filename == NULL || strlen (filename) == 0)
     {
       return false;
     }
 
-  std::string input = filename;
-  size_t i = 0;
-  size_t len = input.length ();
+  std::string origin_path = filename;
+  std::string expanded_path = expand_env_path (origin_path);
 
-  if (input.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+  if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
     {
       return false;
-    }
-
-  while (i < len)
-    {
-#if defined(WINDOWS)
-      if (input[i] == '%')
-	{
-	  size_t next_percent = input.find('%', i + 1);
-	  if (next_percent != std::string::npos && next_percent > i + 1)
-	    {
-	      std::string var_name = input.substr (i + 1, next_percent - i - 1);
-
-	      bool valid_chars = true;
-	      for (size_t k = 0; k < var_name.length (); ++k)
-		{
-		  if (!isValidEnvChar (var_name[k]))
-		    {
-		      valid_chars = false;
-		      break;
-		    }
-		}
-
-	      if (valid_chars)
-		{
-		  if (!isEnvVarAllowed (var_name))
-		    {
-		      return false;
-                    }
-
-		  i = next_percent + 1; // Skip past the closing '%'
-		  continue;
-                }
-	    }
-	}
-#else
-      if (input[i] == '$' && i + 1 < len)
-	{
-	  std::string var_name = "";
-	  size_t token_len = 0;
-
-	  if (input[i + 1] == '{')
-	    {
-	      size_t close_bracket = input.find ('}', i + 2);
-	      if (close_bracket != std::string::npos && close_bracket > i + 2)
-		{
-		  var_name = input.substr(i + 2, close_bracket - i - 2);
-		  token_len = close_bracket - i + 1;
-		}
-	    }
-	  else
-	    {
-	      size_t j = i + 1;
-	      while (j < len && isValidEnvChar (input[j]))
-		{
-		  var_name += input[j];
-		  j++;
-		}
-	      token_len = j - i;
-	    }
-
-            if (!var_name.empty ())
-	      {
-		if (!isEnvVarAllowed (var_name))
-		  {
-		    return false;
-		  }
-		i += token_len;
-		continue;
-	      }
-	}
-#endif
-      i++;
     }
 
     return true;
@@ -4106,7 +4053,8 @@ std::string clean_path (const std::string& path, char seperator)
   return result.empty () ? std::string (1, seperator) : result;
 }
 
-std::string expand_env_path (const std::string& path)
+std::string
+expand_env_path (const std::string& path)
 {
 #if defined (WINDOWS)
   DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
@@ -4190,17 +4138,20 @@ is_subpath (const char *allowd_path, const char *path)
 bool
 is_authorized_filename (const char *path, char *_dbmt_error)
 {
-  if (is_invalid_filename_with_msg (path, _dbmt_error))
+  std::string expanded_path;
+
+  if (!is_valid_filename (path, expanded_path))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path);
       return false;
     }
 
-  std::string origin_path = path;
-  std::string expanded_path = expand_env_path (origin_path);
   if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
     {
       return true;
     }
+
+  std::string origin_path = path;
 
   std::replace (origin_path.begin (), origin_path.end (), '%', '*');
   snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, origin_path.c_str ());
