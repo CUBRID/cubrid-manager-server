@@ -4248,6 +4248,11 @@ is_allowed_script_env (const std::string& name)
 std::string
 extract_env_name (const std::string& env_entry)
 {
+  if (env_entry.empty ())
+    {
+      return "";
+    }
+
   size_t pos = env_entry.find('=');
 
   if (pos == std::string::npos)
