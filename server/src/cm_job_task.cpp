@@ -4599,7 +4599,14 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  snprintf (backupfilepath, PATH_MAX - 1, "%s%s%s", backupdir, volname ? "/" : "", volname ? volname : "");
+  if (volname != NULL)
+    {
+      snprintf (backupfilepath, PATH_MAX, "%s/%s", backupdir, volname);
+    }
+  else
+    {
+      snprintf (backupfilepath, PATH_MAX, "%s", backupdir);
+    }
 
   /* create directory */
   if (access (backupfilepath, F_OK) < 0)
