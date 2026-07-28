@@ -2584,6 +2584,7 @@ bool ext_ut_validate_auth (Json::Value &request)
   T_USER_AUTH auth_user = 0;
   T_DBMT_USER dbmt_user;
   T_DBMT_USER_AUTHINFO *auth_info = NULL;
+  T_USER_AUTH current_user_auth = 0;
 
   string task;
   string user_id;
@@ -2637,34 +2638,63 @@ bool ext_ut_validate_auth (Json::Value &request)
 
   for (int index = 0; index < num_authinfo; ++index)
     {
+      string auth;
+
       if (!strcmp (auth_info[index].domain, "user_auth"))
         {
           istringstream (string (auth_info[index].auth)) >> auth_user;
           break;
         }
+
+      istringstream (string (auth_info[index].auth)) >> auth;
+      if (strcmp (auth_info[index].domain, "dbcreate") == 0)
+        {
+	  if ((AU_DBC & auth_task) && strcmp (auth.c_str (), "admin") == 0)
+	    {
+	      current_user_auth |= AU_DBC | AU_DBO;
+	    }
+
+	  if ((AU_DBO & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+	    {
+	      current_user_auth |= AU_DBO;
+	    }
+        }
+
+      if ((AU_BRK & auth_task) && strcmp (auth_info[index].domain, "unicas") == 0)
+        {
+	  if (strcmp (auth.c_str (),"admin") == 0)
+	    {
+	      current_user_auth |= AU_BRK | AU_MON;
+	    }
+
+	  if ((AU_BRK & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+	    {
+	      current_user_auth |= AU_MON;
+	    }
+        }
+
+      if (!strcmp (auth_info[index].domain, "statusmonitorauth"))
+        {
+	  if ((AU_JOB & auth_task) && strcmp (auth.c_str (), "admin") == 0)
+	    {
+	      current_user_auth |= AU_JOB | AU_VAR;
+	    }
+
+	  if ((AU_VAR & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+	    {
+	      current_user_auth |= AU_VAR;
+	    }
+        }
     }
 
   dbmt_user_free (&dbmt_user);
-
-  // assign default authority to old users.
-  if (auth_user == 0)
-    {
-      if (user_id == "admin")
-        {
-          auth_user = AU_ADMIN;
-        }
-      else
-        {
-          auth_user = ALL_AUTHORITY;
-        }
-    }
 
   if (auth_user == AU_ADMIN)
     {
       return true;
     }
 
-  return (auth_user & auth_task) ? true : false;
+  return (current_user_auth & auth_task) ? true : false;
 }
 
 int ext_get_mon_interval (Json::Value &request, Json::Value &response)
