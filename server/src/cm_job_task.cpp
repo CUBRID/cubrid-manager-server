@@ -11481,7 +11481,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 	  if (v != NULL && strlen (v) != 0)
 	    {
 	      std::string entry = v;
-	      std::string env_name = extract_env_name (entry);;
+	      std::string env_name = extract_env_name (entry);
 
 	      if (is_allowed_script_env (env_name))
 		{
