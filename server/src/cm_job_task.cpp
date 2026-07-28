@@ -134,6 +134,7 @@ using namespace std;
 #endif /* !WINDOWS */
 
 #define        ER_FEATURE_DEPRECATED   -2
+#define        ER_VIOLATE_SECURITY     -3
 
 #if defined (WINDOWS)
 #define UNLINK(file) _unlink(file)
@@ -330,8 +331,7 @@ static int _get_folders_with_keyword (char *search_folder_path,
 static int _get_block_from_log (FILE *fp, char *block_buf, int len);
 static int
 _update_nvplist_name (nvplist *ref, const char *name, const char *value);
-static int
-_get_confpath_by_name (const char *conf_name, char *conf_path, int buflen);
+static int _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char *_dbmt_error);
 
 static void _write_auto_update_log (char *line_buf, int is_success);
 static char *_get_format_time ();
@@ -1670,9 +1670,8 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (_get_confpath_by_name (conf_name, conf_path, sizeof (conf_path)) < 0)
+  if (_get_confpath_by_name (conf_name, conf_path, sizeof (conf_path), _dbmt_error) < 0)
     {
-      strcpy (_dbmt_error, "confname error");
       return ERR_WITH_MSG;
     }
 
@@ -1699,11 +1698,9 @@ ts_get_all_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  ret = _get_confpath_by_name (conf_name, conf_path, sizeof (conf_path));
+  ret = _get_confpath_by_name (conf_name, conf_path, sizeof (conf_path), _dbmt_error);
   if (ret < 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "(%s): %s.", conf_name,
-		ret == ER_FEATURE_DEPRECATED ? "deprecated" : "conf name error");
       return ERR_WITH_MSG;
     }
 
@@ -1735,7 +1732,7 @@ ts_get_all_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
 }
 
 static int
-_get_confpath_by_name (const char *conf_name, char *conf_path, int buflen)
+_get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char *_dbmt_error)
 {
   int retval = 0;
 
@@ -1761,11 +1758,23 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen)
     }
   else if (uStringEqual (conf_name, "shard.conf"))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "deprecated: %s.", conf_name);
       retval = ER_FEATURE_DEPRECATED;
+    }
+  else if (attempt_to_access_parent_dir (conf_name))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "violation of security for conf name: %s.", conf_name);
+      retval = ER_VIOLATE_SECURITY;
     }
   else
     {
       snprintf (conf_path, buflen - 1, "%s/conf/%s", sco.szCubrid, conf_name);
+    }
+
+  if (retval == 0 && !is_authorized_filename (conf_path, _dbmt_error))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "conf path is not authorized: %s.", conf_name);
+      retval = ER_VIOLATE_SECURITY;
     }
 
   return retval;
