@@ -2641,41 +2641,49 @@ bool ext_ut_validate_auth (Json::Value &request)
       string auth;
 
       if (!strcmp (auth_info[index].domain, "user_auth"))
-        {
-          istringstream (string (auth_info[index].auth)) >> auth_user;
-          break;
-        }
+	{
+	  istringstream (string (auth_info[index].auth)) >> auth_user;
+	  continue;
+	}
 
       istringstream (string (auth_info[index].auth)) >> auth;
-      if (strcmp (auth_info[index].domain, "dbcreate") == 0)
-        {
-	  if ((AU_DBC & auth_task) && strcmp (auth.c_str (), "admin") == 0)
+
+      if (strcmp (auth_info[index].domain, "dbcreate") == 0 || strcmp (auth_info[index].domain, "dbc") == 0)
+	{
+	  if (((AU_DBC | AU_DBO) & auth_task) && strcmp (auth.c_str (), "admin") == 0)
 	    {
 	      current_user_auth |= AU_DBC | AU_DBO;
 	    }
 
-	  if ((AU_DBO & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+	  // assign default authority to old users.
+	  if (auth_user == 0)
 	    {
-	      current_user_auth |= AU_DBO;
+	      if (user_id == "admin")
+		{
+		  if ((AU_DBO & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+		    {
+		      current_user_auth |= AU_DBO;
+		    }
+		}
 	    }
-        }
-
-      if ((AU_BRK & auth_task) && strcmp (auth_info[index].domain, "unicas") == 0)
-        {
-	  if (strcmp (auth.c_str (),"admin") == 0)
+	}
+      else if (((AU_BRK | AU_MON) & auth_task)
+	       && (strcmp (auth_info[index].domain, "unicas") == 0 || strcmp (auth_info[index].domain, "brk") == 0))
+	{
+	  if (strcmp (auth.c_str (), "admin") == 0)
 	    {
 	      current_user_auth |= AU_BRK | AU_MON;
 	    }
 
-	  if ((AU_BRK & auth_task) && strcmp (auth.c_str (), "monitor") == 0)
+	  if (strcmp (auth.c_str (), "monitor") == 0)
 	    {
 	      current_user_auth |= AU_MON;
 	    }
-        }
-
-      if (!strcmp (auth_info[index].domain, "statusmonitorauth"))
-        {
-	  if ((AU_JOB & auth_task) && strcmp (auth.c_str (), "admin") == 0)
+	}
+      else if (strcmp (auth_info[index].domain, "statusmonitorauth") == 0
+	       || strcmp (auth_info[index].domain, "job") == 0 || strcmp (auth_info[index].domain, "var") == 0)
+	{
+	  if (((AU_JOB | AU_VAR) & auth_task) && strcmp (auth.c_str (), "admin") == 0)
 	    {
 	      current_user_auth |= AU_JOB | AU_VAR;
 	    }
@@ -2684,7 +2692,7 @@ bool ext_ut_validate_auth (Json::Value &request)
 	    {
 	      current_user_auth |= AU_VAR;
 	    }
-        }
+	}
     }
 
   dbmt_user_free (&dbmt_user);
@@ -2692,6 +2700,11 @@ bool ext_ut_validate_auth (Json::Value &request)
   if (auth_user == AU_ADMIN)
     {
       return true;
+    }
+
+  if (auth_user != 0)
+    {
+      return (auth_user & auth_task) ? true : false;
     }
 
   return (current_user_auth & auth_task) ? true : false;
