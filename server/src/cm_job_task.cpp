@@ -4579,12 +4579,20 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename_with_msg (backupdir, _dbmt_error))
+  if (volname != NULL)
+    {
+      snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
+    }
+  else
+    {
+      snprintf (backupfilepath, PATH_MAX - 1, "%s", backupdir);
+    }
+
+  if (is_invalid_filename_with_msg (backupfilepath, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
 
-  snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
 
   /* create directory */
   if (access (backupfilepath, F_OK) < 0)
