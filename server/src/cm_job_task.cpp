@@ -275,7 +275,7 @@ static int op_make_triggerinput_file_alter (nvplist *req, char *input_filename);
 static int get_broker_info_from_filename (char *path, char *br_name, int *as_id);
 static char *_ts_get_error_log_param (char *dbname);
 
-static char *cm_get_abs_file_path (const char *filename, char *buf);
+static char *cm_get_abs_file_path (const char *filename, char *buf, size_t len);
 static int check_dbpath (char *dir, char *_dbmt_error);
 
 static int file_to_nvpairs (char *filepath, nvplist *res);
@@ -1170,16 +1170,16 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
     {
       v = BROKER_LOG_DIR "/error_log";
     }
-  cm_get_abs_file_path (v, err_logdir);
+  cm_get_abs_file_path (v, err_logdir, sizeof (err_logdir));
 
   v = cm_br_conf_get_value (cm_conf_find_broker (&uc_conf, bname), "LOG_DIR");
   if (v == NULL)
     {
       v = BROKER_LOG_DIR "/sql_log";
     }
-  cm_get_abs_file_path (v, logdir);
+  cm_get_abs_file_path (v, logdir, sizeof (err_logdir));
 
-  cm_get_abs_file_path (BROKER_LOG_DIR, access_logdir);
+  cm_get_abs_file_path (BROKER_LOG_DIR, access_logdir, sizeof (access_logdir));
 
   cm_broker_conf_free (&uc_conf);
 
@@ -13800,7 +13800,7 @@ get_dbvoldir (char *vol_dir, size_t vol_dir_size, char *dbname, char *err_buf)
 }
 
 static char *
-cm_get_abs_file_path (const char *filename, char *buf)
+cm_get_abs_file_path (const char *filename, char *buf, size_t len)
 {
   strcpy (buf, filename);
 
@@ -13814,7 +13814,7 @@ cm_get_abs_file_path (const char *filename, char *buf)
       return buf;
     }
 #endif
-  sprintf (buf, "%s/%s", getenv ("CUBRID"), filename);
+  snprintf (buf, len, "%s/%s", getenv ("CUBRID"), filename);
   return buf;
 }
 
