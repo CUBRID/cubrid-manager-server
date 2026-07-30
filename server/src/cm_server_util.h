@@ -235,4 +235,5 @@ bool is_pid_dir (const std::string & name);
 bool get_proc_uid (const std::string & pid, uid_t & uid);
 bool get_proc_comm (const std::string & pid, std::string & comm);
 #endif
+bool setenv_using_putenv_fmt (const std::string & nameValue, int overwrite = 1);
 #endif                /* _CM_SERVER_UTIL_H_ */

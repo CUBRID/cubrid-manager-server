@@ -9872,7 +9872,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
 
   snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1,
 	    "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
-  putenv (out_msg_file_env);
+  setenv_using_putenv_fmt (out_msg_file_env);
 
   if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
     {
@@ -11505,7 +11505,14 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 	      return ERR_WITH_MSG;
 	    }
 
-	  putenv (v);
+	  if (v)
+	    {
+	      if (!setenv_using_putenv_fmt (v))
+		{
+		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "set environment failed: %s", v);
+		  return ERR_WITH_MSG;
+		}
+	    }
 	}
     }
 

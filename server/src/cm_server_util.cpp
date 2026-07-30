@@ -4264,3 +4264,36 @@ get_proc_comm (const std::string & pid, std::string & comm)
 
   return true;
 }
+
+bool
+setenv_using_putenv_fmt (const std::string & nameValue, int overwrite)
+{
+  size_t eqPos = nameValue.find ('=');
+  if (eqPos == std::string::npos)
+    {
+      return false;
+    }
+
+  std::string name = nameValue.substr (0, eqPos);
+  std::string value = nameValue.substr (eqPos + 1);
+
+  if (name.empty ())
+    {
+      return false;
+    }
+
+#if defined(WINDOWS)
+  errno_t err = _putenv_s (name.c_str (), value.c_str ());
+  if (err != 0)
+    {
+      return false;
+    }
+#else
+  if (setenv (name.c_str (), value.c_str (), overwrite) != 0)
+    {
+      return false;
+    }
+#endif
+
+  return true;
+}
