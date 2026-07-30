@@ -11688,11 +11688,6 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	      return ERR_WITH_MSG;
 	    }
 
-	  if (!is_authorized_filename (path, _dbmt_error))
-	    {
-	      return ERR_WITH_MSG;
-	    }
-
 	  path_len = (int) strlen (path);
 	  if (path_len <= 2 || strstr (path, "..") || strstr (path, "/")
 	      || strstr (path, "\\"))
@@ -11705,6 +11700,11 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      snprintf (fullpath, sizeof (fullpath) - 1, "%s/tmp/%s",
 			sco.szCubrid, (path + 2));
+
+	      if (!is_authorized_filename (fullpath, _dbmt_error))
+		{
+		  return ERR_WITH_MSG;
+		}
 	    }
 	  else
 	    {
