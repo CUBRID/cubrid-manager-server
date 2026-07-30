@@ -320,10 +320,13 @@ bool attempt_to_access_parent_dir (const char *path);
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
 
+/*
+ * We allow $CUBRID on Linux and %CUBRID% on Windows.
+ */
 #if defined (WINDOWS)
-const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;{}";
+const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;{}[]";
 #else
-const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*{}";
+const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*{}[]";
 #endif
 
 int
