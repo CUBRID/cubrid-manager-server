@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <stdint.h>
 #else
+typedef unsigned int uid_t;
 #ifndef uint64_t
 typedef unsigned __int64 uint64_t;
 #endif
