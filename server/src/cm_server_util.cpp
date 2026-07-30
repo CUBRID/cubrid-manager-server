@@ -4136,9 +4136,9 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 {
   std::string expanded_path;
 
-  if (!is_valid_filename (path, expanded_path))
+  if (path == NULL || !is_valid_filename (path, expanded_path))
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path ? path : "(NULL)");
       return false;
     }
 
