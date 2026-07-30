@@ -106,12 +106,8 @@ namespace
    {
       static const std::unordered_set <std::string> kAllowed =
 	{
-	  "PATH",
-	  "HOME",
 	  "LANG",
 	  "TZ",
-	  "CUBRID",
-	  "CUBRID_DATABASES",
 	  "CUBRID_TMP",
 	};
 
