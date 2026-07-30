@@ -4209,3 +4209,58 @@ extract_env_name (const std::string& env_entry)
 
   return env_entry.substr(0, pos);
 }
+
+bool
+is_pid_dir (const std::string & name)
+{
+  if (name.empty ())
+    return false;
+
+for (char c:name)
+    {
+      if (!std::isdigit (static_cast < unsigned char >(c)))
+	  return false;
+    }
+
+  return true;
+}
+
+bool
+get_proc_uid (const std::string & pid, uid_t & uid)
+{
+  std::ifstream status_file ("/proc/" + pid + "/status");
+  if (!status_file.is_open ())
+    return false;
+
+  std::string line;
+  while (std::getline (status_file, line))
+    {
+      if (line.compare (0, 4, "Uid:") == 0)
+	{
+	  std::istringstream iss (line.substr (4));
+	  iss >> uid;
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool
+get_proc_comm (const std::string & pid, std::string & comm)
+{
+  std::ifstream comm_file ("/proc/" + pid + "/comm");
+
+  if (!comm_file.is_open ())
+    {
+      return false;
+    }
+
+  std::getline (comm_file, comm);
+
+  while (!comm.empty () && std::isspace (static_cast < unsigned char >(comm.back ())))
+    {
+      comm.pop_back ();
+    }
+
+  return true;
+}

@@ -15918,37 +15918,55 @@ ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
 #else
-  char pid_file[PATH_MAX];
-  char cmd_name[PATH_MAX];
+  uid_t my_uid = geteuid ();
 
-  FILE *fin;
-  int ch;
+  DIR *proc_dir;
+  struct dirent *entry;
 
-  make_temp_filepath (pid_file, sco.dbmt_tmp_dir, "monitor_process_tmp", TS_MONITOR_PROCESS, PATH_MAX);
-  fin = fopen (pid_file, "w+");
-
-  i = 0;
   while (process_name[i][0] != 0)
     {
-      sprintf (cmd_name, "pgrep -u $(whoami) %s > %s", process_name[i],
-	       pid_file);
-      system (cmd_name);
+      std::string proc = process_name[i];
 
-      if ((ch = fgetc (fin)) == EOF)
+      snprintf (exist, sizeof (exist), "don't exist");
+      if ((proc_dir = opendir ("/proc")) == nullptr)
 	{
-	  strcpy (exist, "don't exist");
-	}
-      else if (ch > '1' && ch < '9')
-	{
-	  strcpy (exist, "exist");
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot open /proc");
+	  return ERR_WITH_MSG;
 	}
 
+      while ((entry = readdir (proc_dir)) != nullptr)
+	{
+	  std::string name (entry->d_name);
+
+	  if (!is_pid_dir (name))
+	    {
+	      continue;
+	    }
+
+	  uid_t proc_uid;
+
+	  if (!get_proc_uid (name, proc_uid) || proc_uid != my_uid)
+	    {
+	      continue;
+	    }
+
+	  std::string comm;
+
+	  if (!get_proc_comm (name, comm))
+	    {
+	      continue;
+	    }
+
+	  if (comm == proc)
+	    {
+	      snprintf (exist, sizeof (exist), "exist");
+	    }
+	}
+
+      closedir (proc_dir);
       nv_add_nvp (res, process_name[i], exist);
       i++;
     }
-
-  fclose (fin);
-  unlink (pid_file);
 #endif
 
   return ERR_NO_ERROR;
