@@ -229,7 +229,9 @@ bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string& name);
 std::string expand_env_path (const std::string& path);
 std::string extract_env_name (const std::string& env_entry);
+#if !defined (WINDOWS)
 bool is_pid_dir (const std::string & name);
 bool get_proc_uid (const std::string & pid, uid_t & uid);
 bool get_proc_comm (const std::string & pid, std::string & comm);
+#endif
 #endif                /* _CM_SERVER_UTIL_H_ */
