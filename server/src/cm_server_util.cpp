@@ -321,9 +321,9 @@ const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
 const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
 
 #if defined (WINDOWS)
-const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;";
+const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;{}";
 #else
-const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*";
+const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*{}";
 #endif
 
 int
@@ -3888,7 +3888,7 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
 bool
 is_valid_filename (const char *filename, std::string& expanded_path)
 {
-  if (filename == NULL || strlen (filename) == 0)
+  if (filename == NULL || strlen (filename) == 0 || strlen (filename) > PATH_MAX)
     {
       return false;
     }
