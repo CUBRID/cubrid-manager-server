@@ -22,7 +22,6 @@ The backupdb interface will create a database backup file.
   "removelog": "n",
   "check": "y",
   "mt": "0",
-  "zip": "y",
-  "safereplication": "n"
+  "zip": "y"
 }
 ```

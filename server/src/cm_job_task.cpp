@@ -4539,7 +4539,7 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   char *dbname, *level, *removelog, *volname, *backupdir, *check;
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
-  char *mt, *zip, *safe_replication;
+  char *mt, *zip;
   char backupfilepath[PATH_MAX];
   char inputfilepath[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -4571,7 +4571,6 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   check = nv_get_val (req, "check");
   mt = nv_get_val (req, "mt");
   zip = nv_get_val (req, "zip");
-  safe_replication = nv_get_val (req, "safereplication");
 
   if (backupdir == NULL || strlen (backupdir) == 0)
     {
@@ -4635,13 +4634,6 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (zip != NULL && uStringEqual (zip, "y"))
     {
       argv[argc++] = "--" BACKUP_COMPRESS_L;
-    }
-
-  if (safe_replication != NULL && uStringEqual (safe_replication, "y"))
-    {
-      snprintf (sp_option, sizeof (sp_option) - 1,
-		"--safe-page-id `repl_safe_page %s`", dbname);
-      argv[argc++] = sp_option;
     }
 
   if (ha_mode != 0)
