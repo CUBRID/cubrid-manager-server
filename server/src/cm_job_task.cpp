@@ -4543,7 +4543,6 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   char backupfilepath[PATH_MAX];
   char inputfilepath[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
-  char sp_option[256];
   const char *argv[16];
   int argc = 0;
   FILE *inputfile;
