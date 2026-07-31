@@ -4217,12 +4217,16 @@ bool
 is_pid_dir (const std::string & name)
 {
   if (name.empty ())
-    return false;
+    {
+      return false;
+    }
 
-for (char c:name)
+  for (char c:name)
     {
       if (!std::isdigit (static_cast < unsigned char >(c)))
+	{
 	  return false;
+	}
     }
 
   return true;
@@ -4232,8 +4236,11 @@ bool
 get_proc_uid (const std::string & pid, uid_t & uid)
 {
   std::ifstream status_file ("/proc/" + pid + "/status");
+
   if (!status_file.is_open ())
-    return false;
+    {
+      return false;
+    }
 
   std::string line;
   while (std::getline (status_file, line))
@@ -4272,6 +4279,7 @@ bool
 setenv_using_putenv_fmt (const std::string & nameValue, int overwrite)
 {
   size_t eqPos = nameValue.find ('=');
+
   if (eqPos == std::string::npos)
     {
       return false;
