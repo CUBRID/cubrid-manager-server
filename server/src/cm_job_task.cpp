@@ -13802,7 +13802,7 @@ get_dbvoldir (char *vol_dir, size_t vol_dir_size, char *dbname, char *err_buf)
 static char *
 cm_get_abs_file_path (const char *filename, char *buf, size_t len)
 {
-  strcpy (buf, filename);
+  snprintf (buf, len, "%s", filename);
 
   if (buf[0] == '/')
     {
