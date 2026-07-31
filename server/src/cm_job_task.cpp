@@ -1170,7 +1170,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
     {
       v = BROKER_LOG_DIR "/error_log";
     }
-  cm_get_abs_file_path (v, err_logdir, sizeof (err_logdir));
+  cm_get_abs_file_path (v, err_logdir, sizeof (logdir));
 
   v = cm_br_conf_get_value (cm_conf_find_broker (&uc_conf, bname), "LOG_DIR");
   if (v == NULL)
