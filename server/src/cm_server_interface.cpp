@@ -589,6 +589,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
@@ -597,6 +598,8 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
+      pthread_mutex_destroy (&pstmt->mutex);
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
@@ -621,26 +624,28 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
+
   pthread_mutex_lock (&pstmt->mutex);
   to.tv_sec = time (NULL) + time_out;
   to.tv_nsec = 0;
-  err = pthread_cond_timedwait (&pstmt->cond, &pstmt->mutex, &to);
 
-  if (err == ETIMEDOUT)
+  err = 0;
+  while (pstmt->status == 0 && err != ETIMEDOUT)
+    {
+      err = pthread_cond_timedwait (&pstmt->cond, &pstmt->mutex, &to);
+    }
+
+  if (pstmt->status == 0)
     {
       string dbname, task_name;
-
       task_name = request.get ("task", "unknown").asString();
       dbname = request.get ("dbname", "").asString();
-
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
-		time_out, task_name.c_str(), dbname.c_str ());
-
+		 time_out, task_name.c_str(), dbname.c_str ());
       pstmt->is_timeout = 1;
       pthread_mutex_unlock (&pstmt->mutex);
       pthread_detach (async_thrd);
-
-      return ERR_WITH_MSG;
+      return build_server_header (response, ERR_WITH_MSG, "execute timeout");
     }
 
   pthread_mutex_unlock (&pstmt->mutex);
