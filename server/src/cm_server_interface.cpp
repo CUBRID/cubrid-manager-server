@@ -505,6 +505,8 @@ cm_async_request_handler (void *lpArg)
 
   pthread_cond_broadcast (&async_param->cond);
   pthread_mutex_unlock (&async_param->mutex);
+#else
+  async_param->status = 1;
 #endif
 
   return NULL;
