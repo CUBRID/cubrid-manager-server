@@ -256,14 +256,9 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[5];
 
-#ifdef HPUX
-  char jvm_env_string[32];
-#endif
-
   cmd_start_master ();
   make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
   make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
-
 
   /* unset CUBRID_ERROR_LOG environment variable, using default value */
 #if defined(WINDOWS)
@@ -285,20 +280,7 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   argv[3] = dbname;
   argv[4] = NULL;
 
-#ifdef HPUX
-#ifdef HPUX_IA64
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.so");
-#else /* pa-risc */
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.sl");
-#endif
-  putenv (jvm_env_string);
-#endif
-
   pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start server */
-
-#ifdef HPUX
-  putenv ("LD_PRELOAD=");
-#endif
 
   if (pid < 0)
     {
