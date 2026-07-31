@@ -1163,29 +1163,12 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
 
   confname= request["confname"].asString();
-
-  if (std::isalpha (static_cast <unsigned char> (confname.c_str ()[0])))
-    {
-      if (attempt_to_access_parent_dir (confname.c_str ()))
-	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename type is not allowed: %s", confname.c_str ());
-	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
-	}
-
-      if (is_invalid_filename_with_msg (confname.c_str (), _dbmt_error))
-	{
-	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
-	}
-    }
-  else
-    {
-      if (!is_authorized_filename  (confname.c_str (), _dbmt_error))
-	{
-	  return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
-	}
-    }
-
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
+
+  if (!is_authorized_filename  (conf_path, _dbmt_error))
+    {
+      return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
+    }
 
   outfile = fopen (conf_path, "w");
   if (outfile == NULL)
