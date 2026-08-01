@@ -3898,14 +3898,21 @@ is_valid_filename (const char *filename, std::string& expanded_path)
 
   std::string origin_path = filename;
 
-  expanded_path = expand_env_path (origin_path);
+  try
+    {
+      expanded_path = expand_env_path (origin_path);
+    }
+  catch (const std::invalid_argument& e)
+    {
+      return false;
+    }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
     {
       return false;
     }
 
-    return true;
+  return true;
 }
 
 bool
@@ -3917,7 +3924,16 @@ is_valid_filename (const char *filename)
     }
 
   std::string origin_path = filename;
-  std::string expanded_path = expand_env_path (origin_path);
+  std::string expanded_path;
+
+  try
+    {
+      expanded_path = expand_env_path (origin_path);
+    }
+  catch (const std::invalid_argument& e)
+    {
+      return false;
+    }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
     {
@@ -4068,21 +4084,63 @@ expand_env_path (const std::string& path)
   expanded.erase (std::find (expanded.begin (), expanded.end (), '\0'), expanded.end ());
   return expanded;
 #else
-  wordexp_t p;
+  std::string result;
+  result.reserve (path.size ());
 
-  if (wordexp (path.c_str (), &p, WRDE_NOCMD) != 0)
+  size_t i = 0;
+  while (i < path.size ())
     {
-      return path;
+      char c = path[i];
+
+      if (c == '$')
+        {
+          size_t start = i + 1;
+          bool braced = (start < path.size () && path[start] == '{');
+          size_t name_start = braced ? start + 1 : start;
+          size_t j = name_start;
+
+          while (j < path.size ()
+                 && (std::isalnum ((unsigned char) path[j]) || path[j] == '_'))
+            {
+              ++j;
+            }
+
+          if (j == name_start)
+            {
+              result += c;
+              ++i;
+              continue;
+            }
+
+          std::string var_name = path.substr (name_start, j - name_start);
+          size_t after = j;
+
+          if (braced)
+            {
+              if (after >= path.size () || path[after] != '}')
+                {
+                  throw std::invalid_argument ("malformed ${} in path: " + path);
+                }
+              ++after;
+            }
+
+          const char* val = std::getenv (var_name.c_str ());
+          if (val == nullptr)
+            {
+              throw std::invalid_argument ("undefined env var: " + var_name);
+            }
+
+          result += val;
+          i = after;
+        }
+      else
+        {
+          result += c;
+          ++i;
+        }
     }
 
-  std::string expanded = "";
-  if (p.we_wordc > 0)
-    {
-      expanded = p.we_wordv[0];
-    }
-
-  wordfree (&p);
-  return expanded;
+  return result;
 #endif
 }
 
