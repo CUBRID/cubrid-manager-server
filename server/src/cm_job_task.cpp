@@ -9869,9 +9869,8 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1,
-	    "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
-  setenv_using_putenv_fmt (out_msg_file_env);
+  snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1, "%s", resfile2);
+  PUT_ENV ("CUBRID_MANAGER_OUT_MSG_FILE", out_msg_file_env);
 
   if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
     {

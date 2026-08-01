@@ -43,8 +43,8 @@
 
 #define SET_TRANSACTION_NO_WAIT_MODE_ENV()                                              \
       do {                                                                              \
-      putenv((char *) "CUBRID_LOCK_TIMEOUT_IN_SECS=1");                                 \
-      putenv((char *) "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED");                    \
+      PUT_ENV("CUBRID_LOCK_TIMEOUT_IN_SECS","1");                                 \
+      PUT_ENV("CUBRID_ISOLATION_LEVEL","TRAN_READ_COMMITTED");                    \
     } while (0)
 
 typedef enum
