@@ -262,7 +262,7 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 
   /* unset CUBRID_ERROR_LOG environment variable, using default value */
 #if defined(WINDOWS)
-  _putenv ("CUBRID_ERROR_LOG=");
+  PUT_ENV ("CUBRID_ERROR_LOG", "");
 #else
   unsetenv ("CUBRID_ERROR_LOG");
 #endif

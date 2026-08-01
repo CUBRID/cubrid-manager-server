@@ -49,6 +49,12 @@ typedef unsigned __int16 uint16_t;
 typedef unsigned __int8  uint8_t;
 #endif
 
+#if defined (WINDOWS)
+#define PUT_ENV(name,val) _putenv_s(name,val)
+#else
+#define PUT_ENV(name,val) setenv(name,val,1)
+#endif
+
 #define makestring1(x) #x
 #define makestring(x) makestring1(x)
 
