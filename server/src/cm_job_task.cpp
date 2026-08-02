@@ -3150,7 +3150,8 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (exvolpath != NULL && !is_authorized_filename (exvolpath, _dbmt_error))
+  if (exvolpath != NULL && strcmp (exvolpath, "none") != 0 &&
+      !is_authorized_filename (exvolpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
