@@ -15706,11 +15706,6 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (nvp_path, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
-    }
-
   if (0 == strncmp (nvp_path, "../", strlen ("../")))
     {
       strcpy (_dbmt_error, "path parameter includes invalid dirctories!");
@@ -15741,6 +15736,11 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
   sprintf (full_path, "%s/%s/", CUBRID, path);
 #endif
+
+  if (!is_authorized_filename (full_path, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
 
 #if defined(WINDOWS)
   {
