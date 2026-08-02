@@ -4152,43 +4152,45 @@ is_subpath (const char *allowd_path, const char *path)
 #else
   char seperator = '/';
 #endif
-
   if (allowd_path == NULL || path == NULL)
     {
       return false;
     }
- 
+
   std::string allowed_dir = allowd_path;
   std::string user_path = path;
-
-  if (allowed_dir.empty ())
+  if (allowed_dir.empty () || user_path.empty ())
     {
       return false;
     }
-
 #if defined (WINDOWS)
   std::replace (allowed_dir.begin (), allowed_dir.end (), '/', '\\');
   std::replace (user_path.begin (), user_path.end (), '/', '\\');
-
   std::transform (allowed_dir.begin (), allowed_dir.end (), allowed_dir.begin (), ::tolower);
   std::transform (user_path.begin (), user_path.end (), user_path.begin (), ::tolower);
 #endif
-
   std::string clean_allowed = clean_path (allowed_dir, seperator);
   std::string clean_user = clean_path (user_path, seperator);
+
+  if (clean_allowed.empty () || clean_user.empty ())
+    {
+      return false;
+    }
 
   if (clean_allowed.back () != seperator)
     {
       clean_allowed += seperator;
     }
-
+  if (clean_user.back () != seperator)
+    {
+      clean_user += seperator;
+    }
 #if defined (WINDOWS)
   if (clean_allowed.substr (0, 2) != clean_user.substr (0, 2))
     {
       return false;
     }
 #endif
-
   return clean_user.rfind (clean_allowed, 0) == 0;
 }
 
@@ -4209,9 +4211,11 @@ is_authorized_filename (const char *path, char *_dbmt_error)
     }
 
   std::string origin_path = path;
+  std::string allowed_path = std::string(sco.szCubrid) + ", " + sco.szCubrid_databases;
 
   std::replace (origin_path.begin (), origin_path.end (), '%', '*');
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (%s allowed): %s", sco.szCubrid, origin_path.c_str ());
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
+	    allowed_path.c_str (), origin_path.c_str ());
 
   return false;
 }
