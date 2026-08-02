@@ -4849,13 +4849,13 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "--" UNLOAD_OUTPUT_PATH_L;
   argv[argc++] = fullpath;
 
-  if (hashdir != NULL && *hashdir && !is_authorized_filename (hashdir, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
-    }
-
   if ((usehash != NULL) && (strcmp (usehash, "yes") == 0))
     {
+      if (strcmp (hashdir, "none") != 0 && !is_authorized_filename (hashdir, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+
       argv[argc++] = "--" UNLOAD_HASH_FILE_L;
       argv[argc++] = hashdir;
     }
