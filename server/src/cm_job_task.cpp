@@ -7135,11 +7135,10 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   int retval = 0;
   int tmp = 0;
   T_DB_SERVICE_MODE db_mode;
-  char *sqltext;
   int num_queries = 0;
   char *query_p = NULL;
   int query_file_size;
-  TS_SQL_INFO *sql_info;
+  TS_SQL_INFO *sql_info = NULL;
   int has_comma[]={0, 0, 0, 0, 0, 0, 0, 1, 0};
 
   cmd_name[0] = '\0';
