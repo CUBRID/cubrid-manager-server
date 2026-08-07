@@ -2521,7 +2521,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      if (!is_authorized_filename (genvolpath, _dbmt_error))
+      if (is_invalid_filename_with_msg (genvolpath, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -2540,7 +2540,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       else
 	{
-	  if (!is_authorized_filename (logvolpath, _dbmt_error))
+	  if (is_invalid_filename_with_msg (logvolpath, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -3151,7 +3151,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   if (exvolpath != NULL && strcmp (exvolpath, "none") != 0 &&
-      !is_authorized_filename (exvolpath, _dbmt_error))
+      is_invalid_filename_with_msg (exvolpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -3556,7 +3556,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       volpath = db_dir;
     }
 
-  if (!is_authorized_filename (volpath, _dbmt_error))
+  if (is_invalid_filename_with_msg (volpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -3713,9 +3713,9 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (logpath, _dbmt_error) ||
-      (destdbpath != NULL && !is_authorized_filename (destdbpath, _dbmt_error)) ||
-      (exvolpath != NULL && !is_authorized_filename (exvolpath, _dbmt_error)))
+  if (is_invalid_filename_with_msg (logpath, _dbmt_error) ||
+      (destdbpath != NULL && is_invalid_filename_with_msg (destdbpath, _dbmt_error)) ||
+      (exvolpath != NULL && is_invalid_filename_with_msg (exvolpath, _dbmt_error)))
     {
       return ERR_WITH_MSG;
     }
@@ -4773,7 +4773,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (fullpath, sizeof (fullpath) - 1, "%s", targetdir);
     }
 
-  if (!is_authorized_filename (fullpath, _dbmt_error))
+  if (is_invalid_filename_with_msg (fullpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -4851,7 +4851,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((usehash != NULL) && (strcmp (usehash, "yes") == 0))
     {
-      if (strcmp (hashdir, "none") != 0 && !is_authorized_filename (hashdir, _dbmt_error))
+      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -5377,7 +5377,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (!is_authorized_filename (schema_file_list, _dbmt_error) ||
+      if (is_invalid_filename_with_msg (schema_file_list, _dbmt_error) ||
 	  is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
@@ -5544,7 +5544,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = lv;
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (!is_authorized_filename (pathname, _dbmt_error))
+      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -5559,7 +5559,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (recovery_path != NULL && !uStringEqual (recovery_path, "")
       && !uStringEqual (recovery_path, "none"))
     {
-      if (!is_authorized_filename (recovery_path, _dbmt_error))
+      if (is_invalid_filename_with_msg (recovery_path, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -5660,7 +5660,7 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (!is_authorized_filename (pathname, _dbmt_error))
+      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
