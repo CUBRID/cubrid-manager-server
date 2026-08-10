@@ -1197,12 +1197,12 @@ int ext_read_private_data (Json::Value &request, Json::Value &response)
 
   confname= request["confname"].asString();
 
-  if (!is_authorized_filename (confname.c_str (), _dbmt_error))
+  snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
+
+  if (!is_authorized_filename (conf_path, _dbmt_error))
     {
       return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
     }
-
-  snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
   infile = fopen (conf_path, "r");
   if (infile == NULL)
