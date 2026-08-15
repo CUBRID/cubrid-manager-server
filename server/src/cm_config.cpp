@@ -233,7 +233,6 @@ uReadSystemConfig (void)
   sco.iCMS_port = DEFAULT_CMS_PORT;
   sco.iMonitorInterval = DEFAULT_MONITOR_INTERVAL;
   sco.iAllow_AdminMultiCon = DEFAULT_ALLOW_MULTI_CON;
-  sco.iSupportWebManager = FALSE;
   sco.iSupportMonStat = FALSE;
   sco.iHttpTimeout = 30;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
@@ -355,17 +354,6 @@ uReadSystemConfig (void)
           if (atoi (ent_val) > 0)
             {
               sco.iMaxLogFiles = atoi (ent_val);
-            }
-        }
-      else if (strcasecmp (ent_name, "support_web_manager") == 0)
-        {
-          if (strcasecmp (ent_val, "yes") == 0)
-            {
-              sco.iSupportWebManager = TRUE;
-            }
-          else
-            {
-              sco.iSupportWebManager = FALSE;
             }
         }
       else if (strcasecmp (ent_name, "web_manager_path") == 0)

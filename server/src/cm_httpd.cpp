@@ -304,6 +304,28 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
   return;
 }
 
+void
+cub_reject_request_handler (struct evhttp_request *req, void *arg)
+{
+  struct evbuffer *evb = evbuffer_new ();
+
+  if (evb)
+    {
+      evhttp_add_header (evhttp_request_get_output_headers (req),
+                          "Content-Type", "application/json;charset=utf-8");
+      evbuffer_add_printf (evb, "{ \"error\" : \"Not Found\" }");
+    }
+
+  evhttp_send_reply (req, HTTP_NOTFOUND, "Not Found", evb);
+
+  if (evb)
+    {
+      evbuffer_free (evb);
+    }
+
+  return;
+}
+
 static int cub_loop_flag = 1;
 
 void
@@ -549,8 +571,7 @@ start_service ()
           evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
           evhttp_set_cb (start_ctx[i]->httpd, "/ctrl", cub_ctrl_request_handler, NULL);
           evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
-          /* Start web server*/
-          evhttp_set_gencb (start_ctx[i]->httpd, load_webfiles_cb, (void *) sco.szCWMPath);
+          evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
         }
       else if (i == 1)
         {

@@ -592,7 +592,6 @@ typedef struct
   int iAllow_AdminMultiCon;
   int iAutoJobTimeout;
   int iCMS_port;
-  int iSupportWebManager;
   int iSupportMonStat;
   int iHttpTimeout;
   char szAutoUpdateURL[PATH_MAX];
