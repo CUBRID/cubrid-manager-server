@@ -363,7 +363,7 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
   token[TOKEN_ENC_LENGTH - 1] = '\0';
   if (!ext_ut_validate_token (token))
     {
-      goto send_reply;
+      goto send_nok_reply;
     }
   for (int index = 0; index < NUM_OF_FILES_IN_URL; ++index)
     {
