@@ -326,16 +326,6 @@ cub_reject_request_handler (struct evhttp_request *req, void *arg)
   return;
 }
 
-static int cub_loop_flag = 1;
-
-void
-cub_ctrl_request_handler (struct evhttp_request *req, void *arg)
-{
-  evhttp_send_reply (req, HTTP_OK, "", NULL);
-  cub_loop_flag = 0;
-  return;
-}
-
 void
 cub_post_request_handler (struct evhttp_request *req, void *arg)
 {
@@ -420,16 +410,6 @@ send_reply:
   return;
 }
 
-void
-cub_timeout_cb (evutil_socket_t fd, short event, void *arg)
-{
-  struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-    }
-}
-
 
 /**
  * @brief callback function to gather monitoring data
@@ -440,11 +420,6 @@ start_monitor_stat_cb (evutil_socket_t fd, short event, void *arg)
   struct timeval stat_tv = { STAT_MONITOR_INTERVAL, 0 };
 
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
 
   // [CUBRIDSUS-11917]sleep the thread for a while when the CUBRID is starting
   if (work_ctx->first)
@@ -466,11 +441,7 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
 {
   struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
+
 #ifdef WINDOWS
   unsigned long thread_status;
   GetExitCodeThread ((HANDLE) auto_task_tid, &thread_status);
@@ -503,7 +474,6 @@ start_service ()
 {
   struct worker_context *start_ctx[DEFAULT_THRD_NUM];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
-  struct timeval tv = { sco.iMonitorInterval, 0 };
   int nfd, err, i = 0;
 
   tmpstrbuf[0] = '\0';
@@ -547,11 +517,7 @@ start_service ()
 
       if (i > 1)        /* DEFAULT_THRD_NUM - 1 for request handler */
         {
-          start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_PERSIST, cub_timeout_cb, (void *) start_ctx[i]);
-          if (start_ctx[i]->timer == NULL)
-            {
-              continue;
-            }
+          start_ctx[i]->timer = NULL;
 
           start_ctx[i]->httpd = evhttp_new (start_ctx[i]->base);
           if (start_ctx[i]->httpd == NULL)
@@ -569,7 +535,6 @@ start_service ()
           /* This is the magic that lets evhttp use SSL. */
           evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
           evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
-          evhttp_set_cb (start_ctx[i]->httpd, "/ctrl", cub_ctrl_request_handler, NULL);
           evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
           evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
         }
@@ -607,10 +572,6 @@ start_service ()
         {
           struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
           evtimer_add (start_ctx[i]->timer, &auto_task_tv);
-        }
-      else
-        {
-          evtimer_add (start_ctx[i]->timer, &tv);
         }
 #ifdef WINDOWS
       start_ctx[i]->ths =
