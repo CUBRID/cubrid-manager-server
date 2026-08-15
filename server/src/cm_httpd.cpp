@@ -326,11 +326,13 @@ cub_reject_request_handler (struct evhttp_request *req, void *arg)
   return;
 }
 
+#if !defined (NDEBUG)
 void
 cub_post_request_handler (struct evhttp_request *req, void *arg)
 {
   string post_msg = "{ \"success\" : true }";
   string req_uri (req->uri);
+  std::string cookie;
   char token[TOKEN_ENC_LENGTH];
   size_t token_pos;
   int code;
@@ -338,13 +340,19 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
   size_t fname_pos = 0;
   size_t tmp_pos = 0;
   struct evbuffer *evb = evbuffer_new();
+  const char *cookie_header = evhttp_find_header (req->input_headers, "COOKIE");
 
   code = HTTP_OK;
   reason = "OK";
   token[0] = '\0';
   token_pos = 0;
 
-  string cookie (evhttp_find_header (req->input_headers, "COOKIE"));
+  if (cookie_header == NULL || strlen (cookie_header) == 0)
+    {
+      goto send_nok_reply;
+    }
+
+  cookie = cookie_header;
   token_pos = cookie.find ("token=");
   if (token_pos == string::npos)
     {
@@ -353,15 +361,15 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
 
   cookie.copy (token, TOKEN_ENC_LENGTH - 1, token_pos + strlen ("token="));
   token[TOKEN_ENC_LENGTH - 1] = '\0';
-  if (ext_ut_validate_token (token))
+  if (!ext_ut_validate_token (token))
     {
       goto send_reply;
     }
-
   for (int index = 0; index < NUM_OF_FILES_IN_URL; ++index)
     {
       char fname[PATH_MAX];
-      string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string path = fname_path;
       fname[0] = '\0';
       fname_pos = req_uri.find ("fname=", tmp_pos);
       if (fname_pos == string::npos && index == 0)
@@ -379,14 +387,23 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
         {
           tmp_pos = req_uri.length();
         }
+
+      if ((tmp_pos - fname_pos) > PATH_MAX)
+	{
+          goto send_nok_reply;
+	}
+
       req_uri.copy (fname, tmp_pos - fname_pos + 1, fname_pos);
       fname[tmp_pos - fname_pos] = '\0';
+
       if (strcmp (fname, "") != 0 || strcmp (fname, "&") != 0)
         {
-          if (strstr (fname, "..") || strstr (fname, "\\") || strstr (fname, "/"))
+	  path += fname;
+	  if (is_invalid_filename (fname) || !is_subpath (sco.dbmt_tmp_dir, path.c_str ()))
             {
-              continue;
+              goto send_nok_reply;
             }
+
           fname_path += fname;
           unlink (fname_path.c_str());
         }
@@ -410,6 +427,7 @@ send_reply:
   return;
 }
 
+#endif
 
 /**
  * @brief callback function to gather monitoring data
@@ -535,8 +553,12 @@ start_service ()
           /* This is the magic that lets evhttp use SSL. */
           evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
           evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
+#if defined (NDEBUG)
+          evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#else
           evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
           evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#endif
         }
       else if (i == 1)
         {
