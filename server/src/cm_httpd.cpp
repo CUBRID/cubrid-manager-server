@@ -388,7 +388,7 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
           tmp_pos = req_uri.length();
         }
 
-      if ((tmp_pos - fname_pos) > PATH_MAX)
+      if ((tmp_pos - fname_pos) >= PATH_MAX)
 	{
           goto send_nok_reply;
 	}
