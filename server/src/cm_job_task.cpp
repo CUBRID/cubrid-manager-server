@@ -4433,6 +4433,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   char *dbname = NULL;
   char *verbose = NULL;
+  char *input_class_file = NULL;
 
   cmd_name[0] = '\0';
   out_file[0] = '\0';
@@ -4480,6 +4481,24 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   else if (db_mode == DB_SERVICE_MODE_NONE)
     {
       argv[argc++] = "--" COMPACT_SA_MODE_L;
+    }
+
+  input_class_file = nv_get_val (req, "input-class-file");
+  if (input_class_file)
+    {
+      if (is_invalid_filename_with_msg (input_class_file, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+
+      if (access (input_class_file, F_OK) < 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
+	  return ERR_WITH_MSG;
+	}
+
+      argv[argc++] = "-" COMPACT_INPUT_CLASS_FILE_S;
+      argv[argc++] = input_class_file;
     }
 
   argv[argc++] = dbname;
