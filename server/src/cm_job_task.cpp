@@ -4440,6 +4440,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   int retval = ERR_NO_ERROR;
   int createtmpfile = 0;
+  char *input_class_file = NULL;
 
   char *dbname = NULL;
   char *verbose = NULL;
@@ -4498,6 +4499,19 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  return ERR_WITH_MSG;
 	}
+    }
+
+  input_class_file = nv_get_val (req, "input-class-file");
+  if (input_class_file)
+    {
+      if (access (input_class_file, F_OK) < 0)
+        {
+          snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
+          return ERR_WITH_MSG;
+        }
+
+      argv[argc++] = "-" COMPACT_INPUT_CLASS_FILE_S;
+      argv[argc++] = input_class_file;
     }
 
   snprintf (dbname_at_hostname, sizeof (dbname_at_hostname), "%s%s", dbname, ha_mode ? "@localhost" : "");

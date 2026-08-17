@@ -373,6 +373,7 @@
 #define COMPACT_SA_MODE_L                       "SA-mode"
 #define COMPACT_CS_MODE_S                       'C'
 #define COMPACT_CS_MODE_L                       "CS-mode"
+#define COMPACT_INPUT_CLASS_FILE_S              "i"
 
 /* paramdump option list */
 #define PARAMDUMP_BOTH_S                        'b'
