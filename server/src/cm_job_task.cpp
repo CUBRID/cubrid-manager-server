@@ -367,6 +367,7 @@ static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_erro
 static int expand_path (const char *src, char *dst, int dest_len);
 
 static int is_ha_updates_disabled (char *dbname, char *_dbmt_error);
+static int create_input_class_file (nvplist *req, nvplist *res, const char *filename, char *_dbmt_error);
 
 static char *allowed_env[]=
 {
@@ -4424,12 +4425,64 @@ statdump_finale:
   return retval;
 }
 
+/*
+ * create_input_class_file () - write the "class-names" values of req to
+ *   filename, one class name per line, so the resulting file can be
+ *   handed to compactdb the same way a user supplied "input-class-file"
+ *   is.
+ *
+ *   req (in)   : client request.
+ *   res (in)   : client response
+ *   filename (in) : path of the temporary file to create.
+ *   _dbmt_error (out) : error message buffer.
+ *
+ *   return : ERR_NO_ERROR on success, an ERR_ code on failure.
+ */
+static int
+create_input_class_file (nvplist *req, nvplist *res, const char *filename, char *_dbmt_error)
+{
+  int i;
+  char *name = NULL;
+  char *value = NULL;
+  int class_cnt = 0;
+  FILE *fp;
+
+  fp = fopen (filename, "w");
+  if (fp == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", filename);
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
+  for (i = 0; i < req->nvplist_leng; i++)
+    {
+      nv_lookup (req, i, &name, &value);
+      if ((name != NULL) && (strcmp (name, "class-names") == 0) && (value != NULL) && (value[0] != '\0'))
+	{
+	  fprintf (fp, "%s\n", value);
+	  class_cnt++;
+	}
+    }
+
+  fclose (fp);
+
+  if (class_cnt == 0)
+    {
+      unlink (filename);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "class-names");
+      return ERR_PARAM_MISSING;
+    }
+
+  return ERR_NO_ERROR;
+}
+
 int
 ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char out_file[PATH_MAX];
   char err_file[PATH_MAX];
+  char class_names_file[PATH_MAX];
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
 
   const char *argv[10];
@@ -4441,6 +4494,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   int retval = ERR_NO_ERROR;
   int createtmpfile = 0;
   char *input_class_file = NULL;
+  char *class_names = NULL;
 
   char *dbname = NULL;
   char *verbose = NULL;
@@ -4448,6 +4502,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   cmd_name[0] = '\0';
   out_file[0] = '\0';
   err_file[0] = '\0';
+  class_names_file[0] = '\0';
 
   dbname = nv_get_val (req, "dbname");
   if (dbname == NULL)
@@ -4502,11 +4557,37 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   input_class_file = nv_get_val (req, "input-class-file");
+  class_names = nv_get_val (req, "class-names");
+
+  if (input_class_file != NULL && class_names != NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Use only one of the two keys: 'input-class-file' or 'class-names'");
+      return ERR_WITH_MSG;
+    }
+
+
+  if (class_names != NULL)
+    {
+      make_temp_filepath (class_names_file, sco.dbmt_tmp_dir, "compactdb_input_class", TS_COMPACTDB, PATH_MAX);
+
+      retval = create_input_class_file (req, res, class_names_file, _dbmt_error);
+      if (retval != ERR_NO_ERROR)
+	{
+	  return retval;
+	}
+
+      input_class_file = class_names_file;
+    }
+
   if (input_class_file)
     {
       if (access (input_class_file, F_OK) < 0)
         {
           snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
+          if (class_names != NULL)
+	    {
+	      unlink (class_names_file);
+	    }
           return ERR_WITH_MSG;
         }
 
@@ -4564,6 +4645,10 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 rm_tmpfile:
   unlink (out_file);
   unlink (err_file);
+  if (class_names != NULL)
+    {
+      unlink (class_names_file);
+    }
   return retval;
 }
 

@@ -10,6 +10,8 @@ Compact database.
 | token | token string encrypted. |
 | dbname | database name |
 | verbose | on-off indicating whether to show detailed information |
+| input-class-file | path of a file that lists the classes to compact, one class name per line. passed to compactdb as `-i <file>`. cannot be given together with class-names |
+| class-names | a list of class names to compact. the server writes the names to a temporary file and passes it to compactdb the same way input-class-file does. cannot be given together with input-class-file |
 
 ## Request Sample
 
@@ -18,7 +20,19 @@ Compact database.
   "task":"compactdb",
   "token":"cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
   "dbname":"alatestdb",
-  "input-class-file":"$CUBRID/tmp/demodb-input-class-file",
+  "input-class-file":"$CUBRID/tmp/alatestdb-input-class-file",
+  "verbose":"y"
+}
+```
+
+`class-names` can be used instead of `input-class-file` when the caller wants to specify the target classes directly, without preparing a file itself:
+
+```
+{
+  "task":"compactdb",
+  "token":"cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
+  "dbname":"alatestdb",
+  "class-names":["public.athlete", "public.event", "public.history"],
   "verbose":"y"
 }
 ```
