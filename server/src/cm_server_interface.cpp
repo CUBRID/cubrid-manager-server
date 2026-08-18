@@ -828,35 +828,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
-  pthread_mutex_lock (pstmt->mutex);
-  to.tv_sec = time (NULL) + time_out;
-  to.tv_nsec = 0;
-  err = pthread_cond_timedwait (pstmt->cond, pstmt->mutex, &to);
-//  err = pthread_cond_wait (&cond, &mutex);
-  pthread_mutex_unlock (pstmt->mutex);
-  if (err == ETIMEDOUT)
-    {
-      string dbname, task_name;
-
-      task_name = request.get ("task", "unknown").asString();
-      dbname = request.get ("dbname", "").asString();
-
-      /* register the still-running job so gettaskstatus / job_status can
-       * find it later. the original code returned here without ever
-       * push_back ()-ing pstmt, which meant a poll for this uuid always
-       * came back "uuid not found" and pstmt (plus its thread) leaked. */
-      mutex_lock (cm_mutex);
-      reap_stale_async_jobs ();
-      request_list.push_back (pstmt);
-      mutex_unlock (cm_mutex);
-
-      put_uuid (response, pstmt->uuid);
-      response["job-status"] = "running";
-      LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
-		time_out, task_name.c_str(), dbname.c_str ());
-      return build_server_header (response, ERR_WITH_MSG, "timeout");
-    }
-
   pthread_mutex_destroy (pstmt->mutex);
   pthread_cond_destroy (pstmt->cond);
   delete pstmt->mutex;
