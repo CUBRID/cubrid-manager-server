@@ -586,8 +586,11 @@ cm_async_request_handler (void *lpArg)
       response["note"] = e.what ();
     }
 
+  mutex_lock (cm_mutex);
   async_param->finished_at = time (NULL);
   async_param->status = 1;
+  mutex_unlock (cm_mutex);
+
   nv_destroy (cli_request);
   nv_destroy (cli_response);
 
