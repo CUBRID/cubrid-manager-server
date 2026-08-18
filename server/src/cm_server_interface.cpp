@@ -477,7 +477,6 @@ static const char *async_capable_tasks[] =
   "restoredb",
   "backupdb",
   "addvoldb",
-  "backupdb",
   NULL
 };
 
