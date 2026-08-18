@@ -647,9 +647,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       return build_server_header (response, ERR_NO_ERROR, "none");
     }
 
-  //dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
-
-  dwWaitResult = WaitForSingleObject (hHandles, INFINITE);    //no timeout.
+  dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
 
   if (dwWaitResult == WAIT_TIMEOUT)
     {
