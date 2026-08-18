@@ -49,6 +49,9 @@
 #define DEFAULT_AUTOJOB_TIMEOUT  43200    /* timeout for all autojobs, 12 hours */
 #define MIN_AUTOJOB_TIMEOUT      60    /* min timeout for all autojobs, 60 sec */
 
+#define DEFAULT_ASYNC_JOB_TTL_SEC  3600  /* how long a finished async job kept around for gettaskstatus polling */
+#define MIN_ASYNC_JOB_TTL_SEC      60    /* min async job TTL, 60 sec */
+
 #define MAX_THREAD_NUM           64
 #define MIN_THREAD_NUM           1
 /* Reject multi connection with "ALL USER" */
@@ -236,6 +239,7 @@ uReadSystemConfig (void)
   sco.iSupportWebManager = FALSE;
   sco.iSupportMonStat = FALSE;
   sco.iHttpTimeout = 30;
+  sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
@@ -389,6 +393,18 @@ uReadSystemConfig (void)
                strcasecmp (ent_name, "HttpTimeout") == 0)
         {
           sco.iHttpTimeout = atoi (ent_val);
+        }
+      else if (strcasecmp (ent_name, "async_job_ttl_sec") == 0)
+        {
+          int ttl = atoi (ent_val);
+          if (MIN_ASYNC_JOB_TTL_SEC <= ttl)
+            {
+              sco.iAsyncJobTtlSec = ttl;
+            }
+          else
+            {
+              sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
+            }
         }
       else if (strcasecmp (ent_name, "auto_update_url") == 0 ||
                strcasecmp (ent_name, "AutoUpdateURL") == 0)

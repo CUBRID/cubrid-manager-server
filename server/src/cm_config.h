@@ -596,6 +596,7 @@ typedef struct
   int iSupportWebManager;
   int iSupportMonStat;
   int iHttpTimeout;
+  int iAsyncJobTtlSec;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   char szTokenActiveTime[PATH_MAX];

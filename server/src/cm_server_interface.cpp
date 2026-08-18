@@ -60,6 +60,8 @@ mutex_t cm_mutex;
 /*global cubrid env*/
 cubrid_env_t cub_httpd_env;
 
+static void put_uuid (Json::Value &response, INT64 uuid);
+
 /**
  * @brief initial monitoring stat information
  *
@@ -455,13 +457,61 @@ cub_cm_extend_request (Json::Value &request, Json::Value &response)
   return 0;
 }
 
+/*
+ * task names that a client may run with "async":"yes". these are the
+ * handful of utility-wrapping tasks that are known to run long enough
+ * (compactdb, backupdb, ...) that blocking the caller for the whole
+ * duration is undesirable. any other task ignores the "async" key and
+ * runs the same way it always has.
+ */
+static const char *async_capable_tasks[] =
+{
+  "loaddb",
+  "unloaddb",
+  "createdb",
+  "optimizedb",
+  "checkdb",
+  "copydb",
+  "renamedb",
+  "compactdb",
+  "restoredb",
+  "backupdb",
+  "addvoldb",
+  "backupdb",
+  NULL
+};
+
+static bool
+is_async_capable_task (const string &task_name)
+{
+  for (int i = 0; async_capable_tasks[i] != NULL; i++)
+    {
+      if (task_name == async_capable_tasks[i])
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
+/*
+ * an async job is dropped sco.iAsyncJobTtlSec seconds after it was
+ * created (default DEFAULT_ASYNC_JOB_TTL_SEC / 60 min, overridable via
+ * "async_job_ttl_sec" in cm.conf) regardless of how many times a
+ * client has polled gettaskstatus for it in the meantime, so
+ * request_list can't grow without bound just because a client stopped
+ * polling.
+ */
+
 class async_request
 {
   public:
-    unsigned int uuid;
+    INT64 uuid;
     Json::Value request;
     Json::Value response;
     int status;
+    time_t created_at;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -469,6 +519,42 @@ class async_request
 };
 
 list < async_request * >request_list;
+
+/*
+ * reap_stale_async_jobs () - drop finished jobs that have been sitting in
+ *   request_list for longer than sco.iAsyncJobTtlSec because the client
+ *   never called gettaskstatus / job_status to collect the result.
+ *   jobs that are still running are left alone no matter how old, since
+ *   we have no safe way to cancel the worker thread underneath them.
+ *
+ *   caller must already hold cm_mutex.
+ */
+static void
+reap_stale_async_jobs (void)
+{
+  time_t now = time (NULL);
+  list < async_request * >::iterator itor = request_list.begin ();
+
+  while (itor != request_list.end ())
+    {
+      if ((*itor)->status != 0 && (now - (*itor)->created_at) > sco.iAsyncJobTtlSec)
+        {
+	  async_request *stale = *itor;
+	  itor = request_list.erase (itor);
+#ifndef WINDOWS
+	  pthread_mutex_destroy (stale->mutex);
+	  pthread_cond_destroy (stale->cond);
+	  delete stale->mutex;
+	  delete stale->cond;
+#endif
+	  delete stale;
+        }
+      else
+        {
+	  ++itor;
+        }
+    }
+}
 
 #ifdef WINDOWS
 DWORD WINAPI
@@ -495,7 +581,7 @@ cm_async_request_handler (void *lpArg)
     }
   catch (exception &e)
     {
-      response["status"] = ERR_REQUEST_FORMAT;
+      response["status"] = STATUS_FAILURE;
       response["note"] = e.what ();
     }
 
@@ -515,12 +601,12 @@ cm_async_request_handler (void *lpArg)
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+                          unsigned long time_out = 600, bool no_wait = false)
 {
   HANDLE hHandles;
   DWORD ThreadID;
   DWORD dwWaitResult;
-  static unsigned int req_id = 0;
+  static INT64 req_id = 0;
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
@@ -529,7 +615,10 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
+  mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
+  mutex_unlock (cm_mutex);
 
   hHandles =
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
@@ -540,6 +629,21 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
                                   "failed to execute task");
     }
 
+  if (no_wait)
+    {
+      /* caller asked for "async":"yes": hand the uuid back right away
+       * and let the worker thread keep running in the background. */
+      CloseHandle (hHandles);
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_list.push_back (pstmt);
+      mutex_unlock (cm_mutex);
+
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
+    }
+
   //dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
 
   dwWaitResult = WaitForSingleObject (hHandles, INFINITE);    //no timeout.
@@ -547,8 +651,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (dwWaitResult == WAIT_TIMEOUT)
     {
       CloseHandle (hHandles);
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
       request_list.push_back (pstmt);
-      response["uuid"] = pstmt->uuid;
+      mutex_unlock (cm_mutex);
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
@@ -560,46 +668,60 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 #else
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+                          unsigned long time_out = 600, bool no_wait = false)
 {
   int err = 0;
   pthread_t async_thrd;
 #if defined(AIX)
   pthread_attr_t thread_attr;
 #endif
-  pthread_cond_t cond;
-  pthread_mutex_t mutex;
   timespec to;
-  static unsigned int req_id = 0;
+  static INT64 req_id = 0;
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
       return ERR_MEM_ALLOC;
     }
 
-  err = pthread_mutex_init (&mutex, NULL);
+  /* pstmt->mutex / pstmt->cond must outlive this function: when the
+   * caller does not wait (no_wait, or a timeout happens below) pstmt is
+   * handed off to request_list and the worker thread signals it long
+   * after this stack frame is gone. stack-allocating them here (as this
+   * function used to) left the worker thread locking/broadcasting on
+   * freed stack memory once we returned without joining it. */
+  pstmt->mutex = new pthread_mutex_t;
+  pstmt->cond = new pthread_cond_t;
+
+  err = pthread_mutex_init (pstmt->mutex, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
+      delete pstmt->mutex;
+      delete pstmt->cond;
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
 
-  err = pthread_cond_init (&cond, NULL);
+  err = pthread_cond_init (pstmt->cond, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
+      pthread_mutex_destroy (pstmt->mutex);
+      delete pstmt->mutex;
+      delete pstmt->cond;
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
 
+  mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
-
-  pstmt->mutex = &mutex;
-  pstmt->cond = &cond;
+  mutex_unlock (cm_mutex);
 
 #if defined(AIX)
   err = pthread_attr_init (&thread_attr);
@@ -644,19 +766,42 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
+      pthread_mutex_destroy (pstmt->mutex);
+      pthread_cond_destroy (pstmt->cond);
+      delete pstmt->mutex;
+      delete pstmt->cond;
       delete (pstmt);
-      pthread_mutex_destroy (&mutex);
-      pthread_cond_destroy (&cond);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
-  pthread_mutex_lock (&mutex);
+
+  /* the thread is never pthread_join ()-ed (the no_wait and timeout
+   * paths below return without waiting for it), so detach it up front;
+   * otherwise it stays joinable forever and its resources are never
+   * released. */
+  pthread_detach (async_thrd);
+
+  if (no_wait)
+    {
+      /* caller asked for "async":"yes": hand the uuid back right away
+       * and let the worker thread keep running in the background. */
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_list.push_back (pstmt);
+      mutex_unlock (cm_mutex);
+
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
+    }
+
+  pthread_mutex_lock (pstmt->mutex);
   to.tv_sec = time (NULL) + time_out;
   to.tv_nsec = 0;
-  err = pthread_cond_timedwait (&cond, &mutex, &to);
+  err = pthread_cond_timedwait (pstmt->cond, pstmt->mutex, &to);
 //  err = pthread_cond_wait (&cond, &mutex);
-  pthread_mutex_unlock (&mutex);
+  pthread_mutex_unlock (pstmt->mutex);
   if (err == ETIMEDOUT)
     {
       string dbname, task_name;
@@ -664,27 +809,85 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       task_name = request.get ("task", "unknown").asString();
       dbname = request.get ("dbname", "").asString();
 
-      response["uuid"] = pstmt->uuid;
+      /* register the still-running job so gettaskstatus / job_status can
+       * find it later. the original code returned here without ever
+       * push_back ()-ing pstmt, which meant a poll for this uuid always
+       * came back "uuid not found" and pstmt (plus its thread) leaked. */
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_list.push_back (pstmt);
+      mutex_unlock (cm_mutex);
+
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
 		time_out, task_name.c_str(), dbname.c_str ());
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
-  pthread_join (async_thrd, NULL);
-
-  pthread_mutex_destroy (&mutex);
-  pthread_cond_destroy (&cond);
+  pthread_mutex_destroy (pstmt->mutex);
+  pthread_cond_destroy (pstmt->cond);
+  delete pstmt->mutex;
+  delete pstmt->cond;
   response = pstmt->response;
   delete (pstmt);
   return ERR_NO_ERROR;
 }
 #endif
 
+static bool
+parse_uuid (const Json::Value &v, INT64 &out)
+{
+  if (v.isIntegral ())
+    {
+      out = v.asUInt ();
+      return true;
+    }
+
+  if (v.isString ())
+    {
+      const string s = v.asString ();
+      if (s.empty ())
+        {
+	  return false;
+        }
+
+      char *endptr = NULL;
+      /* strtoull (not strtoul): on Windows "unsigned long" is only 32
+       * bits, which would silently truncate a uuid here even though
+       * req_id/out are a full 64-bit INT64. */
+      unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
+      if (endptr == s.c_str () || *endptr != '\0')
+        {
+	  return false;
+        }
+
+      out = (INT64) parsed;
+      return true;
+    }
+
+  return false;
+}
+
+/*
+ * cub_check_async_status () - handle a "gettaskstatus"
+ *   poll for a job previously started with "async":"yes" (or one that
+ *   fell back to async because it ran past sco.iHttpTimeout).
+ *
+ *   accepts the "uuid" while the job is still running this reports
+ *   job-status:"running" via a normal
+ *   ERR_NO_ERROR response instead of the previous ERR_WITH_MSG
+ *   "task not return", since "still running" is an expected poll
+ *   outcome, not a failure.
+ *
+ *   caller (cub_cm_request_handler) is expected to already hold
+ *   cm_mutex when calling this, same as before.
+ */
 int
 cub_check_async_status (Json::Value &request, Json::Value &response)
 {
   string task;
-  unsigned int uuid;
+  INT64 uuid;
   list < async_request * >::iterator itor;
   task = request["task"].asString ();
 
@@ -692,11 +895,14 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
     {
       return 0;
     }
-  if (request["uuid"] == Json::Value::null || !request["uuid"].isInt ())
+
+  reap_stale_async_jobs ();
+
+  if (!parse_uuid (request["uuid"], uuid))
     {
       return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
-  uuid = request["uuid"].asInt ();
+
   for (itor = request_list.begin (); itor != request_list.end (); itor++)
     {
       if ((*itor)->uuid != uuid)
@@ -712,12 +918,26 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
 
   if ((*itor)->status == 0)
     {
-      return build_server_header (response, ERR_WITH_MSG, "task not return");
+      put_uuid (response, (*itor)->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
     }
+
+  /* NOTE: a finished job is intentionally left in request_list here,
+   * not erased/deleted on this first successful poll - a client is
+   * free to call gettaskstatus for the same uuid more than once (e.g.
+   * a status-check retry, or more than one part of the client polling
+   * independently) and should keep getting the same finished result
+   * each time. the job is only ever reclaimed by reap_stale_async_jobs
+   * (), once sco.iAsyncJobTtlSec seconds have passed since it was
+   * created (see cm.conf's "async_job_ttl_sec"). */
   response = (*itor)->response;
-  request_list.erase (itor);
+  put_uuid (response, (*itor)->uuid);
+  response["job-status"] = (response["status"].isString () &&
+			    response["status"].asString () == STATUS_SUCCESS) ? "success" : "error";
   return ERR_NO_ERROR;
 }
+
 
 int
 cub_cm_request_handler (Json::Value &request, Json::Value &response)
@@ -755,8 +975,44 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
       mutex_unlock (cm_mutex);
       return 1;
     }
-  cm_execute_request_async (request, response, sco.iHttpTimeout);
 
-  mutex_unlock (cm_mutex);
+  /*
+   * everything above this point is fast and bounded (token/auth lookup,
+   * a request_list scan), so it is fine to run it under cm_mutex. what
+   * follows is not: cm_execute_request_async () either runs the task
+   * and waits for it (up to sco.iHttpTimeout, 30 sec by default) or, for
+   * an explicit "async":"yes" request on a long-running task, does not
+   * wait at all. cm_mutex used to stay held for that entire wait, which
+   * meant one client's slow compactdb/backupdb/etc. blocked every other
+   * client's requests - even unrelated, fast ones - for as long as the
+   * first one took (or until it timed out). release the lock before
+   * that call; cm_execute_request_async () re-takes cm_mutex itself,
+   * briefly, only when it actually needs to touch request_list.
+   */
+  {
+    bool want_async = uStringEqual (request.get ("async", "no").asString ().c_str (), "yes")
+                      && is_async_capable_task (request["task"].asString ());
+
+    mutex_unlock (cm_mutex);
+    cm_execute_request_async (request, response, sco.iHttpTimeout, want_async);
+  }
+
   return 1;
+}
+
+/*
+ * put_uuid () - write a job's uuid into a response as a JSON string.
+ *   the vendored jsoncpp in this tree predates 64-bit JSON number
+ *   support (Json::Value only has a 32-bit Int/UInt, no Int64/UInt64),
+ *   so assigning an INT64 uuid straight into a Json::Value would
+ *   silently truncate it once req_id grows past 2^32. encoding it as a
+ *   string sidesteps that and round-trips losslessly through
+ *   parse_uuid (), which already accepts numeric strings.
+ */
+static void
+put_uuid (Json::Value &response, INT64 uuid)
+{
+  char buf[32];
+  snprintf (buf, sizeof (buf), "%lld", (long long) uuid);
+  response["uuid"] = buf;
 }
