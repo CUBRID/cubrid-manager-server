@@ -857,7 +857,11 @@ parse_uuid (const Json::Value &v, INT64 &out)
       /* strtoull (not strtoul): on Windows "unsigned long" is only 32
        * bits, which would silently truncate a uuid here even though
        * req_id/out are a full 64-bit INT64. */
+#if defined (WINDOWS)
+      unsigned long long parsed = _strtoui64 (s.c_str (), &endptr, 10);
+#else
       unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
+#endif
       if (endptr == s.c_str () || *endptr != '\0')
         {
 	  return false;
