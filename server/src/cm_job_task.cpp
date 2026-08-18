@@ -4571,12 +4571,20 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       make_temp_filepath (class_names_file, sco.dbmt_tmp_dir, "compactdb_input_class", TS_COMPACTDB, PATH_MAX);
 
       retval = create_input_class_file (req, res, class_names_file, _dbmt_error);
-      if (retval != ERR_NO_ERROR)
+      if (retval == ERR_TMPFILE_OPEN_FAIL)
 	{
 	  return retval;
 	}
+      else if (retval == ERR_NO_ERROR)
+	{
+	  input_class_file = class_names_file;
+	}
+      else
+	{
+	  unlink (class_names_file);
+	  class_names = NULL;
+	}
 
-      input_class_file = class_names_file;
     }
 
   if (input_class_file)
