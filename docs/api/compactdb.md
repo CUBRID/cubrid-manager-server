@@ -10,8 +10,8 @@ Compact database.
 | token | token string encrypted. |
 | dbname | database name |
 | verbose | on-off indicating whether to show detailed information |
-| input-class-file | path of a file that lists the classes to compact, one class name per line. passed to compactdb as `-i <file>`. cannot be given together with class-names |
-| class-names | a list of class names to compact. the server writes the names to a temporary file and passes it to compactdb the same way input-class-file does. cannot be given together with input-class-file |
+| input-class-file | path of a file that lists the classes to compact, one class name per line. cannot be given together with class-names |
+| class-names | a list of class names to compact. cannot be given together with input-class-file |
 
 ## Request Sample
 
