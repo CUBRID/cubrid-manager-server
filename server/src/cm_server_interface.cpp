@@ -512,6 +512,7 @@ class async_request
     Json::Value response;
     int status;
     time_t created_at;
+    time_t finished_at;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -537,7 +538,7 @@ reap_stale_async_jobs (void)
 
   while (itor != request_list.end ())
     {
-      if ((*itor)->status != 0 && (now - (*itor)->created_at) > sco.iAsyncJobTtlSec)
+      if ((*itor)->status != 0 && (now - (*itor)->finished_at) > sco.iAsyncJobTtlSec)
         {
 	  async_request *stale = *itor;
 	  itor = request_list.erase (itor);
@@ -585,6 +586,7 @@ cm_async_request_handler (void *lpArg)
       response["note"] = e.what ();
     }
 
+  async_param->finished_at = time (NULL);
   async_param->status = 1;
   nv_destroy (cli_request);
   nv_destroy (cli_response);
@@ -616,6 +618,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->request = request;
   pstmt->status = 0;
   pstmt->created_at = time (NULL);
+  pstmt->finished_at = 0;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
   mutex_unlock (cm_mutex);
@@ -794,6 +797,35 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
       return build_server_header (response, ERR_NO_ERROR, "none");
+    }
+
+  pthread_mutex_lock (pstmt->mutex);
+  to.tv_sec = time (NULL) + time_out;
+  to.tv_nsec = 0;
+  err = 0;
+  while (pstmt->status == 0 && err == 0)
+    {
+      err = pthread_cond_timedwait (pstmt->cond, pstmt->mutex, &to);
+    }
+  pthread_mutex_unlock (pstmt->mutex);
+  if (pstmt->status == 0)
+    {
+      string dbname, task_name;
+      task_name = request.get ("task", "unknown").asString();
+      dbname = request.get ("dbname", "").asString();
+      /* register the still-running job so gettaskstatus can
+       * find it later. the original code returned here without ever
+       * push_back ()-ing pstmt, which meant a poll for this uuid always
+       * came back "uuid not found" and pstmt (plus its thread) leaked. */
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_list.push_back (pstmt);
+      mutex_unlock (cm_mutex);
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
+      LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
+		time_out, task_name.c_str(), dbname.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
   pthread_mutex_lock (pstmt->mutex);
