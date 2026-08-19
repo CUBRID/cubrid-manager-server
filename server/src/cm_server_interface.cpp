@@ -807,8 +807,9 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       err = pthread_cond_timedwait (pstmt->cond, pstmt->mutex, &to);
     }
+  bool finished = (pstmt->status != 0);
   pthread_mutex_unlock (pstmt->mutex);
-  if (pstmt->status == 0)
+  if (!finished)
     {
       string dbname, task_name;
       task_name = request.get ("task", "unknown").asString();
