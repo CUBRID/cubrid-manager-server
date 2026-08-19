@@ -58,7 +58,6 @@ Rename database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "renamedb",
    "uuid" : "14"
 }
 ```

@@ -65,7 +65,6 @@ Create database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "createdb",
    "uuid" : "14"
 }
 ```

@@ -66,7 +66,6 @@ Compact database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "compactdb",
    "uuid" : "14"
 }
 ```

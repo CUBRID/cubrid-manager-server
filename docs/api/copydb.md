@@ -62,7 +62,6 @@ Copy database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "copydb",
    "uuid" : "14"
 }
 ```

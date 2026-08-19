@@ -51,7 +51,6 @@ Optimize database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "optimizedb",
    "uuid" : "14"
 }
 ```

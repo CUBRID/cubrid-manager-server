@@ -54,7 +54,6 @@ Add a new volume.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "addvoldb",
    "uuid" : "14"
 }
 ```

@@ -52,7 +52,6 @@ Check consistency of database.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "checkdb",
    "uuid" : "14"
 }
 ```

@@ -62,7 +62,6 @@ The unloaddb interface will unload a database server.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "task" : "unloaddb",
    "uuid" : "14"
 }
 ```
