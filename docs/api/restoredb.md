@@ -14,6 +14,9 @@ The restoredb interface will restore a database from backup.
 | partial | perform partial recovery if any log archive is absent |
 | pathname | PATH is a directory of backup volumes to be restored |
 | recoverypath | restore the database and log volumes to the path specified in the database location file |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -26,6 +29,18 @@ The restoredb interface will restore a database from backup.
   "level": "0",
   "partial": "y",
   "pathname": "$CUBRID_DATABASES/alatestdb/backup/alatestdb_backup_lv0",
-  "recoverypath": "$CUBRID_DATABASES/alatestdb"
+  "recoverypath": "$CUBRID_DATABASES/alatestdb",
+  "async":"yes"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "restoredb",
+   "uuid" : "14"
 }
 ```

@@ -25,6 +25,9 @@ The unloaddb interface will unload a database server.
 | prefix | PREFIX for output files; default: the database name |
 | cache | NUMBER of cached pages; default: 100 |
 | lofile | lo file COUNT per a directory; default: 0 |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -48,6 +51,18 @@ The unloaddb interface will unload a database server.
   "estimate": "none",
   "prefix": "none",
   "cach": "none",
-  "lofile": "none"
+  "lofile": "none",
+  "async":"yes"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "unloaddb",
+   "uuid" : "14"
 }
 ```

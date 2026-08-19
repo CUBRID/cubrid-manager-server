@@ -23,6 +23,9 @@ The loaddb interface will load a database from files.
 | no-user-specified-name | Find classes, serials, and triggers by their object names without their owner names |
 | schema-file-list | name of schema-file-list, list of schema file names to be used in loaddb |
 | delete_orignal_files | delete original file after load |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -42,6 +45,18 @@ The loaddb interface will load a database from files.
   "index": "none",
   "errorcontrolfile": "none",
   "ignoreclassfile": "none",
-  "delete_orignal_files": "y"
+  "delete_orignal_files": "y",
+  "async":"yes"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "loaddb",
+   "uuid" : "14"
 }
 ```

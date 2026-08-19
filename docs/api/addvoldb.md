@@ -12,6 +12,9 @@ Add a new volume.
 | volname | volume name |
 | purpose | generic, data, index, temp |
 | size_need_mb | size of the volume in megabytes (MB) |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -21,7 +24,8 @@ Add a new volume.
   "dbname":"demodb",
   "volname":"testvol",
   "purpose":"generic",
-  "size_need_mb":"500"
+  "size_need_mb":"500",
+  "async":"yes"
 }
 ```
 
@@ -41,5 +45,16 @@ Add a new volume.
   "note": "none",
   "status": "success",
   "task": "addvoldb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "addvoldb",
+   "uuid" : "14"
 }
 ```

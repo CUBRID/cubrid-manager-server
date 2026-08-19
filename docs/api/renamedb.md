@@ -13,6 +13,9 @@ Rename database.
 | exvolpath | extend volume path |
 | advanced | on-off indicating whether to offer local control files |
 | forcedel | on-off indicating whether to remove backup files |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -25,7 +28,8 @@ Rename database.
   "exvolpath":"none",
   "advanced":"on",
   "volume":{"$CUBRID_DATABASES/destinationdb/destinationdb":"$CUBRID_DATABASES/anotherdb/anotherdb"},
-  "forcedel":"y"
+  "forcedel":"y",
+  "async":"yes"
 }
 ```
 
@@ -45,5 +49,16 @@ Rename database.
   "note": "none",
   "status": "success",
   "task": "renamedb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "renamedb",
+   "uuid" : "14"
 }
 ```
