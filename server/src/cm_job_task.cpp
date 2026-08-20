@@ -5563,7 +5563,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (exit_status != 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", exit_status);
+#if defined (WINDOWS)
+  int exit_code = exit_status;
+#else
+  int exit_code = WIFEXITED (exit_status) ? WEXITSTATUS (exit_status) : exit_status;
+#endif
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", exit_code);
       return ERR_WITH_MSG;
     }
 
