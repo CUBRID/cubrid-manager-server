@@ -60,8 +60,6 @@ mutex_t cm_mutex;
 /*global cubrid env*/
 cubrid_env_t cub_httpd_env;
 
-static void put_uuid (Json::Value &response, INT64 uuid);
-
 /**
  * @brief initial monitoring stat information
  *
@@ -603,6 +601,23 @@ cm_async_request_handler (void *lpArg)
   return NULL;
 }
 
+/*
+ * put_uuid () - write a job's uuid into a response as a JSON string.
+ *   the vendored jsoncpp in this tree predates 64-bit JSON number
+ *   support (Json::Value only has a 32-bit Int/UInt, no Int64/UInt64),
+ *   so assigning an INT64 uuid straight into a Json::Value would
+ *   silently truncate it once req_id grows past 2^32. encoding it as a
+ *   string sidesteps that and round-trips losslessly through
+ *   parse_uuid (), which already accepts numeric strings.
+ */
+static void
+put_uuid (Json::Value &response, INT64 uuid)
+{
+  char buf[32];
+  snprintf (buf, sizeof (buf), "%lld", (long long) uuid);
+  response["uuid"] = buf;
+}
+
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
@@ -966,19 +981,3 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
   return 1;
 }
 
-/*
- * put_uuid () - write a job's uuid into a response as a JSON string.
- *   the vendored jsoncpp in this tree predates 64-bit JSON number
- *   support (Json::Value only has a 32-bit Int/UInt, no Int64/UInt64),
- *   so assigning an INT64 uuid straight into a Json::Value would
- *   silently truncate it once req_id grows past 2^32. encoding it as a
- *   string sidesteps that and round-trips losslessly through
- *   parse_uuid (), which already accepts numeric strings.
- */
-static void
-put_uuid (Json::Value &response, INT64 uuid)
-{
-  char buf[32];
-  snprintf (buf, sizeof (buf), "%lld", (long long) uuid);
-  response["uuid"] = buf;
-}
