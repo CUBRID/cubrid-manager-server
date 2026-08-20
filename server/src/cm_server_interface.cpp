@@ -1005,7 +1005,9 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
    * briefly, only when it actually needs to touch request_list.
    */
   {
-    bool want_async = uStringEqual (request.get ("async", "no").asString ().c_str (), "yes")
+    const Json::Value &async_val = request.get ("async", "no");
+    bool want_async = async_val.isString ()
+                      && uStringEqual (async_val.asString ().c_str (), "yes")
                       && is_async_capable_task (request["task"].asString ());
 
     mutex_unlock (cm_mutex);
