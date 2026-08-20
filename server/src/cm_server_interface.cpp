@@ -585,16 +585,17 @@ cm_async_request_handler (void *lpArg)
       response["note"] = e.what ();
     }
 
-  mutex_lock (cm_mutex);
-  async_param->finished_at = time (NULL);
-  async_param->status = 1;
-  mutex_unlock (cm_mutex);
-
   nv_destroy (cli_request);
   nv_destroy (cli_response);
 
 #ifndef WINDOWS
   pthread_mutex_lock (async_param->mutex);
+#endif
+  mutex_lock (cm_mutex);
+  async_param->finished_at = time (NULL);
+  async_param->status = 1;
+  mutex_unlock (cm_mutex);
+#ifndef WINDOWS
   pthread_cond_broadcast (async_param->cond);
   pthread_mutex_unlock (async_param->mutex);
 #endif
