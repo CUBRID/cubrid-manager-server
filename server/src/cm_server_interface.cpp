@@ -843,7 +843,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 static bool
 parse_uuid (const Json::Value &v, INT64 &out)
 {
-  if (v.isIntegral ())
+  if (v.isInt ())
+    {
+      out = v.asInt ();
+      return true;
+    }
+
+  if (v.isUInt ())
     {
       out = v.asUInt ();
       return true;
