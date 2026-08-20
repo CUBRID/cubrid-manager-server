@@ -846,15 +846,6 @@ parse_uuid (const Json::Value &v, INT64 &out)
  * cub_check_async_status () - handle a "gettaskstatus"
  *   poll for a job previously started with "async":"yes" (or one that
  *   fell back to async because it ran past sco.iHttpTimeout).
- *
- *   accepts the "uuid" while the job is still running this reports
- *   job-status:"running" via a normal
- *   ERR_NO_ERROR response instead of the previous ERR_WITH_MSG
- *   "task not return", since "still running" is an expected poll
- *   outcome, not a failure.
- *
- *   caller (cub_cm_request_handler) is expected to already hold
- *   cm_mutex when calling this, same as before.
  */
 int
 cub_check_async_status (Json::Value &request, Json::Value &response)
