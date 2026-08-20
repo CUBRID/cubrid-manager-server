@@ -539,19 +539,19 @@ reap_stale_async_jobs (void)
     {
       if ((*itor)->status != 0 && (now - (*itor)->finished_at) > sco.iAsyncJobTtlSec)
         {
-	  async_request *stale = *itor;
-	  itor = request_list.erase (itor);
+          async_request *stale = *itor;
+          itor = request_list.erase (itor);
 #ifndef WINDOWS
-	  pthread_mutex_destroy (stale->mutex);
-	  pthread_cond_destroy (stale->cond);
-	  delete stale->mutex;
-	  delete stale->cond;
+          pthread_mutex_destroy (stale->mutex);
+          pthread_cond_destroy (stale->cond);
+          delete stale->mutex;
+          delete stale->cond;
 #endif
-	  delete stale;
+          delete stale;
         }
       else
         {
-	  ++itor;
+          ++itor;
         }
     }
 }
@@ -818,7 +818,7 @@ parse_uuid (const Json::Value &v, INT64 &out)
       const string s = v.asString ();
       if (s.empty ())
         {
-	  return false;
+          return false;
         }
 
       char *endptr = NULL;
@@ -832,7 +832,7 @@ parse_uuid (const Json::Value &v, INT64 &out)
 #endif
       if (endptr == s.c_str () || *endptr != '\0')
         {
-	  return false;
+          return false;
         }
 
       out = (INT64) parsed;
