@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
+#include <stdexcept>
 #include <event2/event.h>
 #include <evhttp.h>
 #include <event2/buffer.h>
@@ -271,14 +272,32 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
 
   cub_add_private_param (req, root);
 
-  if (!strcmp ((char *) arg, "cci"))
+  try
     {
-      cub_cci_request_handler (root, response);
+      if (!strcmp ((char *) arg, "cci"))
+	{
+	  cub_cci_request_handler (root, response);
+	}
+      else if (!strcmp ((char *) arg, "cm_api"))
+	{
+	  cub_cm_request_handler (root, response);
+	}
     }
-  else if (!strcmp ((char *) arg, "cm_api"))
+  catch (const std::exception &e)
     {
-      cub_cm_request_handler (root, response);
+      LOG_ERROR ("cub_generic_request_handler : unhandled exception while "
+                "processing request: %s", e.what ());
+      response = Json::Value (Json::objectValue);
+      build_server_header (response, ERR_WITH_MSG, e.what ());
     }
+  catch (...)
+    {
+      LOG_ERROR ("cub_generic_request_handler : unhandled non-standard "
+                "exception while processing request.");
+      response = Json::Value (Json::objectValue);
+      build_server_header (response, ERR_WITH_MSG, "internal server error");
+    }
+
 
   //outustr = utf8_encode(writer.write(response).c_str());
   //printf("---------------------\n%s\n", outustr);
