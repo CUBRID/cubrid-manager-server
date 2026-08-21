@@ -537,6 +537,26 @@ db_running_async_done (const string &dbname)
     }
 }
 
+static std::string
+db_running_async_task (const std::string &dbname)
+{
+  map <std::string, std::string> ::iterator it = db_running_async.find (dbname);
+  return (it != db_running_async.end ()) ? it->second : std::string ();
+}
+
+static int
+build_db_busy_response (Json::Value &response, const std::string &dbname,
+                        const std::string &running_task)
+{
+  string note = "database '" + dbname + "' is busy with another task";
+  if (!running_task.empty ())
+    {
+      note += " ('" + running_task + "')";
+    }
+  response["job-status"] = "rejected";
+  return build_server_header (response, ERR_WITH_MSG, note.c_str ());
+}
+
 /*
  * an async job is dropped sco.iAsyncJobTtlSec seconds after it was
  * created (default DEFAULT_ASYNC_JOB_TTL_SEC / 60 min, overridable via
@@ -686,11 +706,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       mutex_lock (cm_mutex);
       bool started = db_running_async_start (dbname, task_name);
+      string running_task = started ? "" : db_running_async_task (dbname);
       mutex_unlock (cm_mutex);
       if (!started)
         {
-          return build_server_header (response, ERR_WITH_MSG,
-              ("database '" + dbname + "' is busy with another operation").c_str ());
+          return build_db_busy_response (response, dbname, running_task);
         }
     }
 
@@ -787,11 +807,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
        */
       mutex_lock (cm_mutex);
       bool started = db_running_async_start (dbname, task_name);
+      string running_task = started ? "" : db_running_async_task (dbname);
       mutex_unlock (cm_mutex);
       if (!started)
         {
-          return build_server_header (response, ERR_WITH_MSG,
-              ("database '" + dbname + "' is busy with another operation").c_str ());
+          return build_db_busy_response (response, dbname, running_task);
         }
     }
 
