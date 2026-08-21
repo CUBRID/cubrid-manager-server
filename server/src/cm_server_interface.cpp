@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
-#include <list>
+#include <map>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -516,7 +516,7 @@ class async_request
 #endif
 };
 
-list < async_request * >request_list;
+map < INT64, async_request * > request_list;
 
 /*
  * reap_stale_async_jobs () - drop finished jobs that have been sitting in
@@ -531,21 +531,21 @@ static void
 reap_stale_async_jobs (void)
 {
   time_t now = time (NULL);
-  list < async_request * >::iterator itor = request_list.begin ();
+  map < INT64, async_request * > ::iterator itor = request_list.begin ();
 
   while (itor != request_list.end ())
     {
-      if ((*itor)->status != 0 && (now - (*itor)->finished_at) > sco.iAsyncJobTtlSec)
+      async_request *cur = itor->second;
+      if (cur->status != 0 && (now - cur->finished_at) > sco.iAsyncJobTtlSec)
         {
-          async_request *stale = *itor;
           itor = request_list.erase (itor);
 #ifndef WINDOWS
-          pthread_mutex_destroy (stale->mutex);
-          pthread_cond_destroy (stale->cond);
-          delete stale->mutex;
-          delete stale->cond;
+          pthread_mutex_destroy (cur->mutex);
+          pthread_cond_destroy (cur->cond);
+          delete cur->mutex;
+          delete cur->cond;
 #endif
-          delete stale;
+          delete cur;
         }
       else
         {
@@ -553,6 +553,7 @@ reap_stale_async_jobs (void)
         }
     }
 }
+
 
 #ifdef WINDOWS
 DWORD WINAPI
@@ -657,7 +658,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list.push_back (pstmt);
+      request_list[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
 
       put_uuid (response, pstmt->uuid);
@@ -672,7 +673,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list.push_back (pstmt);
+      request_list[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -765,7 +766,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
        * and let the worker thread keep running in the background. */
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list.push_back (pstmt);
+      request_list[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
 
       put_uuid (response, pstmt->uuid);
@@ -790,11 +791,10 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       dbname = request.get ("dbname", "").asString();
       /* register the still-running job so gettaskstatus can
        * find it later. the original code returned here without ever
-       * push_back ()-ing pstmt, which meant a poll for this uuid always
-       * came back "uuid not found" and pstmt (plus its thread) leaked. */
+       */
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list.push_back (pstmt);
+      request_list[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -867,7 +867,7 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
 {
   string task;
   INT64 uuid;
-  list < async_request * >::iterator itor;
+  map < INT64, async_request * > ::iterator itor;
   task = request["task"].asString ();
 
   if (task != "gettaskstatus")
@@ -882,22 +882,15 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
 
-  for (itor = request_list.begin (); itor != request_list.end (); itor++)
-    {
-      if ((*itor)->uuid != uuid)
-        {
-          continue;
-        }
-      break;
-    }
+  itor = request_list.find (uuid);
   if (itor == request_list.end ())
     {
       return build_server_header (response, ERR_WITH_MSG, "uuid not found");
     }
 
-  if ((*itor)->status == 0)
+  if (itor->second->status == 0)
     {
-      put_uuid (response, (*itor)->uuid);
+      put_uuid (response, itor->second->uuid);
       response["job-status"] = "running";
       return build_server_header (response, ERR_NO_ERROR, "none");
     }
@@ -910,13 +903,12 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
    * each time. the job is only ever reclaimed by reap_stale_async_jobs
    * (), once sco.iAsyncJobTtlSec seconds have passed since it was
    * created (see cm.conf's "async_job_ttl_sec"). */
-  response = (*itor)->response;
-  put_uuid (response, (*itor)->uuid);
+  response = itor->second->response;
+  put_uuid (response, itor->second->uuid);
   response["job-status"] = (response["status"].isString () &&
 			    response["status"].asString () == STATUS_SUCCESS) ? "success" : "error";
   return ERR_NO_ERROR;
 }
-
 
 int
 cub_cm_request_handler (Json::Value &request, Json::Value &response)
