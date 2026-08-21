@@ -492,6 +492,51 @@ is_async_capable_task (const string &task_name)
   return false;
 }
 
+static map <std::string, std::string> db_running_async;
+
+/*
+ * is_db_running_async () - pure query: is some async-capable task
+ * currently running against dbname? caller must hold cm_mutex.
+ */
+static bool
+is_db_running_async (const std::string &dbname)
+{
+  return !dbname.empty ()
+         && db_running_async.find (dbname) != db_running_async.end ();
+}
+
+/*
+ * db_running_async_start () - mark dbname as running task_name.
+ * caller must hold cm_mutex.
+ */
+static bool
+db_running_async_start (const std::string &dbname, const std::string &task_name)
+{
+  if (dbname.empty ())
+    {
+      return true;
+    }
+  if (is_db_running_async (dbname))
+    {
+      return false;
+    }
+  db_running_async[dbname] = task_name;
+  return true;
+}
+
+/*
+ * db_running_async_done () - clear dbname's running-task marker, if any.
+ *   caller must hold cm_mutex.
+ */
+static void
+db_running_async_done (const string &dbname)
+{
+  if (!dbname.empty ())
+    {
+      db_running_async.erase (dbname);
+    }
+}
+
 /*
  * an async job is dropped sco.iAsyncJobTtlSec seconds after it was
  * created (default DEFAULT_ASYNC_JOB_TTL_SEC / 60 min, overridable via
@@ -510,13 +555,14 @@ class async_request
     int status;
     time_t created_at;
     time_t finished_at;
+    std::string db_name;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
 #endif
 };
 
-map < INT64, async_request * > request_list;
+std::map < INT64, async_request * > request_list;
 
 /*
  * reap_stale_async_jobs () - drop finished jobs that have been sitting in
@@ -593,6 +639,10 @@ cm_async_request_handler (void *lpArg)
   mutex_lock (cm_mutex);
   async_param->finished_at = time (NULL);
   async_param->status = 1;
+  /* release the per-db slot (if this task took one) now that the task
+   * has actually finished running - independent of whether/when a
+   * client ever polls gettaskstatus for it. */
+  db_running_async_done (async_param->db_name);
   mutex_unlock (cm_mutex);
 #ifndef WINDOWS
   pthread_cond_broadcast (async_param->cond);
@@ -628,9 +678,31 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   DWORD ThreadID;
   DWORD dwWaitResult;
   static INT64 req_id = 0;
+  string task_name = request.get ("task", "").asString ();
+  string dbname = request.get ("dbname", "").asString ();
+  bool is_db_task = is_async_capable_task (task_name);
+
+  if (is_db_task)
+    {
+      mutex_lock (cm_mutex);
+      bool started = db_running_async_start (dbname, task_name);
+      mutex_unlock (cm_mutex);
+      if (!started)
+        {
+          return build_server_header (response, ERR_WITH_MSG,
+              ("database '" + dbname + "' is busy with another operation").c_str ());
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       return ERR_MEM_ALLOC;
     }
 
@@ -638,6 +710,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->status = 0;
   pstmt->created_at = time (NULL);
   pstmt->finished_at = 0;
+  pstmt->db_name = is_db_task ? dbname : "";
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
   mutex_unlock (cm_mutex);
@@ -646,6 +719,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to execute task");
@@ -694,18 +773,40 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pthread_t async_thrd;
   timespec to;
   static INT64 req_id = 0;
+  string task_name = request.get ("task", "").asString ();
+  string dbname = request.get ("dbname", "").asString ();
+  bool is_db_task = is_async_capable_task (task_name);
+
+  if (is_db_task)
+    {
+      /*
+       * only one async-capable task may run against a given database
+       * at a time (e.g. compactdb 'demodb' must not start while
+       * backupdb 'demodb' is still running). fail fast here, before
+       * spawning a worker thread at all, if dbname is already busy.
+       */
+      mutex_lock (cm_mutex);
+      bool started = db_running_async_start (dbname, task_name);
+      mutex_unlock (cm_mutex);
+      if (!started)
+        {
+          return build_server_header (response, ERR_WITH_MSG,
+              ("database '" + dbname + "' is busy with another operation").c_str ());
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       return ERR_MEM_ALLOC;
     }
 
-  /* pstmt->mutex / pstmt->cond must outlive this function: when the
-   * caller does not wait (no_wait, or a timeout happens below) pstmt is
-   * handed off to request_list and the worker thread signals it long
-   * after this stack frame is gone. stack-allocating them here (as this
-   * function used to) left the worker thread locking/broadcasting on
-   * freed stack memory once we returned without joining it. */
   pstmt->mutex = new pthread_mutex_t;
   pstmt->cond = new pthread_cond_t;
 
@@ -713,6 +814,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       delete pstmt->mutex;
       delete pstmt->cond;
       delete (pstmt);
@@ -724,6 +831,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       pthread_mutex_destroy (pstmt->mutex);
       delete pstmt->mutex;
       delete pstmt->cond;
@@ -735,6 +848,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->request = request;
   pstmt->status = 0;
   pstmt->created_at = time (NULL);
+  pstmt->db_name = is_db_task ? dbname : "";
 
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
@@ -744,6 +858,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
+      if (is_db_task)
+        {
+          mutex_lock (cm_mutex);
+          db_running_async_done (dbname);
+          mutex_unlock (cm_mutex);
+        }
       pthread_mutex_destroy (pstmt->mutex);
       pthread_cond_destroy (pstmt->cond);
       delete pstmt->mutex;
