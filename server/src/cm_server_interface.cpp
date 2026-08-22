@@ -868,6 +868,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->request = request;
   pstmt->status = 0;
   pstmt->created_at = time (NULL);
+  pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
 
   mutex_lock (cm_mutex);
