@@ -32,6 +32,8 @@
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
 
+#define CMS_MAX_NUM_ASYNC_TASK_LIMIT    64
+
 #define MIN_ENCRYPT_LEN                 32
 #define ENCRYPT_SIGN                    "@"
 #define ENCRYPT_ARG(arg)                (ENCRYPT_SIGN arg)
@@ -597,6 +599,7 @@ typedef struct
   int iSupportMonStat;
   int iHttpTimeout;
   int iAsyncJobTtlSec;
+  int iMaxNumAsyncTask;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   char szTokenActiveTime[PATH_MAX];

@@ -557,6 +557,53 @@ build_db_busy_response (Json::Value &response, const std::string &dbname,
   return build_server_header (response, ERR_WITH_MSG, note.c_str ());
 }
 
+static int num_running_async_tasks = 0;
+
+/*
+ * async_job_slot_try_acquire () - reserve one of the sco.iMaxNumAsyncTask
+ *   slots for a new background job. caller must hold cm_mutex.
+ */
+static bool
+async_job_slot_try_acquire (void)
+{
+  if (num_running_async_tasks >= sco.iMaxNumAsyncTask)
+    {
+      return false;
+    }
+  num_running_async_tasks++;
+  return true;
+}
+
+/*
+ * async_job_slot_release () - give back a slot reserved by
+ *   async_job_slot_try_acquire (). caller must hold cm_mutex.
+ */
+static void
+async_job_slot_release (void)
+{
+  if (num_running_async_tasks > 0)
+    {
+      num_running_async_tasks--;
+    }
+}
+
+/*
+ * build_async_task_limit_response () - reply used when a client's
+ *   "async":"yes" request is rejected because sco.iMaxNumAsyncTask
+ *   background jobs are already running.
+ */
+static int
+build_async_task_limit_response (Json::Value &response)
+{
+  char note[128];
+
+  snprintf (note, sizeof (note),
+            "maximum number of concurrent async tasks (%d) reached; try again later",
+            sco.iMaxNumAsyncTask);
+  response["job-status"] = "rejected";
+  return build_server_header (response, ERR_WITH_MSG, note);
+}
+
 /*
  * an async job is dropped sco.iAsyncJobTtlSec seconds after it was
  * created (default DEFAULT_ASYNC_JOB_TTL_SEC / 60 min, overridable via
@@ -575,6 +622,7 @@ class async_request
     int status;
     time_t finished_at;
     std::string db_name;
+    bool holds_async_slot;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -658,10 +706,13 @@ cm_async_request_handler (void *lpArg)
   mutex_lock (cm_mutex);
   async_param->finished_at = time (NULL);
   async_param->status = 1;
-  /* release the per-db slot (if this task took one) now that the task
-   * has actually finished running - independent of whether/when a
-   * client ever polls gettaskstatus for it. */
+
   db_running_async_done (async_param->db_name);
+
+  if (async_param->holds_async_slot)
+    {
+      async_job_slot_release ();
+    }
   mutex_unlock (cm_mutex);
 #ifndef WINDOWS
   pthread_cond_broadcast (async_param->cond);
@@ -713,13 +764,37 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
         }
     }
 
+  if (no_wait)
+    {
+      mutex_lock (cm_mutex);
+      bool acquired = async_job_slot_try_acquire ();
+      mutex_unlock (cm_mutex);
+      if (!acquired)
+        {
+          if (is_db_task)
+            {
+              mutex_lock (cm_mutex);
+              db_running_async_done (dbname);
+              mutex_unlock (cm_mutex);
+            }
+          return build_async_task_limit_response (response);
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       return ERR_MEM_ALLOC;
@@ -729,6 +804,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->status = 0;
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
+  pstmt->holds_async_slot = no_wait;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
   mutex_unlock (cm_mutex);
@@ -737,10 +813,17 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       delete (pstmt);
@@ -813,13 +896,37 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
         }
     }
 
+  if (no_wait)
+    {
+      mutex_lock (cm_mutex);
+      bool acquired = async_job_slot_try_acquire ();
+      mutex_unlock (cm_mutex);
+      if (!acquired)
+        {
+          if (is_db_task)
+            {
+              mutex_lock (cm_mutex);
+              db_running_async_done (dbname);
+              mutex_unlock (cm_mutex);
+            }
+          return build_async_task_limit_response (response);
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       return ERR_MEM_ALLOC;
@@ -832,10 +939,17 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       delete pstmt->mutex;
@@ -849,10 +963,17 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       pthread_mutex_destroy (pstmt->mutex);
@@ -867,6 +988,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->status = 0;
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
+  pstmt->holds_async_slot = no_wait;
 
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
@@ -876,10 +998,17 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
-      if (is_db_task)
+      if (is_db_task || no_wait)
         {
           mutex_lock (cm_mutex);
-          db_running_async_done (dbname);
+          if (is_db_task)
+            {
+              db_running_async_done (dbname);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
           mutex_unlock (cm_mutex);
         }
       pthread_mutex_destroy (pstmt->mutex);

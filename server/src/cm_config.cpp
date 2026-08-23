@@ -52,6 +52,8 @@
 #define DEFAULT_ASYNC_JOB_TTL_SEC  3600  /* how long a finished async job kept around for gettaskstatus polling */
 #define MIN_ASYNC_JOB_TTL_SEC      60    /* min async job TTL, 60 sec */
 
+#define DEFAULT_MAX_NUM_ASYNC_TASK 16    /* default max number of concurrently running async ("async":"yes") jobs */
+
 #define MAX_THREAD_NUM           64
 #define MIN_THREAD_NUM           1
 /* Reject multi connection with "ALL USER" */
@@ -240,6 +242,7 @@ uReadSystemConfig (void)
   sco.iSupportMonStat = FALSE;
   sco.iHttpTimeout = 30;
   sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
+  sco.iMaxNumAsyncTask = DEFAULT_MAX_NUM_ASYNC_TASK;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
@@ -405,6 +408,21 @@ uReadSystemConfig (void)
             {
               sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
             }
+        }
+      else if (strcasecmp (ent_name, "max_num_async_task") == 0)
+        {
+          int max_task = atoi (ent_val);
+          if (max_task < 1 || max_task > CMS_MAX_NUM_ASYNC_TASK_LIMIT)
+            {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                        "CUBRID Manager Server : max_num_async_task(%d) in cm.conf is invalid. it must be between 1 and %d.\n",
+                        max_task, CMS_MAX_NUM_ASYNC_TASK_LIMIT);
+              ut_record_cubrid_utility_log_stderr (err_buf);
+              exit (1);
+            }
+          sco.iMaxNumAsyncTask = max_task;
         }
       else if (strcasecmp (ent_name, "auto_update_url") == 0 ||
                strcasecmp (ent_name, "AutoUpdateURL") == 0)
