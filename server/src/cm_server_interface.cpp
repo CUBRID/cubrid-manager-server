@@ -665,11 +665,14 @@ reap_stale_async_jobs (void)
 
       if (cur->status == 0 && (now - cur->created_at) > sco.iAsyncJobMaxRunningSec)
         {
-          if (cur->holds_async_slot)
-            {
-              async_job_slot_release ();
-              cur->holds_async_slot = false;
-            }
+          string task_name = cur->request.get ("task", "unknown").asString ();
+
+          LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') exceeded "
+                     "async_job_max_running_sec (%d > %d sec) and was dropped from "
+                     "request_list.",
+                     (long long) cur->uuid, task_name.c_str (), cur->db_name.c_str (),
+                     (int) (now - cur->created_at), sco.iAsyncJobMaxRunningSec);
+
           itor = request_list.erase (itor);
           continue;
         }
