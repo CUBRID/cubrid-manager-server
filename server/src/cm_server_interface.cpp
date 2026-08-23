@@ -620,6 +620,7 @@ class async_request
     Json::Value request;
     Json::Value response;
     int status;
+    time_t created_at;
     time_t finished_at;
     std::string db_name;
     std::string requester_id;
@@ -636,8 +637,6 @@ std::map < INT64, async_request * > request_list;
  * reap_stale_async_jobs () - drop finished jobs that have been sitting in
  *   request_list for longer than sco.iAsyncJobTtlSec because the client
  *   never called gettaskstatus / job_status to collect the result.
- *   jobs that are still running are left alone no matter how old, since
- *   we have no safe way to cancel the worker thread underneath them.
  *
  *   caller must already hold cm_mutex.
  */
@@ -650,6 +649,7 @@ reap_stale_async_jobs (void)
   while (itor != request_list.end ())
     {
       async_request *cur = itor->second;
+
       if (cur->status != 0 && (now - cur->finished_at) > sco.iAsyncJobTtlSec)
         {
           itor = request_list.erase (itor);
@@ -660,11 +660,21 @@ reap_stale_async_jobs (void)
           delete cur->cond;
 #endif
           delete cur;
+          continue;
         }
-      else
+
+      if (cur->status == 0 && (now - cur->created_at) > sco.iAsyncJobMaxRunningSec)
         {
-          ++itor;
+          if (cur->holds_async_slot)
+            {
+              async_job_slot_release ();
+              cur->holds_async_slot = false;
+            }
+          itor = request_list.erase (itor);
+          continue;
         }
+
+      ++itor;
     }
 }
 
@@ -803,6 +813,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
@@ -988,6 +999,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
