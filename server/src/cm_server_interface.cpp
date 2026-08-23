@@ -848,7 +848,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
 
-  if (dwWaitResult == WAIT_TIMEOUT)
+  if (dwWaitResult != WAIT_OBJECT_0)
     {
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
