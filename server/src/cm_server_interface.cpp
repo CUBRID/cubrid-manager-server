@@ -622,6 +622,7 @@ class async_request
     int status;
     time_t finished_at;
     std::string db_name;
+    std::string requester_id;
     bool holds_async_slot;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
@@ -804,6 +805,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->status = 0;
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
+  pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
@@ -988,6 +990,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->status = 0;
   pstmt->finished_at = 0;
   pstmt->db_name = is_db_task ? dbname : "";
+  pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
 
   mutex_lock (cm_mutex);
@@ -1153,6 +1156,11 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
   if (itor == request_list.end ())
     {
       return build_server_header (response, ERR_WITH_MSG, "uuid not found");
+    }
+
+  if (request.get ("_ID", "").asString () != itor->second->requester_id)
+    {
+      return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
 
   if (itor->second->status == 0)
