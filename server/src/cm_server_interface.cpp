@@ -1184,16 +1184,14 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
   mutex_lock (cm_mutex);
 
 
-  // leave a back door for testing...
-  if (ext_ut_validate_token (request, response) != ERR_NO_ERROR && request["token"].asString() != "test")
+  if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
     {
       response["task"] = request["task"].asString();
       mutex_unlock (cm_mutex);
       return 1;
     }
 
-  // leave a back door for testing...
-  if (!ext_ut_validate_auth (request) && request["token"].asString() != "test")
+  if (!ext_ut_validate_auth (request))
     {
       response["status"] = STATUS_FAILURE;
       response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
