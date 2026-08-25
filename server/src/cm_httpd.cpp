@@ -82,8 +82,6 @@ static THREAD_FUNC automation_start (void *ud);
 static THREAD_FUNC aj_thread_r (void *aj);
 static void start_auto_thread (void);
 
-T_EMGR_VERSION CLIENT_VERSION = EMGR_MAKE_VER (8, 4);
-
 #ifdef WINDOWS
 T_THREAD auto_task_tid = NULL;
 #else

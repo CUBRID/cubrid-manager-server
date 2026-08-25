@@ -139,7 +139,6 @@ using namespace std;
 
 #define        ER_FEATURE_DEPRECATED   -2
 
-extern T_EMGR_VERSION CLIENT_VERSION;
 extern T_USER_TOKEN_INFO *user_token_info;
 
 typedef struct

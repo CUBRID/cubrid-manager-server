@@ -47,8 +47,6 @@ using namespace std;
 #define MAX_PATH 256
 #endif
 
-extern T_EMGR_VERSION CLIENT_VERSION;
-
 typedef struct
 {
   char cubrid[MAX_PATH];              /*cubrid home; CUBRID=/root/CUBRID */
@@ -214,7 +212,6 @@ ch_process_request (nvplist *req, nvplist *res)
   char access_log_flag;
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
   int major_ver, minor_ver;
-  char *cli_ver;
 
   int elapsed_msec = 0;
   struct timeval task_begin, task_end;
@@ -264,12 +261,6 @@ ch_process_request (nvplist *req, nvplist *res)
         }
     }
 
-  /* set CLIENT_VERSION */
-  cli_ver = nv_get_val (req, "_CLIENT_VERSION");
-  make_version_info (cli_ver == NULL ? "1.0" : cli_ver, &major_ver,
-                     &minor_ver);
-  CLIENT_VERSION = EMGR_MAKE_VER (major_ver, minor_ver);    /* global variable */
-
   sprintf (_dbmt_error, "?");    /* prevent to have null string */
   if (task_code == TS_UNDEFINED)
     {
@@ -314,8 +305,6 @@ ch_process_request (nvplist *req, nvplist *res)
     }
 
   uGenerateStatus (req, res, retval, _dbmt_error);
-
-  //      FREE_MEM (cli_ver);
 
   return 0;
 }
