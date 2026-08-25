@@ -32,7 +32,7 @@
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
 
-#define CMS_MAX_NUM_ASYNC_TASK_LIMIT    64
+#define CMS_MAX_NUM_ASYNC_TASK_LIMIT    12
 
 #define MIN_ENCRYPT_LEN                 32
 #define ENCRYPT_SIGN                    "@"

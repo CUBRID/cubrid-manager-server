@@ -52,11 +52,11 @@
 #define DEFAULT_ASYNC_JOB_TTL_SEC  3600  /* how long a finished async job kept around for gettaskstatus polling */
 #define MIN_ASYNC_JOB_TTL_SEC      60    /* min async job TTL, 60 sec */
 
-#define DEFAULT_MAX_NUM_ASYNC_TASK 16    /* default max number of concurrently running async ("async":"yes") jobs */
+#define DEFAULT_MAX_NUM_ASYNC_TASK 8     /* default max number of concurrently running async ("async":"yes") jobs */
 
 #define DEFAULT_ASYNC_JOB_MAX_RUNNING_SEC  86400  /* 24 hours */
 #define MIN_ASYNC_JOB_MAX_RUNNING_SEC      60     /* min, 60 sec */
-#define MAX_ASYNC_JOB_MAX_RUNNING_SEC      259200 /* 3 days */
+#define MAX_ASYNC_JOB_MAX_RUNNING_SEC      604800 /* 1 week */
 
 #define MAX_THREAD_NUM           64
 #define MIN_THREAD_NUM           1
