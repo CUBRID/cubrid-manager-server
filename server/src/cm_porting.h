@@ -336,4 +336,11 @@ typedef long INT64;
 #define COND_DESTROY(condvar)        pthread_cond_destroy(&(condvar))
 #endif
 
+#if defined(WINDOWS)
+typedef volatile LONG atomic_counter_t;
+#define ATOMIC_FETCH_ADD1(cnt)  InterlockedExchangeAdd(&(cnt), 1)
+#else
+typedef volatile int atomic_counter_t;
+#define ATOMIC_FETCH_ADD1(cnt)  __sync_fetch_and_add(&(cnt), 1)
+#endif
 #endif /* _CM_PORTING_H_ */
