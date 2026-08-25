@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <map>
+#include <atomic>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -172,7 +173,7 @@ cub_cm_destory_env ()
 int
 ch_build_request (Json::Value &req, nvplist *cli_request)
 {
-  static int i = 0;
+  static std::atomic <unsigned int> i (0);
   nv_add_nvp_int (cli_request, "_STAMP", i++);
   nv_add_nvp (cli_request, "_PROGNAME", CMS_NAME);
 
