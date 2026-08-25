@@ -95,6 +95,12 @@ typedef unsigned __int64 uint64_t;
 #define AIX_STACKSIZE_PER_THREAD           (10*1024*1024)
 #endif
 
+#if defined (WINDOWS)
+#define STRTOK(buf,delim,saveptr)  strtok_s (buf, delim, saveptr)
+#else
+#define STRTOK(buf,delim,saveptr)  strtok_r (buf, delim, saveptr)
+#endif
+
 typedef enum
 {
   TIME_STR_FMT_DATE = NV_ADD_DATE,

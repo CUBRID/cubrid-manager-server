@@ -1062,6 +1062,7 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
   struct hostent *hp;
   unsigned char ip_addr[4];
   char *token = NULL;
+  char *saveptr;
 
   snprintf (file, PATH_MAX - 1, "%s/%s", sco.szCubrid_databases,
             CUBRID_DATABASE_TXT);
@@ -1089,8 +1090,8 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
           continue;
         }
 
-      for (token = strtok (dbinfo[2], ":"); token != NULL;
-           token = strtok (NULL, ":"))
+      for (token = STRTOK (dbinfo[2], ":", &saveptr); token != NULL;
+           token = STRTOK (NULL, ":", &saveptr))
         {
           if ((hp = gethostbyname (token)) == NULL)
             {

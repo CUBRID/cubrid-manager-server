@@ -6165,6 +6165,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   char conf_value_item[NAME_MAX];
 
   char *token = NULL;
+  char *saveptr;
 
   int i = 0;
   int period_type_exist = 0;
@@ -6236,7 +6237,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   if ((strcmp (conf_item[3], AUTO_BACKUP_PERIOD_TYPE_MONTHLY) == 0))
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  period_date = atoi (token);
@@ -6248,14 +6249,14 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	      return ERR_WITH_MSG;
 	    }
 
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* period_date: Weekly */
   else if (strcmp (conf_item[3], AUTO_BACKUP_PERIOD_TYPE_WEEKLY) == 0)
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  for (i = 0; i < AUTOBACKUP_PERIOD_WEEK_NUM; i++)
@@ -6276,7 +6277,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	    }
 
 	  period_date_exist = 0;
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* period_date: Daily */
@@ -6300,7 +6301,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   else
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  /* convert period_date from YYYY-MM-DD into YYYYMMDD */
@@ -6321,7 +6322,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 			conf_item[4], autobackup_conf_entry[4]);
 	      return ERR_WITH_MSG;
 	    }
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* check time */

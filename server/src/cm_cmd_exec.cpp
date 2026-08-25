@@ -156,6 +156,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
   char tmpfile[PATH_MAX], strbuf[BUFFER_MAX_LEN];
   FILE *infile;
   char cmd_name[CUBRID_CMD_NAME_LEN];
+  char *saveptr;
 
   cubrid_cmd_name (cmd_name);
   make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", TS_GET_SERVER_VERSION, PATH_MAX);
@@ -175,9 +176,9 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
       char version[10];
       sscanf (strbuf, "%*s %s", version);
 
-      char *p = strtok (version, ".");
+      char *p = STRTOK (version, ".", &saveptr);
       major_version = atoi (p);
-      p = strtok (NULL, ".");
+      p = STRTOK (NULL, ".", &saveptr);
       minor_version = atoi (p);
 
       fclose (infile);
@@ -851,19 +852,20 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
   int volid, total_page, free_page;
   char purpose[COLUMN_VALUE_MAX_SIZE], vol_name[PATH_MAX];
   char *token = NULL, *p;
+  char *saveptr;
   struct stat statbuf;
 
   volid = total_page = free_page = 0;
   purpose[0] = vol_name[0] = '\0';
 
-  token = strtok (str_buf, " ");
+  token = STRTOK (str_buf, " ", &saveptr);
   if (token == NULL)
     {
       return FALSE;
     }
   volid = atoi (token);
 
-  token = strtok (NULL, " ");
+  token = STRTOK (NULL, " ", &saveptr);
   if (token == NULL)
     {
       return FALSE;
@@ -876,7 +878,7 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
       return FALSE;
     }
 
-  token = strtok (NULL, " ");
+  token = STRTOK (NULL, " ", &saveptr);
   if (token == NULL)
     {
       return FALSE;
@@ -894,7 +896,7 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
           strcat (purpose, token);
         }
 
-      token = strtok (NULL, " ");
+      token = STRTOK (NULL, " ", &saveptr);
       if (token == NULL)
         {
           return FALSE;
@@ -902,14 +904,14 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
     }
   total_page = atoi (token);
 
-  token = strtok (NULL, " ");
+  token = STRTOK (NULL, " ", &saveptr);
   if (token == NULL)
     {
       return FALSE;
     }
   free_page = atoi (token);
 
-  token = strtok (NULL, "\n");
+  token = STRTOK (NULL, "\n", &saveptr);
   if (token == NULL)
     {
       return FALSE;

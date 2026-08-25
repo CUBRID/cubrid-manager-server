@@ -232,6 +232,7 @@ uReadSystemConfig (void)
   int str_len = 0;
   char access_log_buf[PATH_MAX];
   char error_log_buf[PATH_MAX];
+  char *saveptr;
 
   conf_file = fopen (conf_get_dbmt_file (FID_DBMT_CONF, cbuf), "rt");
   if (conf_file == NULL)
@@ -275,7 +276,7 @@ uReadSystemConfig (void)
       * put the first token into var ent_name,
       * the separator is ' ', '\t', '='
       */
-      if ((token = strtok (cbuf, separator)) == NULL)
+      if ((token = STRTOK (cbuf, separator, &saveptr)) == NULL)
         {
           continue;
         }
@@ -285,7 +286,7 @@ uReadSystemConfig (void)
       /*
       * put the rest of the string into var ent_val.
       */
-      if ((token = strtok (NULL, "\0")) == NULL)
+      if ((token = STRTOK (NULL, "\0", &saveptr)) == NULL)
         {
           continue;
         }

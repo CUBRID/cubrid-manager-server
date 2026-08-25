@@ -737,15 +737,16 @@ set_query_period_details (query_period_details **details, char *conf_item)
   char delim[] = " ,";
   char *token = NULL;
   query_period_details *head = NULL;
+  char *saveptr;
 
-  token = strtok (conf_item, delim);
+  token = STRTOK (conf_item, delim, &saveptr);
   while (token != NULL)
     {
       *details = (query_period_details *) malloc (sizeof (query_period_details));
       strncpy ((*details)->detail, token, DETAIL_LEN);
       (*details)->next = head;
       head = *details;
-      token = strtok (NULL, delim);
+      token = STRTOK (NULL, delim, &saveptr);
     }
 }
 
@@ -755,9 +756,10 @@ set_backup_period_details (backup_period_details **details,
 {
   char delim[] = " ,";
   char *token;
+  char *saveptr;
   backup_period_details *head = NULL;
 
-  token = strtok (conf_item, delim);
+  token = STRTOK (conf_item, delim, &saveptr);
   while (token != NULL)
     {
       *details =
@@ -817,7 +819,7 @@ set_backup_period_details (backup_period_details **details,
 
       (*details)->next = head;
       head = *details;
-      token = strtok (NULL, delim);
+      token = STRTOK (NULL, delim, &saveptr);
     }
 }
 
