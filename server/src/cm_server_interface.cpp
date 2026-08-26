@@ -614,6 +614,7 @@ class async_request
     std::string db_name;
     std::string requester_id;
     bool holds_async_slot;
+    bool max_running_warned;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -626,6 +627,7 @@ std::map < INT64, async_request * > request_list;
  * reap_stale_async_jobs () - drop finished jobs that have been sitting in
  *   request_list for longer than sco.iAsyncJobTtlSec because the client
  *   never called gettaskstatus / job_status to collect the result.
+ *   a job still in progress (status == 0) is never removed here.
  *
  *   caller must already hold cm_mutex.
  */
@@ -652,18 +654,20 @@ reap_stale_async_jobs (void)
           continue;
         }
 
-      if (cur->status == 0 && (now - cur->created_at) > sco.iAsyncJobMaxRunningSec)
+      if (cur->status == 0 && !cur->max_running_warned
+          && (now - cur->created_at) > sco.iAsyncJobMaxRunningSec)
         {
           string task_name = cur->request.get ("task", "unknown").asString ();
 
-          LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') exceeded "
-                     "async_job_max_running_sec (%d > %d sec) and was dropped from "
-                     "request_list.",
+          LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
+                     "running for %d sec, past async_job_max_running_sec (%d sec); "
+                     "its worker thread cannot be safely cancelled, so it is being "
+                     "left in request_list until it actually finishes.",
                      (long long) cur->uuid, task_name.c_str (), cur->db_name.c_str (),
                      (int) (now - cur->created_at), sco.iAsyncJobMaxRunningSec);
 
-          itor = request_list.erase (itor);
-          continue;
+          /* log this only once per job, not on every reap_stale_async_jobs () call */
+          cur->max_running_warned = true;
         }
 
       ++itor;
@@ -810,6 +814,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
+  pstmt->max_running_warned = false;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
   mutex_unlock (cm_mutex);
@@ -996,6 +1001,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
+  pstmt->max_running_warned = false;
 
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
