@@ -54,9 +54,9 @@
 
 #define DEFAULT_MAX_NUM_ASYNC_TASK 8     /* default max number of concurrently running async ("async":"yes") jobs */
 
-#define DEFAULT_ASYNC_JOB_MAX_RUNNING_SEC  86400  /* 24 hours */
-#define MIN_ASYNC_JOB_MAX_RUNNING_SEC      60     /* min, 60 sec */
-#define MAX_ASYNC_JOB_MAX_RUNNING_SEC      604800 /* 1 week */
+#define DEFAULT_ASYNC_LONG_JOB_SEC  86400  /* 24 hours */
+#define MIN_ASYNC_LONG_JOB_SEC      60     /* min, 60 sec */
+#define MAX_ASYNC_LONG_JOB_SEC      604800 /* 1 week */
 
 #define MAX_THREAD_NUM           64
 #define MIN_THREAD_NUM           1
@@ -248,7 +248,7 @@ uReadSystemConfig (void)
   sco.iHttpTimeout = 30;
   sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
   sco.iMaxNumAsyncTask = DEFAULT_MAX_NUM_ASYNC_TASK;
-  sco.iAsyncJobMaxRunningSec = DEFAULT_ASYNC_JOB_MAX_RUNNING_SEC;
+  sco.iAsyncLongJobSec = DEFAULT_ASYNC_LONG_JOB_SEC;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
@@ -436,17 +436,17 @@ uReadSystemConfig (void)
             }
           sco.iMaxNumAsyncTask = max_task;
         }
-      else if (strcasecmp (ent_name, "async_job_max_running_sec") == 0)
+      else if (strcasecmp (ent_name, "async_long_job_sec") == 0)
         {
-          int max_running = atoi (ent_val);
+          int long_job_sec = atoi (ent_val);
 
-          if (MIN_ASYNC_JOB_MAX_RUNNING_SEC <= max_running && max_running < MAX_ASYNC_JOB_MAX_RUNNING_SEC)
+          if (MIN_ASYNC_LONG_JOB_SEC <= long_job_sec && long_job_sec < MAX_ASYNC_LONG_JOB_SEC)
             {
-              sco.iAsyncJobMaxRunningSec = max_running;
+              sco.iAsyncLongJobSec = long_job_sec;
             }
           else
             {
-              sco.iAsyncJobMaxRunningSec = DEFAULT_ASYNC_JOB_MAX_RUNNING_SEC;
+              sco.iAsyncLongJobSec = DEFAULT_ASYNC_LONG_JOB_SEC;
             }
         }
       else if (strcasecmp (ent_name, "auto_update_url") == 0 ||

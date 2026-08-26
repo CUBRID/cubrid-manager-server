@@ -600,7 +600,7 @@ typedef struct
   int iHttpTimeout;
   int iAsyncJobTtlSec;
   int iMaxNumAsyncTask;
-  int iAsyncJobMaxRunningSec;
+  int iAsyncLongJobSec;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   char szTokenActiveTime[PATH_MAX];

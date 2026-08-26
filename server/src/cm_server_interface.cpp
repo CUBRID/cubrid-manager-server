@@ -614,7 +614,7 @@ class async_request
     std::string db_name;
     std::string requester_id;
     bool holds_async_slot;
-    bool max_running_warned;
+    bool is_long_async_job;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
@@ -654,20 +654,20 @@ reap_stale_async_jobs (void)
           continue;
         }
 
-      if (cur->status == 0 && !cur->max_running_warned
-          && (now - cur->created_at) > sco.iAsyncJobMaxRunningSec)
+      if (cur->status == 0 && !cur->is_long_async_job
+          && (now - cur->created_at) > sco.iAsyncLongJobSec)
         {
           string task_name = cur->request.get ("task", "unknown").asString ();
 
           LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
-                     "running for %d sec, past async_job_max_running_sec (%d sec); "
+                     "running for %d sec, past async_long_job_sec (%d sec); "
                      "its worker thread cannot be safely cancelled, so it is being "
                      "left in request_list until it actually finishes.",
                      (long long) cur->uuid, task_name.c_str (), cur->db_name.c_str (),
-                     (int) (now - cur->created_at), sco.iAsyncJobMaxRunningSec);
+                     (int) (now - cur->created_at), sco.iAsyncLongJobSec);
 
           /* log this only once per job, not on every reap_stale_async_jobs () call */
-          cur->max_running_warned = true;
+          cur->is_long_async_job = true;
         }
 
       ++itor;
@@ -814,7 +814,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
-  pstmt->max_running_warned = false;
+  pstmt->is_long_async_job = false;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
   mutex_unlock (cm_mutex);
@@ -1001,7 +1001,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_name = is_db_task ? dbname : "";
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
-  pstmt->max_running_warned = false;
+  pstmt->is_long_async_job = false;
 
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
