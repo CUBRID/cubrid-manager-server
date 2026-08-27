@@ -1195,6 +1195,110 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
   return ERR_NO_ERROR;
 }
 
+/*
+ * cub_check_server_status () - handle a "getserverstatus" query: an
+ *   admin-only, instant (no worker thread, no external process) health
+ *   snapshot of the async-job subsystem, 'admin' user only
+ */
+int
+cub_check_server_status (Json::Value &request, Json::Value &response)
+{
+  string task = request["task"].asString ();
+  char vers[32];
+
+  if (task != "getserverstatus")
+    {
+      return 0;
+    }
+
+  if (request.get ("_ID", "").asString () != "admin")
+    {
+      response["status"] = STATUS_FAILURE;
+      response["note"] = "The user don't have authority to execute the task: getserverstatus";
+      response["task"] = task;
+      return 1;
+    }
+
+  reap_stale_async_jobs ();
+
+  time_t now = time (NULL);
+
+  Json::Value conf;
+  snprintf (vers, sizeof (vers), "%d.%d", cubrid_version_major,cubrid_version_minor);
+  conf["CUBRID Version"] = vers;
+  conf["async_job_ttl_sec"] = sco.iAsyncJobTtlSec;
+  conf["async_long_job_sec"] = sco.iAsyncLongJobSec;
+  conf["max_num_async_task"] = sco.iMaxNumAsyncTask;
+  conf["http_timeout"] = sco.iHttpTimeout;
+  response["cm-conf"] = conf;
+
+  int total = 0, running = 0, finished_pending_ttl = 0, long_jobs = 0;
+  int oldest_running_sec = 0;
+  Json::Value long_job_list;
+
+  for (map < INT64, async_request * >::iterator itor = request_list.begin ();
+       itor != request_list.end (); ++itor)
+    {
+      async_request *cur = itor->second;
+
+      total++;
+
+      if (cur->status != 0)
+        {
+          finished_pending_ttl++;
+          continue;
+        }
+
+      running++;
+
+      int elapsed_sec = (int) (now - cur->created_at);
+      if (elapsed_sec > oldest_running_sec)
+        {
+          oldest_running_sec = elapsed_sec;
+        }
+
+      if (cur->is_long_async_job)
+        {
+          long_jobs++;
+
+          Json::Value j;
+          put_uuid (j, cur->uuid);
+          j["task"] = cur->request.get ("task", "unknown").asString ();
+          j["db_name"] = cur->db_name;
+          j["requester_id"] = cur->requester_id;
+          j["elapsed_sec"] = elapsed_sec;
+          long_job_list.append (j);
+        }
+    }
+
+  Json::Value req_list_status;
+  req_list_status["total"] = total;
+  req_list_status["running"] = running;
+  req_list_status["finished_pending_ttl"] = finished_pending_ttl;
+  req_list_status["long_jobs"] = long_jobs;
+  req_list_status["oldest_running_sec"] = oldest_running_sec;
+  req_list_status["long_job_list"] = long_job_list;
+  response["request-list"] = req_list_status;
+
+  Json::Value slot;
+  slot["in_use"] = num_running_async_tasks;
+  slot["max"] = sco.iMaxNumAsyncTask;
+  response["async-slot"] = slot;
+
+  Json::Value db_busy;
+  for (map <string, string>::iterator itor = db_running_async.begin ();
+       itor != db_running_async.end (); ++itor)
+    {
+      Json::Value d;
+      d["task"] = itor->second;
+      d["db_name"] = itor->first;
+      db_busy.append (d);
+    }
+  response["db-running-async"] = db_busy;
+
+  return build_server_header (response, ERR_NO_ERROR, "none");
+}
+
 int
 cub_cm_request_handler (Json::Value &request, Json::Value &response)
 {
@@ -1220,6 +1324,11 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
     }
 
   if (cub_check_async_status (request, response))
+    {
+      mutex_unlock (cm_mutex);
+      return 1;
+    }
+  if (cub_check_server_status (request, response))
     {
       mutex_unlock (cm_mutex);
       return 1;
