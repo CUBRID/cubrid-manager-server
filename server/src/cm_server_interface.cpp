@@ -1281,8 +1281,8 @@ cub_check_server_status (Json::Value &request, Json::Value &response)
   response["request-list"] = req_list_status;
 
   Json::Value slot;
-  slot["in_use"] = num_running_async_tasks;
-  slot["max"] = sco.iMaxNumAsyncTask;
+  slot["num_async_job_running"] = num_running_async_tasks;
+  slot["max_async_job"] = sco.iMaxNumAsyncTask;
   response["async-slot"] = slot;
 
   Json::Value db_busy;
