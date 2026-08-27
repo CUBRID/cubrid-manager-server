@@ -593,15 +593,6 @@ build_async_task_limit_response (Json::Value &response)
   return build_server_header (response, ERR_WITH_MSG, note);
 }
 
-/*
- * an async job is dropped sco.iAsyncJobTtlSec seconds after it was
- * created (default DEFAULT_ASYNC_JOB_TTL_SEC / 60 min, overridable via
- * "async_job_ttl_sec" in cm.conf) regardless of how many times a
- * client has polled gettaskstatus for it in the meantime, so
- * request_list can't grow without bound just because a client stopped
- * polling.
- */
-
 class async_request
 {
   public:
@@ -621,11 +612,11 @@ class async_request
 #endif
 };
 
-std::map < INT64, async_request * > request_list;
+std::map < INT64, async_request * > request_map;
 
 /*
  * reap_stale_async_jobs () - drop finished jobs that have been sitting in
- *   request_list for longer than sco.iAsyncJobTtlSec because the client
+ *   request_map for longer than sco.iAsyncJobTtlSec because the client
  *   never called gettaskstatus / job_status to collect the result.
  *   a job still in progress (status == 0) is never removed here.
  *
@@ -635,15 +626,15 @@ static void
 reap_stale_async_jobs (void)
 {
   time_t now = time (NULL);
-  map < INT64, async_request * > ::iterator itor = request_list.begin ();
+  map < INT64, async_request * > ::iterator itor = request_map.begin ();
 
-  while (itor != request_list.end ())
+  while (itor != request_map.end ())
     {
       async_request *cur = itor->second;
 
       if (cur->status != 0 && (now - cur->finished_at) > sco.iAsyncJobTtlSec)
         {
-          itor = request_list.erase (itor);
+          itor = request_map.erase (itor);
 #ifndef WINDOWS
           pthread_mutex_destroy (cur->mutex);
           pthread_cond_destroy (cur->cond);
@@ -662,7 +653,7 @@ reap_stale_async_jobs (void)
           LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
                      "running for %d sec, past async_long_job_sec (%d sec); "
                      "its worker thread cannot be safely cancelled, so it is being "
-                     "left in request_list until it actually finishes.",
+                     "left in request_map until it actually finishes.",
                      (long long) cur->uuid, task_name.c_str (), cur->db_name.c_str (),
                      (int) (now - cur->created_at), sco.iAsyncLongJobSec);
 
@@ -848,7 +839,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list[pstmt->uuid] = pstmt;
+      request_map[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
 
       put_uuid (response, pstmt->uuid);
@@ -863,7 +854,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list[pstmt->uuid] = pstmt;
+      request_map[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -1046,7 +1037,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
        * and let the worker thread keep running in the background. */
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list[pstmt->uuid] = pstmt;
+      request_map[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
 
       put_uuid (response, pstmt->uuid);
@@ -1074,7 +1065,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
        */
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
-      request_list[pstmt->uuid] = pstmt;
+      request_map[pstmt->uuid] = pstmt;
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -1162,8 +1153,8 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
 
-  itor = request_list.find (uuid);
-  if (itor == request_list.end ())
+  itor = request_map.find (uuid);
+  if (itor == request_map.end ())
     {
       return build_server_header (response, ERR_WITH_MSG, "uuid not found");
     }
@@ -1180,7 +1171,7 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_NO_ERROR, "none");
     }
 
-  /* NOTE: a finished job is intentionally left in request_list here,
+  /* NOTE: a finished job is intentionally left in request_map here,
    * not erased/deleted on this first successful poll - a client is
    * free to call gettaskstatus for the same uuid more than once (e.g.
    * a status-check retry, or more than one part of the client polling
@@ -1236,8 +1227,8 @@ cub_check_server_status (Json::Value &request, Json::Value &response)
   int oldest_running_sec = 0;
   Json::Value long_job_list;
 
-  for (map < INT64, async_request * >::iterator itor = request_list.begin ();
-       itor != request_list.end (); ++itor)
+  for (map < INT64, async_request * >::iterator itor = request_map.begin ();
+       itor != request_map.end (); ++itor)
     {
       async_request *cur = itor->second;
 
@@ -1271,14 +1262,14 @@ cub_check_server_status (Json::Value &request, Json::Value &response)
         }
     }
 
-  Json::Value req_list_status;
-  req_list_status["total"] = total;
-  req_list_status["running"] = running;
-  req_list_status["finished_pending_ttl"] = finished_pending_ttl;
-  req_list_status["long_jobs"] = long_jobs;
-  req_list_status["longest_task_running_sec"] = oldest_running_sec;
-  req_list_status["long_job_list"] = long_job_list;
-  response["request-list"] = req_list_status;
+  Json::Value req_map_status;
+  req_map_status["map_size"] = total;
+  req_map_status["running"] = running;
+  req_map_status["finished_pending_ttl"] = finished_pending_ttl;
+  req_map_status["long_jobs"] = long_jobs;
+  req_map_status["longest_task_running_sec"] = oldest_running_sec;
+  req_map_status["long_job_list"] = long_job_list;
+  response["request-map"] = req_map_status;
 
   Json::Value slot;
   slot["num_async_job_running"] = num_running_async_tasks;
@@ -1341,16 +1332,7 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
 
   /*
    * everything above this point is fast and bounded (token/auth lookup,
-   * a request_list scan), so it is fine to run it under cm_mutex. what
-   * follows is not: cm_execute_request_async () either runs the task
-   * and waits for it (up to sco.iHttpTimeout, 30 sec by default) or, for
-   * an explicit "async":"yes" request on a long-running task, does not
-   * wait at all. cm_mutex used to stay held for that entire wait, which
-   * meant one client's slow compactdb/backupdb/etc. blocked every other
-   * client's requests - even unrelated, fast ones - for as long as the
-   * first one took (or until it timed out). release the lock before
-   * that call; cm_execute_request_async () re-takes cm_mutex itself,
-   * briefly, only when it actually needs to touch request_list.
+   * a request_map scan), so it is fine to run it under cm_mutex.
    */
   {
     const Json::Value &async_val = request.get ("async", "no");
