@@ -1276,7 +1276,7 @@ cub_check_server_status (Json::Value &request, Json::Value &response)
   req_list_status["running"] = running;
   req_list_status["finished_pending_ttl"] = finished_pending_ttl;
   req_list_status["long_jobs"] = long_jobs;
-  req_list_status["oldest_running_sec"] = oldest_running_sec;
+  req_list_status["longest_task_running_sec"] = oldest_running_sec;
   req_list_status["long_job_list"] = long_job_list;
   response["request-list"] = req_list_status;
 
