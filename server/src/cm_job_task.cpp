@@ -11574,7 +11574,12 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
   make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
+  /*
+   * putenv () in runscript api will not be allowed for a while
+   * for thread-safety
+   */
   /* set environment that the script need to run. */
+#if 0
   for (i = 0; i < req->nvplist_leng; i++)
     {
       nv_lookup (req, i, &n, &v);
@@ -11583,6 +11588,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 	  putenv (v);
 	}
     }
+#endif
 
   if ((script_path = nv_get_val (req, "script_path")) == NULL)
     {
