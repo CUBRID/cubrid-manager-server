@@ -267,11 +267,13 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 
 
   /* unset CUBRID_ERROR_LOG environment variable, using default value */
+  env_mutex_lock ();
 #if defined(WINDOWS)
   _putenv ("CUBRID_ERROR_LOG=");
 #else
   unsetenv ("CUBRID_ERROR_LOG");
 #endif
+  env_mutex_unlock ();
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -292,13 +294,17 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 #else /* pa-risc */
   strcpy (jvm_env_string, "LD_PRELOAD=libjvm.sl");
 #endif
+  env_mutex_lock ();
   putenv (jvm_env_string);
+  env_mutex_unlock ();
 #endif
 
   pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start server */
 
 #ifdef HPUX
+  env_mutex_lock ();
   putenv ("LD_PRELOAD=");
+  env_mutex_unlock ();
 #endif
 
   if (pid < 0)
