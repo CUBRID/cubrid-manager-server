@@ -10272,7 +10272,7 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   char *targetid, *dbname, *dbuser, *dbpasswd;
   int isdba = 0;
   char outfile[PATH_MAX];
-  static int cmdid = 0;
+  static atomic_counter_t cmdid = 0;
   const char *statement = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ?
 	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;" :
 	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
@@ -10298,7 +10298,7 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   nv_add_nvp (out, "dbname", dbname);
 
   snprintf (outfile, sizeof (outfile) - 1, "%s/tmp/DBMT_user_login.%d",
-	    sco.szCubrid, cmdid++);
+	    sco.szCubrid, ATOMIC_FETCH_ADD1 (cmdid));
   errcode =
 	  run_csql_statement (statement, dbname, dbuser, dbpasswd, outfile, _dbmt_error);
   if (errcode != ERR_NO_ERROR)
@@ -14298,10 +14298,9 @@ ts_get_shard_info (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[6];
-  static int reqid = 0;
+  static atomic_counter_t reqid = 0;
 
-  /* not thread safe :( */
-  reqid++;
+  ATOMIC_FETCH_ADD1 (reqid);
   sprintf (stdout_log_file, "%s/cmshardinfo.%d.err", sco.dbmt_tmp_dir, reqid);
   sprintf (stderr_log_file, "%s/cmshardinfo2.%d.err", sco.dbmt_tmp_dir, reqid);
 
@@ -14446,15 +14445,15 @@ ts_get_shard_status (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[6];
   char *sname;
-  static int reqid = 0;
+  static atomic_counter_t reqid = 0;
 
   if ((sname = nv_get_val (req, "shardname")) == NULL)
     {
       strcpy (_dbmt_error, "shard name");
       return ERR_PARAM_MISSING;
     }
-  /* not thread safe :( */
-  reqid++;
+
+  ATOMIC_FETCH_ADD1 (reqid);
   sprintf (stdout_log_file, "%s/cmshardstatus.%d.err", sco.dbmt_tmp_dir, reqid);
   sprintf (stderr_log_file, "%s/cmshardstatus2.%d.err", sco.dbmt_tmp_dir, reqid);
 
