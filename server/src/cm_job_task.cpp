@@ -9956,16 +9956,21 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1,
-	    "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
-  putenv (out_msg_file_env);
+  {
+    const char *extra_envp[2];
+
+    snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1,
+	      "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
+    extra_envp[0] = out_msg_file_env;
+    extra_envp[1] = NULL;
 
 #if defined (WINDOWS)
-  status = EXIT_SUCCESS;
-  ret = run_child (argv, 1, NULL, NULL, NULL, NULL);
+    status = EXIT_SUCCESS;
+    ret = run_child_env (argv, 1, NULL, NULL, NULL, extra_envp, NULL);
 #else
-  ret = run_child (argv, 1, NULL, NULL, NULL, &status);
+    ret = run_child_env (argv, 1, NULL, NULL, NULL, extra_envp, &status);
 #endif
+  }
 
   if (ret < 0 || status != EXIT_SUCCESS)
     {
