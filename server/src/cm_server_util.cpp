@@ -2734,6 +2734,485 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
 }
 #endif
 
+/*
+ * _env_mutex () - the lock behind env_mutex_lock ()/env_mutex_unlock ().
+ *
+ */
+static mutex_t *
+_env_mutex (void)
+{
+  struct env_mutex_holder
+  {
+    mutex_t m;
+
+    env_mutex_holder (void)
+    {
+      mutex_init (m);
+    }
+    ~env_mutex_holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static env_mutex_holder holder;
+
+  return &holder.m;
+}
+
+/*
+ * env_mutex_lock ()/env_mutex_unlock () - the lock run_child_env () holds
+ * while it snapshots the process environment (see cm_server_util.cpp).
+ */
+void
+env_mutex_lock (void)
+{
+  mutex_lock (*_env_mutex ());
+}
+
+void
+env_mutex_unlock (void)
+{
+  mutex_unlock (*_env_mutex ());
+}
+
+/*
+ * _env_key_len () - length of the "KEY" part of a "KEY=VALUE" string
+ *                    (or the whole string, if there is no '=').
+ */
+static size_t
+_env_key_len (const char *kv)
+{
+  const char *eq = strchr (kv, '=');
+
+  return (eq != NULL) ? (size_t) (eq - kv) : strlen (kv);
+}
+
+#if defined(WINDOWS)
+
+/*
+ * _build_env_block () - build a Windows environment block (a sequence of
+ * NUL-terminated "KEY=VALUE" strings, terminated by an extra NUL)
+ */
+static char *
+_build_env_block (const char *const envp[])
+{
+  char *base_block;
+  char *merged_block;
+  const char *p;
+  char *q;
+  size_t merged_size;
+  int extra_count, j;
+
+  /* GetEnvironmentStrings ()/FreeEnvironmentStrings () bracket a snapshot of
+   * the live Win32 environment block; hold the lock across that snapshot so
+   * it can't be torn by a concurrent _putenv ()/SetEnvironmentVariable ()
+   * on another thread. */
+  env_mutex_lock ();
+
+  base_block = GetEnvironmentStrings ();
+  if (base_block == NULL)
+    {
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  for (extra_count = 0; envp != NULL && envp[extra_count] != NULL; extra_count++)
+    ;
+
+  /* pass 1: compute the merged block size, skipping any base entry that
+   * envp[] overrides (Windows env var names are case-insensitive) */
+  merged_size = 0;
+  for (p = base_block; *p != '\0'; p += strlen (p) + 1)
+    {
+      size_t key_len = _env_key_len (p);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && _strnicmp (p, envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         merged_size += strlen (p) + 1;
+       }
+    }
+  for (j = 0; j < extra_count; j++)
+    {
+      merged_size += strlen (envp[j]) + 1;
+    }
+  merged_size += 1;    /* final block-terminating NUL */
+
+  merged_block = (char *) malloc (merged_size);
+  if (merged_block == NULL)
+    {
+      FreeEnvironmentStrings (base_block);
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  /* pass 2: copy */
+  q = merged_block;
+  for (p = base_block; *p != '\0'; p += strlen (p) + 1)
+    {
+      size_t len = strlen (p);
+      size_t key_len = _env_key_len (p);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && _strnicmp (p, envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         memcpy (q, p, len + 1);
+         q += len + 1;
+       }
+    }
+  for (j = 0; j < extra_count; j++)
+    {
+      size_t len = strlen (envp[j]);
+
+      memcpy (q, envp[j], len + 1);
+      q += len + 1;
+    }
+  *q = '\0';
+
+  FreeEnvironmentStrings (base_block);
+  env_mutex_unlock ();
+
+  return merged_block;
+}
+
+/*
+ * run_child_env () - same as cm_common's run_child (), but lets the caller
+ * pass extra "KEY=VALUE" environment entries that apply only to the child
+ * process, instead of mutating the whole server process's environment via
+ * putenv () before fork ()/CreateProcess ().
+ *
+ * envp (in) : NULL-terminated array of "KEY=VALUE" strings to add to (or
+ *             override in) the child's environment. May be NULL, in which
+ *             case the child simply inherits the current environment,
+ *             identical to run_child ().
+ */
+int
+run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+              char *stderr_file, const char *envp[], int *exit_status)
+{
+  int new_pid;
+  STARTUPINFO start_info;
+  PROCESS_INFORMATION proc_info;
+  BOOL res;
+  int i, cmd_arg_len;
+  char cmd_arg[1024];
+  BOOL inherit_flag = FALSE;
+  HANDLE hStdIn = INVALID_HANDLE_VALUE;
+  HANDLE hStdOut = INVALID_HANDLE_VALUE;
+  HANDLE hStdErr = INVALID_HANDLE_VALUE;
+  char *env_block = NULL;
+
+  if (exit_status != NULL)
+    *exit_status = 0;
+
+  for (i = 0, cmd_arg_len = 0; argv[i]; i++)
+    {
+      cmd_arg_len += sprintf (cmd_arg + cmd_arg_len, "\"%s\" ", argv[i]);
+    }
+
+  GetStartupInfo (&start_info);
+  start_info.wShowWindow = SW_HIDE;
+
+  if (stdin_file)
+    {
+      hStdIn = CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdIn != INVALID_HANDLE_VALUE)
+       {
+         SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+         start_info.dwFlags = STARTF_USESTDHANDLES;
+         start_info.hStdInput = hStdIn;
+         inherit_flag = TRUE;
+       }
+    }
+  if (stdout_file)
+    {
+      hStdOut =
+       CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdOut != INVALID_HANDLE_VALUE)
+       {
+         SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+         start_info.dwFlags = STARTF_USESTDHANDLES;
+         start_info.hStdOutput = hStdOut;
+         inherit_flag = TRUE;
+       }
+    }
+  if (stderr_file)
+    {
+      hStdErr =
+       CreateFile (stderr_file, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                   CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdErr != INVALID_HANDLE_VALUE)
+       {
+         SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+         start_info.dwFlags = STARTF_USESTDHANDLES;
+         start_info.hStdError = hStdErr;
+         inherit_flag = TRUE;
+       }
+    }
+
+  if (envp != NULL)
+    {
+      /* NULL on failure just means "inherit parent env unchanged", same as run_child () */
+      env_block = _build_env_block (envp);
+    }
+
+  /* env_block is an ANSI block from GetEnvironmentStrings (), so we must NOT pass
+   * CREATE_UNICODE_ENVIRONMENT here. */
+  res =
+    CreateProcess (argv[0], cmd_arg, NULL, NULL, inherit_flag, CREATE_NO_WINDOW, env_block, NULL, &start_info,
+                  &proc_info);
+
+  if (env_block != NULL)
+    {
+      free (env_block);
+    }
+
+  if (hStdIn != INVALID_HANDLE_VALUE)
+    {
+      CloseHandle (hStdIn);
+    }
+  if (hStdOut != INVALID_HANDLE_VALUE)
+    {
+      CloseHandle (hStdOut);
+    }
+  if (hStdErr != INVALID_HANDLE_VALUE)
+    {
+      CloseHandle (hStdErr);
+    }
+
+  if (res == FALSE)
+    {
+      return -1;
+    }
+
+  new_pid = proc_info.dwProcessId;
+
+  if (wait_flag)
+    {
+      DWORD status = 0;
+      WaitForSingleObject (proc_info.hProcess, INFINITE);
+      GetExitCodeProcess (proc_info.hProcess, &status);
+      if (exit_status != NULL)
+       *exit_status = status;
+      CloseHandle (proc_info.hProcess);
+      CloseHandle (proc_info.hThread);
+      return 0;
+    }
+  else
+    {
+      CloseHandle (proc_info.hProcess);
+      CloseHandle (proc_info.hThread);
+      return new_pid;
+    }
+}
+
+#else /* !WINDOWS */
+
+/*
+ * _merge_envp () - build a NULL-terminated envp[] array (for execve ()).
+ * if the key already exists, overridden else added.
+ */
+static char **
+_merge_envp (const char *const envp[])
+{
+  extern char **environ;
+  int base_count, extra_count, i, j;
+  int total_count = 0;
+  char **merged;
+
+  env_mutex_lock ();
+
+  for (base_count = 0; environ != NULL && environ[base_count] != NULL; base_count++)
+    ;
+  for (extra_count = 0; envp != NULL && envp[extra_count] != NULL; extra_count++)
+    ;
+
+  merged = (char **) malloc (sizeof (char *) * (base_count + extra_count + 1));
+  if (merged == NULL)
+    {
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  for (i = 0; i < base_count; i++)
+    {
+      size_t key_len = _env_key_len (environ[i]);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && strncmp (environ[i], envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         merged[total_count] = strdup (environ[i]);
+         if (merged[total_count] == NULL)
+           {
+             goto error;
+           }
+         total_count++;
+       }
+    }
+
+  for (j = 0; j < extra_count; j++)
+    {
+      merged[total_count] = strdup (envp[j]);
+      if (merged[total_count] == NULL)
+       {
+         goto error;
+       }
+      total_count++;
+    }
+
+  merged[total_count] = NULL;
+
+  env_mutex_unlock ();
+  return merged;
+
+error:
+  merged[total_count] = NULL;
+  for (i = 0; merged[i] != NULL; i++)
+    {
+      free (merged[i]);
+    }
+  free (merged);
+  env_mutex_unlock ();
+  return NULL;
+}
+
+static void
+_free_envp (char **merged)
+{
+  int i;
+
+  if (merged == NULL)
+    {
+      return;
+    }
+  for (i = 0; merged[i] != NULL; i++)
+    {
+      free (merged[i]);
+    }
+  free (merged);
+}
+
+int
+run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+              char *stderr_file, const char *envp[], int *exit_status)
+{
+  int pid;
+  char **merged_envp = NULL;
+
+  if (exit_status != NULL)
+    *exit_status = 0;
+
+  if (envp != NULL)
+    {
+      merged_envp = _merge_envp (envp);
+      /* on OOM, merged_envp stays NULL and the child just inherits the
+       * parent's environment unchanged -- same as run_child (). */
+    }
+
+  if (wait_flag)
+    signal (SIGCHLD, SIG_DFL);
+  else
+    signal (SIGCHLD, SIG_IGN);
+
+  pid = fork ();
+  if (pid == 0)
+    {
+      FILE *fp;
+
+      close_all_fds (3);
+
+      if (stdin_file != NULL)
+       {
+         fp = fopen (stdin_file, "r");
+         if (fp != NULL)
+           {
+             dup2 (fileno (fp), 0);
+             fclose (fp);
+           }
+       }
+      if (stdout_file != NULL)
+       {
+         unlink (stdout_file);
+         fp = fopen (stdout_file, "w");
+         if (fp != NULL)
+           {
+             dup2 (fileno (fp), 1);
+             fclose (fp);
+           }
+       }
+      if (stderr_file != NULL)
+       {
+         unlink (stderr_file);
+         fp = fopen (stderr_file, "w");
+         if (fp != NULL)
+           {
+             dup2 (fileno (fp), 2);
+             fclose (fp);
+           }
+       }
+
+      if (merged_envp != NULL)
+       {
+         execve ((const char *) argv[0], (char *const *) argv, merged_envp);
+       }
+      else
+       {
+         execv ((const char *) argv[0], (char *const *) argv);
+       }
+      _exit (127); /* when execve () failed, just _exit () immediately */
+    }
+
+  _free_envp (merged_envp);
+
+  if (pid < 0)
+    {
+      return -1;
+    }
+
+  if (wait_flag)
+    {
+      int status = 0;
+      waitpid (pid, &status, 0);
+      if (exit_status != NULL)
+       {
+         *exit_status = status;
+       }
+      return 0;
+    }
+  else
+    {
+      return pid;
+    }
+}
+#endif
+
 typedef struct _dir_file_node
 {
   char *file_name;
