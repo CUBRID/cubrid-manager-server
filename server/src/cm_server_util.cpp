@@ -2798,10 +2798,6 @@ _build_env_block (const char *const envp[])
   size_t merged_size;
   int extra_count, j;
 
-  /* GetEnvironmentStrings ()/FreeEnvironmentStrings () bracket a snapshot of
-   * the live Win32 environment block; hold the lock across that snapshot so
-   * it can't be torn by a concurrent _putenv ()/SetEnvironmentVariable ()
-   * on another thread. */
   env_mutex_lock ();
 
   base_block = GetEnvironmentStrings ();
