@@ -280,6 +280,8 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   int ret_val;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[5];
+  const char *extra_envp[3];
+  int envc = 0;
 
 #ifdef HPUX
   char jvm_env_string[32];
@@ -288,16 +290,6 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   cmd_start_master ();
   make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
   make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
-
-
-  /* unset CUBRID_ERROR_LOG environment variable, using default value */
-  env_mutex_lock ();
-#if defined(WINDOWS)
-  _putenv ("CUBRID_ERROR_LOG=");
-#else
-  unsetenv ("CUBRID_ERROR_LOG");
-#endif
-  env_mutex_unlock ();
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -312,24 +304,20 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   argv[3] = dbname;
   argv[4] = NULL;
 
+  extra_envp[envc++] = "CUBRID_ERROR_LOG=";    /* removing env variable CUBRID_ERROR_LOG if exists */
+
 #ifdef HPUX
 #ifdef HPUX_IA64
   strcpy (jvm_env_string, "LD_PRELOAD=libjvm.so");
 #else /* pa-risc */
   strcpy (jvm_env_string, "LD_PRELOAD=libjvm.sl");
 #endif
-  env_mutex_lock ();
-  putenv (jvm_env_string);
-  env_mutex_unlock ();
+  extra_envp[envc++] = jvm_env_string;
 #endif
 
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start server */
+  extra_envp[envc] = NULL;
 
-#ifdef HPUX
-  env_mutex_lock ();
-  putenv ("LD_PRELOAD=");
-  env_mutex_unlock ();
-#endif
+  pid = run_child_env (argv, 1, NULL, stdout_log_file, stderr_log_file, extra_envp, NULL);    /* start server */
 
   if (pid < 0)
     {
