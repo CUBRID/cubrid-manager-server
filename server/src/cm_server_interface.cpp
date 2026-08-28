@@ -133,7 +133,6 @@ cub_cm_init_env ()
   memset (&cub_httpd_env, 0, sizeof (cubrid_env_t));
   putenv (default_cubrid_lang_type);    /* set as default language type */
   putenv (default_cubrid_lang_msg_type);    /* set as default language type */
-  //putenv ("CUBRID_CHARSET=en_US");    /* set as default language type */
 
   snprintf (cub_httpd_env.cubrid_err_log, MAX_PATH,
             "CUBRID_ERROR_LOG=%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
@@ -146,19 +145,6 @@ cub_cm_init_env ()
             sco.szCubrid_databases);
   putenv (cub_httpd_env.cubrid_databases);
 
-  /*  charset = getenv ("CUBRID_CHARSET");
-  if (charset != NULL)
-  {
-      snprintf (cub_httpd_env.cubrid_charset, MAX_PATH, "CUBRID_CHARSET=%s",
-                charset);
-  }
-  else
-  {
-      snprintf (cub_httpd_env.cubrid_charset, MAX_PATH,
-                "CUBRID_CHARSET=en_US");
-      putenv (cub_httpd_env.cubrid_charset);
-  }
-  */
   mutex_init (cm_mutex);
   return;
 }
@@ -277,12 +263,6 @@ ch_process_request (nvplist *req, nvplist *res)
           ut_access_log (req, NULL);
         }
 
-      /*    if (charset != NULL)
-      {
-      snprintf (charsetenv, PATH_MAX, "CUBRID_CHARSET=%s", charset);
-      putenv (charsetenv);
-      }
-      */
       /* record the start time of running cub_manager */
       gettimeofday (&task_begin, NULL);
 
@@ -290,11 +270,7 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* record the end time of running cub_manager */
       gettimeofday (&task_end, NULL);
-      /*     if (charset != NULL)
-      {
-      putenv (cub_httpd_env.cubrid_charset);
-      }
-      */
+
       /* caculate the running time of cub_manager. */
       _ut_timeval_diff (&task_begin, &task_end, &elapsed_msec);
 
