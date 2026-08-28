@@ -11575,25 +11575,8 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   int i;
   int status = EXIT_SUCCESS;
   int ret;
-
-  make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
-  make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
-
-  /*
-   * putenv () in runscript api will not be allowed for a while
-   * for thread-safety
-   */
-  /* set environment that the script need to run. */
-#if 0
-  for (i = 0; i < req->nvplist_leng; i++)
-    {
-      nv_lookup (req, i, &n, &v);
-      if ((n != NULL) && (strcmp (n, "envvar") == 0))
-	{
-	  putenv (v);
-	}
-    }
-#endif
+  int envc = 0;
+  const char **extra_envp = NULL;
 
   if ((script_path = nv_get_val (req, "script_path")) == NULL)
     {
@@ -11601,19 +11584,59 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
+  make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
+
+  /* set environment that the script need to run. */
+
+  for (i = 0; i < req->nvplist_leng; i++)
+    {
+      nv_lookup (req, i, &n, &v);
+      if ((n != NULL) && (v != NULL) && (strcmp (n, "envvar") == 0))
+	{
+	  envc++;
+	}
+    }
+
+  if (envc > 0)
+    {
+      extra_envp = (const char **) malloc (sizeof (const char *) * (envc + 1));
+      if (extra_envp == NULL)
+	{
+	  strcpy_limit (_dbmt_error, "malloc", DBMT_ERROR_MSG_SIZE);
+	  return ERR_SYSTEM_CALL;
+	}
+
+      envc = 0;
+      for (i = 0; i < req->nvplist_leng; i++)
+	{
+	  nv_lookup (req, i, &n, &v);
+	  if ((n != NULL) && (v != NULL) && (strcmp (n, "envvar") == 0))
+	    {
+	      extra_envp[envc++] = v;
+	    }
+	}
+      extra_envp[envc] = NULL;
+    }
+
   argv[argc++] = script_path;
   argv[argc++] = NULL;
 
   /* run *.bat or *.sh. */
 #if defined (WINDOWS)
-  ret = run_child (argv, 1, NULL, outfile, errfile, NULL);
+  ret = run_child_env (argv, 1, NULL, outfile, errfile, extra_envp, NULL);
 #else
-  ret = run_child (argv, 1, NULL, outfile, errfile, &status);
+  ret = run_child_env (argv, 1, NULL, outfile, errfile, extra_envp, &status);
 #endif
   if (ret < 0 || status != EXIT_SUCCESS)
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       retval = ERR_SYSTEM_CALL;
+    }
+
+  if (extra_envp != NULL)
+    {
+      free (extra_envp);
     }
 
   unlink (outfile);
