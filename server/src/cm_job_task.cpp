@@ -335,7 +335,8 @@ static char *_get_format_time ();
 static void read_stdout_stderr_as_err (char *tmp_out_file, char *tmp_err_file,
 				       char *_dbmt_error);
 static int _run_child (const char *const argv[], int wait_flag,
-		       char *task_name, char *stdout_file, char *_dbmt_error);
+		       char *task_name, char *stdout_file, char *_dbmt_error,
+		       const char *envp[] = NULL);
 static int _check_backup_info (const char *conf_item[], int check_backupid,
 			       char *_dbmt_error);
 static int _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -410,9 +411,15 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
   return retval;
 }
 
+/*
+ * _run_child () - run a child process (via run_child_env ()), read its
+ * error file into _dbmt_error on failure.
+ *
+ * envp (in) : extra "KEY=VALUE" entries that apply only to this child
+ */
 static int
 _run_child (const char *const argv[], int wait_flag, char *task_name,
-	    char *stdout_file, char *_dbmt_error)
+	    char *stdout_file, char *_dbmt_error, const char *envp[])
 {
   char tmp_out_file[PATH_MAX];
   char tmp_err_file[PATH_MAX];
@@ -436,8 +443,8 @@ _run_child (const char *const argv[], int wait_flag, char *task_name,
   snprintf (buf, PATH_MAX - 1, "%s_err_tmp", task_name);
   make_temp_filepath (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
 
-  if (run_child
-      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, &exit_code) < 0)
+  if (run_child_env
+      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, envp, &exit_code) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", argv[0]);
       ret_val = ERR_SYSTEM_CALL;
@@ -8661,9 +8668,12 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "trigger_operation_err_tmp", TS_GETTRIGGERINFO, PATH_MAX);
-  SET_TRANSACTION_NO_WAIT_MODE_ENV ();
 
-  retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* csql - trigger */
+  {
+    const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
+
+    retval = run_child_env (argv, 1, NULL, NULL, cubrid_err_file, extra_envp, NULL);    /* csql - trigger */
+  }
   if (strlen (input_file) > 0)
     {
       unlink (input_file);
@@ -10766,10 +10776,12 @@ run_csql_statement (const char *sql_stat, char *dbname, char *dbuser,
 
   argv[argc++] = NULL;
 
-  SET_TRANSACTION_NO_WAIT_MODE_ENV ();
-
   strncpy (task_name, "csql", TASKNAME_LEN);
-  retval = _run_child (argv, 1, task_name, outfilepath, _dbmt_error);
+  {
+    const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
+
+    retval = _run_child (argv, 1, task_name, outfilepath, _dbmt_error, extra_envp);
+  }
 
   return retval;
 }
