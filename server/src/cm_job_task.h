@@ -41,11 +41,8 @@
 #define SIZE_BUFFER_MAX        1024
 #endif
 
-#define SET_TRANSACTION_NO_WAIT_MODE_ENV()                                              \
-      do {                                                                              \
-      putenv((char *) "CUBRID_LOCK_TIMEOUT_IN_SECS=1");                                 \
-      putenv((char *) "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED");                    \
-    } while (0)
+#define TRANSACTION_NO_WAIT_MODE_ENVP                                                   \
+      { "CUBRID_LOCK_TIMEOUT_IN_SECS=1", "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED", NULL }
 
 typedef enum
 {
