@@ -1175,7 +1175,6 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       strcpy (_dbmt_error, "broker");
       return ERR_PARAM_MISSING;
     }
-  chdir (sco.szCubrid);
   if (cm_get_broker_conf (&uc_conf, NULL, &error) < 0)
     {
       strcpy (_dbmt_error, error.err_msg);
