@@ -117,6 +117,7 @@ struct worker_context
 
 int cubrid_version_major = -1;
 int cubrid_version_minor = -1;
+char cubrid_version_build[CUBRID_VERSION_BUILD_LEN] = "";
 
 int
 bind_socket (int port)
@@ -935,8 +936,8 @@ main (int argc, char **argv)
 
   start_auto_thread ();
 
-  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor);
-  LOG_INFO ("started '%s' with Engine Version: %d.%d", argv[0], cubrid_version_major, cubrid_version_minor);
+  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build, sizeof (cubrid_version_build));
+  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
 
   start_service ();
 

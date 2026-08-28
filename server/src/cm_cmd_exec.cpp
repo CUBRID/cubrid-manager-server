@@ -150,13 +150,18 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
   return res;
 }
 
-void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size)
 {
   const char *argv[3];
   char tmpfile[PATH_MAX], strbuf[BUFFER_MAX_LEN];
   FILE *infile;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char *saveptr;
+
+  if (build_version != NULL && build_version_size > 0)
+    {
+      build_version[0] = '\0';
+    }
 
   cubrid_cmd_name (cmd_name);
   make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", TS_GET_SERVER_VERSION, PATH_MAX);
@@ -169,7 +174,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
     {
       if (!fgets (strbuf, sizeof (strbuf), infile) || ! fgets (strbuf, sizeof (strbuf), infile))
         {
-           LOG_ERROR ("Spacedb is skipped due to temporarily insufficient resources");
+           LOG_ERROR ("cubrid --version is skipped due to temporarily insufficient resources");
            major_version = minor_version = -1;
            return;
         }
@@ -180,6 +185,25 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
       major_version = atoi (p);
       p = STRTOK (NULL, ".", &saveptr);
       minor_version = atoi (p);
+
+      if (build_version != NULL && build_version_size > 0)
+        {
+          char *lparen = strchr (strbuf, '(');
+          if (lparen != NULL)
+            {
+              char *rparen = strchr (lparen + 1, ')');
+              if (rparen != NULL && rparen > lparen + 1)
+                {
+                  size_t len = (size_t) (rparen - (lparen + 1));
+                  if (len >= build_version_size)
+                    {
+                      len = build_version_size - 1;
+                    }
+                  strncpy (build_version, lparen + 1, len);
+                  build_version[len] = '\0';
+                }
+            }
+        }
 
       fclose (infile);
       unlink (tmpfile);
@@ -206,7 +230,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
   if (IS_INVALID_CUBRID_VERS_MAJOR (cubrid_version_major))
     {
       LOG_ERROR ("Invalid CUBRID Engine Version: %d.%d", cubrid_version_major, cubrid_version_minor);
-      find_and_parse_cub_admin_version (major_version, minor_version);
+      find_and_parse_cub_admin_version (major_version, minor_version, cubrid_version_build, sizeof (cubrid_version_build));
       cubrid_version_major = major_version;
       cubrid_version_minor = minor_version;
     }

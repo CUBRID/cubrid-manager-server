@@ -1195,7 +1195,6 @@ int
 cub_check_server_status (Json::Value &request, Json::Value &response)
 {
   string task = request["task"].asString ();
-  char vers[32];
 
   if (task != "getserverstatus")
     {
@@ -1215,8 +1214,7 @@ cub_check_server_status (Json::Value &request, Json::Value &response)
   time_t now = time (NULL);
 
   Json::Value conf;
-  snprintf (vers, sizeof (vers), "%d.%d", cubrid_version_major,cubrid_version_minor);
-  conf["CUBRID Version"] = vers;
+  conf["CUBRID_Version"] = cubrid_version_build;
   conf["async_job_ttl_sec"] = sco.iAsyncJobTtlSec;
   conf["async_long_job_sec"] = sco.iAsyncLongJobSec;
   conf["max_num_async_task"] = sco.iMaxNumAsyncTask;

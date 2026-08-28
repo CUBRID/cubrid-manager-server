@@ -627,9 +627,12 @@ extern const char *autounicas_conf_entry[AUTOUNICAS_CONF_ENTRY_NUM];
 extern const char *autobackup_period_type[AUTOBACKUP_PERIOD_TYPE_NUM];
 extern const char *autobackup_period_week[AUTOBACKUP_PERIOD_WEEK_NUM];
 
+#define CUBRID_VERSION_BUILD_LEN	64
+
 extern int cubrid_version_major;
 extern int cubrid_version_minor;
-void find_and_parse_cub_admin_version (int &major_version, int &minor_version);
+extern char cubrid_version_build[CUBRID_VERSION_BUILD_LEN];
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size);
 #define IS_INVALID_CUBRID_VERS_MAJOR(major)	(major <= 0)
 #define CUBRID_VERS(major,minor)	(major*100 + minor)
 
