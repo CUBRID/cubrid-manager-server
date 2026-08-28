@@ -844,16 +844,6 @@ ut_daemon_start (void)
   signal (SIGTTIN, SIG_IGN);
   signal (SIGTSTP, SIG_IGN);
 
-#if 0
-  /* to make it run in background */
-  signal (SIGHUP, SIG_IGN);
-  childpid = PROC_FORK ();
-  if (childpid > 0)
-    {
-      exit (0);  /* kill parent */
-    }
-#endif
-
   /* setpgrp(); */
   setsid ();            /* become process group leader and  */
   /* disconnect from control terminal */
@@ -865,12 +855,6 @@ ut_daemon_start (void)
       exit (0);  /* kill parent */
     }
 
-#if 0
-  /* change current working directory */
-  chdir ("/");
-  /* clear umask */
-  umask (0);
-#endif
 #endif /* ifndef WINDOWS */
 }
 
@@ -2787,6 +2771,17 @@ _env_key_len (const char *kv)
   return (eq != NULL) ? (size_t) (eq - kv) : strlen (kv);
 }
 
+/*
+ * _env_entry_is_delete () - true if kv is a "KEY=" entry with no value
+ */
+static int
+_env_entry_is_delete (const char *kv)
+{
+  const char *eq = strchr (kv, '=');
+
+  return (eq != NULL) && (eq[1] == '\0');
+}
+
 #if defined(WINDOWS)
 
 /*
@@ -2843,6 +2838,10 @@ _build_env_block (const char *const envp[])
     }
   for (j = 0; j < extra_count; j++)
     {
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
       merged_size += strlen (envp[j]) + 1;
     }
   merged_size += 1;    /* final block-terminating NUL */
@@ -2880,7 +2879,13 @@ _build_env_block (const char *const envp[])
     }
   for (j = 0; j < extra_count; j++)
     {
-      size_t len = strlen (envp[j]);
+      size_t len;
+
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
+      len = strlen (envp[j]);
 
       memcpy (q, envp[j], len + 1);
       q += len + 1;
@@ -2894,15 +2899,9 @@ _build_env_block (const char *const envp[])
 }
 
 /*
- * run_child_env () - same as cm_common's run_child (), but lets the caller
- * pass extra "KEY=VALUE" environment entries that apply only to the child
- * process, instead of mutating the whole server process's environment via
- * putenv () before fork ()/CreateProcess ().
- *
  * envp (in) : NULL-terminated array of "KEY=VALUE" strings to add to (or
- *             override in) the child's environment. May be NULL, in which
- *             case the child simply inherits the current environment,
- *             identical to run_child ().
+ *             override in) the child's environment. An entry of the form
+ *             "KEY=" (no value) removes KEY from the child's environment
  */
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
@@ -3028,7 +3027,6 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
 
 /*
  * _merge_envp () - build a NULL-terminated envp[] array (for execve ()).
- * if the key already exists, overridden else added.
  */
 static char **
 _merge_envp (const char *const envp[])
@@ -3079,6 +3077,11 @@ _merge_envp (const char *const envp[])
 
   for (j = 0; j < extra_count; j++)
     {
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
+
       merged[total_count] = strdup (envp[j]);
       if (merged[total_count] == NULL)
        {
