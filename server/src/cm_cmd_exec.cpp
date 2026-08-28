@@ -134,9 +134,11 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
 #endif
   make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_csql_err", TS_CSQL_CMD, PATH_MAX);
 
-  SET_TRANSACTION_NO_WAIT_MODE_ENV ();
+  {
+    const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
 
-  run_child (argv, 1, NULL, NULL, out_file, NULL);    /* csql */
+    run_child_env (argv, 1, NULL, NULL, out_file, extra_envp, NULL);    /* csql */
+  }
 
   res = new_csql_result ();
   if (res == NULL)
