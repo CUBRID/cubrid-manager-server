@@ -2901,7 +2901,7 @@ _build_env_block (const char *const envp[])
  */
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-              char *stderr_file, const char *envp[], int *exit_status)
+              char *stderr_file, int *exit_status, const char *envp[])
 {
   int new_pid;
   STARTUPINFO start_info;
@@ -3134,7 +3134,7 @@ _reap_child_async (void *arg)
 
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-              char *stderr_file, const char *envp[], int *exit_status)
+              char *stderr_file, int *exit_status, const char *envp[])
 {
   int pid;
   char **merged_envp = NULL;
