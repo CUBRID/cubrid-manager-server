@@ -3118,6 +3118,20 @@ _free_envp (char **merged)
   free (merged);
 }
 
+/*
+ * _reap_child_async (), blocks in waitpid () for exactly one child
+ */
+static void *
+_reap_child_async (void *arg)
+{
+  pid_t *pid_ptr = (pid_t *) arg;
+  pid_t pid = *pid_ptr;
+
+  delete pid_ptr;
+  waitpid (pid, NULL, 0);
+  return NULL;
+}
+
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
               char *stderr_file, const char *envp[], int *exit_status)
@@ -3131,14 +3145,7 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
   if (envp != NULL)
     {
       merged_envp = _merge_envp (envp);
-      /* on OOM, merged_envp stays NULL and the child just inherits the
-       * parent's environment unchanged -- same as run_child (). */
     }
-
-  if (wait_flag)
-    signal (SIGCHLD, SIG_DFL);
-  else
-    signal (SIGCHLD, SIG_IGN);
 
   pid = fork ();
   if (pid == 0)
@@ -3207,6 +3214,18 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
     }
   else
     {
+      pthread_t reaper;
+      pid_t *reap_pid = new pid_t (pid);
+
+      if (pthread_create (&reaper, NULL, _reap_child_async, reap_pid) == 0)
+       {
+         pthread_detach (reaper);
+       }
+      else
+       {
+         delete reap_pid;
+         waitpid (pid, NULL, 0);
+       }
       return pid;
     }
 }
