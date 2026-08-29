@@ -2828,7 +2828,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   make_temp_filepath (createdb_err_file, sco.dbmt_tmp_dir, "createdb_err_file", TS_CREATEDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, NULL, createdb_err_file, NULL);    /* createdb */
+  retval = run_child_env (argv, 1, NULL, NULL, createdb_err_file, NULL);    /* createdb */
 
   if (read_error_file (createdb_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
     {
