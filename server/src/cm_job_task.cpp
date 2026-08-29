@@ -444,7 +444,7 @@ _run_child (const char *const argv[], int wait_flag, char *task_name,
   make_temp_filepath (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
 
   if (run_child_env
-      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, envp, &exit_code) < 0)
+      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, &exit_code, envp) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", argv[0]);
       ret_val = ERR_SYSTEM_CALL;
@@ -8672,7 +8672,7 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
   {
     const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
 
-    retval = run_child_env (argv, 1, NULL, NULL, cubrid_err_file, extra_envp, NULL);    /* csql - trigger */
+    retval = run_child_env (argv, 1, NULL, NULL, cubrid_err_file, NULL, extra_envp);    /* csql - trigger */
   }
   if (strlen (input_file) > 0)
     {
@@ -9975,9 +9975,9 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
 
 #if defined (WINDOWS)
     status = EXIT_SUCCESS;
-    ret = run_child_env (argv, 1, NULL, NULL, NULL, extra_envp, NULL);
+    ret = run_child_env (argv, 1, NULL, NULL, NULL, NULL, extra_envp);
 #else
-    ret = run_child_env (argv, 1, NULL, NULL, NULL, extra_envp, &status);
+    ret = run_child_env (argv, 1, NULL, NULL, NULL, &status, extra_envp);
 #endif
   }
 
@@ -11635,9 +11635,9 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 
   /* run *.bat or *.sh. */
 #if defined (WINDOWS)
-  ret = run_child_env (argv, 1, NULL, outfile, errfile, extra_envp, NULL);
+  ret = run_child_env (argv, 1, NULL, outfile, errfile, NULL, extra_envp);
 #else
-  ret = run_child_env (argv, 1, NULL, outfile, errfile, extra_envp, &status);
+  ret = run_child_env (argv, 1, NULL, outfile, errfile, &status, extra_envp);
 #endif
   if (ret < 0 || status != EXIT_SUCCESS)
     {

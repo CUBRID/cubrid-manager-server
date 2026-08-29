@@ -137,7 +137,7 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
   {
     const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
 
-    run_child_env (argv, 1, NULL, NULL, out_file, extra_envp, NULL);    /* csql */
+    run_child_env (argv, 1, NULL, NULL, out_file, NULL, extra_envp);    /* csql */
   }
 
   res = new_csql_result ();
@@ -319,7 +319,7 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
 
   extra_envp[envc] = NULL;
 
-  pid = run_child_env (argv, 1, NULL, stdout_log_file, stderr_log_file, extra_envp, NULL);    /* start server */
+  pid = run_child_env (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL, extra_envp);    /* start server */
 
   if (pid < 0)
     {
