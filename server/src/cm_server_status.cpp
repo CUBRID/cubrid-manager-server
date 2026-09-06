@@ -38,6 +38,7 @@
 #include <tlhelp32.h>
 #else
 #include <unistd.h>
+#include <signal.h>
 #endif
 
 #include "cm_config.h"
@@ -192,6 +193,64 @@ cmd_cms_server_status (void)
 
   unlink (out_file);
   return res;
+}
+
+/*
+ * cms_is_database_active () - CMS-native port of CUBRID engine's
+ * cm_common/cm_utils.c:uIsDatabaseActive ().
+ *
+ * returns 0 if dbn is not currently active,
+ *         1 if active (non-HA),
+ *         2 if active in HA mode
+ */
+int
+cms_is_database_active (char *dbn)
+{
+  T_SERVER_STATUS_RESULT *cmd_res;
+  int retval = 0;
+
+  if (dbn == NULL)
+    {
+      return 0;
+    }
+
+  cmd_res = cmd_cms_server_status ();
+  if (cmd_res != NULL)
+    {
+      retval = uIsDatabaseActive2 (cmd_res, dbn);
+      cmd_servstat_result_free (cmd_res);
+    }
+  return retval;
+}
+
+/*
+ * cms_database_mode () - CMS-native port of CUBRID engine's
+ * cm_common/cm_utils.c:uDatabaseMode ().
+ */
+T_DB_SERVICE_MODE
+cms_database_mode (char *dbname, int *ha_mode)
+{
+  int pid, retval;
+
+  retval = cms_is_database_active (dbname);
+  if (retval != 0)
+    {
+      if (ha_mode != NULL)
+        {
+          *ha_mode = (retval == 2) ? 1 : 0;
+        }
+      return DB_SERVICE_MODE_CS;
+    }
+
+  pid = get_db_server_pid (dbname);
+  if (pid > 0)
+    {
+      if (kill (pid, 0) >= 0)
+        {
+          return DB_SERVICE_MODE_SA;
+        }
+    }
+  return DB_SERVICE_MODE_NONE;
 }
 
 /*

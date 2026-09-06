@@ -304,4 +304,11 @@ int cmd_optimizedb_sa (const char *dbname, const char *classname, char *_dbmt_er
  */
 T_SERVER_STATUS_RESULT *cmd_cms_server_status (void);
 
+/*
+ * cms_is_database_active () / cms_database_mode () - CMS-native ports of
+ * CUBRID engine's cm_common/cm_utils.c:uIsDatabaseActive ()/uDatabaseMode ().
+ */
+int cms_is_database_active (char *dbn);
+T_DB_SERVICE_MODE cms_database_mode (char *dbname, int *ha_mode);
+
 #endif                /* _CM_COMMAND_EXECUTE_H_ */
