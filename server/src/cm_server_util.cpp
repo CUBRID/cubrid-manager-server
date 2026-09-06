@@ -2759,41 +2759,60 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
   GetStartupInfo (&start_info);
   start_info.wShowWindow = SW_HIDE;
 
+  /*
+   * mirrors the POSIX side: if a redirect the caller explicitly asked for
+   * can't be set up, fail the whole call
+   */
   if (stdin_file)
     {
       hStdIn = CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdIn != INVALID_HANDLE_VALUE)
+      if (hStdIn == INVALID_HANDLE_VALUE)
        {
-         SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-         start_info.dwFlags = STARTF_USESTDHANDLES;
-         start_info.hStdInput = hStdIn;
-         inherit_flag = TRUE;
+         return -1;
        }
+      SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdInput = hStdIn;
+      inherit_flag = TRUE;
     }
   if (stdout_file)
     {
       hStdOut =
        CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdOut != INVALID_HANDLE_VALUE)
+      if (hStdOut == INVALID_HANDLE_VALUE)
        {
-         SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-         start_info.dwFlags = STARTF_USESTDHANDLES;
-         start_info.hStdOutput = hStdOut;
-         inherit_flag = TRUE;
+         if (hStdIn != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdIn);
+           }
+         return -1;
        }
+      SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdOutput = hStdOut;
+      inherit_flag = TRUE;
     }
   if (stderr_file)
     {
       hStdErr =
        CreateFile (stderr_file, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdErr != INVALID_HANDLE_VALUE)
+      if (hStdErr == INVALID_HANDLE_VALUE)
        {
-         SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-         start_info.dwFlags = STARTF_USESTDHANDLES;
-         start_info.hStdError = hStdErr;
-         inherit_flag = TRUE;
+         if (hStdIn != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdIn);
+           }
+         if (hStdOut != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdOut);
+           }
+         return -1;
        }
+      SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdError = hStdErr;
+      inherit_flag = TRUE;
     }
 
   if (envp != NULL)
@@ -2933,7 +2952,7 @@ error:
     }
   free (merged);
   env_mutex_unlock ();
-  LOG_ERROR ("malloc () for execve failed (critical), try execv () instead");
+  LOG_ERROR ("strdup () for execve failed (critical), try execv () instead");
   return NULL;
 }
 
@@ -3007,7 +3026,6 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
        }
       if (stdout_file != NULL)
        {
-         unlink (stdout_file);
          fd = open (stdout_file, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0666);
          if (fd >= 0)
            {
@@ -3021,7 +3039,6 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
        }
       if (stderr_file != NULL)
        {
-         unlink (stderr_file);
          fd = open (stderr_file, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0666);
          if (fd >= 0)
            {
