@@ -411,6 +411,13 @@ uReadSystemConfig (void)
           int max_task = atoi (ent_val);
           if (max_task < 1 || max_task > MAX_NUM_ASYNC_TASK_LIMIT)
             {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid max_num_async_task in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_MAX_NUM_ASYNC_TASK);
+              ut_record_cubrid_utility_log_stderr (err_buf);
+
               sco.iMaxNumAsyncTask = DEFAULT_MAX_NUM_ASYNC_TASK;
             }
           else
