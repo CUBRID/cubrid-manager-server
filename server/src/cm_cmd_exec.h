@@ -28,6 +28,7 @@
 #include <time.h>
 
 #include "cm_dep.h"
+#include "cm_stat.h"
 
 #if defined(WINDOWS)
 #define DBMT_EXE_EXT        ".exe"
@@ -310,5 +311,16 @@ T_SERVER_STATUS_RESULT *cmd_cms_server_status (void);
  */
 int cms_is_database_active (char *dbn);
 T_DB_SERVICE_MODE cms_database_mode (char *dbname, int *ha_mode);
+
+/*
+ * cms_get_db_proc_stat () / cms_get_db_proc_stat_all () /
+ * cms_get_host_disk_partition_stat () / cms_get_db_exec_stat () -
+ * CMS-native ports of CUBRID engine's cm_common/cm_mem_cpu_stat.c functions
+ * of (almost) the same name - see cm_mem_cpu_stat.cpp.
+ */
+int cms_get_db_proc_stat (const char *db_name, T_CM_DB_PROC_STAT *stat, T_CM_ERROR *err_buf);
+T_CM_DB_PROC_STAT_ALL *cms_get_db_proc_stat_all (T_CM_ERROR *err_buf);
+T_CM_DISK_PARTITION_STAT_ALL *cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf);
+int cms_get_db_exec_stat (const char *db_name, T_CM_DB_EXEC_STAT *exec_stat, T_CM_ERROR *err_buf);
 
 #endif                /* _CM_COMMAND_EXECUTE_H_ */

@@ -51,6 +51,7 @@ cub_manager_SOURCES = \
         $(DBMT_DIR)/cm_job_task.cpp \
         $(DBMT_DIR)/cm_cmd_exec.cpp \
         $(DBMT_DIR)/cm_server_status.cpp \
+        $(DBMT_DIR)/cm_mem_cpu_stat.cpp \
         $(DBMT_DIR)/cm_connect_info.cpp \
         $(DBMT_DIR)/cm_auto_task.cpp \
         $(DBMT_DIR)/cm_httpd.cpp \

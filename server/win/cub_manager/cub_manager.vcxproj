@@ -194,6 +194,7 @@
     <ClCompile Include="..\..\src\cm_httpd.cpp" />
     <ClCompile Include="..\..\src\cm_http_server.cpp" />
     <ClCompile Include="..\..\src\cm_job_task.cpp" />
+    <ClCompile Include="..\..\src\cm_mem_cpu_stat.cpp" />
     <ClCompile Include="..\..\src\cm_mon_stat.cpp" />
     <ClCompile Include="..\..\src\cm_server_autoupdate.cpp" />
     <ClCompile Include="..\..\src\cm_server_extend_interface.cpp" />

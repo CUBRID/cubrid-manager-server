@@ -4372,14 +4372,14 @@ ts_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, dbname, sizeof (dbname_at_hostname));
-      retval = cm_get_db_exec_stat (dbname_at_hostname, &exec_stat, &err_buf);
+      retval = cms_get_db_exec_stat (dbname_at_hostname, &exec_stat, &err_buf);
     }
   else
     {
-      retval = cm_get_db_exec_stat (dbname, &exec_stat, &err_buf);
+      retval = cms_get_db_exec_stat (dbname, &exec_stat, &err_buf);
     }
 
-  /* call cm_get_db_exec_stat to get stat infomation. */
+  /* call cms_get_db_exec_stat to get stat infomation. */
   if (retval < 0)
     {
       /* return error with message if the operation is not success. */
@@ -10595,7 +10595,7 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
-      if ((db_stat_all = cm_get_db_proc_stat_all (&error)) == NULL)
+      if ((db_stat_all = cms_get_db_proc_stat_all (&error)) == NULL)
 	{
 	  strcpy_limit (_dbmt_error, error.err_msg, DBMT_ERROR_MSG_SIZE);
 	  retval = ERR_WITH_MSG;
@@ -10612,7 +10612,7 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      if (cm_get_db_proc_stat (dbname, &db_stat, &error) < 0)
+      if (cms_get_db_proc_stat (dbname, &db_stat, &error) < 0)
 	{
 	  strcpy_limit (_dbmt_error, error.err_msg, DBMT_ERROR_MSG_SIZE);
 	  retval = ERR_WITH_MSG;
