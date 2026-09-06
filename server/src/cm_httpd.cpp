@@ -70,13 +70,11 @@
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 
-#if _MSC_VER >= 1900
-extern "C" {
-  FILE __iob_func[3] = { *stdin, *stdout, *stderr };
-}
+#if defined (_MSC_VER) && _MSC_VER >= 1900
+static FILE _iob_shim[3] = { *stdin, *stdout, *stderr };
+extern "C" FILE * __cdecl __iob_func (void) { return _iob_shim; }
 #endif
 
-//#include "cm_utf8.h"
 using namespace std;
 
 #define DEFAULT_THRD_NUM                      24
