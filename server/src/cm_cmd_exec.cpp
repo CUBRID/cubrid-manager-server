@@ -199,7 +199,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
       return;
     }
 
-  if (sscanf (strbuf, "%*s %64s", version) != 1)
+  if (sscanf (strbuf, "%*s %127s", version) != 1)
     {
       LOG_ERROR ("Unable to parse cubrid version from '%s'. Set version to %d.%d defined by default.",
                  strbuf, cubrid_version_major, cubrid_version_minor);
@@ -213,18 +213,14 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
     {
       local_major = atoi (p);
     }
-  else
-    {
-      LOG_ERROR ("Unable to parse cubrid major version from '%s'. Set version to %d.%d defined by default.",
-                 version, cubrid_version_major, cubrid_version_minor);
-    }
 
   p = STRTOK (NULL, ".", &saveptr);
   if (p != NULL && is_positive_number (p))
     {
       local_minor = atoi (p);
     }
-  else
+
+  if (local_major < 0 || local_minor < 0)
     {
       LOG_ERROR ("Unable to parse cubrid minor version from '%s'. Set version to %d.%d defined by default.",
                  version, cubrid_version_major, cubrid_version_minor);
