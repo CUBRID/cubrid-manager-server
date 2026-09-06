@@ -17214,7 +17214,20 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = db_name;
   argv[argc++] = NULL;
 
+#if defined (WINDOWS)
   ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, NULL, NULL, NULL);
+#else
+  {
+    /*
+ *      * run_child_env ()'s stdout_file/stderr_file are char *, so a
+ *           * string literal can't be passed directly here.
+ *                */
+    char devnull_out[] = "/dev/null";
+    char devnull_err[] = "/dev/null";
+
+    ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, devnull_out, devnull_err, NULL);
+  }
+#endif
 
   long long dispatcher_start_time = (ret_val >= 0) ? _get_proc_start_time (ret_val) : -1;
 
