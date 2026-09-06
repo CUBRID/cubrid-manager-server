@@ -80,9 +80,9 @@ cubrid_cmd_name (char *buf)
 {
   buf[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (buf, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, UTIL_CUBRID);
+  snprintf (buf, PATH_MAX, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, UTIL_CUBRID);
 #else
-  sprintf (buf, "%s/%s", CUBRID_BINDIR, UTIL_CUBRID);
+  snprintf (buf, PATH_MAX, "%s/%s", CUBRID_BINDIR, UTIL_CUBRID);
 #endif
   return buf;
 }
