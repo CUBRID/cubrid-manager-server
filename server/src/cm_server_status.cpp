@@ -186,7 +186,6 @@ cmd_cms_server_status (void)
       cmd_result_free (res);
       return NULL;
     }
-  unlink (out_file);
 
   cubrid_cmd_name (cmd_name);
 
