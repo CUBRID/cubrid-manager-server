@@ -3483,13 +3483,13 @@ get_short_filename (char *ret_name, int ret_name_len,
   ptr = strrchr (short_filename, '.');
   if (ptr == NULL)
     {
-      snprintf (ret_name, strlen (short_filename) + 1, short_filename);
+      snprintf (ret_name, strlen (short_filename) + 1, "%s", short_filename);
       return -1;
     }
 
   filename_len = (unsigned int) (ptr - short_filename);
 
-  snprintf (ret_name, filename_len + 1, short_filename);
+  snprintf (ret_name, filename_len + 1, "%s", short_filename);
 
   return 0;
 }
@@ -3520,7 +3520,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
 
   if (with_ext == 1)
     {
-      snprintf (ret_filename, PATH_MAX, filename + 1);
+      snprintf (ret_filename, PATH_MAX, "%s", filename + 1);
       return 0;
     }
   else
@@ -3529,7 +3529,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
         {
           return -1;
         }
-      snprintf (ret_filename, PATH_MAX, short_filename);
+      snprintf (ret_filename, PATH_MAX, "%s", short_filename);
     }
   return 0;
 }
