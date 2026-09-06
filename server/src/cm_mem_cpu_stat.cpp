@@ -203,9 +203,11 @@ cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_
   fp = fopen (outputfile, "r");
   if (fp == NULL)
     {
+      char errbuf[ERR_MSG_LEN];
+
       err_buf->err_code = CM_FILE_OPEN_FAILED;
       snprintf (err_buf->err_msg, sizeof (err_buf->err_msg) - 1, "file (%s) open failed: %s", outputfile,
-               strerror (errno));
+               STRERROR_R (errno, errbuf, sizeof (errbuf)));
       unlink (outputfile);
       unlink (errfile);
       return NULL;
@@ -286,6 +288,7 @@ cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
   char names[32][4] = { 0 };
   char *token;
   T_CM_DISK_PARTITION_STAT_ALL *res;
+  char *saveptr;
 
   len = GetLogicalDriveStringsA (sizeof (buf), buf);
 
@@ -300,7 +303,7 @@ cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
   buf[len - 1] = 0;
   i = 0;
 
-  for (token = strtok (buf, ";"); token != NULL && i < 32; token = strtok (NULL, ";"))
+  for (token = STRTOK (buf, ";", &saveptr); token != NULL && i < 32; token = STRTOK (NULL, ";", &saveptr))
     {
       if (GetDriveTypeA (token) == DRIVE_FIXED)
         {
