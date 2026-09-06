@@ -644,7 +644,7 @@ extern int cubrid_version_minor;
 extern char cubrid_version_build[CUBRID_VERSION_BUILD_LEN];
 void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size);
 #define IS_INVALID_CUBRID_VERS_MAJOR(major)	(major <= 0)
-#define CUBRID_VERS(major,minor)	(major*100 + minor)
+#define CUBRID_VERS(major,minor)	((major)*100 + (minor))
 
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
