@@ -454,12 +454,6 @@ cmd_start_master (void)
 }
 
 /*
- * is_master_start () and cmd_cms_server_status () - moved to
- * cm_server_status.cpp (see the comment at its top for why); still
- * declared for other translation units in cm_cmd_exec.h.
- */
-
-/*
  * cub_jobsa_cmd_name () / cub_sainfo_cmd_name () - build the path to the
  * SA-mode helper executables
  */
