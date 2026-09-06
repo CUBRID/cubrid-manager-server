@@ -17,6 +17,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
+SSL_RSA_BITS=2048
 
 SUBDIRS = conf
 
@@ -62,3 +63,8 @@ cub_manager_SOURCES = \
 		$(DBMT_DIR)/cm_server_autoupdate.cpp
 cub_manager_CPPFLAGS = $(AM_CFLAGS) -DFSERVER_SLAVE -DJSON_SUPPORT -DEVENT__HAVE_OPENSSL -D_FILE_OFFSET_BITS=64 @EXTERNAL_INC@
 cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt -lcascci
+
+install-exec-hook:
+	$(RM) $(prefix)/conf/cm_ssl_cert.key $(prefix)/conf/cm_ssl_cert.crt
+	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).key $(prefix)/conf/cm_ssl_cert.key
+	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).crt $(prefix)/conf/cm_ssl_cert.crt
