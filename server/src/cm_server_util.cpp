@@ -336,11 +336,6 @@ _op_check_is_localhost (char *token, char *hname)
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
 
-  if (getaddrinfo (hname, NULL, &hints, &res) != 0 || res == NULL)
-    {
-      return -1;
-    }
-
   /* if token is an ip address. */
   if (_maybe_ip_addr (token) > 0)
     {
