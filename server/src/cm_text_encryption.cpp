@@ -85,7 +85,11 @@ uEncrypt (int len, const char *src, char *trg)
    * bytes) with random padding
    */
   array_init_random_value (encstr, len + 1);
-  snprintf (encstr, len, src);
+
+  size_t slen = strlen (src);
+  slen = (slen > (size_t) len) ? (size_t) len : slen;
+  memcpy (encstr, src, slen);
+  encstr[slen] = '\0';
 
   tea_encrypt (key, len, encstr);
   for (i = 0; i < len; ++i)
