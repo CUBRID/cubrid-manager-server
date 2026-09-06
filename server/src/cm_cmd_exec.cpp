@@ -419,7 +419,7 @@ cmd_stop_server (char *dbname, char *err_buf, int err_buf_size)
   for (t = timeout; t > 0; t -= interval)
     {
       SLEEP_MILISEC (interval, 0);
-      if (!uIsDatabaseActive (dbname))
+      if (!cms_is_database_active (dbname))
         {
           return 0;
         }

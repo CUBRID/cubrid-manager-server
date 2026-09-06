@@ -925,7 +925,7 @@ ts_class_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
@@ -3187,7 +3187,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3380,7 +3380,7 @@ tsStartDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3421,7 +3421,7 @@ tsStopDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode != DB_SERVICE_MODE_CS)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3458,7 +3458,7 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3592,7 +3592,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3784,7 +3784,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (srcdbname, NULL);
+  db_mode = cms_database_mode (srcdbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", srcdbname);
@@ -4036,7 +4036,7 @@ ts_plandump (nvplist *req, nvplist *res, char *_dbmt_error)
   * check the running mode of current database,
   * return error if it is DB_SERVICE_MODE_SA.
   */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4133,7 +4133,7 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
   * check the running mode of current database,
   * return error if it is DB_SERVICE_MODE_SA.
   */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4239,7 +4239,7 @@ ts_optimizedb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
@@ -4295,7 +4295,7 @@ ts_checkdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DB_NONEXISTANT;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4361,7 +4361,7 @@ ts_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* check the database mode. */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4606,7 +4606,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4768,7 +4768,7 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4963,7 +4963,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -5464,7 +5464,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   no_user_specified_name = nv_get_val (req, "no-user-specified-name");
   schema_file_list = nv_get_val (req, "schema-file-list");
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -5723,7 +5723,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_err_file[0] = '\0';
 
   dbname = nv_get_val (req, "dbname");
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -5832,13 +5832,13 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   dbname = nv_get_val (req, "dbname");
   gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPVOLINFO, PATH_MAX);
 
-  if (uIsDatabaseActive (dbname))
+  if (cms_is_database_active (dbname))
     {
       sprintf (_dbmt_error, "%s", dbname);
       return ERR_DB_ACTIVE;
     }
 
-  if (uDatabaseMode (dbname, NULL) == DB_SERVICE_MODE_SA)
+  if (cms_database_mode (dbname, NULL) == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
       return ERR_STANDALONE_MODE;
@@ -5941,7 +5941,7 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   cubrid_mode =
-	  (uDatabaseMode (dbname, &ha_mode) ==
+	  (cms_database_mode (dbname, &ha_mode) ==
 	   DB_SERVICE_MODE_NONE) ? CUBRID_MODE_SA : CUBRID_MODE_CS;
 
   if (ha_mode != 0)
@@ -6494,7 +6494,7 @@ ts_backupdb_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (uDatabaseMode (dbname, NULL) == DB_SERVICE_MODE_SA)
+  if (cms_database_mode (dbname, NULL) == DB_SERVICE_MODE_SA)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", dbname);
       return ERR_STANDALONE_MODE;
@@ -7356,7 +7356,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* get database mode. */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       strncpy (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
@@ -7816,7 +7816,7 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
 
   param = nv_get_val (req, "parameter");
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -7942,7 +7942,7 @@ ts_lockdb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "dbname");
       return ERR_PARAM_MISSING;
     }
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -8663,7 +8663,7 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
   argc = 0;
   argv[argc++] = cmd_name;
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, dbname,
@@ -8796,7 +8796,7 @@ ts_get_triggerinfo (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
@@ -10828,7 +10828,7 @@ run_csql_statement (const char *sql_stat, char *dbname, char *dbuser,
       return ERR_DB_NONEXISTANT;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
 
   if (db_mode == DB_SERVICE_MODE_SA)
     {
@@ -11096,7 +11096,7 @@ cmd_get_db_mode (T_DB_MODE_INFO *dbmodeinfo, char *dbname, char *_dbmt_error)
 
   strcpy_limit (dbmodeinfo->dbname, dbname, sizeof (dbmodeinfo->dbname));
 
-  dbmode = uDatabaseMode (dbname, &ha_mode);
+  dbmode = cms_database_mode (dbname, &ha_mode);
 
   if (ha_mode == 0)
     {
@@ -11228,7 +11228,7 @@ cmd_changemode (char *dbname, char *modify, char *force,
       return ERR_PARAM_MISSING;
     }
 
-  dbmode = uDatabaseMode (dbname, &ha_mode);
+  dbmode = cms_database_mode (dbname, &ha_mode);
   if (dbmode == DB_SERVICE_MODE_SA)
     {
       strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
@@ -11635,7 +11635,7 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
   error_continue = nv_get_val (req, "error_continue");
 
   mode =
-	  (uDatabaseMode (dbname, NULL) ==
+	  (cms_database_mode (dbname, NULL) ==
 	   DB_SERVICE_MODE_NONE ? CUBRID_MODE_SA : CUBRID_MODE_CS);
 
   csql_res = cmd_csql (dbname, uid, passwd, mode, infile, command, error_continue);    /* csql */
@@ -17166,7 +17166,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = uDatabaseMode (db_name, NULL);
+  db_mode = cms_database_mode (db_name, NULL);
   if (db_mode != DB_SERVICE_MODE_CS)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);
@@ -17282,7 +17282,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = uDatabaseMode (db_name, NULL);
+  db_mode = cms_database_mode (db_name, NULL);
   if (db_mode != DB_SERVICE_MODE_CS)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);

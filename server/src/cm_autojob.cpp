@@ -1282,7 +1282,7 @@ aj_execquery (autoexecquery_node *c)
 #endif
   argv[argc++] = cmd_name;
 
-  db_mode = uDatabaseMode (c->dbname, &ha_mode);
+  db_mode = cms_database_mode (c->dbname, &ha_mode);
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, c->dbname,
@@ -1565,7 +1565,7 @@ aj_backupdb (autobackupdb_node *n)
   sprintf (backup_vol_name, "%s_auto_backup_lv%d", n->dbname, n->level);
   sprintf (bkpath, "%s/%s_%s", n->path, strtime, backup_vol_name);
 
-  db_mode = uDatabaseMode (n->dbname, &ha_mode);
+  db_mode = cms_database_mode (n->dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (buf, "Failed to execute backupdb: %s is in standalone mode", n->dbname);

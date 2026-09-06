@@ -1301,7 +1301,7 @@ _import_class_sql (Json::Value &request, Json::Value &response)
   import_filename = request["import_filename"].asString ();
   import_path = string (sco.dbmt_tmp_dir) + "/" + import_filename;
 
-  mode = (uDatabaseMode ((char *) db_name.c_str (), NULL) ==
+  mode = (cms_database_mode ((char *) db_name.c_str (), NULL) ==
           DB_SERVICE_MODE_NONE ? CUBRID_MODE_SA : CUBRID_MODE_CS);
   csql_result =
     cmd_csql ((char *) db_name.c_str (), (char *) db_user.c_str (),
