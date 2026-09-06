@@ -397,12 +397,18 @@ uReadSystemConfig (void)
       else if (strcasecmp (ent_name, "async_job_ttl_sec") == 0)
         {
           int ttl = atoi (ent_val);
-          if (MIN_ASYNC_JOB_TTL_SEC <= ttl && ttl <= MAX_ASYNC_LONG_JOB_SEC)
+          if (MIN_ASYNC_JOB_TTL_SEC <= ttl && ttl <= MAX_ASYNC_JOB_TTL_SEC)
             {
               sco.iAsyncJobTtlSec = ttl;
             }
           else
             {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid async_job_ttl_sec in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_ASYNC_JOB_TTL_SEC);
+              ut_record_cubrid_utility_log_stderr (err_buf);
               sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
             }
         }
@@ -435,6 +441,12 @@ uReadSystemConfig (void)
             }
           else
             {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid async_long_job_sec in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_ASYNC_LONG_JOB_SEC);
+              ut_record_cubrid_utility_log_stderr (err_buf);
               sco.iAsyncLongJobSec = DEFAULT_ASYNC_LONG_JOB_SEC;
             }
         }
