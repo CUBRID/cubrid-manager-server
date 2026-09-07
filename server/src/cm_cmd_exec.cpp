@@ -60,7 +60,6 @@ static int read_start_server_output (char *stdout_log_file,
 
 static int _size_to_byte_by_unit (double orgin_num, char unit);
 
-static bool _child_exited_ok (int exit_code);
 static void _fill_dbmt_error_from_errfile (const char *err_file, char *_dbmt_error);
 
 /*
@@ -475,21 +474,6 @@ cub_sainfo_cmd_name (char *buf)
   snprintf (buf, PATH_MAX, "%s/cub_sainfo%s", CUBRID_BINDIR, DBMT_EXE_EXT);
 #endif
   return buf;
-}
-
-/*
- * _child_exited_ok () - true if a run_child_env () (wait_flag ==
- * RUN_FOREGROUND) child both ran to completion and exited with status 0.
- *
- */
-static bool
-_child_exited_ok (int exit_code)
-{
-#if defined(WINDOWS)
-  return (exit_code == 0);
-#else
-  return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
-#endif
 }
 
 /*

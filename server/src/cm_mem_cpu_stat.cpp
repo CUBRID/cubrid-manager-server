@@ -68,7 +68,6 @@ static void cm_db_proc_stat_free (T_CM_DB_PROC_STAT *stat);
 static void *extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf);
 static void *extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf);
 static uint64_t *get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name);
-static bool _child_exited_ok (int exit_code);
 static void *cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_arg1,
                                      T_CM_ERROR *err_buf);
 static void cms_err_buf_reset (T_CM_ERROR *err_buf);
@@ -140,17 +139,6 @@ cms_trim (char *str)
     }
   return str;
 }
-
-static bool
-_child_exited_ok (int exit_code)
-{
-#if defined(WINDOWS)
-  return (exit_code == 0);
-#else
-  return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
-#endif
-}
-
 
 /*
  * cms_get_command_result () - CMS-native port of CUBRID engine

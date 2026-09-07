@@ -65,7 +65,6 @@ static void read_server_status_output (T_SERVER_STATUS_RESULT *res,
 #if defined(WINDOWS)
 static int is_master_start (void);
 #endif
-static bool _child_exited_ok (int exit_code);
 
 /*
  * cubrid_cmd_name () - build the path to the `cubrid` CLI executable.
@@ -130,16 +129,6 @@ func_clean_return:
   return retval;
 }
 #endif
-
-static bool
-_child_exited_ok (int exit_code)
-{
-#if defined(WINDOWS)
-  return (exit_code == 0);
-#else
-  return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
-#endif
-}
 
 /*
  * cmd_cms_server_status () - see the declaration comment in cm_cmd_exec.h.

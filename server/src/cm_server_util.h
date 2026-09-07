@@ -228,4 +228,6 @@ int ut_record_cubrid_utility_log_stdout (const char *msg);
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 
+bool _child_exited_ok (int exit_code);
+
 #endif                /* _CM_SERVER_UTIL_H_ */

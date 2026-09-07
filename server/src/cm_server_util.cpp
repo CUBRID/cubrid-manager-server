@@ -4183,3 +4183,18 @@ gen_tempfile_path (char *tempfile, const char *tempdir, const char *prefix, int 
 
   return (ret > 0 && ret < (int) (size - 1)) ? 0 : -1;
 }
+
+/*
+ * _child_exited_ok () - true if a run_child_env () (wait_flag ==
+ * RUN_FOREGROUND) child both ran to completion and exited with status 0.
+ */
+
+bool
+_child_exited_ok (int exit_code)
+{
+#if defined(WINDOWS)
+  return (exit_code == 0);
+#else
+  return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
+#endif
+}
