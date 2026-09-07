@@ -30,11 +30,11 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <config.h>
-#include <inttypes.h>
 
 #if defined(WINDOWS)
 #include <process.h>
 #include <windows.h>
+#include <inttypes.h>
 #else
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
