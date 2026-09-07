@@ -1,12 +1,35 @@
 @echo off
-
+setlocal enabledelayedexpansion
 REM prepare vc environment
-
 SET VERS=win/version.h
 SET COMMIT_COUNT=
+REM ----------------------------------------------------------------------
+REM Locate and initialize the Visual Studio build environment.
+REM This build supports Visual Studio 2017 Community only
+REM
+REM Set CMS_VSDEVCMD_PATH to point at a different VsDevCmd.bat instead.
+REM ----------------------------------------------------------------------
+SET "PF86=%ProgramFiles(x86)%"
+SET "PF64=%ProgramFiles%"
+SET VSDEVCMD=%CMS_VSDEVCMD_PATH%
 
-call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
+IF NOT DEFINED VSDEVCMD (
+	FOR %%P IN ("!PF86!" "!PF64!") DO (
+		IF NOT DEFINED VSDEVCMD (
+			IF EXIST "%%~P\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat" (
+				SET "VSDEVCMD=%%~P\Microsoft Visual Studio\2017\Community\Common7\Tools\VsDevCmd.bat"
+			)
+		)
+	)
+)
 
+IF NOT DEFINED VSDEVCMD (
+	echo build_server.bat: Visual Studio 2017 Community was not found.
+	echo Set the CMS_VSDEVCMD_PATH environment variable to a specific VsDevCmd.bat to override.
+	exit /b 1
+)
+
+call "!VSDEVCMD!" -arch=x64
 FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET MAJOR=%%i)
 FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET MINOR=%%i)
 FOR /F "tokens=3 delims=." %%i IN ('type BUILD_NUMBER') do (SET PATCH=%%i)

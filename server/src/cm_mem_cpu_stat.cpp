@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <config.h>
+#include <inttypes.h>
 
 #if defined(WINDOWS)
 #include <process.h>
