@@ -279,6 +279,10 @@ cms_get_db_proc_stat_all (T_CM_ERROR *err_buf)
   return (T_CM_DB_PROC_STAT_ALL *) cms_get_command_result (argv, extract_db_stat, NULL, err_buf);
 }
 
+/*
+ * This function is not used, but it is code that has been ported for the future.
+ */
+#if defined (ENABLE_UNUSED_FUNCTION)
 #if defined(WINDOWS)
 T_CM_DISK_PARTITION_STAT_ALL *
 cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
@@ -358,6 +362,7 @@ cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
   cms_err_buf_reset (err_buf);
   return (T_CM_DISK_PARTITION_STAT_ALL *) cms_get_command_result (argv, extract_host_partition_stat, NULL, err_buf);
 }
+#endif
 #endif
 
 int
