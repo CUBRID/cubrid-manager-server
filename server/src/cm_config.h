@@ -37,7 +37,7 @@
 
 #define DEFAULT_ASYNC_JOB_TTL_SEC       3600    /* how long a finished async job kept around for gettaskstatus polling */
 #define MIN_ASYNC_JOB_TTL_SEC           60      /* min async job TTL, 60 sec */
-#define MAX_ASYNC_JOB_TTL_SEC           604800  /* min async job TTL, 60 sec */
+#define MAX_ASYNC_JOB_TTL_SEC           604800  /* max async job TTL, 1 week */
 
 #define DEFAULT_ASYNC_LONG_JOB_SEC      86400   /* 24 hours */
 #define MIN_ASYNC_LONG_JOB_SEC          60      /* min, 60 sec */
