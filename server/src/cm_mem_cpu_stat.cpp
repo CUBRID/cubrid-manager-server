@@ -236,6 +236,7 @@ cms_get_db_proc_stat (const char *db_name, T_CM_DB_PROC_STAT *stat, T_CM_ERROR *
     NULL,
   };
 
+  cms_err_buf_reset (err_buf);
   cubrid_cmd_name (cmd_name);
 
   if (db_name == NULL)
