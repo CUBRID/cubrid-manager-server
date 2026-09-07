@@ -67,7 +67,7 @@ static void assign_db_stat (T_CM_DB_PROC_STAT *db_stat, char *db_name, T_CM_PROC
 static void cm_db_proc_stat_free (T_CM_DB_PROC_STAT *stat);
 static void *extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf);
 static void *extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf);
-static unsigned int *get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name);
+static uint64_t *get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name);
 static bool _child_exited_ok (int exit_code);
 static void *cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_arg1,
                                      T_CM_ERROR *err_buf);
@@ -150,6 +150,7 @@ _child_exited_ok (int exit_code)
   return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
 #endif
 }
+
 
 /*
  * cms_get_command_result () - CMS-native port of CUBRID engine
@@ -777,7 +778,7 @@ static STATDUMP_PROP statdump_offset[] = {
   {"Time_data_page_fix_acquire_time", offsetof (T_CM_DB_EXEC_STAT, pb_page_fix_acquire_time_msec)}
 };
 
-static unsigned int *
+static uint64_t *
 get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name)
 {
   unsigned int i;
@@ -785,7 +786,7 @@ get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name)
     {
       if (strcmp (statdump_offset[i].prop_name, prop_name) == 0)
         {
-          return (unsigned int *) ((char *) stat + statdump_offset[i].prop_offset);
+          return (uint64_t *) ((char *) stat + statdump_offset[i].prop_offset);
         }
     }
   return NULL;
@@ -809,7 +810,7 @@ extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf)
     }
   while (fgets (linebuf, sizeof (linebuf), fp))
     {
-      unsigned int *member_ptr;
+      uint64_t *member_ptr;
       uint64_t prop_val;
       memset (prop_name, 0, sizeof (prop_name));
       sscanf (linebuf, "%99s%*s%" SCNu64, prop_name, &prop_val);
