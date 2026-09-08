@@ -17219,9 +17219,9 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
   {
     /*
- *      * run_child_env ()'s stdout_file/stderr_file are char *, so a
- *           * string literal can't be passed directly here.
- *                */
+     * run_child_env ()'s stdout_file/stderr_file are char *, so a
+     * string literal can't be passed directly here.
+     */
     char devnull_out[] = "/dev/null";
     char devnull_err[] = "/dev/null";
 
