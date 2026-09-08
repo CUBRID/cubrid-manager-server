@@ -317,7 +317,7 @@ read_server_status_output (T_SERVER_STATUS_RESULT *res, char *out_file)
             {
               /*
                * realloc () failure doesn't touch the original block
-               * hance, everything parsed so far is invalid
+               * so, everything parsed before realloc fail is valid
                */
               num_info--;
               break;
