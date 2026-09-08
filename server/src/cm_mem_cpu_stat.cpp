@@ -506,6 +506,7 @@ assign_db_stat (T_CM_DB_PROC_STAT *db_stat, char *db_name, T_CM_PROC_STAT *stat)
   db_stat->stat = *stat;
 }
 
+#if defined (ENABLE_UNUSED_FUNCTION)
 static void *
 extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf)
 {
@@ -556,6 +557,7 @@ extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf)
 
   return stat;
 }
+#endif
 
 typedef struct
 {

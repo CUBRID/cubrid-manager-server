@@ -320,7 +320,9 @@ T_DB_SERVICE_MODE cms_database_mode (char *dbname, int *ha_mode);
  */
 int cms_get_db_proc_stat (const char *db_name, T_CM_DB_PROC_STAT *stat, T_CM_ERROR *err_buf);
 T_CM_DB_PROC_STAT_ALL *cms_get_db_proc_stat_all (T_CM_ERROR *err_buf);
-T_CM_DISK_PARTITION_STAT_ALL *cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf);
 int cms_get_db_exec_stat (const char *db_name, T_CM_DB_EXEC_STAT *exec_stat, T_CM_ERROR *err_buf);
+#if defined (ENABLE_UNUSED_FUNCTION)
+T_CM_DISK_PARTITION_STAT_ALL *cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf);
+#endif
 
 #endif                /* _CM_COMMAND_EXECUTE_H_ */
