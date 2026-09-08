@@ -34,6 +34,7 @@
 #if defined(WINDOWS)
 #include <process.h>
 #include <windows.h>
+#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #else
 #define __STDC_FORMAT_MACROS
