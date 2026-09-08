@@ -2977,7 +2977,9 @@ _reap_child_async (void *arg)
   pid_t pid = *pid_ptr;
 
   delete pid_ptr;
-  waitpid (pid, NULL, 0);
+
+  while (waitpid (pid, NULL, 0) < 0 && errno == EINTR)
+    ;
   return NULL;
 }
 
@@ -3067,7 +3069,14 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
   if (wait_flag)
     {
       int status = 0;
-      waitpid (pid, &status, 0);
+      int wait_rc;
+
+      while ((wait_rc = waitpid (pid, &status, 0)) < 0 && errno == EINTR)
+       ;
+      if (wait_rc < 0)
+       {
+         return -1;
+       }
       if (exit_status != NULL)
        {
          *exit_status = status;
@@ -3086,7 +3095,8 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
       else
        {
          delete reap_pid;
-         waitpid (pid, NULL, 0);
+         while (waitpid (pid, NULL, 0) < 0 && errno == EINTR)
+           ;
        }
       return pid;
     }
