@@ -1,13 +1,17 @@
 @echo off
+REM
+REM The Windows version is supported only up to 11.4 and only for 64-bits systems.
+REM prepare vc environment
+REM VS2017 community is the official build system for the CMS
+REM
 setlocal enabledelayedexpansion
-REM prepare vc environment (VS2017 community)
-SET VERS=win/version.h
-SET COMMIT_COUNT=
+SET "VERS=win/version.h"
+SET "COMMIT_COUNT="
 
 SET "PF86=%ProgramFiles(x86)%"
 SET "PF64=%ProgramFiles%"
-SET VSDEVCMD=%CMS_VSDEVCMD_PATH%
-SET VSCMD_DEBUG=1
+SET "VSDEVCMD=%CMS_VSDEVCMD_PATH%"
+SET "VSCMD_DEBUG=0"
 
 IF NOT DEFINED VSDEVCMD (
     SET "VSWHERE=!PF86!\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -15,9 +19,9 @@ IF NOT DEFINED VSDEVCMD (
     IF EXIST "!VSWHERE!" (
         SET "VSWHERE_OUT=%TEMP%\cms_vswhere_out.txt"
         "!VSWHERE!" -version "[15.0,16.0)" -products Microsoft.VisualStudio.Product.Community -property installationPath > "!VSWHERE_OUT!" 2>NUL
-        SET VSINSTALLDIR=
+        SET "VSINSTALLDIR="
         IF EXIST "!VSWHERE_OUT!" (
-            FOR /F "usebackq tokens=*" %%i IN ("!VSWHERE_OUT!") DO SET VSINSTALLDIR=%%i
+            FOR /F "usebackq tokens=*" %%i IN ("!VSWHERE_OUT!") DO SET "VSINSTALLDIR=%%i"
             DEL /Q "!VSWHERE_OUT!" >NUL 2>&1
         )
         IF DEFINED VSINSTALLDIR (
@@ -32,24 +36,24 @@ IF NOT DEFINED VSDEVCMD (
     exit /b 1
 )
 
-call "!VSDEVCMD!" -arch=x64
+call "!VSDEVCMD!" -arch=%platform%
 if errorlevel 1 (
     echo build_server.bat: warning - VsDevCmd.bat reported errors ^(see above^); continuing.
 )
 REM VsDevCmd.bat can leave ERRORLEVEL non-zero even on a usable env; force reset it.
 (call )
 
-FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET MAJOR=%%i)
-FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET MINOR=%%i)
-FOR /F "tokens=3 delims=." %%i IN ('type BUILD_NUMBER') do (SET PATCH=%%i)
-FOR /F "tokens=4 delims=." %%i IN ('type BUILD_NUMBER') do (SET SERIAL=%%i)
+FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MAJOR=%%i")
+FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MINOR=%%i")
+FOR /F "tokens=3 delims=." %%i IN ('type BUILD_NUMBER') do (SET "PATCH=%%i")
+FOR /F "tokens=4 delims=." %%i IN ('type BUILD_NUMBER') do (SET "SERIAL=%%i")
 if not ERRORLEVEL 0 (exit /b %ERRORLEVEL%)
 
-FOR /F "tokens=*" %%i IN ('git rev-list --count HEAD') do (SET COMMIT_COUNT=%%i)
-if "%COMMIT_COUNT%" == "" (SET COMMIT_COUNT=%SERIAL%)
+FOR /F "tokens=*" %%i IN ('git rev-list --count HEAD') do (SET "COMMIT_COUNT=%%i")
+if "%COMMIT_COUNT%" == "" (SET "COMMIT_COUNT=%SERIAL%")
 
-FOR /F "tokens=* delims=0" %%i IN ('echo %COMMIT_COUNT%') do (SET COMMIT_COUNT=%%i)
-FOR /F "tokens=*" %%i IN ('printf %%04d %COMMIT_COUNT%') do (SET COMMIT_COUNT=%%i)
+FOR /F "tokens=* delims=0" %%i IN ('echo %COMMIT_COUNT%') do (SET "COMMIT_COUNT=%%i")
+FOR /F "tokens=*" %%i IN ('printf %%04d %COMMIT_COUNT%') do (SET "COMMIT_COUNT=%%i")
 
 echo #define RELEASE_STRING %MAJOR%.%MINOR%.%PATCH% > %VERS%
 echo #define MAJOR_RELEASE_STRING %MAJOR% >> %VERS%
@@ -74,9 +78,9 @@ cd ..
 if not "%exitcode%" == "0" (
     REM devenv's own exit code can be non-zero even on a full build success;
     REM trust the actual install output instead.
-    SET INSTALL_CHECK_OK=
-    IF EXIST "win\install\CMServer_%mode%_%platform%\bin\cm_admin.exe" SET INSTALL_CHECK_OK=1
-    IF EXIST "win\install\CMServer_%mode%_%platform%\cm_admin.exe" SET INSTALL_CHECK_OK=1
+    SET "INSTALL_CHECK_OK="
+    IF EXIST "win\install\CMServer_%mode%_%platform%\bin\cm_admin.exe" SET "INSTALL_CHECK_OK=1"
+    IF EXIST "win\install\CMServer_%mode%_%platform%\cm_admin.exe" SET "INSTALL_CHECK_OK=1"
     IF DEFINED INSTALL_CHECK_OK (
         echo build_server.bat: warning - devenv exit code %exitcode% ignored, cm_admin.exe was found.
         set exitcode=0
@@ -95,9 +99,9 @@ robocopy . %prefix%\ /e
 set robocopy_rc=%errorlevel%
 echo build_server.bat: diag - robocopy raw exit code = %robocopy_rc%
 if errorlevel 1 (
-    set exitcode=0
+    set "exitcode=0"
     ) else (
-    set exitcode=%errorlevel%
+    set "exitcode=%errorlevel%"
     )
 
 echo build_server.bat: diag - computed exitcode = %exitcode%

@@ -20,7 +20,6 @@ copy %SRC_DIR%\..\..\cmserver\conf\*.pass %DEST_DIR%\conf
 copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl* %DEST_DIR%\conf
 copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl_cert_%SSL_RSA_BITS%.key %DEST_DIR%\conf\cm_ssl_cert.key
 copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl_cert_%SSL_RSA_BITS%.crt %DEST_DIR%\conf\cm_ssl_cert.crt
-copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl* %DEST_DIR%\conf
 
 if errorlevel 1 (
 	exit /b 0
