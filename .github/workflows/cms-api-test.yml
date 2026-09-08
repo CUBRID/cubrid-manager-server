@@ -299,7 +299,7 @@ jobs:
           set -uo pipefail
           status='${{ steps.run.outputs.status }}'
 
-          SUMMARY_FILE="${{ github.workspace }}/summary_result.md" 
+          SUMMARY_FILE="/tmp/summary_result.md" 
           touch "$SUMMARY_FILE"
           if [ ! -f run.log ]; then
             verdict='⚠️ NOT RUN'
@@ -343,7 +343,7 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: cms-api-test
-          path: ${{ github.workspace }}/summary_result.md
+          path: /tmp/summary_result.md
 
       - name: Upload the reports
         if: always()
