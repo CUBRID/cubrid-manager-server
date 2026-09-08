@@ -178,7 +178,7 @@ cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_
       return NULL;
     }
 
-  if (!_child_exited_ok (exit_code))
+  if (!ut_child_exited_ok (exit_code))
     {
       err_buf->err_code = CM_ERR_SYSTEM_CALL;
       if (read_error_file (errfile, err_buf->err_msg, sizeof (err_buf->err_msg)) == 0

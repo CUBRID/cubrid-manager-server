@@ -4185,12 +4185,12 @@ gen_tempfile_path (char *tempfile, const char *tempdir, const char *prefix, int 
 }
 
 /*
- * _child_exited_ok () - true if a run_child_env () (wait_flag ==
+ * ut_child_exited_ok () - true if a run_child_env () (wait_flag ==
  * RUN_FOREGROUND) child both ran to completion and exited with status 0.
  */
 
 bool
-_child_exited_ok (int exit_code)
+ut_child_exited_ok (int exit_code)
 {
 #if defined(WINDOWS)
   return (exit_code == 0);

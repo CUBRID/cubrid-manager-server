@@ -554,7 +554,7 @@ cmd_class_info_sa (const char *dbname, const char *uid, const char *passwd,
       return ERR_SYSTEM_CALL;
     }
 
-  if (!_child_exited_ok (exit_code))
+  if (!ut_child_exited_ok (exit_code))
     {
       _fill_dbmt_error_from_errfile (errfile, _dbmt_error);
       ret_val = ERR_WITH_MSG;
@@ -636,7 +636,7 @@ cmd_get_triggerinfo_sa (const char *dbname, const char *uid, const char *passwd,
       return ERR_SYSTEM_CALL;
     }
 
-  if (!_child_exited_ok (exit_code))
+  if (!ut_child_exited_ok (exit_code))
     {
       _fill_dbmt_error_from_errfile (errfile, _dbmt_error);
       ret_val = ERR_WITH_MSG;
@@ -686,7 +686,7 @@ cmd_optimizedb_sa (const char *dbname, const char *classname, char *_dbmt_error)
       return ERR_SYSTEM_CALL;
     }
 
-  if (!_child_exited_ok (exit_code))
+  if (!ut_child_exited_ok (exit_code))
     {
       _fill_dbmt_error_from_errfile (cubrid_err_file, _dbmt_error);
       unlink (cubrid_err_file);

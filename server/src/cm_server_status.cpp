@@ -189,7 +189,7 @@ cmd_cms_server_status (void)
    * stdout_file parameter), rather than out_file being passed in argv[].
    */
   if (run_child_env (argv, RUN_FOREGROUND, NULL, out_file, NULL, &exit_code) < 0    /* cubrid server status */
-      || !_child_exited_ok (exit_code))
+      || !ut_child_exited_ok (exit_code))
     {
       unlink (out_file);
       cmd_result_free (res);
