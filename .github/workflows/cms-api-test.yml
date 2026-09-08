@@ -8,7 +8,7 @@ name: CMS API test
 
 on:
   pull_request:
-    branches: [api-test]
+    branches: [develop]
   workflow_dispatch:
     inputs:
       engine_repo:
