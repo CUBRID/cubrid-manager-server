@@ -299,8 +299,8 @@ jobs:
           set -uo pipefail
           status='${{ steps.run.outputs.status }}'
 
-          SUMMARY_FILE="${{ github.workspace }}/summary_result.md"
-          > "$SUMMARY_FILE"
+          SUMMARY_FILE="${{ github.workspace }}/summary_result.md" 
+          touch "$SUMMARY_FILE"
           if [ ! -f run.log ]; then
             verdict='⚠️ NOT RUN'
             echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
