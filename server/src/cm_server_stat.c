@@ -25,6 +25,7 @@
 #ident "$Id$"
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <sys/sysinfo.h>	/* CPU_WAIT */
 #if !defined(AIX)
 #include <sys/swap.h>
