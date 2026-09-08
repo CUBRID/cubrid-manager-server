@@ -298,6 +298,9 @@ jobs:
         run: |
           set -uo pipefail
           status='${{ steps.run.outputs.status }}'
+
+          SUMMARY_FILE="${{ github.workspace }}/summary_result.md"
+          > "$SUMMARY_FILE"
           if [ ! -f run.log ]; then
             verdict='⚠️ NOT RUN'
             echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
@@ -305,7 +308,7 @@ jobs:
               echo "## CMS API test — $verdict"
               echo
               echo "The suite did not run; an earlier step failed."
-            } >> "$GITHUB_STEP_SUMMARY"
+            } | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE"
             exit 0
           fi
           if [ "$status" = "0" ]; then verdict='✅ PASS'; else verdict='❌ FAIL'; fi
@@ -332,7 +335,7 @@ jobs:
               echo "</details>"
             fi
             echo
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE"
 
       - name: Comment the result on the PR
         if: always() && github.event_name == 'pull_request'
@@ -340,11 +343,7 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: cms-api-test
-          message: |
-            **CMS API test — ${{ steps.summary.outputs.verdict }}**
-
-            engine `${{ env.ENGINE_REPO }}@${{ env.ENGINE_REF }}` (VERSION ${{ steps.version.outputs.full }}),
-            test set `${{ env.TEST_SET }}`, built on Rocky Linux 8.10.
+          path: ${{ github.workspace }}/summary_result.md
 
       - name: Upload the reports
         if: always()
@@ -354,7 +353,5 @@ jobs:
           path: |
             cubrid/cubridmanager/server/test/run.log
             cubrid/cubridmanager/server/test/log/
-            CUBRID/log/
-            CUBRID/conf/cm.conf
           retention-days: 14
           if-no-files-found: warn
