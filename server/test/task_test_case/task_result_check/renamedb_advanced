@@ -1,0 +1,9 @@
+{"task":"renamedb",
+"token":"",
+"dbname":"renameadvdb",
+"rename":"renamedadvdb",
+"exvolpath":"none",
+"advanced":"on",
+"volume":[{
+"$CUBRID_DATABASES/renameadvdb/renameadvdb":"$CUBRID_DATABASES/renamedadvdb/renamedadvdb"}],
+"forcedel":"y"}

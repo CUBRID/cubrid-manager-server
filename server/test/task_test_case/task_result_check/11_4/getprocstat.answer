@@ -1,0 +1,10 @@
+{
+   "cpu_kernel": "<volatile>",
+   "cpu_user": "<volatile>",
+   "mem_physical": "<volatile>",
+   "mem_virtual": "<volatile>",
+   "note": "none",
+   "pid": "<volatile>",
+   "status": "success",
+   "task": "getprocstat"
+}

@@ -1,0 +1,15 @@
+26-08-18 09:00:00.000 (0) CAS STARTED pid 10000
+26-08-18 09:00:00.010 (0) CLIENT IP 127.0.0.1
+26-08-18 09:00:00.010 (0) connect db demodb@localhost user dba url cci:cubrid:127.0.0.1:30000:demodb:dba:********: session id 1
+26-08-18 09:00:00.020 (1) prepare 0 select count(*) from db_class
+26-08-18 09:00:00.021 (1) prepare srv_h_id 1
+26-08-18 09:00:00.022 (1) execute srv_h_id 1 select count(*) from db_class
+26-08-18 09:00:00.069 (1) execute 0 tuple 1 time 0.047
+26-08-18 09:00:00.069 (0) *** elapsed time 0.047
+26-08-18 09:00:00.080 (2) prepare 0 select * from db_user
+26-08-18 09:00:00.081 (2) prepare srv_h_id 2
+26-08-18 09:00:00.082 (2) execute srv_h_id 2 select * from db_user
+26-08-18 09:00:00.215 (2) execute 0 tuple 2 time 0.133
+26-08-18 09:00:00.215 (0) *** elapsed time 0.133
+26-08-18 09:00:00.220 (0) disconnect
+26-08-18 09:00:00.220 (0) END OF LOG

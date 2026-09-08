@@ -1,0 +1,16 @@
+{
+   "cas_mon": [
+      {
+         "cas_mon_act_session": "1",
+         "cas_mon_error_query": "0",
+         "cas_mon_long_query": "0",
+         "cas_mon_long_tran": "0",
+         "cas_mon_query": "0",
+         "cas_mon_req": "0",
+         "cas_mon_tran": "0"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getdiagdata"
+}

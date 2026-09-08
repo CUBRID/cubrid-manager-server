@@ -1,0 +1,8 @@
+{"task":"restoredb",
+"token":"",
+"dbname":"alatestdb",
+"date":"none",
+"level":"0",
+"partial":"y",
+"pathname":"$CUBRID_DATABASES/alatestdb/backup/alatestdb_backup_lv0",
+"recoverypath":"$CUBRID_DATABASES/alatestdb"}

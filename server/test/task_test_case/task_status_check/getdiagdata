@@ -1,0 +1,13 @@
+{"task":"getdiagdata",
+"token":"",
+"db_name":"demodb",
+"mon_db":"yes",
+"mon_cas":"yes",
+"cas_mon_req":"yes",
+"cas_mon_tran":"yes",
+"cas_mon_act_session":"yes",
+"mon_driver":"no",
+"mon_resource":"no",
+"act_db":"no",
+"act_cas":"no",
+"act_driver":"no"}

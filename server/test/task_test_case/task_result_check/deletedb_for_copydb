@@ -1,0 +1,4 @@
+{"task":"deletedb",
+"token":"",
+"dbname":"destinationdb1",
+"delbackup":"y"}

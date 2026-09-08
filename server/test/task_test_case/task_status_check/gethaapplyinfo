@@ -1,0 +1,5 @@
+{"task":"gethaapplyinfo",
+"token":"",
+"dbname":"demodb",
+"copylogpath":"$CUBRID_DATABASES/demodb",
+"remotehostname":"localhost"}

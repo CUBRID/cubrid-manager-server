@@ -1,0 +1,360 @@
+name: CMS API test
+
+# Builds CUBRID with this PR's manager server and runs server/test against it.
+#
+# The build runs in a Rocky Linux 8.10 container so that CUBRID is compiled
+# with the GCC 8 toolchain the product targets.
+#
+
+on:
+  pull_request:
+    branches: [api-test]
+  workflow_dispatch:
+    inputs:
+      engine_repo:
+        description: 'engine repository to build against'
+        default: CUBRID/cubrid
+        required: false
+      engine_ref:
+        description: 'engine branch or tag to build against'
+        default: develop
+        required: false
+
+concurrency:
+  group: cms-api-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  ENGINE_REPO: ${{ github.event.inputs.engine_repo || vars.ENGINE_REPO || 'CUBRID/cubrid' }}
+  ENGINE_REF: ${{ github.event.inputs.engine_ref || vars.ENGINE_REF || 'develop' }}
+  TEST_SET: task_status_check.txt
+  CMAKE_VERSION: 3.28.3
+  NINJA_VERSION: 1.11.1
+
+jobs:
+  cms-api-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    container:
+      image: rockylinux/rockylinux:8.10
+      options: --init
+
+    steps:
+      # Before the checkouts: actions/checkout needs git in the container, or
+      # it falls back to a tarball and the submodules do not come along.
+      - name: Install the toolchain and test dependencies
+        run: |
+          set -euo pipefail
+          dnf -y install epel-release
+          # ninja-build and systemtap-sdt-devel live in CodeReady Builder,
+          # which is off by default.
+          /usr/bin/crb enable 2>/dev/null \
+            || dnf -y config-manager --set-enabled powertools \
+            || dnf -y config-manager --set-enabled crb \
+            || echo "could not enable CRB; some packages may be missing"
+
+          dnf -y install \
+            git gcc gcc-c++ make bison flex ccache \
+            libtool autoconf automake patch file which rsync tar gzip xz curl unzip \
+            ncurses-devel expat-devel zlib-devel systemtap-sdt-devel \
+            elfutils-libelf-devel libstdc++-static \
+            glibc-gconv-extra glibc-langpack-ko glibc-langpack-en \
+            java-1.8.0-openjdk-devel ant \
+            python3 procps-ng diffutils
+
+          # build.sh runs "ninja install" by name, and the EL package installs
+          # the binary as ninja-build.
+          dnf -y install ninja-build || true
+          if ! command -v ninja >/dev/null && command -v ninja-build >/dev/null; then
+            ln -s "$(command -v ninja-build)" /usr/local/bin/ninja
+          fi
+          if ! command -v ninja >/dev/null; then
+            curl -fsSL -o /tmp/ninja.zip \
+              https://github.com/ninja-build/ninja/releases/download/v$NINJA_VERSION/ninja-linux.zip
+            unzip -o /tmp/ninja.zip -d /usr/local/bin
+            chmod 0755 /usr/local/bin/ninja
+          fi
+          command -v ninja >/dev/null \
+            || { echo "ninja is required and could not be installed"; exit 1; }
+
+          gcc --version | head -1
+          ninja --version
+
+          url=https://github.com/Kitware/CMake/releases/download
+          curl -fsSL "$url/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-linux-x86_64.tar.gz" \
+            | tar xz -C /opt
+          echo "/opt/cmake-$CMAKE_VERSION-linux-x86_64/bin" >> "$GITHUB_PATH"
+          "/opt/cmake-$CMAKE_VERSION-linux-x86_64/bin/cmake" --version | head -1
+
+          # Checked here so a missing piece fails with a clear reason instead
+          # of as an obscure error deep in the build.
+          command -v pgrep >/dev/null || { echo "pgrep is missing"; exit 1; }
+          echo test | iconv -f utf-8 -t euckr >/dev/null \
+            || { echo "iconv cannot convert to euckr"; exit 1; }
+          ls /usr/lib/gcc/x86_64-redhat-linux/*/libstdc++.a >/dev/null \
+            || { echo "libstdc++.a is missing"; exit 1; }
+          test -f /usr/include/nlist.h \
+            || { echo "nlist.h is missing"; exit 1; }
+          # The EL package installs the compiler shims here; putting the
+          # directory first on PATH is what routes the build through ccache,
+          # for the engine and for the 3rdparty projects alike.
+          test -x /usr/lib64/ccache/c++ \
+            || { echo "the ccache compiler shims are missing"; exit 1; }
+
+      - name: Restore the compiler cache
+        id: ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-rocky8-${{ github.run_id }}
+          restore-keys: ccache-rocky8-
+
+      # The manager server is a submodule of the engine at path cubridmanager,
+      # so the engine is checked out and this PR replaces that submodule.
+      - name: Check out the engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          ref: ${{ env.ENGINE_REF }}
+          submodules: recursive
+          fetch-depth: 1
+          path: cubrid
+
+      - name: Check out this PR over the cubridmanager submodule
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: cubrid/cubridmanager
+
+      - name: Read the engine version
+        id: version
+        working-directory: cubrid
+        run: |
+          set -euo pipefail
+          full=$(tr -d '[:space:]' < VERSION)
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "engine VERSION=$full"
+
+      # CUBRID is meant to be run by its own unprivileged owner, and a
+      # container job is root, so everything from here runs as cubrid.
+      - name: Create the cubrid user
+        run: |
+          set -euo pipefail
+          useradd -m -s /bin/bash cubrid
+          mkdir -p "$GITHUB_WORKSPACE/CUBRID" "$GITHUB_WORKSPACE/.ccache"
+          chown -R cubrid:cubrid "$GITHUB_WORKSPACE"
+
+      - name: Build CUBRID with this manager server
+        run: |
+          set -euo pipefail
+          JAVA_HOME=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
+          java -version 2>&1 | head -1
+          echo "cores: $(nproc), memory: $(free -g | awk '/^Mem:/{print $2"G"}')"
+          echo "cache restored from: ${{ steps.ccache.outputs.cache-matched-key || '(nothing)' }}"
+          du -sh "$GITHUB_WORKSPACE/.ccache" 2>/dev/null || echo "  .ccache is empty"
+
+          cat > /tmp/build-as-cubrid.sh <<'EOS'
+          set -euo pipefail
+          echo "gcc resolves to $(command -v gcc)"
+          echo "g++ resolves to $(command -v g++)"
+          ccache --max-size="$CCACHE_MAXSIZE"
+          ccache --zero-stats >/dev/null
+          cd "$WORKSPACE/cubrid"
+          # set -e is dropped around the build so that the statistics below are
+          # printed on a failure too: a cache that stopped being hit is
+          # invisible otherwise, and the run only looks slower for no reason.
+          set +e
+          ./build.sh -m release -g ninja -j "$JAVA_HOME" \
+            -p "$WORKSPACE/CUBRID" build
+          rc=$?
+          set -e
+          echo "===== ccache"
+          ccache --show-stats | grep -E 'cache hit|cache miss|cache size|files in cache'
+          exit $rc
+          EOS
+          chmod 0755 /tmp/build-as-cubrid.sh
+
+          set +e
+          runuser -u cubrid -- env HOME=/home/cubrid \
+            PATH="/usr/lib64/ccache:$PATH" \
+            CCACHE_DIR="$GITHUB_WORKSPACE/.ccache" CCACHE_MAXSIZE=2G \
+            JAVA_HOME="$JAVA_HOME" WORKSPACE="$GITHUB_WORKSPACE" \
+            bash /tmp/build-as-cubrid.sh
+          rc=$?
+          set -e
+
+          # ExternalProject keeps its output in log files, so a failure prints
+          # only "Command failed"; show the logs of whatever did not finish.
+          if [ $rc -ne 0 ]; then
+            cd cubrid
+            stamp=build_x86_64_release/3rdparty/Stamp
+            echo "===== external projects that configured but did not build"
+            failed=""
+            for d in "$stamp"/*/; do
+              n=$(basename "$d")
+              [ -f "$d/$n-configure" ] || continue
+              [ -f "$d/$n-build" ] || { echo "  $n"; failed="$failed $n"; }
+            done
+            [ -n "$failed" ] \
+              || echo "  (none; look for a FAILED: line in the ninja output above)"
+            for n in $failed; do
+              for f in "$stamp/$n/$n-build-err.log" "$stamp/$n/$n-build-out.log"; do
+                [ -s "$f" ] || continue
+                echo "===== $f (last 80 lines)"; tail -n 80 "$f"
+              done
+            done
+            echo "===== compiler errors across all 3rdparty logs"
+            grep -h -E 'error:|fatal error|Error [0-9]+|cannot find|No such file or directory' \
+              "$stamp"/*/*.log 2>/dev/null | sort -u | head -30 \
+              || echo "  none matched"
+            echo "===== disk"; df -h . | tail -1
+            exit $rc
+          fi
+          test -x "$GITHUB_WORKSPACE/CUBRID/bin/cub_manager" \
+            || { echo "cub_manager was not built"; exit 1; }
+
+      # A build from source installs this repository's own cm.conf, which has
+      # support_mon_statistic=NO, while the released packages ship YES. With it
+      # off the monitoring gather never runs, and set_mon_interval and the
+      # volume cases of get_mon_statistic fail on data that was never collected.
+      - name: Turn on monitoring statistics
+        run: |
+          set -euo pipefail
+          conf="$GITHUB_WORKSPACE/CUBRID/conf/cm.conf"
+          sed -i -E 's/^([[:space:]]*support_mon_statistic[[:space:]]*=?[[:space:]]*).*/\1YES/' "$conf"
+          grep -q -i 'support_mon_statistic.*YES' "$conf" \
+            || { echo "support_mon_statistic is not YES in $conf"; cat "$conf"; exit 1; }
+          grep -n -i 'support_mon_statistic' "$conf" | sed 's/^/  /'
+
+      # Only the database is created here; the suite starts the service itself
+      # to reach a known state before the first case.
+      - name: Create demodb
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          cat > /tmp/demodb-as-cubrid.sh <<'EOS'
+          set -euo pipefail
+          export CUBRID="$WORKSPACE/CUBRID"
+          export CUBRID_DATABASES="$CUBRID/databases"
+          export LD_LIBRARY_PATH="$CUBRID/lib:$CUBRID/cci/lib:${LD_LIBRARY_PATH:-}"
+          export PATH="$CUBRID/bin:$PATH"
+          mkdir -p "$CUBRID_DATABASES/demodb"
+          cd "$CUBRID_DATABASES/demodb"
+          sh "$CUBRID/demo/make_cubrid_demo.sh"
+          grep -q '^demodb' "$CUBRID_DATABASES/databases.txt" \
+            || { echo "demodb was not registered in databases.txt"; exit 1; }
+          test -f "$CUBRID_DATABASES/demodb/demodb" \
+            || { echo "the demodb volume is not where the cases expect it:"
+                 cat "$CUBRID_DATABASES/databases.txt"; exit 1; }
+          timeout 300 cubrid service stop || echo "service stop returned $?"
+          EOS
+          chmod 0755 /tmp/demodb-as-cubrid.sh
+          runuser -u cubrid -- env HOME=/home/cubrid PATH="$PATH" \
+            WORKSPACE="$GITHUB_WORKSPACE" bash /tmp/demodb-as-cubrid.sh
+
+      - name: Run the API test suite
+        id: run
+        timeout-minutes: 60
+        run: |
+          set -uo pipefail
+          cat > /tmp/test-as-cubrid.sh <<'EOS'
+          set -uo pipefail
+          export CUBRID="$WORKSPACE/CUBRID"
+          export CUBRID_DATABASES="$CUBRID/databases"
+          export LD_LIBRARY_PATH="$CUBRID/lib:${LD_LIBRARY_PATH:-}"
+          export PATH="$CUBRID/bin:$PATH"
+          # Python block buffers into a pipe, which would hide the progress of
+          # the whole run until it ended.
+          export PYTHONUNBUFFERED=1
+          cd "$WORKSPACE/cubrid/cubridmanager/server/test"
+          timeout --signal=INT --kill-after=1m 50m \
+            ./run_tests.sh -ns "$TEST_SET" </dev/null 2>&1 | tee run.log
+          exit ${PIPESTATUS[0]}
+          EOS
+          chmod 0755 /tmp/test-as-cubrid.sh
+          status=0
+          runuser -u cubrid -- env HOME=/home/cubrid PATH="$PATH" \
+            WORKSPACE="$GITHUB_WORKSPACE" TEST_SET="$TEST_SET" \
+            bash /tmp/test-as-cubrid.sh || status=$?
+          if [ $status -eq 124 ] || [ $status -eq 137 ]; then
+            echo "the suite did not finish in time; the last case in run.log"
+            echo "above is where it stopped making progress"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit $status
+
+      - name: Summarise the result
+        id: summary
+        if: always()
+        working-directory: cubrid/cubridmanager/server/test
+        run: |
+          set -uo pipefail
+          status='${{ steps.run.outputs.status }}'
+          if [ ! -f run.log ]; then
+            verdict='⚠️ NOT RUN'
+            echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+            {
+              echo "## CMS API test — $verdict"
+              echo
+              echo "The suite did not run; an earlier step failed."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$status" = "0" ]; then verdict='✅ PASS'; else verdict='❌ FAIL'; fi
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## CMS API test — $verdict"
+            echo
+            echo "| | |"
+            echo "| --- | --- |"
+            echo "| engine | \`${ENGINE_REPO}@${ENGINE_REF}\` (VERSION ${{ steps.version.outputs.full }}) |"
+            echo "| built on | Rocky Linux 8.10, gcc $(gcc -dumpversion) |"
+            echo "| test set | \`$TEST_SET\` |"
+            echo
+            tail -n 3 run.log | grep -E 'succeeded|failed' || true
+            echo
+            if [ "$status" != "0" ]; then
+              echo "<details><summary>failed cases</summary>"
+              echo
+              echo '```'
+              sed 's/\x1b\[[0-9;]*m//g' run.log | sed -n '/task(s) failed/,$p' | head -40
+              echo '```'
+              echo
+              echo "</details>"
+            fi
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment the result on the PR
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true   # a PR from a fork has no write token
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cms-api-test
+          message: |
+            **CMS API test — ${{ steps.summary.outputs.verdict }}**
+
+            engine `${{ env.ENGINE_REPO }}@${{ env.ENGINE_REF }}` (VERSION ${{ steps.version.outputs.full }}),
+            test set `${{ env.TEST_SET }}`, built on Rocky Linux 8.10.
+
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cms-api-test
+          path: |
+            cubrid/cubridmanager/server/test/run.log
+            cubrid/cubridmanager/server/test/log/
+            CUBRID/log/
+            CUBRID/conf/cm.conf
+          retention-days: 14
+          if-no-files-found: warn
