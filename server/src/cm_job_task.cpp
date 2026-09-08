@@ -448,7 +448,7 @@ run_child_with_msg (const char *const argv[], int wait_flag, char *task_name,
     }
   else
     {
-      snprintf (tmp_out_file, PATH_MAX, stdout_file);
+      snprintf (tmp_out_file, PATH_MAX, "%s", stdout_file);
     }
   snprintf (buf, PATH_MAX - 1, "%s_err_tmp", task_name);
   gen_tempfile_path (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
