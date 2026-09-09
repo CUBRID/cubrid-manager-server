@@ -355,23 +355,39 @@ jobs:
               echo "</details>"
             fi
             echo
-            if [ "${{ github.event_name }}" = "pull_request" ] \
-               && [ "${{ github.event.pull_request.head.repo.full_name }}" \
-                    != "${{ github.repository }}" ]; then
-              echo "_This pull request comes from a fork, so its token cannot"
-              echo "post a comment; this summary is the whole report._"
-            fi
           } | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE"
 
-      - name: Comment the result on the PR
-        if: >-
-          always() && github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        continue-on-error: true
-        uses: marocchino/sticky-pull-request-comment@v2
+          if [ "$status" = "0" ]; then
+            echo "::notice title=CMS API test::$(tail -n 3 run.log \
+              | grep -E 'succeeded' | head -1)"
+          else
+            detail=$(sed 's/\x1b\[[0-9;]*m//g' run.log \
+              | sed -n '/task(s) failed/,$p' | head -20 \
+              | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=CMS API test failed::$detail"
+          fi
+
+      - name: Stage the report for the comment workflow
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/report"
+          mkdir -p "$out"
+          if [ -s /tmp/summary_result.md ]; then
+            cp /tmp/summary_result.md "$out/summary_result.md"
+          else
+            echo "The run produced no summary; see the workflow run." \
+              > "$out/summary_result.md"
+          fi
+          echo "${{ github.event.pull_request.number }}" > "$out/pr-number.txt"
+
+      - name: Upload the report for the comment workflow
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
         with:
-          header: cms-api-test
-          path: /tmp/summary_result.md
+          name: cms-api-test-comment
+          path: report/
+          retention-days: 3
 
       - name: Upload the reports
         if: always()
