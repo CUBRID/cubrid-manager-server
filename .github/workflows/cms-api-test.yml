@@ -355,11 +355,19 @@ jobs:
               echo "</details>"
             fi
             echo
+            if [ "${{ github.event_name }}" = "pull_request" ] \
+               && [ "${{ github.event.pull_request.head.repo.full_name }}" \
+                    != "${{ github.repository }}" ]; then
+              echo "_This pull request comes from a fork, so its token cannot"
+              echo "post a comment; this summary is the whole report._"
+            fi
           } | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE"
 
       - name: Comment the result on the PR
-        if: always() && github.event_name == 'pull_request'
-        continue-on-error: true   # a PR from a fork has no write token
+        if: >-
+          always() && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: cms-api-test
