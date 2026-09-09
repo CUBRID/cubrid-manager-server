@@ -55,6 +55,8 @@ if not exist %prefix% (
 	mkdir %prefix%
 )
 
+set platform_token=%platform%
+
 call build_server.bat
 set exitcode=!errorlevel!
 

@@ -36,12 +36,17 @@ IF NOT DEFINED VSDEVCMD (
     exit /b 1
 )
 
-call "!VSDEVCMD!" -arch=%platform%
-if errorlevel 1 (
-    echo build_server.bat: warning - VsDevCmd.bat reported errors ^(see above^); continuing.
+REM CMS on Windows only supports the x64 platform.
+IF NOT "%platform_token%" == "x64" (
+    echo build_server.bat: CMS on Windows only supports the x64 platform - platform_token is "%platform_token%".
+    exit /b 1
 )
-REM VsDevCmd.bat can leave ERRORLEVEL non-zero even on a usable env; force reset it.
-(call )
+
+call "!VSDEVCMD!" -arch=%platform_token%
+if errorlevel 1 (
+    echo build_server.bat: VsDevCmd.bat reported errors ^(see above^).
+    exit /b 1
+)
 
 FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MAJOR=%%i")
 FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MINOR=%%i")
