@@ -71,6 +71,19 @@ echo #define BUILD_SERIAL_NUMBER %COMMIT_COUNT% >> %VERS%
 echo #define VERSION_STRING "%MAJOR%.%MINOR%.%PATCH%.%COMMIT_COUNT%" >> %VERS%
 
 echo Start build cm_server ...
+
+SET "INSTALL_DIR=win\install\CMServer_%mode%_%platform%"
+IF EXIST "%INSTALL_DIR%" (
+    echo build_server.bat: removing stale output directory "%INSTALL_DIR%" ...
+    rmdir /s /q "%INSTALL_DIR%"
+
+    IF EXIST "%INSTALL_DIR%" (
+        echo build_server.bat: warning - "%INSTALL_DIR%" still exists after waiting for removal; continuing anyway.
+    ) ELSE (
+        echo build_server.bat: confirmed "%INSTALL_DIR%" removed.
+    )
+)
+
 cd win
 
 set cubrid_libdir=%cubrid_libdir%
@@ -82,16 +95,32 @@ echo build_server.bat: diag - devenv raw exit code = %exitcode%
 
 cd ..
 if not "%exitcode%" == "0" (
-    REM devenv's own exit code can be non-zero even on a full build success;
-    REM trust the actual install output instead.
+    SET "CM_ADMIN_PATH="
+    IF EXIST "%INSTALL_DIR%\bin\cm_admin.exe" SET "CM_ADMIN_PATH=%INSTALL_DIR%\bin\cm_admin.exe"
+    IF EXIST "%INSTALL_DIR%\cm_admin.exe" SET "CM_ADMIN_PATH=%INSTALL_DIR%\cm_admin.exe"
+    IF DEFINED CM_ADMIN_PATH (
+        echo build_server.bat: diag - CM_ADMIN_PATH=!CM_ADMIN_PATH!
+    ) ELSE (
+        echo build_server.bat: diag - cm_admin.exe not found under "%INSTALL_DIR%"
+    )
+
+    SET "CUB_MANAGER_PATH="
+    IF EXIST "%INSTALL_DIR%\bin\cub_manager.exe" SET "CUB_MANAGER_PATH=%INSTALL_DIR%\bin\cub_manager.exe"
+    IF EXIST "%INSTALL_DIR%\cub_manager.exe" SET "CUB_MANAGER_PATH=%INSTALL_DIR%\cub_manager.exe"
+    IF DEFINED CUB_MANAGER_PATH (
+        echo build_server.bat: diag - CUB_MANAGER_PATH=!CUB_MANAGER_PATH!
+    ) ELSE (
+        echo build_server.bat: diag - cub_manager.exe not found under "%INSTALL_DIR%"
+    )
+
     SET "INSTALL_CHECK_OK="
-    IF EXIST "win\install\CMServer_%mode%_%platform%\bin\cm_admin.exe" SET "INSTALL_CHECK_OK=1"
-    IF EXIST "win\install\CMServer_%mode%_%platform%\cm_admin.exe" SET "INSTALL_CHECK_OK=1"
+    IF DEFINED CM_ADMIN_PATH IF DEFINED CUB_MANAGER_PATH SET "INSTALL_CHECK_OK=1"
+
     IF DEFINED INSTALL_CHECK_OK (
-        echo build_server.bat: warning - devenv exit code %exitcode% ignored, cm_admin.exe was found.
+        echo build_server.bat: warning - devenv exit code %exitcode% ignored, cm_admin.exe and cub_manager.exe were both found in the freshly-wiped output directory.
         set exitcode=0
     ) ELSE (
-        echo build_server.bat: devenv exit code %exitcode% and no build output found - real failure.
+        echo build_server.bat: devenv exit code %exitcode% and no fresh build output found - real failure.
         exit /b %exitcode%
     )
 )
@@ -104,11 +133,7 @@ echo build_server.bat: diag - copying from "%CD%" to "%prefix%" ...
 robocopy . %prefix%\ /e
 set robocopy_rc=%errorlevel%
 echo build_server.bat: diag - robocopy raw exit code = %robocopy_rc%
-if errorlevel 1 (
-    set "exitcode=0"
-    ) else (
-    set "exitcode=%errorlevel%"
-    )
+if %robocopy_rc% GEQ 8 ( set "exitcode=%robocopy_rc%" ) else ( set "exitcode=0" )
 
 echo build_server.bat: diag - computed exitcode = %exitcode%
 cd ..\..\..
