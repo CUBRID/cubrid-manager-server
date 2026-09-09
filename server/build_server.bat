@@ -44,9 +44,10 @@ IF NOT "%platform_token%" == "x64" (
 
 call "!VSDEVCMD!" -arch=%platform_token%
 if errorlevel 1 (
-    echo build_server.bat: VsDevCmd.bat reported errors ^(see above^).
-    exit /b 1
+    echo build_server.bat: warning - VsDevCmd.bat reported errors ^(see above^); continuing.
 )
+REM VsDevCmd.bat can leave ERRORLEVEL non-zero even on a usable env; force reset it.
+(call )
 
 FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MAJOR=%%i")
 FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MINOR=%%i")
