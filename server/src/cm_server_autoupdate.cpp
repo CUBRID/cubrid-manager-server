@@ -73,51 +73,51 @@ unzip (const char *zip_file, const char *unzip_dir)
       status = mz_zip_reader_file_stat (&zip_archive, i, &file_stat);
 
       if (!status)
-        {
-          mz_zip_reader_end (&zip_archive);
-          return MZ_FALSE;
-        }
+	{
+	  mz_zip_reader_end (&zip_archive);
+	  return MZ_FALSE;
+	}
 
       snprintf (unzip_file, MAX_LINE, "%s/%s", unzip_dir,
-                file_stat.m_filename);
+		file_stat.m_filename);
 
       file_index =
-        mz_zip_reader_locate_file (&zip_archive, file_stat.m_filename, NULL,
-                                   0);
+	      mz_zip_reader_locate_file (&zip_archive, file_stat.m_filename, NULL,
+					 0);
 
       if (mz_zip_reader_is_file_a_directory (&zip_archive, file_index))
-        {
-          //create sub directory according to the folder's name, which is zipped in zip file.
+	{
+	  //create sub directory according to the folder's name, which is zipped in zip file.
 #ifdef WINDOWS
-          if (access (unzip_file, 0) != 0
-              && !CreateDirectory (unzip_file, NULL))
+	  if (access (unzip_file, 0) != 0
+	      && !CreateDirectory (unzip_file, NULL))
 #else
-          mode_t old_mode = umask (0);
-          if (access (unzip_file, 0) != 0 && mkdir (unzip_file, 0700) != 0)
+	  mode_t old_mode = umask (0);
+	  if (access (unzip_file, 0) != 0 && mkdir (unzip_file, 0700) != 0)
 #endif
-            {
+	    {
 #ifndef WINDOWS
-              umask (old_mode);
+	      umask (old_mode);
 #endif
-              mz_zip_reader_end (&zip_archive);
-              return MZ_FALSE;
-            }
+	      mz_zip_reader_end (&zip_archive);
+	      return MZ_FALSE;
+	    }
 #ifndef WINDOWS
-          umask (old_mode);
+	  umask (old_mode);
 #endif
-          continue;
-        }
+	  continue;
+	}
 
       status =
-        mz_zip_reader_extract_file_to_file (&zip_archive,
-                                            file_stat.m_filename, unzip_file,
-                                            0);
+	      mz_zip_reader_extract_file_to_file (&zip_archive,
+		  file_stat.m_filename, unzip_file,
+		  0);
 
       if (!status)
-        {
-          mz_zip_reader_end (&zip_archive);
-          return MZ_FALSE;
-        }
+	{
+	  mz_zip_reader_end (&zip_archive);
+	  return MZ_FALSE;
+	}
     }
 
 

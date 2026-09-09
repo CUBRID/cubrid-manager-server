@@ -138,9 +138,9 @@ typedef struct
 
 int _op_check_is_localhost (char *token, char *tmpdbname);
 void append_host_to_dbname (char *name_buf, const char *dbname,
-                            int buf_len);
+			    int buf_len);
 void *increase_capacity (void *ptr, int block_size, int old_count,
-                         int new_count);
+			 int new_count);
 char *strcpy_limit (char *dest, const char *src, int buf_len);
 int ut_getdelim (char **lineptr, int *n, int delimiter, FILE *fp);
 int ut_getline (char **lineptr, int *n, FILE *fp);
@@ -180,7 +180,7 @@ int string_tokenize (char *str, char *tok[], int num_tok);
 int string_tokenize2 (char *str, char *tok[], int num_tok, int c);
 int string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[]);
 int ut_get_task_info (const char *task, char *access_log_flag,
-                      T_TASK_FUNC *task_func, T_USER_AUTH *auth);
+		      T_TASK_FUNC *task_func, T_USER_AUTH *auth);
 char *time_to_str (time_t t, const char *fmt, char *buf, int type);
 int read_from_socket (SOCKET fd, char *buf, int size);
 int write_to_socket (SOCKET fd, const char *buf, int size);
@@ -200,50 +200,50 @@ char *nt_style_path (char *path, char *new_path_buf);
 
 int _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd);
 void uGenerateStatus (nvplist *req, nvplist *res, int retval,
-                      const char *_dbmt_error);
+		      const char *_dbmt_error);
 int ut_validate_token (nvplist *req);
 void _ut_timeval_diff (struct timeval *start, struct timeval *end,
-                       int *res_msec);
+		       int *res_msec);
 char *ut_token_generate (char *client_ip, char *client_port,
-                         char *dbmt_id, int proc_id, time_t login_time);
+			 char *dbmt_id, int proc_id, time_t login_time);
 void _accept_connection (nvplist *cli_request, nvplist *cli_response);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
 int ut_run_child (const char *bin_path, const char *const argv[],
-                  int wait_flag, const char *stdin_file,
-                  const char *stdout_file, const char *stderr_file, int *exit_status);
+		  int wait_flag, const char *stdin_file,
+		  const char *stdout_file, const char *stderr_file, int *exit_status);
 
 int IsValidUserName (const char *pUserName);
 int ut_validate_auth (nvplist *req);
 int ut_get_token_active_time (time_t *active_time);
 int remove_extra_subdir (const char *dirpath, const char *pattern,
-                         unsigned int save_num);
+			 unsigned int save_num);
 int ut_get_filename (char *fullpath, int with_ext, char *ret_filename);
 int ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error);
 int ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid);
 int ut_record_cubrid_utility_log_stderr (const char *msg);
 int ut_record_cubrid_utility_log_stdout (const char *msg);
 int run_child_linux (const char *pname, const char *const argv[], int wait_flag,
-                     const char *stdin_file, char *stdout_file, char *stderr_file,
-                     int *exit_status);
+		     const char *stdin_file, char *stdout_file, char *stderr_file,
+		     int *exit_status);
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 bool is_valid_filename (const char *filename);
 bool is_invalid_filename (const char *filename);
-bool is_valid_filename (const char *filename, std::string& expanded_path);
+bool is_valid_filename (const char *filename, std::string &expanded_path);
 bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 bool is_authorized_filename (const char *path, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
-bool is_allowed_script_env (const std::string& name);
-std::string expand_env_path (const std::string& path);
-std::string extract_env_name (const std::string& env_entry);
+bool is_allowed_script_env (const std::string &name);
+std::string expand_env_path (const std::string &path);
+std::string extract_env_name (const std::string &env_entry);
 #if !defined (WINDOWS)
-bool is_pid_dir (const std::string & name);
-bool get_proc_uid (const std::string & pid, uid_t & uid);
-bool get_proc_comm (const std::string & pid, std::string & comm);
+bool is_pid_dir (const std::string &name);
+bool get_proc_uid (const std::string &pid, uid_t &uid);
+bool get_proc_comm (const std::string &pid, std::string &comm);
 #endif
-bool setenv_using_putenv_fmt (const std::string & nameValue, int overwrite = 1);
+bool setenv_using_putenv_fmt (const std::string &nameValue, int overwrite = 1);
 #endif                /* _CM_SERVER_UTIL_H_ */

@@ -115,29 +115,29 @@ static void _dbmt_user_free (T_DBMT_USER *dbmt_user);
 static void _errmsg_output (int cmd_id, const char *error_msg);
 static void _print_dbmtuser_info (T_DBMT_USER_INFO *dbmtuser_info);
 static int _add_dbinfo_to_dbinfo_array (const char *dbinfo_str,
-                                        T_DBMT_USER_DBINFO **dbmt_dbinfo,
-                                        int *num_db, char *error_msg);
+					T_DBMT_USER_DBINFO **dbmt_dbinfo,
+					int *num_db, char *error_msg);
 static int _check_str_in_list (const char *str, const char *str_list[]);
 static int _check_dbmt_user_passwd (T_DBMT_USER *dbmt_user,
-                                    const char *username, const char *passwd,
-                                    char *error_msg);
+				    const char *username, const char *passwd,
+				    char *error_msg);
 
 static int
 _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
-                  struct option opt[], const char *need_arg_list[],
-                  char *error_msg);
+		  struct option opt[], const char *need_arg_list[],
+		  char *error_msg);
 
 static int
 _get_longname_by_shortname (struct option opt[], int shortname,
-                            char *longname, int buflen);
+			    char *longname, int buflen);
 
 static int
 _set_nvplist_by_arglist (nvplist *arg_list, const char *argnamearray[],
-                         const char *argvalarray[]);
+			 const char *argvalarray[]);
 
 static int
 _dbmtuser_auth_arg_check (const char *unicas_auth, const char *dbcreate_auth,
-                          const char *monitor_auth, char *error_msg);
+			  const char *monitor_auth, char *error_msg);
 static int _get_localhost_ip (char *ipaddr, int ipaddr_len);
 
 
@@ -159,7 +159,7 @@ cmd_listdb (int argc, const char *in_argv[])
   FILE *fp = NULL;
 
   snprintf (db_txt_path, sizeof (db_txt_path) - 1, "%s/%s",
-            sco.szCubrid_databases, CUBRID_DATABASE_TXT);
+	    sco.szCubrid_databases, CUBRID_DATABASE_TXT);
 
   if ((fp = fopen (db_txt_path, "r")) == NULL)
     {
@@ -172,14 +172,14 @@ cmd_listdb (int argc, const char *in_argv[])
       ut_trim (buf);
 
       if (buf[0] == '#')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (string_tokenize (buf, tok, 2) < 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       printf ("  %d.  %s\n", ++i, ut_trim (tok[0]));
     }
@@ -208,7 +208,7 @@ cmd_deluser (int argc, const char *in_argv[])
   if (argc != 2)
     {
       strcpy_limit (error_msg, get_msg_by_id (PTN_ARG_NUM_ERR),
-                    DBMT_ERROR_MSG_SIZE);
+		    DBMT_ERROR_MSG_SIZE);
       retval = E_ARG_ERR;
       goto error_clean_return;
     }
@@ -224,7 +224,7 @@ cmd_deluser (int argc, const char *in_argv[])
   if (uStringEqual (DBMT_USER_ADMIN_NAME, dbmt_user_name))
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_DEL), DBMT_USER_ADMIN_NAME);
+		get_msg_by_id (PTN_DBMT_USER_NOT_DEL), DBMT_USER_ADMIN_NAME);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -234,7 +234,7 @@ cmd_deluser (int argc, const char *in_argv[])
   if (dbmt_user_index < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -294,8 +294,8 @@ cmd_adduser (int argc, const char *in_argv[])
 
   arg_list = nv_create (5, NULL, "\n", ":", "\n");
   if ((retval =
-         _get_cmd_nvplist (arg_list, in_argv, argc, adduser_opt,
-                           need_arg_list, error_msg)) != E_SUCCESS)
+	       _get_cmd_nvplist (arg_list, in_argv, argc, adduser_opt,
+				 need_arg_list, error_msg)) != E_SUCCESS)
     {
       goto error_return;
     }
@@ -313,7 +313,7 @@ cmd_adduser (int argc, const char *in_argv[])
   userpass = nv_get_val (arg_list, ARG_DBMT_USER_PWD);
 
   if ((retval =
-         _dbmtuser_auth_arg_check (unicas, dbcreate, monitor, error_msg)) != E_SUCCESS)
+	       _dbmtuser_auth_arg_check (unicas, dbcreate, monitor, error_msg)) != E_SUCCESS)
     {
       goto error_return;
     }
@@ -323,14 +323,14 @@ cmd_adduser (int argc, const char *in_argv[])
       char *n, *v;
       nv_lookup (arg_list, i, &n, &v);
       if (n != NULL && (uStringEqual (n, ARG_DB_INFO)))
-        {
-          if ((_add_dbinfo_to_dbinfo_array (v, &db_info,
-                                            &num_db, error_msg)) != E_SUCCESS)
-            {
-              retval = E_ARG_ERR;
-              goto error_return;
-            }
-        }
+	{
+	  if ((_add_dbinfo_to_dbinfo_array (v, &db_info,
+					    &num_db, error_msg)) != E_SUCCESS)
+	    {
+	      retval = E_ARG_ERR;
+	      goto error_return;
+	    }
+	}
     }
 
   if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
@@ -342,14 +342,14 @@ cmd_adduser (int argc, const char *in_argv[])
   if (_get_dbmt_user_index (dbmt_user, username) >= 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_EXIST), username);
+		get_msg_by_id (PTN_DBMT_USER_EXIST), username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
 
   /* set dbmt user auth info. */
   if ((auth_info =
-         (T_DBMT_USER_AUTHINFO *) malloc (AUTH_NUM_TOTAL * sizeof (T_DBMT_USER_AUTHINFO))) == NULL)
+	       (T_DBMT_USER_AUTHINFO *) malloc (AUTH_NUM_TOTAL * sizeof (T_DBMT_USER_AUTHINFO))) == NULL)
     {
       goto error_mem_alloc_return;
     }
@@ -365,8 +365,8 @@ cmd_adduser (int argc, const char *in_argv[])
 
   /* set dbmt user info struct. */
   dbmt_user->user_info =
-    (T_DBMT_USER_INFO *) increase_capacity (dbmt_user->user_info, sizeof (T_DBMT_USER_INFO),
-        num_dbmt_user, num_dbmt_user + 1);
+	  (T_DBMT_USER_INFO *) increase_capacity (dbmt_user->user_info, sizeof (T_DBMT_USER_INFO),
+	      num_dbmt_user, num_dbmt_user + 1);
 
   if (dbmt_user->user_info == NULL)
     {
@@ -374,8 +374,8 @@ cmd_adduser (int argc, const char *in_argv[])
     }
 
   dbmt_user_set_userinfo (& (dbmt_user->user_info[num_dbmt_user]),
-                          (char *) username, (char *) dbmt_pass,
-                          AUTH_NUM_TOTAL, auth_info, num_db, db_info);
+			  (char *) username, (char *) dbmt_pass,
+			  AUTH_NUM_TOTAL, auth_info, num_db, db_info);
   dbmt_user->num_dbmt_user++;
 
   /* update the cmdbpass & cm.pass conf file. */
@@ -441,9 +441,9 @@ cmd_viewuser (int argc, const char *in_argv[])
     {
       /* show all the dbmtuser info. */
       for (i = 0; i < dbmt_user->num_dbmt_user; i++)
-        {
-          _print_dbmtuser_info (&dbmt_user->user_info[i]);
-        }
+	{
+	  _print_dbmtuser_info (&dbmt_user->user_info[i]);
+	}
     }
   else if (argc == 2)
     {
@@ -452,19 +452,19 @@ cmd_viewuser (int argc, const char *in_argv[])
       index = _get_dbmt_user_index (dbmt_user, (char *) in_argv[1]);
 
       if (index < 0)
-        {
-          snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                    get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), in_argv[1]);
-          retval = E_FAILURE;
-          goto error_return;
-        }
+	{
+	  snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+		    get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), in_argv[1]);
+	  retval = E_FAILURE;
+	  goto error_return;
+	}
 
       _print_dbmtuser_info (&dbmt_user->user_info[index]);
     }
   else
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_NUM_ERR));
+		get_msg_by_id (PTN_ARG_NUM_ERR));
       retval = E_ARG_ERR;
       goto error_return;
     }
@@ -510,7 +510,7 @@ cmd_chguser_pwd (int argc, const char *in_argv[])
     }
 
   if ((retval =
-         _get_cmd_nvplist (arg_list, in_argv, argc, chguserpwd_opt, need_arg_list, error_msg)) != E_SUCCESS)
+	       _get_cmd_nvplist (arg_list, in_argv, argc, chguserpwd_opt, need_arg_list, error_msg)) != E_SUCCESS)
     {
       goto error_clean_return;
     }
@@ -530,7 +530,7 @@ cmd_chguser_pwd (int argc, const char *in_argv[])
   if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmtusername)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmtusername);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmtusername);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -539,27 +539,27 @@ cmd_chguser_pwd (int argc, const char *in_argv[])
     {
       /* check old password. */
       if (_check_dbmt_user_passwd
-          (dbmt_user, dbmtusername, oldpass, error_msg) < 0)
-        {
-          retval = E_FAILURE;
-          goto error_clean_return;
-        }
+	  (dbmt_user, dbmtusername, oldpass, error_msg) < 0)
+	{
+	  retval = E_FAILURE;
+	  goto error_clean_return;
+	}
     }
   else if (adminpass != NULL)
     {
       /* check admin password. */
       if (_check_dbmt_user_passwd
-          (dbmt_user, DBMT_USER_ADMIN_NAME, adminpass, error_msg) < 0)
-        {
-          retval = E_FAILURE;
-          goto error_clean_return;
-        }
+	  (dbmt_user, DBMT_USER_ADMIN_NAME, adminpass, error_msg) < 0)
+	{
+	  retval = E_FAILURE;
+	  goto error_clean_return;
+	}
     }
   else
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
-                ARG_OLD_PASS ", " ARG_ADMIN_PASS);
+		get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
+		ARG_OLD_PASS ", " ARG_ADMIN_PASS);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -567,7 +567,7 @@ cmd_chguser_pwd (int argc, const char *in_argv[])
   /* reset the new password. */
   uEncrypt (PASSWD_LENGTH, newpass, pwd_tmp);
   strcpy_limit (dbmt_user->user_info[dbmt_user_index].user_passwd, pwd_tmp,
-                PASSWD_ENC_LENGTH);
+		PASSWD_ENC_LENGTH);
 
   if (dbmt_user_write_pass (dbmt_user, error_msg) != ERR_NO_ERROR)
     {
@@ -620,7 +620,7 @@ cmd_chguser_auth (int argc, const char *in_argv[])
     }
 
   if ((retval =
-         _get_cmd_nvplist (arg_list, in_argv, argc, chguserauth_opt, need_arg_list, error_msg)) != E_SUCCESS)
+	       _get_cmd_nvplist (arg_list, in_argv, argc, chguserauth_opt, need_arg_list, error_msg)) != E_SUCCESS)
     {
       goto error_clean_return;
     }
@@ -631,7 +631,7 @@ cmd_chguser_auth (int argc, const char *in_argv[])
   username = nv_get_val (arg_list, ARG_DBMT_USER_NAME);
 
   if ((retval =
-         _dbmtuser_auth_arg_check (unicas, dbcreate, monitor, error_msg)) != E_SUCCESS)
+	       _dbmtuser_auth_arg_check (unicas, dbcreate, monitor, error_msg)) != E_SUCCESS)
     {
       goto error_clean_return;
     }
@@ -639,8 +639,8 @@ cmd_chguser_auth (int argc, const char *in_argv[])
   if (unicas == NULL && dbcreate == NULL && monitor == NULL)
     {
       snprintf (error_msg, sizeof (error_msg) - 1,
-                get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
-                ARG_UNICAS ", " ARG_DBCREATE ", " ARG_MONITOR);
+		get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
+		ARG_UNICAS ", " ARG_DBCREATE ", " ARG_MONITOR);
       retval = E_ARG_ERR;
       goto error_clean_return;
     }
@@ -655,7 +655,7 @@ cmd_chguser_auth (int argc, const char *in_argv[])
   if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -669,18 +669,18 @@ cmd_chguser_auth (int argc, const char *in_argv[])
       auth_t = & (dbmt_user_info_t->authinfo[i]);
 
       if (uStringEqual (auth_t->domain, "unicas") && unicas != NULL)
-        {
-          strcpy_limit (auth_t->auth, unicas, sizeof (auth_t->auth));
-        }
+	{
+	  strcpy_limit (auth_t->auth, unicas, sizeof (auth_t->auth));
+	}
       else if (uStringEqual (auth_t->domain, "dbcreate") && dbcreate != NULL)
-        {
-          strcpy_limit (auth_t->auth, dbcreate, sizeof (auth_t->auth));
-        }
+	{
+	  strcpy_limit (auth_t->auth, dbcreate, sizeof (auth_t->auth));
+	}
       else if (uStringEqual (auth_t->domain, "statusmonitorauth")
-               && monitor != NULL)
-        {
-          strcpy_limit (auth_t->auth, monitor, sizeof (auth_t->auth));
-        }
+	       && monitor != NULL)
+	{
+	  strcpy_limit (auth_t->auth, monitor, sizeof (auth_t->auth));
+	}
     }
 
   if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
@@ -745,7 +745,7 @@ cmd_adddbinfo (int argc, const char *in_argv[])
   if (_get_localhost_ip (local_ip, sizeof (local_ip)) != 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                "failed to get localhost ip");
+		"failed to get localhost ip");
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -754,7 +754,7 @@ cmd_adddbinfo (int argc, const char *in_argv[])
   db_list = nv_create (5, NULL, "\n", ":", "\n");
 
   if ((retval =
-         _get_cmd_nvplist (arg_list, in_argv, argc, adddbinfo_opt, need_arg_list, error_msg)) != E_SUCCESS)
+	       _get_cmd_nvplist (arg_list, in_argv, argc, adddbinfo_opt, need_arg_list, error_msg)) != E_SUCCESS)
     {
       goto error_clean_return;
     }
@@ -780,7 +780,7 @@ cmd_adddbinfo (int argc, const char *in_argv[])
   if (ut_get_dblist (db_list, 0) != ERR_NO_ERROR)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                "failed to get database lists.");
+		"failed to get database lists.");
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -788,33 +788,33 @@ cmd_adddbinfo (int argc, const char *in_argv[])
     {
       nv_lookup (db_list, i, &n, &v);
       if (n == NULL || v == NULL)
-        {
-          snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, "malformed database lists.");
-          retval = E_FAILURE;
-          goto error_clean_return;
-        }
+	{
+	  snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, "malformed database lists.");
+	  retval = E_FAILURE;
+	  goto error_clean_return;
+	}
 
       if (!strcmp (n, "open") && !strcmp (v, "dblist"))
-        {
-          flag = 1;
-        }
+	{
+	  flag = 1;
+	}
       else if (!strcmp (n, "close") && !strcmp (v, "dblist"))
-        {
-          flag = 0;
-          break;
-        }
+	{
+	  flag = 0;
+	  break;
+	}
       else if (flag == 1)
-        {
-          if (!strcmp (n, "dbname") && !strcmp (v, dbname))
-            {
-              dbexist = 1;
-            }
-        }            /* close "else if (flag == 1)" */
+	{
+	  if (!strcmp (n, "dbname") && !strcmp (v, dbname))
+	    {
+	      dbexist = 1;
+	    }
+	}            /* close "else if (flag == 1)" */
     }
   if (!dbexist)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_NOT_EXIST), dbname);
+		get_msg_by_id (PTN_DB_NOT_EXIST), dbname);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -828,7 +828,7 @@ cmd_adddbinfo (int argc, const char *in_argv[])
   if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -841,15 +841,15 @@ cmd_adddbinfo (int argc, const char *in_argv[])
   if (dbmt_user_search (t_info, dbname) >= 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_ALREADY_AUTH), dbname, username);
+		get_msg_by_id (PTN_DB_ALREADY_AUTH), dbname, username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
 
   num_db = t_info->num_dbinfo;
   t_info->dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (t_info->dbinfo,
-                   sizeof (T_DBMT_USER_DBINFO),
-                   num_db, num_db + 1);
+		   sizeof (T_DBMT_USER_DBINFO),
+		   num_db, num_db + 1);
   if (t_info->dbinfo == NULL)
     {
       strcpy_limit (error_msg, get_msg_by_id (PTN_MEM_ALLOC_ERR), DBMT_ERROR_MSG_SIZE);
@@ -934,17 +934,17 @@ cmd_deldbinfo (int argc, const char *in_argv[])
   if (dbmt_user_index < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
 
       retval = E_FAILURE;
       goto error_clean_return;
     }
 
   if ((db_index =
-         dbmt_user_search (&dbmt_user->user_info[dbmt_user_index], dbname)) < 0)
+	       dbmt_user_search (&dbmt_user->user_info[dbmt_user_index], dbname)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_NOT_AUTH), dbname, dbmt_user_name);
+		get_msg_by_id (PTN_DB_NOT_AUTH), dbname, dbmt_user_name);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -1007,7 +1007,7 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
     }
 
   if ((retval =
-         _get_cmd_nvplist (arg_list, in_argv, argc, chgdbinfo_opt,need_arg_list, error_msg)) != E_SUCCESS)
+	       _get_cmd_nvplist (arg_list, in_argv, argc, chgdbinfo_opt,need_arg_list, error_msg)) != E_SUCCESS)
     {
       goto error_clean_return;
     }
@@ -1028,7 +1028,7 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
   if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -1038,7 +1038,7 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
   if ((dbinfo_index = dbmt_user_search (userinfo_t, dbname)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_NOT_EXIST), dbname, username);
+		get_msg_by_id (PTN_DB_NOT_EXIST), dbname, username);
       retval = E_FAILURE;
       goto error_clean_return;
     }
@@ -1046,21 +1046,21 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
   dbinfo_t = & (userinfo_t->dbinfo[dbinfo_index]);
 
   strcpy_limit (broker_addr_t, dbinfo_t->broker_address,
-                sizeof (broker_addr_t));
+		sizeof (broker_addr_t));
   if (string_tokenize2 (broker_addr_t, broker_tok, 2, ',') < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_BROKER_ADDR_ERR), dbinfo_t->broker_address);
+		get_msg_by_id (PTN_BROKER_ADDR_ERR), dbinfo_t->broker_address);
       retval = E_FAILURE;
       goto error_clean_return;
     }
 
   snprintf (broker_addr, sizeof (broker_addr) - 1, "%s,%s",
-            ((host == NULL) ? broker_tok[0] : host),
-            ((port == NULL) ? broker_tok[1] : port));
+	    ((host == NULL) ? broker_tok[0] : host),
+	    ((port == NULL) ? broker_tok[1] : port));
 
   strcpy_limit (dbinfo_t->broker_address, broker_addr,
-                sizeof (dbinfo_t->broker_address));
+		sizeof (dbinfo_t->broker_address));
 
   if (auth != NULL)
     {
@@ -1103,7 +1103,7 @@ memory_clean_return:
 
 static int
 _check_dbmt_user_passwd (T_DBMT_USER *dbmt_user, const char *username,
-                         const char *passwd, char *error_msg)
+			 const char *passwd, char *error_msg)
 {
   int dbmt_user_index = -1;
   char pwd_tmp[PASSWD_ENC_LENGTH];
@@ -1113,7 +1113,7 @@ _check_dbmt_user_passwd (T_DBMT_USER *dbmt_user, const char *username,
   if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+		get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
       return -1;
     }
 
@@ -1123,7 +1123,7 @@ _check_dbmt_user_passwd (T_DBMT_USER *dbmt_user, const char *username,
   if (!uStringEqual (pwd_tmp, passwd))
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_PWD_ERR), passwd);
+		get_msg_by_id (PTN_DBMT_USER_PWD_ERR), passwd);
       return -1;
     }
 
@@ -1168,9 +1168,9 @@ _get_dbmt_user_index (T_DBMT_USER *dbmt_user, const char *username)
   for (i = 0; i < dbmt_user->num_dbmt_user; i++)
     {
       if (uStringEqual (username, dbmt_user->user_info[i].user_name))
-        {
-          return i;
-        }
+	{
+	  return i;
+	}
     }
 
   return -1;
@@ -1193,8 +1193,8 @@ _errmsg_output (int cmd_id, const char *error_msg)
 
 static int
 _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
-                  struct option opt[], const char *need_arg_list[],
-                  char *error_msg)
+		  struct option opt[], const char *need_arg_list[],
+		  char *error_msg)
 {
   int retval = E_SUCCESS;
   int i, need_arg_num;
@@ -1217,18 +1217,18 @@ _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
       char longname[OPT_STR_LEN];
 
       opt_key =
-        getopt_long (argc, (char **const) argv, opt_str, opt, &opt_index);
+	      getopt_long (argc, (char **const) argv, opt_str, opt, &opt_index);
 
       /* end of args */
       if (opt_key == -1)
-        {
-          break;
-        }
+	{
+	  break;
+	}
       if (_get_longname_by_shortname
-          (opt, opt_key, longname, sizeof (longname)) < 0)
-        {
-          return E_ARG_ERR;
-        }
+	  (opt, opt_key, longname, sizeof (longname)) < 0)
+	{
+	  return E_ARG_ERR;
+	}
       l_opt_arg = optarg;
 
       nv_add_nvp (arg_list, longname, l_opt_arg);
@@ -1241,13 +1241,13 @@ _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
   else if (argc - optind < need_arg_num)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_MISS), need_arg_list[need_arg_num - 1]);
+		get_msg_by_id (PTN_ARG_MISS), need_arg_list[need_arg_num - 1]);
       retval = E_ARG_ERR;
     }
   else
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_MORE), argv[optind + 1]);
+		get_msg_by_id (PTN_ARG_MORE), argv[optind + 1]);
       retval = E_ARG_ERR;
     }
 
@@ -1256,17 +1256,17 @@ _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
 
 static int
 _get_longname_by_shortname (struct option opt[], int shortname,
-                            char *longname, int buflen)
+			    char *longname, int buflen)
 {
   int i;
 
   for (i = 0; opt[i].val != 0; i++)
     {
       if (shortname == opt[i].val)
-        {
-          strcpy_limit (longname, opt[i].name, buflen);
-          return 0;
-        }
+	{
+	  strcpy_limit (longname, opt[i].name, buflen);
+	  return 0;
+	}
     }
 
   return -1;
@@ -1274,7 +1274,7 @@ _get_longname_by_shortname (struct option opt[], int shortname,
 
 static int
 _set_nvplist_by_arglist (nvplist *arg_list, const char *argnamelist[],
-                         const char *argvalarray[])
+			 const char *argvalarray[])
 {
   int i;
 
@@ -1300,9 +1300,9 @@ _check_str_in_list (const char *str, const char *str_list[])
   for (i = 0; str_list[i] != NULL; i++)
     {
       if (uStringEqual (str, str_list[i]))
-        {
-          return i;
-        }
+	{
+	  return i;
+	}
     }
 
   return -1;
@@ -1310,8 +1310,8 @@ _check_str_in_list (const char *str, const char *str_list[])
 
 static int
 _add_dbinfo_to_dbinfo_array (const char *dbinfo_str,
-                             T_DBMT_USER_DBINFO **dbmt_dbinfo, int *num_db,
-                             char *error_msg)
+			     T_DBMT_USER_DBINFO **dbmt_dbinfo, int *num_db,
+			     char *error_msg)
 {
   char *tok[3];
   char str_t[1024];
@@ -1337,20 +1337,20 @@ _add_dbinfo_to_dbinfo_array (const char *dbinfo_str,
   if ((*num_db) > 0)
     {
       for (i = 0; i < (*num_db); i++)
-        {
-          if (uStringEqual (tok[0], (*dbmt_dbinfo)[i].dbname))
-            {
-              snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, get_msg_by_id (PTN_DB_ADD_TWICE), tok[0]);
-              return E_FAILURE;
-            }
-        }
+	{
+	  if (uStringEqual (tok[0], (*dbmt_dbinfo)[i].dbname))
+	    {
+	      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, get_msg_by_id (PTN_DB_ADD_TWICE), tok[0]);
+	      return E_FAILURE;
+	    }
+	}
     }
 
   snprintf (broker_str, sizeof (broker_str) - 1, "%s,%s", ut_trim (broker_tok[0]), ut_trim (broker_tok[1]));
 
   *dbmt_dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (*dbmt_dbinfo,
-                 sizeof (T_DBMT_USER_DBINFO),
-                 (*num_db), (*num_db) + 1);
+		 sizeof (T_DBMT_USER_DBINFO),
+		 (*num_db), (*num_db) + 1);
 
   if (*dbmt_dbinfo == NULL)
     {
@@ -1359,7 +1359,7 @@ _add_dbinfo_to_dbinfo_array (const char *dbinfo_str,
     }
 
   dbmt_user_set_dbinfo (& (*dbmt_dbinfo)[ (*num_db)], ut_trim (tok[0]),
-                        DBMT_USER_ADMIN_NAME, ut_trim (tok[1]), broker_str);
+			DBMT_USER_ADMIN_NAME, ut_trim (tok[1]), broker_str);
   (*num_db)++;
 
   return E_SUCCESS;
@@ -1383,13 +1383,13 @@ _print_dbmtuser_info (T_DBMT_USER_INFO *dbmtuser_info)
     {
       T_DBMT_USER_AUTHINFO *t_authinfo = &dbmtuser_info->authinfo[i];
       if (strcmp (t_authinfo->domain, "unicas") == 0)
-        {
-          printf ("    broker: %s\n", t_authinfo->auth);
-        }
+	{
+	  printf ("    broker: %s\n", t_authinfo->auth);
+	}
       else
-        {
-          printf ("    %s: %s\n", t_authinfo->domain, t_authinfo->auth);
-        }
+	{
+	  printf ("    %s: %s\n", t_authinfo->domain, t_authinfo->auth);
+	}
     }
 
   printf ("  DB info: \n");
@@ -1401,7 +1401,7 @@ _print_dbmtuser_info (T_DBMT_USER_INFO *dbmtuser_info)
     {
       T_DBMT_USER_DBINFO *t_dbinfo = &dbmtuser_info->dbinfo[i];
       printf (dbinfo_pattern,
-              t_dbinfo->dbname, t_dbinfo->uid, t_dbinfo->broker_address);
+	      t_dbinfo->dbname, t_dbinfo->uid, t_dbinfo->broker_address);
     }
   printf ("\n");
 
@@ -1410,25 +1410,25 @@ _print_dbmtuser_info (T_DBMT_USER_INFO *dbmtuser_info)
 
 static int
 _dbmtuser_auth_arg_check (const char *unicas_auth, const char *dbcreate_auth,
-                          const char *monitor_auth, char *error_msg)
+			  const char *monitor_auth, char *error_msg)
 {
   if (unicas_auth != NULL && _check_str_in_list (unicas_auth, auth_list) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_UNICAS);
+		get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_UNICAS);
       return E_ARG_ERR;
     }
   if (dbcreate_auth != NULL
       && _check_str_in_list (dbcreate_auth, createdb_auth_list) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_DBCREATE);
+		get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_DBCREATE);
       return E_ARG_ERR;
     }
   if (monitor_auth != NULL && _check_str_in_list (monitor_auth, auth_list) < 0)
     {
       snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_MONITOR);
+		get_msg_by_id (PTN_ARG_FORMAT_ERR), ARG_MONITOR);
       return E_ARG_ERR;
     }
 
@@ -1465,20 +1465,20 @@ _get_localhost_ip (char *ipaddr, int ipaddr_len)
   else
     {
       for (i = 0; hostent_p->h_addr_list[i] != NULL; i++)
-        {
-          ip = inet_ntoa (* ((struct in_addr *) hostent_p->h_addr_list[i]));
-          /* ignore the 127.0.0.1 */
-          if (strcmp (ip, "127.0.0.1") == 0)
-            {
-              continue;
-            }
-          break;
-        }
+	{
+	  ip = inet_ntoa (* ((struct in_addr *) hostent_p->h_addr_list[i]));
+	  /* ignore the 127.0.0.1 */
+	  if (strcmp (ip, "127.0.0.1") == 0)
+	    {
+	      continue;
+	    }
+	  break;
+	}
       if (ip)
-        {
-          strcpy_limit (ipaddr, ip, ipaddr_len);
-          return 0;
-        }
+	{
+	  strcpy_limit (ipaddr, ip, ipaddr_len);
+	  return 0;
+	}
 
       goto exit_err;
     }

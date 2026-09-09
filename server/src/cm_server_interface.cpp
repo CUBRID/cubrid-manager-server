@@ -78,11 +78,11 @@ mon_stat_init (void)
   if (access (sco.sMonStatDataPath, F_OK) < 0)
     {
       if (mkdir (sco.sMonStatDataPath, 0755) < 0)
-        {
-          fprintf (stderr, "Error while creating monitoring data path(%s)\n",
-                   sco.sMonStatDataPath);
-          return -1;
-        }
+	{
+	  fprintf (stderr, "Error while creating monitoring data path(%s)\n",
+		   sco.sMonStatDataPath);
+	  return -1;
+	}
     }
 
   if (!cm_mon_stat::get_instance ()->initial ())
@@ -110,7 +110,7 @@ cub_cm_init_env ()
   if (uReadSystemConfig () < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : Cannot find the configuration file[%s].\n",
-                conf_get_dbmt_file (FID_DBMT_CONF, conf_name));
+		conf_get_dbmt_file (FID_DBMT_CONF, conf_name));
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       exit (1);
     }
@@ -133,14 +133,14 @@ cub_cm_init_env ()
   PUT_ENV ("CUBRID_LANG", "en_US");
 
   snprintf (cub_httpd_env.cubrid_err_log, MAX_PATH,
-            "%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
+	    "%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
   PUT_ENV ("CUBRID_ERROR_LOG", cub_httpd_env.cubrid_err_log);
 
   snprintf (cub_httpd_env.cubrid, MAX_PATH, "CUBRID=%s", sco.szCubrid);
   PUT_ENV ("CUBRID", sco.szCubrid);
 
   snprintf (cub_httpd_env.cubrid_databases, MAX_PATH, "CUBRID_DATABASES=%s",
-            sco.szCubrid_databases);
+	    sco.szCubrid_databases);
   PUT_ENV ("CUBRID_DATABASES", sco.szCubrid_databases);
 
   mutex_init (cm_mutex);
@@ -171,9 +171,9 @@ is_no_token_cmd (int task_code)
   for (i = 0; no_token_cmd[i] != -1; i++)
     {
       if (task_code == no_token_cmd[i])
-        {
-          return 1;
-        }
+	{
+	  return 1;
+	}
     }
 
   return 0;
@@ -236,37 +236,37 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* if database name is specified */
       if (dbname)
-        {
-          memset (dbid, 0, 32);
-          memset (dbpasswd, 0, 80);
-          _ut_get_dbaccess (req, dbid, dbpasswd);
-          nv_add_nvp (req, "_DBID", dbid);
-          nv_add_nvp (req, "_DBPASSWD", dbpasswd);
-          nv_add_nvp (req, "_DBNAME", dbname);
-        }
+	{
+	  memset (dbid, 0, 32);
+	  memset (dbpasswd, 0, 80);
+	  _ut_get_dbaccess (req, dbid, dbpasswd);
+	  nv_add_nvp (req, "_DBID", dbid);
+	  nv_add_nvp (req, "_DBPASSWD", dbpasswd);
+	  nv_add_nvp (req, "_DBNAME", dbname);
+	}
     }
 
   /* set CLIENT_VERSION */
   cli_ver = nv_get_val (req, "_CLIENT_VERSION");
   make_version_info (cli_ver == NULL ? "1.0" : cli_ver, &major_ver,
-                     &minor_ver);
+		     &minor_ver);
   CLIENT_VERSION = EMGR_MAKE_VER (major_ver, minor_ver);    /* global variable */
 
   sprintf (_dbmt_error, "?");    /* prevent to have null string */
   if (task_code == TS_UNDEFINED)
     {
       if (task != NULL)
-        {
-          strcpy (_dbmt_error, task);
-        }
+	{
+	  strcpy (_dbmt_error, task);
+	}
       retval = ERR_UNDEFINED_TASK;
     }
   else
     {
       if (access_log_flag)
-        {
-          ut_access_log (req, NULL);
-        }
+	{
+	  ut_access_log (req, NULL);
+	}
 
       gettimeofday (&task_begin, NULL);
 
@@ -278,7 +278,7 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* add cub_manager task running time to response. */
       snprintf (elapsed_time_str, sizeof (elapsed_time_str), "%d ms",
-                elapsed_msec);
+		elapsed_msec);
       nv_add_nvp (res, "__EXEC_TIME", elapsed_time_str);
     }
 
@@ -299,29 +299,29 @@ json_to_nv (Json::Value &root, const char *name, nvplist *nv)
       int size = root.size ();
 
       for (int index = 0; index < size; ++index)
-        {
-          if (!strcmp (name, "line") || !strcmp (name, "confdata")
-              || !strcmp (name, "group"))
-            {
-              json_to_nv (root[index], name, nv);
-            }
-          else
-            {
-              nv_add_nvp (nv, "open", name);
-              json_to_nv (root[index], name, nv);
-              nv_add_nvp (nv, "close", name);
-            }
-        }
+	{
+	  if (!strcmp (name, "line") || !strcmp (name, "confdata")
+	      || !strcmp (name, "group"))
+	    {
+	      json_to_nv (root[index], name, nv);
+	    }
+	  else
+	    {
+	      nv_add_nvp (nv, "open", name);
+	      json_to_nv (root[index], name, nv);
+	      nv_add_nvp (nv, "close", name);
+	    }
+	}
     }
     break;
     case Json::objectValue:
     {
       Json::Value::Members members (root.getMemberNames ());
       for (Json::Value::Members::iterator it = members.begin ();
-           it != members.end (); ++it)
-        {
-          json_to_nv (root[*it], (*it).c_str (), nv);
-        }
+	   it != members.end (); ++it)
+	{
+	  json_to_nv (root[*it], (*it).c_str (), nv);
+	}
     }
     break;
     case Json::intValue:
@@ -350,37 +350,37 @@ nv_to_json (nvplist *ref, char *value, int &index, Json::Value &root)
   for (; index < ref->nvplist_size; ++index)
     {
       if (ref->nvpairs[index] == NULL
-          || dst_buffer (ref->nvpairs[index]->name) == NULL)
-        {
-          continue;
-        }
+	  || dst_buffer (ref->nvpairs[index]->name) == NULL)
+	{
+	  continue;
+	}
       pname = dst_buffer (ref->nvpairs[index]->name);
       pvalue = dst_buffer (ref->nvpairs[index]->value);
       if (!strcmp (pname, "open"))
-        {
-          array.clear ();
-          nv_to_json (ref, pvalue, ++index, array);
-          if (!array.empty ())
-            {
-              root[pvalue].append (array);
-            }
-          else
-            {
-              root[pvalue] = array;
-            }
-        }
+	{
+	  array.clear ();
+	  nv_to_json (ref, pvalue, ++index, array);
+	  if (!array.empty ())
+	    {
+	      root[pvalue].append (array);
+	    }
+	  else
+	    {
+	      root[pvalue] = array;
+	    }
+	}
       else if (!strcmp (pname, "close") && !strcmp (pvalue, value))
-        {
-          break;
-        }
+	{
+	  break;
+	}
       else if (IS_SPECIAL_KEY)
-        {
-          root[pname].append ((pvalue == NULL) ? "" : pvalue);
-        }
+	{
+	  root[pname].append ((pvalue == NULL) ? "" : pvalue);
+	}
       else
-        {
-          root[pname] = (pvalue == NULL) ? "" : pvalue;
-        }
+	{
+	  root[pname] = (pvalue == NULL) ? "" : pvalue;
+	}
     }
 
   return 1;
@@ -410,10 +410,10 @@ cub_cm_extend_request (Json::Value &request, Json::Value &response)
       task = request["task"].asString ();
       response["task"] = task;
       if (get_ext_task_info (task.c_str (), 0, &task_func, NULL))
-        {
-          (*task_func) (request, response);
-          return 1;
-        }
+	{
+	  (*task_func) (request, response);
+	  return 1;
+	}
     }
   catch (exception &e)
     {
@@ -497,7 +497,7 @@ cm_async_request_handler (void *lpArg)
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+			  unsigned long time_out = 600)
 {
   HANDLE hHandles;
   DWORD ThreadID;
@@ -514,12 +514,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->uuid = req_id++;
 
   hHandles =
-    CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
+	  CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to execute task");
+				  "failed to execute task");
     }
 
   //dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
@@ -542,7 +542,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 #else
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+			  unsigned long time_out = 600)
 {
   int err = 0;
   pthread_t async_thrd;
@@ -561,7 +561,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
 
   err = pthread_cond_init (&pstmt->cond, NULL);
@@ -571,7 +571,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       pthread_mutex_destroy (&pstmt->mutex);
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
 
   pstmt->request = request;
@@ -592,7 +592,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       delete (pstmt);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
 
   pthread_mutex_lock (&pstmt->mutex);
@@ -649,9 +649,9 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
   for (itor = request_list.begin (); itor != request_list.end (); itor++)
     {
       if ((*itor)->uuid != uuid)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       break;
     }
   if (itor == request_list.end ())

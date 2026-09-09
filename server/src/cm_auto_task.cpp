@@ -68,7 +68,7 @@ ts_validate_user (nvplist *req, nvplist *res, char *_dbmt_error)
   if (passwd == NULL)
     {
       sprintf (_dbmt_error, "%s",
-               "parameter(password) is missing in request.");
+	       "parameter(password) is missing in request.");
       ut_error_log (req, "password not specified in the request.");
       return ERR_PARAM_MISSING;
     }
@@ -84,24 +84,24 @@ ts_validate_user (nvplist *req, nvplist *res, char *_dbmt_error)
   for (i = 0; i < dbmt_user.num_dbmt_user; i++)
     {
       if (strcmp (dbmt_user.user_info[i].user_name, id) == 0)
-        {
-          char decrypted[PASSWD_LENGTH + 1];
+	{
+	  char decrypted[PASSWD_LENGTH + 1];
 
-          uDecrypt (PASSWD_LENGTH, dbmt_user.user_info[i].user_passwd,
-                    decrypted);
-          if (uStringEqual (passwd, decrypted))
-            {
-              nv_update_val (res, "status", "success");
-              retval = ERR_NO_ERROR;
-            }
-          else
-            {
-              ut_error_log (req, "Incorrect password");
-              sprintf (_dbmt_error, "Incorrect password");
-              retval = ERR_WITH_MSG;
-            }
-          break;
-        }
+	  uDecrypt (PASSWD_LENGTH, dbmt_user.user_info[i].user_passwd,
+		    decrypted);
+	  if (uStringEqual (passwd, decrypted))
+	    {
+	      nv_update_val (res, "status", "success");
+	      retval = ERR_NO_ERROR;
+	    }
+	  else
+	    {
+	      ut_error_log (req, "Incorrect password");
+	      sprintf (_dbmt_error, "Incorrect password");
+	      retval = ERR_WITH_MSG;
+	    }
+	  break;
+	}
     }
   dbmt_user_free (&dbmt_user);
 
@@ -129,9 +129,9 @@ ts_check_client_version (nvplist *req, nvplist *res)
       major_ver = atoi (p);
       p = strchr (p, '.');
       if (p != NULL)
-        {
-          minor_ver = atoi (p + 1);
-        }
+	{
+	  minor_ver = atoi (p + 1);
+	}
     }
   clt_ver = EMGR_MAKE_VER (major_ver, minor_ver);
 
@@ -139,7 +139,7 @@ ts_check_client_version (nvplist *req, nvplist *res)
     {
       nv_update_val (res, "status", "failure");
       nv_update_val (res, "note",
-                     "Can not connect to the server due to version mismatch.");
+		     "Can not connect to the server due to version mismatch.");
       return 0;
     }
 
@@ -148,28 +148,28 @@ ts_check_client_version (nvplist *req, nvplist *res)
 
 int
 ts_check_already_connected (nvplist *cli_response, int max_index,
-                            int current_index, T_CLIENT_INFO *client_info)
+			    int current_index, T_CLIENT_INFO *client_info)
 {
   int index = 0;
   for (index = 0; index <= max_index; index++)
     {
       if (IS_INVALID_SOCKET (client_info[index].sock_fd)
-          || (index == current_index))
-        {
-          continue;
-        }
+	  || (index == current_index))
+	{
+	  continue;
+	}
 
       if (!strcmp (client_info[current_index].user_id, client_info[index].user_id))
-        {
-          char message[1024];
-          sprintf (message,
-                   "User %s was already connected from another client(%s)",
-                   client_info[index].user_id, client_info[index].ip_address);
+	{
+	  char message[1024];
+	  sprintf (message,
+		   "User %s was already connected from another client(%s)",
+		   client_info[index].user_id, client_info[index].ip_address);
 
-          nv_update_val (cli_response, "status", "failure");
-          nv_update_val (cli_response, "note", message);
-          return index;
-        }
+	  nv_update_val (cli_response, "status", "failure");
+	  nv_update_val (cli_response, "note", message);
+	  return index;
+	}
     }
 
   return -1;
@@ -189,7 +189,7 @@ ts_get_server_version (nvplist *req, nvplist *res)
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
-            CUBRID_DIR_BIN, UTIL_CUBRID_REL_NAME);
+	    CUBRID_DIR_BIN, UTIL_CUBRID_REL_NAME);
 
   argv[0] = cmd_name;
   argv[1] = NULL;

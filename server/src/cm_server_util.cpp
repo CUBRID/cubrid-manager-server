@@ -102,17 +102,17 @@
 
 namespace
 {
-  const std::unordered_set <std::string>& allowed_script_env_names ()
-   {
-      static const std::unordered_set <std::string> kAllowed =
-	{
-	  "LANG",
-	  "TZ",
-	  "CUBRID_TMP",
-	};
+  const std::unordered_set <std::string> &allowed_script_env_names ()
+  {
+    static const std::unordered_set <std::string> kAllowed =
+    {
+      "LANG",
+      "TZ",
+      "CUBRID_TMP",
+    };
 
-      return kAllowed;
-    }
+    return kAllowed;
+  }
 }
 
 static T_FSERVER_TASK_INFO task_info[] =
@@ -313,12 +313,12 @@ static volatile NT_QUERY_SYSTEM_INFORMATION s_pfnNtQuerySystemInformation = NULL
 static int _maybe_ip_addr (char *hostname);
 static int _ip_equal_hostent (struct hostent *hp, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
-                               char *short_filename);
-static bool delete_directory (const std::string& path);
+			       char *short_filename);
+static bool delete_directory (const std::string &path);
 bool attempt_to_access_parent_dir (const char *path);
 
 const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
-const size_t ALLOWED_ENV_VARS_COUNT = sizeof(ALLOWED_ENV_VARS) / sizeof(ALLOWED_ENV_VARS[0]);
+const size_t ALLOWED_ENV_VARS_COUNT = sizeof (ALLOWED_ENV_VARS) / sizeof (ALLOWED_ENV_VARS[0]);
 
 /*
  * We allow $CUBRID on Linux and %CUBRID% on Windows.
@@ -344,10 +344,10 @@ _op_check_is_localhost (char *token, char *hname)
     {
       /* if token equal 127.0.0.1 or the ip is in the list of hname. */
       if ((strcmp (token, "127.0.0.1") == 0)
-          || _ip_equal_hostent (hp, token) == 0)
-        {
-          return 0;
-        }
+	  || _ip_equal_hostent (hp, token) == 0)
+	{
+	  return 0;
+	}
     }
   else
     {
@@ -356,10 +356,10 @@ _op_check_is_localhost (char *token, char *hname)
       * then compare it with the hostname ignore case.
       */
       if ((strcasecmp (token, hname) == 0)
-          || (strcasecmp (token, "localhost") == 0))
-        {
-          return 0;
-        }
+	  || (strcasecmp (token, "localhost") == 0))
+	{
+	  return 0;
+	}
     }
   return -1;
 }
@@ -395,10 +395,10 @@ _ip_equal_hostent (struct hostent *hp, char *token)
 
       /* compare the ip string with token. */
       if (strcmp (token, tmpstr) == 0)
-        {
-          retval = 0;
-          break;
-        }
+	{
+	  retval = 0;
+	  break;
+	}
     }
   return retval;
 }
@@ -420,19 +420,19 @@ increase_capacity (void *ptr, int block_size, int old_count, int new_count)
   if (ptr == NULL)
     {
       if ((ptr = MALLOC (block_size * new_count)) == NULL)
-        {
-          return NULL;
-        }
+	{
+	  return NULL;
+	}
       memset (ptr, 0, block_size * new_count);
     }
   else
     {
       if ((ptr = realloc (ptr, block_size * new_count)) == NULL)
-        {
-          return NULL;
-        }
+	{
+	  return NULL;
+	}
       memset ((char *) ptr + old_count * block_size, 0,
-              block_size * (new_count - old_count));
+	      block_size * (new_count - old_count));
     }
 
   return ptr;
@@ -465,9 +465,9 @@ ut_getdelim (char **lineptr, int *n, int delimiter, FILE *fp)
       new_lineptr = (char *) realloc (*lineptr, *n);
 
       if (new_lineptr == NULL)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       *lineptr = new_lineptr;
     }
 
@@ -475,42 +475,42 @@ ut_getdelim (char **lineptr, int *n, int delimiter, FILE *fp)
     {
       c = getc (fp);
       if (c == EOF)
-        {
-          result = -1;
-          break;
-        }
+	{
+	  result = -1;
+	  break;
+	}
 
       /* Make enough space for len+1 (for final NUL) bytes. */
       if (cur_len + 1 >= *n)
-        {
-          int line_len = 2 * *n + 1;
-          char *new_lineptr;
+	{
+	  int line_len = 2 * *n + 1;
+	  char *new_lineptr;
 
-          if (line_len > MAX_LINE)
-            {
-              line_len = MAX_LINE;
-            }
-          if (cur_len + 1 >= line_len)
-            {
-              return -1;
-            }
+	  if (line_len > MAX_LINE)
+	    {
+	      line_len = MAX_LINE;
+	    }
+	  if (cur_len + 1 >= line_len)
+	    {
+	      return -1;
+	    }
 
-          new_lineptr = (char *) realloc (*lineptr, line_len);
-          if (new_lineptr == NULL)
-            {
-              return -1;
-            }
+	  new_lineptr = (char *) realloc (*lineptr, line_len);
+	  if (new_lineptr == NULL)
+	    {
+	      return -1;
+	    }
 
-          *lineptr = new_lineptr;
-          *n = line_len;
-        }
+	  *lineptr = new_lineptr;
+	  *n = line_len;
+	}
       (*lineptr)[cur_len] = c;
       cur_len++;
 
       if (c == delimiter)
-        {
-          break;
-        }
+	{
+	  break;
+	}
     }
   (*lineptr)[cur_len] = '\0';
   result = cur_len ? cur_len : result;
@@ -527,7 +527,7 @@ ut_getline (char **lineptr, int *n, FILE *fp)
 void
 uRemoveCRLF (char *str)
 {
-    size_t i;
+  size_t i;
   if (str == NULL)
     {
       return;
@@ -562,7 +562,7 @@ time_to_str (time_t t, const char *fmt, char *buf, int type)
     }
   else                /* TIME_STR_FMT_DATE_TIME */
     sprintf (buf, fmt, ltm.tm_year + 1900, ltm.tm_mon + 1, ltm.tm_mday,
-             ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
+	     ltm.tm_hour, ltm.tm_min, ltm.tm_sec);
   return buf;
 }
 
@@ -674,29 +674,29 @@ ut_access_log (nvplist *req, const char *msg)
 
 int
 ut_get_task_info (const char *task, char *access_log_flag,
-                  T_TASK_FUNC *task_func, T_USER_AUTH *auth)
+		  T_TASK_FUNC *task_func, T_USER_AUTH *auth)
 {
   int i;
 
   for (i = 0; task_info[i].task_str != NULL; i++)
     {
       if (uStringEqual (task, task_info[i].task_str))
-        {
-          if (access_log_flag)
-            {
-              *access_log_flag = task_info[i].access_log_flag;
-            }
-          if (task_func)
-            {
-              *task_func = task_info[i].task_func;
-            }
+	{
+	  if (access_log_flag)
+	    {
+	      *access_log_flag = task_info[i].access_log_flag;
+	    }
+	  if (task_func)
+	    {
+	      *task_func = task_info[i].task_func;
+	    }
 
-          if (auth)
-            {
-              *auth = task_info[i].user_auth;
-            }
-          return task_info[i].task_code;
-        }
+	  if (auth)
+	    {
+	      *auth = task_info[i].user_auth;
+	    }
+	  return task_info[i].task_code;
+	}
     }
 
   return TS_UNDEFINED;
@@ -715,41 +715,41 @@ ut_send_response (SOCKET fd, nvplist *res)
   for (i = 0; i < res->nvplist_size; ++i)
     {
       if (res->nvpairs[i] == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       write_to_socket (fd, dst_buffer (res->nvpairs[i]->name),
-                       dst_length (res->nvpairs[i]->name));
+		       dst_length (res->nvpairs[i]->name));
       write_to_socket (fd, dst_buffer (res->delimiter), res->delimiter->dlen);
 
       if (strncmp (res->nvpairs[i]->name->dbuf, ENCRYPT_SIGN,
-                   strlen (ENCRYPT_SIGN)) == 0)
-        {
-          int str_len;
-          char *encrypt_buf;
+		   strlen (ENCRYPT_SIGN)) == 0)
+	{
+	  int str_len;
+	  char *encrypt_buf;
 
-          str_len = dst_length (res->nvpairs[i]->value);
-          str_len = MAX (str_len, MIN_ENCRYPT_LEN);
+	  str_len = dst_length (res->nvpairs[i]->value);
+	  str_len = MAX (str_len, MIN_ENCRYPT_LEN);
 
-          /* make the len to be multiple of 8. */
-          str_len = MAKE_MUTIPLE_EIGHT (str_len);
+	  /* make the len to be multiple of 8. */
+	  str_len = MAKE_MUTIPLE_EIGHT (str_len);
 
-          if ((encrypt_buf = (char *) MALLOC (str_len * 2 + 1)) == NULL)
-            {
-              return -1;
-            }
+	  if ((encrypt_buf = (char *) MALLOC (str_len * 2 + 1)) == NULL)
+	    {
+	      return -1;
+	    }
 
-          uEncrypt (str_len, dst_buffer (res->nvpairs[i]->value),
-                    encrypt_buf);
-            write_to_socket (fd, encrypt_buf, (int) strlen (encrypt_buf));
+	  uEncrypt (str_len, dst_buffer (res->nvpairs[i]->value),
+		    encrypt_buf);
+	  write_to_socket (fd, encrypt_buf, (int) strlen (encrypt_buf));
 
-          FREE_MEM (encrypt_buf);
-        }
+	  FREE_MEM (encrypt_buf);
+	}
       else
-        {
-          write_to_socket (fd, dst_buffer (res->nvpairs[i]->value),
-                           dst_length (res->nvpairs[i]->value));
-        }
+	{
+	  write_to_socket (fd, dst_buffer (res->nvpairs[i]->value),
+			   dst_length (res->nvpairs[i]->value));
+	}
       write_to_socket (fd, dst_buffer (res->endmarker), res->endmarker->dlen);
     }
   write_to_socket (fd, dst_buffer (res->listcloser), res->listcloser->dlen);
@@ -775,60 +775,60 @@ ut_receive_request (SOCKET fd, nvplist *req)
       char *dstbuf;
 
       if (c == '\n')
-        {
-          /* if null string, stop parsing */
-          if (dst_length (linebuf) == 0)
-            {
-              dst_destroy (linebuf);
-              return 0;
-            }
+	{
+	  /* if null string, stop parsing */
+	  if (dst_length (linebuf) == 0)
+	    {
+	      dst_destroy (linebuf);
+	      return 0;
+	    }
 
-          dstbuf = dst_buffer (linebuf);
-          if (dstbuf != NULL)
-            {
-              p = strchr (dstbuf, ':');
-              if (p)
-                {
-                  *p = '\0';
-                  p++;
-                  if (strncmp (dstbuf, ENCRYPT_SIGN, strlen (ENCRYPT_SIGN)) == 0)
-                    {
-                      int len;
-                      char *decrypt_buf;
+	  dstbuf = dst_buffer (linebuf);
+	  if (dstbuf != NULL)
+	    {
+	      p = strchr (dstbuf, ':');
+	      if (p)
+		{
+		  *p = '\0';
+		  p++;
+		  if (strncmp (dstbuf, ENCRYPT_SIGN, strlen (ENCRYPT_SIGN)) == 0)
+		    {
+		      int len;
+		      char *decrypt_buf;
 
-                        len = (int) strlen (p);
-                      if (len % 2)
-                        {
-                          goto error_return;
-                        }
+		      len = (int) strlen (p);
+		      if (len % 2)
+			{
+			  goto error_return;
+			}
 
-                      len /= 2;
-                      if ((decrypt_buf = (char *) MALLOC (len + 1)) == NULL)
-                        {
-                          goto error_return;
-                        }
+		      len /= 2;
+		      if ((decrypt_buf = (char *) MALLOC (len + 1)) == NULL)
+			{
+			  goto error_return;
+			}
 
-                      /* decrypt the value. */
-                      uDecrypt (len, p, decrypt_buf);
-                      nv_add_nvp (req, dstbuf + strlen (ENCRYPT_SIGN),
-                                  decrypt_buf);
-                      free (decrypt_buf);
-                    }
-                  else
-                    {
-                      nv_add_nvp (req, dst_buffer (linebuf), p);
-                    }
-                }
-            }
-          dst_reset (linebuf);
-        }
+		      /* decrypt the value. */
+		      uDecrypt (len, p, decrypt_buf);
+		      nv_add_nvp (req, dstbuf + strlen (ENCRYPT_SIGN),
+				  decrypt_buf);
+		      free (decrypt_buf);
+		    }
+		  else
+		    {
+		      nv_add_nvp (req, dst_buffer (linebuf), p);
+		    }
+		}
+	    }
+	  dst_reset (linebuf);
+	}
       else
-        {
-          if (c != '\r')
-            {
-              dst_append (linebuf, &c, 1);
-            }
-        }
+	{
+	  if (c != '\r')
+	    {
+	      dst_append (linebuf, &c, 1);
+	    }
+	}
     }
 
 error_return:
@@ -905,9 +905,9 @@ server_fd_clear (fd_set srv_fds)
   for (i = 3; i < 1024; i++)
     {
       if (!FD_ISSET (i, &srv_fds))
-        {
-          close (i);
-        }
+	{
+	  close (i);
+	}
     }
 
   fd = open ("/dev/null", O_RDWR);
@@ -933,9 +933,9 @@ uRetrieveDBDirectory (const char *dbname, char *target)
       strcpy (temp_name, target);
       memset (target, '\0', strlen (target));
       if (GetLongPathName (temp_name, target, PATH_MAX) == 0)
-        {
-          strcpy (target, temp_name);
-        }
+	{
+	  strcpy (target, temp_name);
+	}
     }
 #endif
 
@@ -966,7 +966,7 @@ uReadDBnfo (char *dblist)
   int lock_fd;
 
   lock_fd =
-    uCreateLockFile (conf_get_dbmt_file (FID_LOCK_PSVR_DBINFO, strbuf));
+	  uCreateLockFile (conf_get_dbmt_file (FID_LOCK_PSVR_DBINFO, strbuf));
   if (lock_fd < 0)
     {
       return -1;
@@ -984,11 +984,11 @@ uReadDBnfo (char *dblist)
 
       p = dblist;
       while (fgets (strbuf, sizeof (strbuf), infp))
-        {
-          ut_trim (strbuf);
-          strcpy (p, strbuf);
-          p += (strlen (p) + 1);
-        }
+	{
+	  ut_trim (strbuf);
+	  strcpy (p, strbuf);
+	  p += (strlen (p) + 1);
+	}
       fclose (infp);
     }
 
@@ -1019,7 +1019,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   T_SERVER_STATUS_INFO *info;
 
   lock_fd =
-    uCreateLockFile (conf_get_dbmt_file (FID_LOCK_PSVR_DBINFO, strbuf));
+	  uCreateLockFile (conf_get_dbmt_file (FID_LOCK_PSVR_DBINFO, strbuf));
   if (lock_fd < 0)
     {
       return;
@@ -1030,27 +1030,27 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
     {
       dbcnt = 0;
       if (cmd_res == NULL)
-        {
-          fprintf (outfp, "%d\n", dbcnt);
-        }
+	{
+	  fprintf (outfp, "%d\n", dbcnt);
+	}
       else
-        {
-          info = (T_SERVER_STATUS_INFO *) cmd_res->result;
-          for (i = 0; i < cmd_res->num_result; i++)
-            {
-              if (_isRegisteredDB (info[i].db_name))
-                {
-                  dbvect[dbcnt] = i;
-                  ++dbcnt;
-                }
-            }
-          fprintf (outfp, "%d\n", dbcnt);
-          info = (T_SERVER_STATUS_INFO *) cmd_res->result;
-          for (i = 0; i < dbcnt; i++)
-            {
-              fprintf (outfp, "%s\n", info[dbvect[i]].db_name);
-            }
-        }
+	{
+	  info = (T_SERVER_STATUS_INFO *) cmd_res->result;
+	  for (i = 0; i < cmd_res->num_result; i++)
+	    {
+	      if (_isRegisteredDB (info[i].db_name))
+		{
+		  dbvect[dbcnt] = i;
+		  ++dbcnt;
+		}
+	    }
+	  fprintf (outfp, "%d\n", dbcnt);
+	  info = (T_SERVER_STATUS_INFO *) cmd_res->result;
+	  for (i = 0; i < dbcnt; i++)
+	    {
+	      fprintf (outfp, "%s\n", info[dbvect[i]].db_name);
+	    }
+	}
       fclose (outfp);
     }
 
@@ -1069,7 +1069,7 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
   char *token = NULL;
 
   snprintf (file, PATH_MAX - 1, "%s/%s", sco.szCubrid_databases,
-            CUBRID_DATABASE_TXT);
+	    CUBRID_DATABASE_TXT);
   if ((infile = fopen (file, "rt")) == NULL)
     {
       return ERR_DATABASETXT_OPEN;
@@ -1090,35 +1090,35 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
       ut_trim (strbuf);
 
       if ((strbuf[0] == '#') || (string_tokenize (strbuf, dbinfo, 4) < 0))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       for (token = strtok (dbinfo[2], ":"); token != NULL;
-           token = strtok (NULL, ":"))
-        {
-          if ((hp = gethostbyname (token)) == NULL)
-            {
-              continue;
-            }
+	   token = strtok (NULL, ":"))
+	{
+	  if ((hp = gethostbyname (token)) == NULL)
+	    {
+	      continue;
+	    }
 
-          if (_op_check_is_localhost (token, hname) >= 0)
-            {
+	  if (_op_check_is_localhost (token, hname) >= 0)
+	    {
 #ifdef JSON_SUPPORT
-              nv_add_nvp (res, "open", "dbs");
+	      nv_add_nvp (res, "open", "dbs");
 #endif
-              nv_add_nvp (res, "dbname", dbinfo[0]);
+	      nv_add_nvp (res, "dbname", dbinfo[0]);
 
-              if (dbdir_flag)
-                {
-                  nv_add_nvp (res, "dbdir", dbinfo[1]);
-                }
+	      if (dbdir_flag)
+		{
+		  nv_add_nvp (res, "dbdir", dbinfo[1]);
+		}
 #ifdef JSON_SUPPORT
-              nv_add_nvp (res, "close", "dbs");
+	      nv_add_nvp (res, "close", "dbs");
 #endif
-              break;
-            }
-        }
+	      break;
+	    }
+	}
     }
   nv_add_nvp (res, "close", "dblist");
   fclose (infile);
@@ -1222,9 +1222,9 @@ folder_copy (const char *src_folder, const char *dest_folder)
   if (access (dest_dir, F_OK) != 0)
     {
       if (uCreateDir (dest_dir) != ERR_NO_ERROR)
-        {
-          goto err_return;
-        }
+	{
+	  goto err_return;
+	}
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1251,33 +1251,33 @@ folder_copy (const char *src_folder, const char *dest_folder)
 
       snprintf (src_path, PATH_MAX - 1, "%s/%s", src_dir, FileData.cFileName);
       snprintf (dest_path, PATH_MAX - 1, "%s/%s", dest_dir,
-                FileData.cFileName);
+		FileData.cFileName);
 
       if (FileData.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY)
-        {
-          /* ignore folder "." and "..". */
-          if (strcmp (FileData.cFileName, ".") == 0
-              || strcmp (FileData.cFileName, "..") == 0)
-            {
-              continue;
-            }
+	{
+	  /* ignore folder "." and "..". */
+	  if (strcmp (FileData.cFileName, ".") == 0
+	      || strcmp (FileData.cFileName, "..") == 0)
+	    {
+	      continue;
+	    }
 
-          folder_copy (src_path, dest_path);
-          continue;
-        }
+	  folder_copy (src_path, dest_path);
+	  continue;
+	}
 
       if (file_copy (src_path, dest_path) == 0)
-        {
-          dwAttrs = GetFileAttributes (dest_path);
-          if (dwAttrs == INVALID_FILE_ATTRIBUTES)
-            {
-              goto err_clean_return;
-            }
-        }
+	{
+	  dwAttrs = GetFileAttributes (dest_path);
+	  if (dwAttrs == INVALID_FILE_ATTRIBUTES)
+	    {
+	      goto err_clean_return;
+	    }
+	}
       else
-        {
-          goto err_clean_return;
-        }
+	{
+	  goto err_clean_return;
+	}
     }
 
   /* Close the search handle. */
@@ -1314,9 +1314,9 @@ folder_copy (const char *src_folder, const char *dest_folder)
   if (access (dest_dir, F_OK) != 0)
     {
       if (uCreateDir (dest_dir) != ERR_NO_ERROR)
-        {
-          goto err_return;
-        }
+	{
+	  goto err_return;
+	}
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1340,32 +1340,32 @@ folder_copy (const char *src_folder, const char *dest_folder)
       char dest_path[PATH_MAX];
 
       snprintf (src_path, sizeof (src_path) - 1, "%s/%s", src_dir,
-                dirp->d_name);
+		dirp->d_name);
       snprintf (dest_path, sizeof (dest_path) - 1, "%s/%s", dest_dir,
-                dirp->d_name);
+		dirp->d_name);
 
       stat (src_path, &statbuf);
 
       if (S_ISDIR (statbuf.st_mode))
-        {
-          if (uStringEqual (dirp->d_name, ".")
-              || uStringEqual (dirp->d_name, ".."))
-            {
-              continue;
-            }
+	{
+	  if (uStringEqual (dirp->d_name, ".")
+	      || uStringEqual (dirp->d_name, ".."))
+	    {
+	      continue;
+	    }
 
-          if (folder_copy (src_path, dest_path) < 0)
-            {
-              goto err_clean_return;
-            }
-        }
+	  if (folder_copy (src_path, dest_path) < 0)
+	    {
+	      goto err_clean_return;
+	    }
+	}
       else
-        {
-          if (file_copy (src_path, dest_path) < 0)
-            {
-              goto err_clean_return;
-            }
-        }
+	{
+	  if (file_copy (src_path, dest_path) < 0)
+	    {
+	      goto err_clean_return;
+	    }
+	}
     }
 
   closedir (dp);
@@ -1425,21 +1425,21 @@ uCreateDir (char *new_dir)
     {
       p = strchr (p, '/');
       if (p != NULL)
-        {
-          *p = '\0';
-        }
+	{
+	  *p = '\0';
+	}
       if (access (path, F_OK) < 0)
-        {
-          if (mkdir (path, 0700) < 0)
-            {
-              return ERR_DIR_CREATE_FAIL;
-            }
-        }
+	{
+	  if (mkdir (path, 0700) < 0)
+	    {
+	      return ERR_DIR_CREATE_FAIL;
+	    }
+	}
       if (p != NULL)
-        {
-          *p = '/';
-          p++;
-        }
+	{
+	  *p = '/';
+	  p++;
+	}
     }
   return ERR_NO_ERROR;
 }
@@ -1535,8 +1535,8 @@ char *
 ip2str (unsigned char *ip, char *ip_str)
 {
   sprintf (ip_str, "%d.%d.%d.%d", (unsigned char) ip[0],
-           (unsigned char) ip[1],
-           (unsigned char) ip[2], (unsigned char) ip[3]);
+	   (unsigned char) ip[1],
+	   (unsigned char) ip[2], (unsigned char) ip[3]);
   return ip_str;
 }
 
@@ -1551,17 +1551,17 @@ string_tokenize_accept_laststring_space (char *str, char *tok[], int num_tok)
     {
       tok[i] = strpbrk (tok[i - 1], " \t");
       if (tok[i] == NULL)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       * (tok[i]) = '\0';
       p = (tok[i]) + 1;
       for (; *p && (*p == ' ' || *p == '\t'); p++)
-        ;
+	;
       if (*p == '\0')
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       tok[i] = p;
     }
 
@@ -1579,17 +1579,17 @@ string_tokenize (char *str, char *tok[], int num_tok)
     {
       tok[i] = strpbrk (tok[i - 1], " \t");
       if (tok[i] == NULL)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       * (tok[i]) = '\0';
       p = (tok[i]) + 1;
       for (; *p && (*p == ' ' || *p == '\t'); p++)
-        ;
+	;
       if (*p == '\0')
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       tok[i] = p;
     }
   p = strpbrk (tok[num_tok - 1], " \t");
@@ -1622,9 +1622,9 @@ string_tokenize2 (char *str, char *tok[], int num_tok, int c)
     {
       tok[i] = strchr (tok[i - 1], c);
       if (tok[i] == NULL)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       * (tok[i]) = '\0';
       (tok[i])++;
     }
@@ -1649,40 +1649,40 @@ string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[])
     {
       ptr = strpbrk (tok[i - 1], " \t");
       if (ptr == NULL)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
 
-      if (has_comma[i - 1] && (ptr != str) && *(ptr - 1) == ',')
-        {
-          for (;;)
-           {
-             ptr++;
-             ptr2 = strpbrk (ptr, " \t");
+      if (has_comma[i - 1] && (ptr != str) && * (ptr - 1) == ',')
+	{
+	  for (;;)
+	    {
+	      ptr++;
+	      ptr2 = strpbrk (ptr, " \t");
 
-             if (ptr2 == NULL)
-               {
-		 return -1;
-               }
+	      if (ptr2 == NULL)
+		{
+		  return -1;
+		}
 
-             if (*(ptr2 - 1) == ',')
-               {
-		 ptr = ptr2;
-               }
-             else
-               {
-		 break;
-               }
-           }
+	      if (* (ptr2 - 1) == ',')
+		{
+		  ptr = ptr2;
+		}
+	      else
+		{
+		  break;
+		}
+	    }
 
-          *ptr2 = '\0';
-          tok[i] = ptr2;
-        }
+	  *ptr2 = '\0';
+	  tok[i] = ptr2;
+	}
       else
-        {
-          tok[i] = ptr;
-          *(tok[i]) = '\0';
-        }
+	{
+	  tok[i] = ptr;
+	  * (tok[i]) = '\0';
+	}
 
       p = (tok[i]) + 1;
       for (; *p && (*p == ' ' || *p == '\t'); p++)
@@ -1780,13 +1780,13 @@ kill (int pid, int signo)
     {
       int error = GetLastError ();
       if (error == ERROR_ACCESS_DENIED)
-        {
-          errno = EPERM;
-        }
+	{
+	  errno = EPERM;
+	}
       else
-        {
-          errno = ESRCH;
-        }
+	{
+	  errno = ESRCH;
+	}
       return -1;
     }
 
@@ -1808,9 +1808,9 @@ unix_style_path (char *path)
   for (p = path; *p; p++)
     {
       if (*p == '\\')
-        {
-          *p = '/';
-        }
+	{
+	  *p = '/';
+	}
     }
 }
 
@@ -1840,25 +1840,25 @@ nt_style_path (char *path, char *new_path_buf)
   for (p = path; *p; p++, q++)
     {
       if (*p == '/')
-        {
-          *q = '\\';
-        }
+	{
+	  *q = '\\';
+	}
       else
-        {
-          *q = *p;
-        }
+	{
+	  *q = *p;
+	}
     }
   *q = '\0';
   for (q--; q != new_path_buf; q--)
     {
       if (*q == '\\')
-        {
-          *q = '\0';
-        }
+	{
+	  *q = '\0';
+	}
       else
-        {
-          break;
-        }
+	{
+	  break;
+	}
     }
   if (*q == ':')
     {
@@ -1939,14 +1939,14 @@ file_copy (char *src_file, char *dest_file)
   while ((read_size = read (src_fd, strbuf, sizeof (strbuf))) > 0)
     {
       if (read_size > sizeof (strbuf)
-          || (write_size =
-                write (dest_fd, strbuf, (unsigned int) read_size)) < read_size)
-        {
-          close (src_fd);
-          close (dest_fd);
-          unlink (dest_file);
-          return -1;
-        }
+	  || (write_size =
+		      write (dest_fd, strbuf, (unsigned int) read_size)) < read_size)
+	{
+	  close (src_fd);
+	  close (dest_fd);
+	  unlink (dest_file);
+	  return -1;
+	}
     }
 
   close (src_fd);
@@ -1999,13 +1999,13 @@ is_cmserver_process (int pid, const char *module_name)
   if (Module32First (hModuleSnap, &me32))
     {
       do
-        {
-          if (strcasecmp (me32.szModule, module_name) == 0)
-            {
-              CloseHandle (hModuleSnap);
-              return 1;
-            }
-        }
+	{
+	  if (strcasecmp (me32.szModule, module_name) == 0)
+	    {
+	      CloseHandle (hModuleSnap);
+	      return 1;
+	    }
+	}
       while (Module32Next (hModuleSnap, &me32));
     }
   CloseHandle (hModuleSnap);
@@ -2071,7 +2071,7 @@ is_cmserver_process (int pid, const char *module_name)
 
   snprintf (cmjs_pid, sizeof (cmjs_pid) - 1, "%d", pid);
   snprintf (result_file, sizeof (result_file) - 1, "%s/DBMT_js.%d",
-            sco.dbmt_tmp_dir, (int) getpid ());
+	    sco.dbmt_tmp_dir, (int) getpid ());
   argv[argc++] = "/usr/bin/ps";
   argv[argc++] = "-e";
   argv[argc] = NULL;
@@ -2086,19 +2086,19 @@ is_cmserver_process (int pid, const char *module_name)
   if (fRes)
     {
       while (fgets (buf, 1024, fRes))
-        {
-          if (sscanf (buf, "%9s %*s %*s %31s", cur_pid, prog_name) != 2)
-            {
-              continue;
-            }
+	{
+	  if (sscanf (buf, "%9s %*s %*s %31s", cur_pid, prog_name) != 2)
+	    {
+	      continue;
+	    }
 
-          if (strcmp (cur_pid, cmjs_pid) == 0
-              && strcmp (prog_name, module_name) == 0)
-            {
-              return_value = 1;
-              break;
-            }
-        }
+	  if (strcmp (cur_pid, cmjs_pid) == 0
+	      && strcmp (prog_name, module_name) == 0)
+	    {
+	      return_value = 1;
+	      break;
+	    }
+	}
 
       fclose (fRes);
     }
@@ -2149,9 +2149,9 @@ make_default_env (void)
   if (access (strbuf, F_OK) < 0)
     {
       if ((fd = fopen (strbuf, "a")) == NULL)
-        {
-          return ERR_FILE_CREATE_FAIL;
-        }
+	{
+	  return ERR_FILE_CREATE_FAIL;
+	}
       fclose (fd);
     }
   return retval;
@@ -2179,8 +2179,8 @@ _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd)
   /* read conlist */
   memset (&con_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
   if ((retval =
-         dbmt_con_read_dbinfo (&con_dbinfo, ip, port, dbname,
-                               _dbmt_error)) <= 0)
+	       dbmt_con_read_dbinfo (&con_dbinfo, ip, port, dbname,
+				     _dbmt_error)) <= 0)
     {
       return 0;
     }
@@ -2196,7 +2196,7 @@ _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd)
 /* Generate status, note and write to log */
 void
 uGenerateStatus (nvplist *req, nvplist *res, int retval,
-                 const char *_dbmt_error)
+		 const char *_dbmt_error)
 {
   char strbuf[1024];
 
@@ -2215,7 +2215,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
     {
       nv_update_val (res, "status", "success");
       nv_update_val (res, "note",
-                     "Can't compress the file. Download original file");
+		     "Can't compress the file. Download original file");
       return;
     }
 
@@ -2230,7 +2230,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
       break;
     case ERR_DBDIRNAME_NULL:
       sprintf (strbuf, "Can not find the directory database(%s) is located",
-               _dbmt_error);
+	       _dbmt_error);
       break;
     case ERR_GET_FILE:
       sprintf (strbuf, "Can't get requested files");
@@ -2264,7 +2264,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
       break;
     case ERR_STANDALONE_MODE:
       sprintf (strbuf, "Database(%s) is running in standalone mode",
-               _dbmt_error);
+	       _dbmt_error);
       break;
     case ERR_DB_ACTIVE:
       sprintf (strbuf, "Database(%s) is active state.", _dbmt_error);
@@ -2286,7 +2286,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
       break;
     case ERR_INVALID_TOKEN:
       sprintf (strbuf,
-               "Request is rejected due to invalid token. Please reconnect.");
+	       "Request is rejected due to invalid token. Please reconnect.");
       break;
     case ERR_SYSTEM_CALL_CON_DUMP:
       sprintf (strbuf, "%s", _dbmt_error);
@@ -2305,7 +2305,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
       break;
     case ERR_DBLOGIN_FAIL:
       sprintf (strbuf, "Failed to log in to database using id:%s",
-               _dbmt_error);
+	       _dbmt_error);
       break;
     case ERR_DBRESTART_FAIL:
       sprintf (strbuf, "Failed to restart database(%s)", _dbmt_error);
@@ -2428,11 +2428,11 @@ ut_validate_token (nvplist *req)
  */
 char *
 ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
-                   int proc_id, time_t login_time)
+		   int proc_id, time_t login_time)
 {
   char sbuf[TOKEN_LENGTH + 1];
   char token_string[TOKEN_ENC_LENGTH];
-    size_t i, len;
+  size_t i, len;
 
   if ((client_ip == NULL) || (client_port == NULL) || (dbmt_id == NULL))
     {
@@ -2440,7 +2440,7 @@ ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
     }
   memset (sbuf, 0, TOKEN_LENGTH + 1);
   snprintf (sbuf, TOKEN_LENGTH, "%s:%s:%s:%d:%lu", client_ip, client_port,
-            dbmt_id, proc_id, login_time);
+	    dbmt_id, proc_id, login_time);
   len = strlen (sbuf);
   /* insert padding to checksum part */
   for (i = len; i < TOKEN_LENGTH; ++i)
@@ -2474,15 +2474,15 @@ _accept_connection (nvplist *cli_request, nvplist *cli_response)
 
   /* generate token and record new connection to file */
   pstrbuf =
-    ut_token_generate (client_ip, client_port, client_id, getpid (),
-                       login_time);
+	  ut_token_generate (client_ip, client_port, client_id, getpid (),
+			     login_time);
   nv_add_nvp (cli_response, "token", pstrbuf);
 
   dbmt_con_add (client_ip, client_port, client_ver, client_id);
 
   ut_access_log (cli_request, "before add token into token list.");
   dbmt_user_new_token_info (client_id, client_ip, client_port, pstrbuf,
-                            proc_id, login_time);
+			    proc_id, login_time);
 
   free (pstrbuf);
   return;
@@ -2515,8 +2515,8 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
 #if defined(WINDOWS)
 int
 ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
-              const char *stdin_file, const char *stdout_file,
-              const char *stderr_file, int *exit_status)
+	      const char *stdin_file, const char *stdout_file,
+	      const char *stderr_file, int *exit_status)
 {
   int new_pid;
   STARTUPINFO start_info;
@@ -2545,49 +2545,49 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   if (stdin_file)
     {
       hStdIn =
-        CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL,
-                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	      CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL,
+			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
       if (hStdIn != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdInput = hStdIn;
-          inherit_flag = TRUE;
-        }
+	{
+	  SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT,
+				HANDLE_FLAG_INHERIT);
+	  start_info.dwFlags = STARTF_USESTDHANDLES;
+	  start_info.hStdInput = hStdIn;
+	  inherit_flag = TRUE;
+	}
     }
   if (stdout_file)
     {
       hStdOut =
-        CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	      CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+			  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
       if (hStdOut != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdOutput = hStdOut;
-          inherit_flag = TRUE;
-        }
+	{
+	  SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT,
+				HANDLE_FLAG_INHERIT);
+	  start_info.dwFlags = STARTF_USESTDHANDLES;
+	  start_info.hStdOutput = hStdOut;
+	  inherit_flag = TRUE;
+	}
     }
   if (stderr_file)
     {
       hStdErr =
-        CreateFile (stderr_file, GENERIC_WRITE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	      CreateFile (stderr_file, GENERIC_WRITE,
+			  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			  NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
       if (hStdErr != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdError = hStdErr;
-          inherit_flag = TRUE;
-        }
+	{
+	  SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT,
+				HANDLE_FLAG_INHERIT);
+	  start_info.dwFlags = STARTF_USESTDHANDLES;
+	  start_info.hStdError = hStdErr;
+	  inherit_flag = TRUE;
+	}
     }
 
   res = CreateProcess (bin_path, cmd_arg, NULL, NULL, inherit_flag,
-                       CREATE_NO_WINDOW, NULL, NULL, &start_info, &proc_info);
+		       CREATE_NO_WINDOW, NULL, NULL, &start_info, &proc_info);
 
   if (hStdIn != INVALID_HANDLE_VALUE)
     {
@@ -2615,9 +2615,9 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
       //WaitForSingleObject (proc_info.hProcess, INFINITE);
       //GetExitCodeProcess (proc_info.hProcess, &status);
       if (exit_status != NULL)
-        {
-          *exit_status = status;
-        }
+	{
+	  *exit_status = status;
+	}
       CloseHandle (proc_info.hProcess);
       CloseHandle (proc_info.hThread);
       return 0;
@@ -2632,8 +2632,8 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
 #else
 int
 ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
-              const char *stdin_file, const char *stdout_file,
-              const char *stderr_file, int *exit_status)
+	      const char *stdin_file, const char *stdout_file,
+	      const char *stderr_file, int *exit_status)
 {
   int pid;
 
@@ -2658,34 +2658,34 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
       close_all_fds (3);
 
       if (stdin_file != NULL)
-        {
-          fp = fopen (stdin_file, "r");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 0);
-              fclose (fp);
-            }
-        }
+	{
+	  fp = fopen (stdin_file, "r");
+	  if (fp != NULL)
+	    {
+	      dup2 (fileno (fp), 0);
+	      fclose (fp);
+	    }
+	}
       if (stdout_file != NULL)
-        {
-          unlink (stdout_file);
-          fp = fopen (stdout_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 1);
-              fclose (fp);
-            }
-        }
+	{
+	  unlink (stdout_file);
+	  fp = fopen (stdout_file, "w");
+	  if (fp != NULL)
+	    {
+	      dup2 (fileno (fp), 1);
+	      fclose (fp);
+	    }
+	}
       if (stderr_file != NULL)
-        {
-          unlink (stderr_file);
-          fp = fopen (stderr_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 2);
-              fclose (fp);
-            }
-        }
+	{
+	  unlink (stderr_file);
+	  fp = fopen (stderr_file, "w");
+	  if (fp != NULL)
+	    {
+	      dup2 (fileno (fp), 2);
+	      fclose (fp);
+	    }
+	}
 
       execv (bin_path, (char *const *) argv);
       exit (0);
@@ -2701,9 +2701,9 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
       int status = 0;
       waitpid (pid, &status, 0);
       if (exit_status != NULL)
-        {
-          *exit_status = status;
-        }
+	{
+	  *exit_status = status;
+	}
       return 0;
     }
   else
@@ -2755,7 +2755,7 @@ add_node_to_list (dir_file_list_head *file_head, const char *file_name)
 
 static void
 remove_node_from_list (dir_file_list_head *file_head,
-                       dir_file_node *file_node)
+		       dir_file_node *file_node)
 {
   if (file_head == NULL || file_node == NULL)
     {
@@ -2798,9 +2798,9 @@ free_file_list (dir_file_list_head *file_head)
       pnext = pnode->next;
 
       if (pnode->file_name)
-        {
-          free (pnode->file_name);
-        }
+	{
+	  free (pnode->file_name);
+	}
       free (pnode);
       pnode = pnext;
     }
@@ -2813,7 +2813,7 @@ free_file_list (dir_file_list_head *file_head)
 #if defined(WINDOWS)
 static int
 scan_dir (const char *scan_path, const char *pattern,
-          dir_file_list_head *file_list)
+	  dir_file_list_head *file_list)
 {
   WIN32_FIND_DATA FileData;
   HANDLE hSearch = NULL;
@@ -2835,9 +2835,9 @@ scan_dir (const char *scan_path, const char *pattern,
   while (!finished)
     {
       if (strstr (FileData.cFileName, pattern))
-        {
-          add_node_to_list (file_list, FileData.cFileName);
-        }
+	{
+	  add_node_to_list (file_list, FileData.cFileName);
+	}
       finished = !FindNextFile (hSearch, &FileData);
     }
   FindClose (hSearch);
@@ -2846,7 +2846,7 @@ scan_dir (const char *scan_path, const char *pattern,
 #else
 static int
 scan_dir (const char *scan_path, const char *pattern,
-          dir_file_list_head *file_list)
+	  dir_file_list_head *file_list)
 {
   DIR *dp;
   struct dirent *ep;
@@ -2858,9 +2858,9 @@ scan_dir (const char *scan_path, const char *pattern,
   while ((ep = readdir (dp)) != NULL)
     {
       if (strstr (ep->d_name, pattern))
-        {
-          add_node_to_list (file_list, ep->d_name);
-        }
+	{
+	  add_node_to_list (file_list, ep->d_name);
+	}
     }
   closedir (dp);
 
@@ -2870,7 +2870,7 @@ scan_dir (const char *scan_path, const char *pattern,
 
 int
 remove_extra_subdir (const char *dirpath, const char *pattern,
-                     unsigned int save_num)
+		     unsigned int save_num)
 {
   dir_file_list_head file_list = { 0, NULL };
   dir_file_node *pnode, *pnext;
@@ -2885,13 +2885,13 @@ remove_extra_subdir (const char *dirpath, const char *pattern,
       pnode = file_list.head;
       pnext = pnode;
       while (pnext)
-        {
-          if (strcmp (pnode->file_name, pnext->file_name) > 0)
-            {
-              pnode = pnext;
-            }
-          pnext = pnext->next;
-        }
+	{
+	  if (strcmp (pnode->file_name, pnext->file_name) > 0)
+	    {
+	      pnode = pnext;
+	    }
+	  pnext = pnext->next;
+	}
       snprintf (file_path, 260, "%s/%s", dirpath, pnode->file_name);
       uRemoveDir (file_path, REMOVE_DIR_FORCED);
       remove_node_from_list (&file_list, pnode);
@@ -2904,8 +2904,8 @@ remove_extra_subdir (const char *dirpath, const char *pattern,
 int
 IsValidUserName (const char *pUserName)
 {
-    size_t len = 0;
-    size_t idx = 0;
+  size_t len = 0;
+  size_t idx = 0;
   if (!pUserName || !*pUserName)
     {
       return -1;
@@ -2919,7 +2919,7 @@ IsValidUserName (const char *pUserName)
 
   // If the first char isn't 'a'-'z' or 'A'-'Z', then return error
   if (! ((pUserName[0] >= 'a' && pUserName[0] <= 'z')
-         || (pUserName[0] >= 'A' && pUserName[0] <= 'Z')))
+	 || (pUserName[0] >= 'A' && pUserName[0] <= 'Z')))
     {
       return -1;
     }
@@ -2928,12 +2928,12 @@ IsValidUserName (const char *pUserName)
   for (idx = 1; idx < len; idx++)
     {
       if (! ((pUserName[idx] >= 'a' && pUserName[idx] <= 'z')
-             || (pUserName[idx] >= 'A' && pUserName[idx] <= 'Z')
-             || (pUserName[idx] >= '0' && pUserName[idx] <= '9')
-             || (pUserName[idx] == '_')))
-        {
-          return -1;
-        }
+	     || (pUserName[idx] >= 'A' && pUserName[idx] <= 'Z')
+	     || (pUserName[idx] >= '0' && pUserName[idx] <= '9')
+	     || (pUserName[idx] == '_')))
+	{
+	  return -1;
+	}
     }
   return 0;
 }
@@ -2961,20 +2961,20 @@ ut_get_token_active_time (time_t *active_time)
   while (fgets (line_buf, LINE_MAX, in_file) != NULL)
     {
       if (line_buf[0] == '#')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if ((pos = strstr (line_buf, "=")) != NULL &&
-          strstr (line_buf, "token_active_time") != NULL)
-        {
-          char tmp_str[LINE_MAX];
-          strcpy (tmp_str, pos + 1);
+	  strstr (line_buf, "token_active_time") != NULL)
+	{
+	  char tmp_str[LINE_MAX];
+	  strcpy (tmp_str, pos + 1);
 
-          *active_time = atoi (tmp_str);
+	  *active_time = atoi (tmp_str);
 
-          break;
-        }
+	  break;
+	}
     }
   fclose (in_file);
 
@@ -3033,33 +3033,33 @@ ut_validate_auth (nvplist *req)
   for (i = 0; i < dbmt_user.num_dbmt_user; ++i)
     {
       if (!strcmp (dbmt_user.user_info[i].user_name, user_id))
-        {
-          auth_info = dbmt_user.user_info[i].authinfo;
-          num_authinfo = dbmt_user.user_info[i].num_authinfo;
-          break;
-        }
+	{
+	  auth_info = dbmt_user.user_info[i].authinfo;
+	  num_authinfo = dbmt_user.user_info[i].num_authinfo;
+	  break;
+	}
     }
 
   for (i = 0; i < num_authinfo; ++i)
     {
       if (!strcmp (auth_info[i].domain, "user_auth"))
-        {
-          auth_user = atoi (auth_info[i].auth);
-          break;
-        }
+	{
+	  auth_user = atoi (auth_info[i].auth);
+	  break;
+	}
     }
 
   // assign default authority to old users.
   if (auth_user == 0)
     {
       if (!strcmp (user_id, "admin"))
-        {
-          auth_user = AU_ADMIN;
-        }
+	{
+	  auth_user = AU_ADMIN;
+	}
       else
-        {
-          auth_user = ALL_AUTHORITY;
-        }
+	{
+	  auth_user = ALL_AUTHORITY;
+	}
     }
 
   if (auth_user == AU_ADMIN)
@@ -3073,7 +3073,7 @@ ut_validate_auth (nvplist *req)
 
 static int
 get_short_filename (char *ret_name, int ret_name_len,
-                    char *short_filename)
+		    char *short_filename)
 {
   char *ptr = NULL;
   char *path_p = NULL;
@@ -3095,7 +3095,7 @@ get_short_filename (char *ret_name, int ret_name_len,
       return -1;
     }
 
-    if (ret_name_len <= (int) strlen (short_filename))
+  if (ret_name_len <= (int) strlen (short_filename))
     {
       return -1;
     }
@@ -3146,9 +3146,9 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
   else
     {
       if (get_short_filename (short_filename, PATH_MAX, filename + 1) != 0)
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
       snprintf (ret_filename, PATH_MAX, short_filename);
     }
   return 0;
@@ -3178,33 +3178,33 @@ get_cpu_time (__int64 *kernel, __int64 *user, __int64 *idle)
       */
       HMODULE module = LoadLibraryA ("kernel32.dll");
       s_pfnGetSystemTimes =
-        (GET_SYSTEM_TIMES) GetProcAddress (module, "GetSystemTimes");
+	      (GET_SYSTEM_TIMES) GetProcAddress (module, "GetSystemTimes");
       FreeLibrary (module);
 
       if (s_pfnGetSystemTimes != NULL)
-        {
-          s_symbol_loaded = 1;
-        }
+	{
+	  s_symbol_loaded = 1;
+	}
       else
-        {
-          /*
-          * OS may be is Windows 2000 or Windows XP. (does not support Windows 9x/NT)
-          * try find function NtQuerySystemInformation()
-          */
-          module = LoadLibraryA ("ntdll.dll");
-          s_pfnNtQuerySystemInformation = (NT_QUERY_SYSTEM_INFORMATION)
-                                          GetProcAddress (module, "NtQuerySystemInformation");
-          FreeLibrary (module);
+	{
+	  /*
+	  * OS may be is Windows 2000 or Windows XP. (does not support Windows 9x/NT)
+	  * try find function NtQuerySystemInformation()
+	  */
+	  module = LoadLibraryA ("ntdll.dll");
+	  s_pfnNtQuerySystemInformation = (NT_QUERY_SYSTEM_INFORMATION)
+					  GetProcAddress (module, "NtQuerySystemInformation");
+	  FreeLibrary (module);
 
-          if (s_pfnNtQuerySystemInformation == NULL)
-            {
-              s_symbol_loaded = 3;
-            }
-          else
-            {
-              s_symbol_loaded = 2;
-            }
-        }
+	  if (s_pfnNtQuerySystemInformation == NULL)
+	    {
+	      s_symbol_loaded = 3;
+	    }
+	  else
+	    {
+	      s_symbol_loaded = 2;
+	    }
+	}
     }
 
   if (s_symbol_loaded == 1)
@@ -3235,7 +3235,7 @@ get_cpu_time (__int64 *kernel, __int64 *user, __int64 *idle)
       ULONG len;
 
       s_pfnNtQuerySystemInformation (SystemProcessorPerformanceInformation,
-                                     &sppi, sizeof (sppi), &len);
+				     &sppi, sizeof (sppi), &len);
 
       /* In win32 system, sppi.KernelTime includes "System Idle Process"
       * time, so we should exclude it */
@@ -3273,7 +3273,7 @@ SetPrivilege (HANDLE hToken, LPCTSTR lpszPrivilege, BOOL bEnablePrivilege)
     }
 
   if (!AdjustTokenPrivileges (hToken, FALSE, &tp,
-                              sizeof (TOKEN_PRIVILEGES), NULL, NULL))
+			      sizeof (TOKEN_PRIVILEGES), NULL, NULL))
     {
       return FALSE;
     }
@@ -3298,27 +3298,27 @@ ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
 
   stat->pid = pid;
   if (!OpenThreadToken (GetCurrentThread (),
-                        (TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY),
-                        FALSE, &hToken))
+			(TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY),
+			FALSE, &hToken))
     {
       if (GetLastError () == ERROR_NO_TOKEN)
-        {
-          if (!ImpersonateSelf (SecurityImpersonation))
-            {
-              return -1;
-            }
+	{
+	  if (!ImpersonateSelf (SecurityImpersonation))
+	    {
+	      return -1;
+	    }
 
-          if (!OpenThreadToken (GetCurrentThread (),
-                                (TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY),
-                                FALSE, &hToken))
-            {
-              return -1;
-            }
-        }
+	  if (!OpenThreadToken (GetCurrentThread (),
+				(TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY),
+				FALSE, &hToken))
+	    {
+	      return -1;
+	    }
+	}
       else
-        {
-          return -1;
-        }
+	{
+	  return -1;
+	}
     }
 
   /* enable SeDebugPrivilege */
@@ -3392,14 +3392,14 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   if (stat == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Invalid parameter: %s.",
-                "stat");
+		"stat");
       return ERR_WITH_MSG;
     }
 
   if (get_cpu_time (&kernel, &user, &idle) != 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "Failed to get the cpu information.");
+		"Failed to get the cpu information.");
       return ERR_WITH_MSG;
     }
 
@@ -3413,7 +3413,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   if (!GetPerformanceInfo (&pi, sizeof (pi)))
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "Failed to get the memory information.");
+		"Failed to get the memory information.");
       return ERR_WITH_MSG;
     }
 
@@ -3421,7 +3421,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   stat->mem_physical_free = ((__int64) pi.PhysicalAvailable) * pi.PageSize;
   stat->mem_swap_total = ((__int64) pi.CommitLimit) * pi.PageSize;
   stat->mem_swap_free =
-    ((__int64) (pi.CommitLimit - pi.CommitTotal)) * pi.PageSize;
+	  ((__int64) (pi.CommitLimit - pi.CommitTotal)) * pi.PageSize;
 
   return ERR_NO_ERROR;
 }
@@ -3460,11 +3460,11 @@ ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
   close (fd);
 
   stat->cpu_user =
-    (uint64_t) ((proc_stat.pr_utime.tv_sec +
-                 proc_stat.pr_utime.tv_nsec * 10e-9) * ticks_per_sec);
+	  (uint64_t) ((proc_stat.pr_utime.tv_sec +
+		       proc_stat.pr_utime.tv_nsec * 10e-9) * ticks_per_sec);
   stat->cpu_kernel =
-    (uint64_t) ((proc_stat.pr_stime.tv_sec +
-                 proc_stat.pr_stime.tv_nsec * 10e-9) * ticks_per_sec);
+	  (uint64_t) ((proc_stat.pr_stime.tv_sec +
+		       proc_stat.pr_stime.tv_nsec * 10e-9) * ticks_per_sec);
 
   snprintf (file_name, PATH_MAX, "/proc/%d/psinfo", pid);
 
@@ -3500,7 +3500,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   if (perfstat_cpu_total (NULL, &cpu_stat, sizeof (perfstat_cpu_total_t), 1) == -1)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "Failed to get the cpu information.");
+		"Failed to get the cpu information.");
       return ERR_WITH_MSG;
     }
   stat->cpu_user = cpu_stat.user;
@@ -3512,7 +3512,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
       (NULL, &mem_info, sizeof (perfstat_memory_total_t), 1) == -1)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "Failed to get the memory information.");
+		"Failed to get the memory information.");
       return ERR_WITH_MSG;
     }
   stat->mem_physical_total = mem_info.real_total * 4 * 1024;
@@ -3561,11 +3561,11 @@ ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
     }
 #if __WORDSIZE == 64
   fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%lu%lu",
-          &stat->cpu_user, &stat->cpu_kernel);
+	  &stat->cpu_user, &stat->cpu_kernel);
   fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
 #else
   fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%llu%llu",
-          &stat->cpu_user, &stat->cpu_kernel);
+	  &stat->cpu_user, &stat->cpu_kernel);
   fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
 #endif
 
@@ -3618,19 +3618,19 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
     {
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "cpu"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu%lu%lu%lu%lu", &stat->cpu_user, &nice,
-                  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
+	  sscanf (linebuf, "%*s%lu%lu%lu%lu%lu", &stat->cpu_user, &nice,
+		  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
 #else
-          sscanf (linebuf, "%*s%llu%llu%llu%llu%llu", &stat->cpu_user, &nice,
-                  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
+	  sscanf (linebuf, "%*s%llu%llu%llu%llu%llu", &stat->cpu_user, &nice,
+		  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
 #endif
 
-          stat->cpu_user += nice;
-          n_cpuitem++;
-          break;
-        }
+	  stat->cpu_user += nice;
+	  n_cpuitem++;
+	  break;
+	}
     }
   if (n_cpuitem != 1)
     {
@@ -3641,57 +3641,57 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
     {
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "MemTotal:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_physical_total);
+	  sscanf (linebuf, "%*s%lu", &stat->mem_physical_total);
 #else
-          sscanf (linebuf, "%*s%llu", &stat->mem_physical_total);
+	  sscanf (linebuf, "%*s%llu", &stat->mem_physical_total);
 #endif
-          n_memitem++;
-        }
+	  n_memitem++;
+	}
       if (!strcmp (prefix, "MemFree:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_physical_free);
+	  sscanf (linebuf, "%*s%lu", &stat->mem_physical_free);
 #else
-          sscanf (linebuf, "%*s%llu", &stat->mem_physical_free);
+	  sscanf (linebuf, "%*s%llu", &stat->mem_physical_free);
 #endif
-          n_memitem++;
-        }
+	  n_memitem++;
+	}
       if (!strcmp (prefix, "Buffers:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &buffers);
+	  sscanf (linebuf, "%*s%lu", &buffers);
 #else
-          sscanf (linebuf, "%*s%llu", &buffers);
+	  sscanf (linebuf, "%*s%llu", &buffers);
 #endif
-        }
+	}
       if (!strcmp (prefix, "Cached:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &cached);
+	  sscanf (linebuf, "%*s%lu", &cached);
 #else
-          sscanf (linebuf, "%*s%llu", &cached);
+	  sscanf (linebuf, "%*s%llu", &cached);
 #endif
-        }
+	}
       if (!strcmp (prefix, "SwapTotal:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_swap_total);
+	  sscanf (linebuf, "%*s%lu", &stat->mem_swap_total);
 #else
-          sscanf (linebuf, "%*s%llu", &stat->mem_swap_total);
+	  sscanf (linebuf, "%*s%llu", &stat->mem_swap_total);
 #endif
-          n_memitem++;
-        }
+	  n_memitem++;
+	}
       if (!strcmp (prefix, "SwapFree:"))
-        {
+	{
 #if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_swap_free);
+	  sscanf (linebuf, "%*s%lu", &stat->mem_swap_free);
 #else
-          sscanf (linebuf, "%*s%llu", &stat->mem_swap_free);
+	  sscanf (linebuf, "%*s%llu", &stat->mem_swap_free);
 #endif
-          n_memitem++;
-        }
+	  n_memitem++;
+	}
     }
   if (n_memitem != 4)
     {
@@ -3750,7 +3750,7 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
 
 #if defined (WINDOWS)
 static bool
-delete_directory (const std::string& rawPath)
+delete_directory (const std::string &rawPath)
 {
   char abs_path[MAX_PATH + 1];
   if (GetFullPathNameA (rawPath.c_str (), MAX_PATH, abs_path, NULL) == 0)
@@ -3784,12 +3784,15 @@ delete_directory (const std::string& rawPath)
 }
 #else
 static bool
-delete_directory (const std::string& path)
+delete_directory (const std::string &path)
 {
-  DIR* dir = opendir (path.c_str ());
-  if (!dir) return false;
+  DIR *dir = opendir (path.c_str ());
+  if (!dir)
+    {
+      return false;
+    }
 
-  struct dirent* entry;
+  struct dirent *entry;
   bool success = true;
 
   while ((entry = readdir (dir)) != nullptr)
@@ -3811,7 +3814,7 @@ delete_directory (const std::string& path)
 		{
 		  success = false;
 		}
-            }
+	    }
 	  else
 	    {
 	      if (unlink (fullPath.c_str ()) != 0)
@@ -3840,7 +3843,7 @@ isValidEnvChar (char c)
 }
 
 bool
-isEnvVarAllowed (const std::string& var_name)
+isEnvVarAllowed (const std::string &var_name)
 {
   for (size_t i = 0; i < ALLOWED_ENV_VARS_COUNT; ++i)
     {
@@ -3889,7 +3892,7 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
 }
 
 bool
-is_valid_filename (const char *filename, std::string& expanded_path)
+is_valid_filename (const char *filename, std::string &expanded_path)
 {
   if (filename == NULL || strlen (filename) == 0 || strlen (filename) > PATH_MAX)
     {
@@ -3902,7 +3905,7 @@ is_valid_filename (const char *filename, std::string& expanded_path)
     {
       expanded_path = expand_env_path (origin_path);
     }
-  catch (const std::invalid_argument& e)
+  catch (const std::invalid_argument &e)
     {
       return false;
     }
@@ -3930,7 +3933,7 @@ is_valid_filename (const char *filename)
     {
       expanded_path = expand_env_path (origin_path);
     }
-  catch (const std::invalid_argument& e)
+  catch (const std::invalid_argument &e)
     {
       return false;
     }
@@ -3940,7 +3943,7 @@ is_valid_filename (const char *filename)
       return false;
     }
 
-    return true;
+  return true;
 }
 
 bool
@@ -4018,49 +4021,49 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
   return ret;
 }
 
-std::vector<std::string> split_path (const std::string& path, char seperator)
+std::vector<std::string> split_path (const std::string &path, char seperator)
 {
   std::vector<std::string> tokens;
-  std::stringstream ss(path);
+  std::stringstream ss (path);
   std::string token;
 
-  while (std::getline(ss, token, seperator))
+  while (std::getline (ss, token, seperator))
     {
       if (!token.empty ())
 	{
 	  tokens.push_back (token);
-        }
+	}
     }
 
-    return tokens;
+  return tokens;
 }
 
-std::string clean_path (const std::string& path, char seperator)
+std::string clean_path (const std::string &path, char seperator)
 {
   std::vector<std::string> tokens = split_path (path, seperator);
   std::vector<std::string> cleaned;
 
-  for (const auto& token : tokens)
+  for (const auto &token : tokens)
     {
       if (token == ".")
 	{
 	  continue;
-        }
+	}
 
       if (token == "..")
-        {
+	{
 	  if (!cleaned.empty ())
 	    {
 	      cleaned.pop_back ();
 	    }
 	  continue;
-        }
+	}
 
       cleaned.push_back (token);
     }
 
   std::string result;
-  for (const auto& token : cleaned)
+  for (const auto &token : cleaned)
     {
       result += seperator + token;
     }
@@ -4069,7 +4072,7 @@ std::string clean_path (const std::string& path, char seperator)
 }
 
 std::string
-expand_env_path (const std::string& path)
+expand_env_path (const std::string &path)
 {
 #if defined (WINDOWS)
   DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
@@ -4093,51 +4096,51 @@ expand_env_path (const std::string& path)
       char c = path[i];
 
       if (c == '$')
-        {
-          size_t start = i + 1;
-          bool braced = (start < path.size () && path[start] == '{');
-          size_t name_start = braced ? start + 1 : start;
-          size_t j = name_start;
+	{
+	  size_t start = i + 1;
+	  bool braced = (start < path.size () && path[start] == '{');
+	  size_t name_start = braced ? start + 1 : start;
+	  size_t j = name_start;
 
-          while (j < path.size ()
-                 && (std::isalnum ((unsigned char) path[j]) || path[j] == '_'))
-            {
-              ++j;
-            }
+	  while (j < path.size ()
+		 && (std::isalnum ((unsigned char) path[j]) || path[j] == '_'))
+	    {
+	      ++j;
+	    }
 
-          if (j == name_start)
-            {
-              result += c;
-              ++i;
-              continue;
-            }
+	  if (j == name_start)
+	    {
+	      result += c;
+	      ++i;
+	      continue;
+	    }
 
-          std::string var_name = path.substr (name_start, j - name_start);
-          size_t after = j;
+	  std::string var_name = path.substr (name_start, j - name_start);
+	  size_t after = j;
 
-          if (braced)
-            {
-              if (after >= path.size () || path[after] != '}')
-                {
-                  throw std::invalid_argument ("malformed ${} in path: " + path);
-                }
-              ++after;
-            }
+	  if (braced)
+	    {
+	      if (after >= path.size () || path[after] != '}')
+		{
+		  throw std::invalid_argument ("malformed ${} in path: " + path);
+		}
+	      ++after;
+	    }
 
-          const char* val = std::getenv (var_name.c_str ());
-          if (val == nullptr)
-            {
-              throw std::invalid_argument ("undefined env var: " + var_name);
-            }
+	  const char *val = std::getenv (var_name.c_str ());
+	  if (val == nullptr)
+	    {
+	      throw std::invalid_argument ("undefined env var: " + var_name);
+	    }
 
-          result += val;
-          i = after;
-        }
+	  result += val;
+	  i = after;
+	}
       else
-        {
-          result += c;
-          ++i;
-        }
+	{
+	  result += c;
+	  ++i;
+	}
     }
 
   return result;
@@ -4211,7 +4214,7 @@ is_authorized_filename (const char *path, char *_dbmt_error)
     }
 
   std::string origin_path = path;
-  std::string allowed_path = std::string(sco.szCubrid) + ", " + sco.szCubrid_databases;
+  std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
 
   std::replace (origin_path.begin (), origin_path.end (), '%', '*');
   snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
@@ -4221,7 +4224,7 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 }
 
 bool
-is_valid_env_name_format (const std::string& name)
+is_valid_env_name_format (const std::string &name)
 {
   if (name.empty ())
     {
@@ -4245,38 +4248,38 @@ is_valid_env_name_format (const std::string& name)
 }
 
 bool
-is_allowed_script_env (const std::string& name)
+is_allowed_script_env (const std::string &name)
 {
   if (!is_valid_env_name_format (name))
     {
       return false;
     }
 
-  const auto& allowed = allowed_script_env_names ();
+  const auto &allowed = allowed_script_env_names ();
 
   return allowed.find (name) != allowed.end ();
 }
 
 std::string
-extract_env_name (const std::string& env_entry)
+extract_env_name (const std::string &env_entry)
 {
   if (env_entry.empty ())
     {
       return "";
     }
 
-  size_t pos = env_entry.find('=');
+  size_t pos = env_entry.find ('=');
 
   if (pos == std::string::npos)
     {
       return "";
     }
 
-  return env_entry.substr(0, pos);
+  return env_entry.substr (0, pos);
 }
 
 bool
-is_pid_dir (const std::string & name)
+is_pid_dir (const std::string &name)
 {
   if (name.empty ())
     {
@@ -4285,7 +4288,7 @@ is_pid_dir (const std::string & name)
 
   for (char c:name)
     {
-      if (!std::isdigit (static_cast < unsigned char >(c)))
+      if (!std::isdigit (static_cast < unsigned char > (c)))
 	{
 	  return false;
 	}
@@ -4295,7 +4298,7 @@ is_pid_dir (const std::string & name)
 }
 
 bool
-get_proc_uid (const std::string & pid, uid_t & uid)
+get_proc_uid (const std::string &pid, uid_t &uid)
 {
   std::ifstream status_file ("/proc/" + pid + "/status");
 
@@ -4318,7 +4321,7 @@ get_proc_uid (const std::string & pid, uid_t & uid)
 }
 
 bool
-get_proc_comm (const std::string & pid, std::string & comm)
+get_proc_comm (const std::string &pid, std::string &comm)
 {
   std::ifstream comm_file ("/proc/" + pid + "/comm");
 
@@ -4329,7 +4332,7 @@ get_proc_comm (const std::string & pid, std::string & comm)
 
   std::getline (comm_file, comm);
 
-  while (!comm.empty () && std::isspace (static_cast < unsigned char >(comm.back ())))
+  while (!comm.empty () && std::isspace (static_cast < unsigned char > (comm.back ())))
     {
       comm.pop_back ();
     }
@@ -4338,7 +4341,7 @@ get_proc_comm (const std::string & pid, std::string & comm)
 }
 
 bool
-setenv_using_putenv_fmt (const std::string & nameValue, int overwrite)
+setenv_using_putenv_fmt (const std::string &nameValue, int overwrite)
 {
   size_t eqPos = nameValue.find ('=');
 
