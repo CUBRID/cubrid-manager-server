@@ -28,7 +28,7 @@ Add `"async":"yes"` to the request of any task listed above:
 }
 ```
 
-CMS returns a response right away, without waiting for the task to complete:
+If CMS can start the job, it returns a response right away, without waiting for the task to complete:
 
 ```
 {
@@ -38,6 +38,25 @@ CMS returns a response right away, without waiting for the task to complete:
    "uuid" : "14"
 }
 ```
+
+### Request Rejected
+
+CMS rejects the request instead of starting the job when either of these is true:
+
+* the server already has `max_num_async_task` async jobs running (see [Configuration](#configuration) below), or
+* the task is one that must run exclusively against its database (for example `backupdb`, `restoredb`, `copydb`) and another async job is already running against that same database.
+
+A rejected request never gets a `uuid`, since the job never started:
+
+```
+{
+   "job-status" : "rejected",
+   "note" : "maximum number of concurrent async tasks (8) reached; try again later",
+   "status" : "failure"
+}
+```
+
+Check `note` for the reason and retry the request later.
 
 ## Checking Job Status
 
@@ -51,7 +70,7 @@ Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
 }
 ```
 
-`job-status` in the response is one of `running`, `success`, or `error`. See [gettaskstatus](gettaskstatus.md) for the full response syntax and samples.
+`job-status` in the response is one of `running`, `success`, or `error`. (`rejected` is also a possible `job-status` value, but only in the immediate response to the original task request - see [Request Rejected](#request-rejected) above; a rejected request never receives a `uuid`, so it is never something you check with `gettaskstatus`.) See [gettaskstatus](gettaskstatus.md) for the full response syntax and samples.
 
 A `uuid` is only valid for a limited time after the job finishes; see `async_job_ttl_sec` below.
 
