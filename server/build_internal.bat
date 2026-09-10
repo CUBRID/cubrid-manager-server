@@ -3,7 +3,7 @@
 if "%1" == "" goto PRINT_USAGE
 
 set cubrid_dir=%CUBRID%
-set platform=Win32
+set platform=x64
 set mode=release
 
 :LOOP_BEGIN
@@ -15,7 +15,6 @@ if "%1" == "--prefix" set prefix=%2& shift & shift & goto LOOP_BEGIN
 if "%1" == "--with-cubrid-dir" set cubrid_dir=%2& shift & shift & goto LOOP_BEGIN
 if "%1" == "--with-cubrid-libdir" set cubrid_libdir=%2& shift & shift & goto LOOP_BEGIN
 if "%1" == "--with-cubrid-includedir" set cubrid_includedir=%2& shift & shift & goto LOOP_BEGIN
-if "%1" == "--enable-64bit" set platform=x64& shift & goto LOOP_BEGIN
 if "%1" == "--enable-debug" set mode=debug& shift & goto LOOP_BEGIN
 
 shift
@@ -87,7 +86,6 @@ exit /b
 @echo                                 default to with_cubrid_dir\lib
 @echo   --with-cubrid-includedir=DIR  directory have cubrid include files (optional)
 @echo                                 default to with_cubrid_dir\include
-@echo   --enable-64bit                build 64bit applications
 @echo   --enable-debug                build debug version applications
 @echo.
 @echo   --help                        display this help and exit
