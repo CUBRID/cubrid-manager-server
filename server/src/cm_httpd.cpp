@@ -71,7 +71,7 @@
 #include "cm_http_server.h"
 
 #if defined (_MSC_VER) && _MSC_VER >= 1900
-static FILE _iob_shim[3] = { *stdin, *stdout, *stderr };
+static FILE _iob_shim[3 * 64] = { *stdin, *stdout, *stderr }; /* required until the libraries are rebuilt */
 extern "C" FILE * __cdecl __iob_func (void) { return _iob_shim; }
 #endif
 
