@@ -1,0 +1,5 @@
+{
+   "note": "demodb",
+   "status": "success",
+   "task": "stop_statdump"
+}

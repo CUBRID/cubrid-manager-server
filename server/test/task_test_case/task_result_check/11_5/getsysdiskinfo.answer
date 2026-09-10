@@ -1,0 +1,12 @@
+{
+   "disk_info": [
+      {
+         "free_size": "<volatile>",
+         "name": "/",
+         "total_size": "1832296755200"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getsysdiskinfo"
+}

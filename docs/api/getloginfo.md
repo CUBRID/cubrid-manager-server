@@ -28,6 +28,14 @@ Get database log file information.
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
 | dbname | database name |
+| loginfo | one entry holding a `log` array, one object per log file |
+
+### log
+
+log is composed of objects with following structure
+
+| **Key** | **Description** |
+| --- | --- |
 | path | database log file path |
 | @owner | database owner |
 | size | the size of log file |

@@ -1,0 +1,16 @@
+{
+   "line": [
+      "",
+      "Start schema loading.",
+      "Total       48 statements executed.",
+      "Schema loading from $CUBRID/tmp/test_loaddb_schema finished.",
+      "Statistics for Catalog classes have been updated.",
+      "",
+      "",
+      "Start object loading.",
+      "Total 19202 object(s) inserted, 0 object(s) failed."
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "loaddb"
+}

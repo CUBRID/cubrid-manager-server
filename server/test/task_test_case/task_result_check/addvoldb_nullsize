@@ -1,0 +1,7 @@
+{"task":"addvoldb",
+"token":"",
+"dbname":"alatestdb",
+"volname":"",
+"purpose":"generic",
+"path":"$CUBRID_DATABASES/alatestdb",
+"numberofpages":"100"}

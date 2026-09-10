@@ -1,0 +1,10 @@
+{"task":"backupdb",
+"token":"",
+"dbname":"alatestdb",
+"level":"0",
+"volname":"alatestdb_backup_lv0",
+"removelog":"n",
+"check":"y",
+"mt":"0",
+"zip":"y",
+"safereplication":"n"}

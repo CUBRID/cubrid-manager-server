@@ -1,0 +1,68 @@
+name: CMS API test comment
+
+# Posts the verdict of "CMS API test" as a comment on the pull request.
+
+on:
+  workflow_run:
+    workflows: ["CMS API test"]
+    types: [completed]
+
+permissions: {}   # the one job below opts in
+
+concurrency:
+  group: cms-api-test-comment-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  comment:
+    # Nothing to say about a run that was cancelled, and pushes or manual runs
+    # have no pull request to comment on.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read          # to read the artifact of the run that triggered this
+
+    steps:
+      - name: Download the report
+        uses: actions/download-artifact@v4
+        with:
+          name: cms-api-test-comment
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: report
+
+      # The number comes from the artifact rather than from the event, because
+      # workflow_run carries an empty pull_requests list for a fork. It is
+      # written by the test run, so it is checked before it is used.
+      - name: Read the pull request number
+        id: pr
+        run: |
+          set -euo pipefail
+          number=$(tr -d '[:space:]' < report/pr-number.txt)
+          case "$number" in
+            ''|*[!0-9]*)
+              echo "not a pull request number: '$number'"; exit 1 ;;
+          esac
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "commenting on #$number"
+
+      # The same app the other CUBRID workflows use; its token can write to a
+      # pull request that GITHUB_TOKEN cannot.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.TC_APP_ID }}
+          private-key: ${{ secrets.TC_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Post or update the comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: cms-api-test
+          number: ${{ steps.pr.outputs.number }}
+          path: report/summary_result.md
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

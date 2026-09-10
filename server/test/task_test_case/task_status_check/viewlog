@@ -1,0 +1,6 @@
+{"task":"viewlog",
+"token":"",
+"dbname":"demodb",
+"path":"$CUBRID/log/manager/cub_manager.log",
+"start":"1",
+"end":"1000"}

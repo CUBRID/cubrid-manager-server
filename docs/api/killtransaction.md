@@ -9,9 +9,6 @@ Delete transactions, and return the rest of the transactions information.
 | task | task name |
 | token | token string encrypted. |
 | dbname | database name |
-| dbuser | database username, must have dba Privileges |
-| dbpasswd | password for dbuser |
-| \_DBPASSWD | DBA password for dbname |
 | type | options from killtransaction command. |
 | parameter | a paramter according to the option in "type" field |
 
@@ -35,11 +32,8 @@ other letters should cause an error. 
   "task": "killtransaction",
   "token": "cdfb4c5717170c5eb159540c0384c7424ea3fcd68c6ea615f538801cd09c6f3a7926f07dd201b6aa",
   "dbname": "demodb",
-  "dbuser": "dbuser1",
-  "dbpasswd": "1234",
-  "_DBPASSWD": "abcd",
   "type": "i",
-  "parameter": "2(+)"
+  "parameter": "2"
 }
 ```
 
@@ -58,26 +52,36 @@ other letters should cause an error. 
 | host | host name |
 | pid | process id |
 | program | process name |
+| query_time | the elapsed time of the running query |
+| tran_time | the elapsed time of the transaction |
+| SQL_ID | the id of the running SQL |
+| SQL_Text | the text of the running SQL |
+| wait_for_lock_holder | the transaction indexes this transaction waits for |
 
 ## Response Sample
 
 ```
 {
-   "__EXEC_TIME" : "35 ms",
+   "__EXEC_TIME" : "1106 ms",
    "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
    "task" : "killtransaction",
-   "transactioninfo" : 
+   "transactioninfo" : [
       {
          "transaction" : [
             {
                "@user" : "DBA",
-               "host" : "huangqiyu-VirtualBox",
-               "pid" : "6632",
-               "program" : "query_editor_cub_cas_1",
-               "tranindex" : "1(ACTIVE)"
+               "SQL_ID" : "empty",
+               "host" : "ai-work-49",
+               "pid" : "1997471",
+               "program" : "csql",
+               "query_time" : "0.00",
+               "tran_time" : "8.60",
+               "tranindex" : "2(ACTIVE)",
+               "wait_for_lock_holder" : "-1"
             }
+         ]
       }
    ]
 }

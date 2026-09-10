@@ -1,0 +1,12 @@
+{
+   "dbserver": [
+      {
+         "dbname": "demodb",
+         "server_mode": "CS-mode",
+         "server_msg": "none"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getdbmode"
+}

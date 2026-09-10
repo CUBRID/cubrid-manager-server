@@ -40,11 +40,11 @@ Get the information of tables from a database.
 
 ```
 {
-   "__EXEC_TIME" : "271 ms",
-   "dbname" : "testdb",
+   "__EXEC_TIME" : "31 ms",
+   "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
-   "systemclass" : 
+   "systemclass" : [
       {
          "class" : [
             {
@@ -53,212 +53,41 @@ Get the information of tables from a database.
                "virtual" : "normal"
             },
             {
-               "classname" : "db_user",
+               "classname" : "_db_user",
                "owner" : "DBA",
                "virtual" : "normal"
             },
             {
-               "classname" : "db_password",
+               "classname" : "_db_password",
                "owner" : "DBA",
                "virtual" : "normal"
-            },
-            {
-               "classname" : "db_authorization",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "db_authorizations",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "db_trigger",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_class",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_attribute",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_domain",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_method",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_meth_sig",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_meth_arg",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_meth_file",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_query_spec",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_index",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_index_key",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_data_type",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_auth",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_partition",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_stored_procedure",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "_db_stored_procedure_args",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "db_serial",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "db_ha_apply_info",
-               "owner" : "DBA",
-               "virtual" : "normal"
-            },
-            {
-               "classname" : "db_class",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_direct_super_class",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_vclass",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_attribute",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_attr_setdomain_elm",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_method",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_meth_arg",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_meth_arg_setdomain_elm",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_meth_file",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_index",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_index_key",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_auth",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_trig",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_partition",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_stored_procedure",
-               "owner" : "DBA",
-               "virtual" : "view"
-            },
-            {
-               "classname" : "db_stored_procedure_args",
-               "owner" : "DBA",
-               "virtual" : "view"
             }
+         ]
       }
    ],
    "task" : "classinfo",
-   "userclass" : 
+   "userclass" : [
       {
          "class" : [
             {
-               "classname" : "table1",
+               "classname" : "public.stadium",
                "owner" : "PUBLIC",
                "virtual" : "normal"
             },
             {
-               "classname" : "table2",
+               "classname" : "public.code",
+               "owner" : "PUBLIC",
+               "virtual" : "normal"
+            },
+            {
+               "classname" : "public.nation",
                "owner" : "PUBLIC",
                "virtual" : "normal"
             }
+         ]
       }
    ]
 }
 ```
+
+> Lists are shortened to 3 entries here.

@@ -1,0 +1,4 @@
+{"task":"ha_applylogdb",
+"token":"",
+"dbname":"test",
+"peer_node":"ha-test-81"}

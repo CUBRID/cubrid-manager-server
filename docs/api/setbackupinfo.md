@@ -20,6 +20,8 @@ Add an auto-backup plan
 | updatestatus | on-off indicating whether to update statistic infromation |
 | check | on-off indicating whether to start consistency check |
 | mt | the number of auto-backup threads |
+| path | the directory the backup volume is created in |
+| onoff | on-off indicating whether the auto-backup plan is enabled |
 
 ## Request Sample
 

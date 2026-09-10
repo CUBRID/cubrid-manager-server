@@ -12,6 +12,7 @@ Create database user.
 | username | database user name |
 | userpass | database user password |
 | authorization | authorities of this user |
+| groups | the groups the database user belongs to |
 
 ## Request Sample
 

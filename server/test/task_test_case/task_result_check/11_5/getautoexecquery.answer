@@ -1,0 +1,19 @@
+{
+   "note": "none",
+   "planlist": [
+      {
+         "dbname": "alatestdb",
+         "queryplan": [
+            {
+               "@username": "dba",
+               "detail": "<timestamp>",
+               "period": "ONE",
+               "query_id": "bbaa",
+               "query_string": "select * from db_class;"
+            }
+         ]
+      }
+   ],
+   "status": "success",
+   "task": "getautoexecquery"
+}

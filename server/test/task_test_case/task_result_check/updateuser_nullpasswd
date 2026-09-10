@@ -1,0 +1,7 @@
+{"task":"updateuser",
+"token":"",
+"dbname":"demodb",
+"username":"yifan",
+"userpass":"__NULL__",
+"groups":[{"group": ["public"]}],
+"authorization":[{}]}

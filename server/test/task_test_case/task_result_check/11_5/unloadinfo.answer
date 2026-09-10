@@ -1,0 +1,12 @@
+{
+   "database": [
+      {
+         "dbname": "demodb",
+         "object": "$CUBRID_DATABASES/demodb/demodb_objects;<timestamp>",
+         "schema": "$CUBRID_DATABASES/demodb/demodb_schema;<timestamp>"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "unloadinfo"
+}

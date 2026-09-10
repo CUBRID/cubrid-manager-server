@@ -1,0 +1,14 @@
+{
+"task": "createdb",
+"token": "",
+"dbname": "compactdbtest",
+"numpage": "10240",
+"pagesize": "4096",
+"logpagesize": "4096",
+"logsize": "10240",
+"genvolpath": "$CUBRID_DATABASES/compactdbtest",
+"logvolpath": "$CUBRID_DATABASES/compactdbtest",
+"exvol": [],
+"overwrite_config_file": "YES",
+"charset": "en_US"
+}

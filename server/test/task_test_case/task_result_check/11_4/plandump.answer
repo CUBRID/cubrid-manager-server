@@ -1,0 +1,49 @@
+{
+   "log": [
+      {
+         "line": [
+            "",
+            "XASL cache",
+            "Stats: ",
+            "Max size:                   <count>",
+            "Current entry count:        <count>",
+            "Lookups:                    <count>",
+            "Hits:                       <count>",
+            "Miss:                       <count>",
+            "Inserts:                    <count>",
+            "Found at insert:            <count>",
+            "Recompiles:                 <count>",
+            "Failed recompiles:          <count>",
+            "Deletes:                    <count>",
+            "Fix:                        <count>",
+            "Unfix:                      <count>",
+            "Cache cleanups:             <count>",
+            "Deletes at cleanup:\t    <count>",
+            "",
+            "Entries:",
+            "",
+            "Filter predicate cache",
+            "Stats: ",
+            "Max size:                   <count>",
+            "Current entry count:        <count>",
+            "Current clone count:        <count>",
+            "Lookups:                    <count>",
+            "Entry Hits:                 <count>",
+            "Entry Miss:                 <count>",
+            "Entry discards:             <count>",
+            "Clone Hits:                 <count>",
+            "Clone Miss:                 <count>",
+            "Clone discards:             <count>",
+            "Adds:                       <count>",
+            "Clone adds:                 <count>",
+            "Cleanups:                   <count>",
+            "Cleaned entries:            <count>",
+            "",
+            "Entries:"
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "plandump"
+}
