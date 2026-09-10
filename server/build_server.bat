@@ -125,6 +125,8 @@ if not "%exitcode%" == "0" (
     )
 )
 
+IF NOT EXIST "%INSTALL_DIR%" ( echo ... & exit /b 1 )
+
 cd win/install
 cd CMServer_%mode%_%platform%
 
@@ -134,6 +136,7 @@ robocopy . %prefix%\ /e
 set robocopy_rc=%errorlevel%
 echo build_server.bat: diag - robocopy raw exit code = %robocopy_rc%
 if %robocopy_rc% GEQ 8 ( set "exitcode=%robocopy_rc%" ) else ( set "exitcode=0" )
+if %robocopy_rc% EQU 0 (echo "robocopy: no files to copy because the source and target are the same")
 
 echo build_server.bat: diag - computed exitcode = %exitcode%
 cd ..\..\..
