@@ -42,12 +42,13 @@ IF NOT "%platform_token%" == "x64" (
     exit /b 1
 )
 
-call "!VSDEVCMD!" -arch=%platform_token%
-if errorlevel 1 (
-    echo build_server.bat: warning - VsDevCmd.bat reported errors ^(see above^); continuing.
-)
-REM VsDevCmd.bat can leave ERRORLEVEL non-zero even on a usable env; force reset it.
 (call )
+call "!VSDEVCMD!" -arch=%platform_token%
+where devenv >NUL 2>&1
+if errorlevel 1 (
+	echo build_server.bat: VsDevCmd.bat did not set up a usable VC environment ^(devenv not on PATH^).
+	exit /b 1
+)
 
 FOR /F "tokens=1 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MAJOR=%%i")
 FOR /F "tokens=2 delims=." %%i IN ('type BUILD_NUMBER') do (SET "MINOR=%%i")
@@ -78,9 +79,8 @@ IF EXIST "%INSTALL_DIR%" (
     rmdir /s /q "%INSTALL_DIR%"
 
     IF EXIST "%INSTALL_DIR%" (
-        echo build_server.bat: warning - "%INSTALL_DIR%" still exists after waiting for removal; continuing anyway.
-    ) ELSE (
-        echo build_server.bat: confirmed "%INSTALL_DIR%" removed.
+        echo build_server.bat: failed to remove "%INSTALL_DIR%" - aborting to avoid shipping stale binaries.
+        exit /b 1
     )
 )
 
