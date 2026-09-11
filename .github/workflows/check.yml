@@ -44,17 +44,25 @@ jobs:
         working-directory: ${{ env.working-directory }}
       - id: files
         uses: jitterbit/get-changed-files@v1
+        with:
+          format: json
         continue-on-error: true
       - name: Check code style
         id: stylecheck
+        env:
+          # The changed file list is controlled by the PR author, so it must never be
+          # interpolated into the script body. It is passed through the environment and
+          # parsed as JSON below.
+          ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
         run: |
-          for f in ${{ steps.files.outputs.added_modified }}; do
-            if [[ ! $f =~ ^server/src/.* ]]; then
+          while IFS= read -r -d '' f; do
+            # only files under server/src are checked.
+            if [[ $f != server/src/* ]]; then
               continue
             fi
 
-            .github/workflows/codestyle.sh ${f}
-          done 
+            .github/workflows/codestyle.sh "$f"
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "${ADDED_MODIFIED:-[]}")
           git diff | tee gitdiff
           test ! -s gitdiff # is empty? yes: 0 no: 1
       - name: Suggest code changes
@@ -85,27 +93,35 @@ jobs:
       - uses: actions/checkout@v5
       - uses: jitterbit/get-changed-files@v1
         id: files
+        with:
+          format: json
         continue-on-error: true
       - name: cppcheck
+        env:
+          # The changed file list is controlled by the PR author, so it must never be
+          # interpolated into the script body. It is passed through the environment and
+          # parsed as JSON below.
+          ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
         run: |
           result_file="cppcheck.result"
           summary_file="cppcheck.summary"
 
-          touch $result_file
-          touch $summary_file
+          touch "$result_file"
+          touch "$summary_file"
 
           # to suppress other error, add it to .github/workflows/cppcheck-spr-list
-          for f in ${{ steps.files.outputs.added_modified }}; do
+          while IFS= read -r -d '' f; do
             if [ -d "$f" ]; then
               continue
             fi
 
-            if [[ ! $f =~ ^server/src/.* ]]; then
+            # only files under server/src are checked.
+            if [[ $f != server/src/* ]]; then
               continue
             fi
 
             set +e
-            ext=$(expr $f : ".*\(\..*\)")
+            ext=$(expr "$f" : ".*\(\..*\)")
             set -e
 
             case $ext in
@@ -113,27 +129,31 @@ jobs:
             *) continue ;; # skip others
             esac
 
-            ${{ env.CPPCHECK_PATH }}/cppcheck --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --quiet --enable=warning $f 2>>$result_file
-          done
+            "$CPPCHECK_PATH/cppcheck" --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --quiet --enable=warning "$f" 2>>"$result_file"
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "${ADDED_MODIFIED:-[]}")
 
-          echo "errors: `cat $result_file | grep " error: " | wc -l`" > $summary_file
-          echo "warnings: `cat $result_file | grep " warning: " | wc -l`" >> $summary_file
+          echo "errors: $(grep -c ' error: ' "$result_file" || true)" > "$summary_file"
+          echo "warnings: $(grep -c ' warning: ' "$result_file" || true)" >> "$summary_file"
 
           echo "-----------------------------Result-------------------------------------"
-          cat $result_file
+          cat "$result_file"
           echo "-----------------------------Summary------------------------------------"
-          cat $summary_file
+          cat "$summary_file"
 
-          ! cat $result_file | grep " error: " 1>/dev/null # if has errors, fail
+          ! grep " error: " "$result_file" 1>/dev/null # if has errors, fail
       - name: Get cppcheck.summary
         id: get-comment-body
         if: ${{ failure() }}
         run: |
-          body=$(cat cppcheck.summary)
-          body="${body//'%'/'%25'}"
-          body="${body//$'\n'/'%0A'}"
-          body="${body//$'\r'/'%0D'}" 
-          echo ::set-output name=body::$body
+          # ::set-output is removed from GitHub Actions; write to $GITHUB_OUTPUT instead.
+          # A random heredoc delimiter keeps the multi-line body from being able to
+          # terminate the block early, so no percent-encoding is needed.
+          delimiter="$(openssl rand -hex 16)"
+          {
+            echo "body<<${delimiter}"
+            cat cppcheck.summary
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
       - name: Report cppcheck.summary
         if: ${{ failure() }}
         uses: unsplash/comment-on-pr@master
