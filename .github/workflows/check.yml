@@ -43,10 +43,7 @@ jobs:
           sudo apt-get -yq install astyle
         working-directory: ${{ env.working-directory }}
       - id: files
-        uses: jitterbit/get-changed-files@v1
-        with:
-          format: json
-        continue-on-error: true
+        uses: ./.github/actions/changed-files
       - name: Check code style
         id: stylecheck
         env:
@@ -55,6 +52,16 @@ jobs:
           # parsed as JSON below.
           ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
         run: |
+          # The changed file list must never be silently empty: if the step above broke
+          # (API, permissions, network) the loop would check nothing and this required
+          # gate would pass. An empty list is only acceptable as a well-formed [].
+          # (jq -e exits 0 on empty input, so the emptiness must be tested separately.)
+          if [ -z "$ADDED_MODIFIED" ] || ! jq -e 'type == "array"' <<< "$ADDED_MODIFIED" > /dev/null 2>&1; then
+            echo "::error::changed file list is missing or malformed - refusing to report success without checking anything"
+            exit 1
+          fi
+
+          checked=0
           while IFS= read -r -d '' f; do
             # only files under server/src are checked.
             if [[ $f != server/src/* ]]; then
@@ -62,7 +69,9 @@ jobs:
             fi
 
             .github/workflows/codestyle.sh "$f"
-          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "${ADDED_MODIFIED:-[]}")
+            checked=$((checked + 1))
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "$ADDED_MODIFIED")
+          echo "code style checked $checked file(s) under server/src"
           git diff | tee gitdiff
           test ! -s gitdiff # is empty? yes: 0 no: 1
       - name: Suggest code changes
@@ -91,11 +100,8 @@ jobs:
 
           cd $wd
       - uses: actions/checkout@v5
-      - uses: jitterbit/get-changed-files@v1
-        id: files
-        with:
-          format: json
-        continue-on-error: true
+      - id: files
+        uses: ./.github/actions/changed-files
       - name: cppcheck
         env:
           # The changed file list is controlled by the PR author, so it must never be
@@ -103,6 +109,15 @@ jobs:
           # parsed as JSON below.
           ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
         run: |
+          # The changed file list must never be silently empty: if the step above broke
+          # (API, permissions, network) the loop would check nothing and this required
+          # gate would pass. An empty list is only acceptable as a well-formed [].
+          # (jq -e exits 0 on empty input, so the emptiness must be tested separately.)
+          if [ -z "$ADDED_MODIFIED" ] || ! jq -e 'type == "array"' <<< "$ADDED_MODIFIED" > /dev/null 2>&1; then
+            echo "::error::changed file list is missing or malformed - refusing to report success without checking anything"
+            exit 1
+          fi
+
           result_file="cppcheck.result"
           summary_file="cppcheck.summary"
 
@@ -110,6 +125,7 @@ jobs:
           touch "$summary_file"
 
           # to suppress other error, add it to .github/workflows/cppcheck-spr-list
+          checked=0
           while IFS= read -r -d '' f; do
             if [ -d "$f" ]; then
               continue
@@ -130,7 +146,9 @@ jobs:
             esac
 
             "$CPPCHECK_PATH/cppcheck" --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --quiet --enable=warning "$f" 2>>"$result_file"
-          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "${ADDED_MODIFIED:-[]}")
+            checked=$((checked + 1))
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "$ADDED_MODIFIED")
+          echo "cppcheck checked $checked file(s) under server/src"
 
           echo "errors: $(grep -c ' error: ' "$result_file" || true)" > "$summary_file"
           echo "warnings: $(grep -c ' warning: ' "$result_file" || true)" >> "$summary_file"
