@@ -19,17 +19,25 @@ on:
   pull_request:
     branches:
       - develop
+# Least privilege by default; jobs widen this only where they must write.
+permissions:
+  contents: read
 jobs:
   pr-style:
     name: pr-style
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
-      - uses: deepakputhraya/action-pr-title@master
-        with:
-          regex: '^\[[A-Z]+-\d+\]\s.+' # Regex the title should match.
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/check-pr-title
   code-style:
     name: code-style
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write # reviewdog posts review suggestions
     env:
       working-directory: .github/workflows
     steps:
@@ -76,7 +84,7 @@ jobs:
           test ! -s gitdiff # is empty? yes: 0 no: 1
       - name: Suggest code changes
         if: ${{ failure() }}
-        uses: reviewdog/action-suggester@v1
+        uses: reviewdog/action-suggester@2558ba17e65a9039e73764a73009fc05fef28a46 # v1.24.3
         with:
           tool_name: code-style (indent, astyle)
   cppcheck:
@@ -159,26 +167,3 @@ jobs:
           cat "$summary_file"
 
           ! grep " error: " "$result_file" 1>/dev/null # if has errors, fail
-      - name: Get cppcheck.summary
-        id: get-comment-body
-        if: ${{ failure() }}
-        run: |
-          # ::set-output is removed from GitHub Actions; write to $GITHUB_OUTPUT instead.
-          # A random heredoc delimiter keeps the multi-line body from being able to
-          # terminate the block early, so no percent-encoding is needed.
-          delimiter="$(openssl rand -hex 16)"
-          {
-            echo "body<<${delimiter}"
-            cat cppcheck.summary
-            echo "${delimiter}"
-          } >> "$GITHUB_OUTPUT"
-      - name: Report cppcheck.summary
-        if: ${{ failure() }}
-        uses: unsplash/comment-on-pr@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          check_for_duplicate_msg: true  # OPTIONAL 
-          msg: |
-            **cppcheck**
-            ${{ steps.get-comment-body.outputs.body }}
