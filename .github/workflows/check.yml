@@ -132,7 +132,6 @@ jobs:
           touch "$result_file"
           touch "$summary_file"
 
-          # to suppress other error, add it to .github/workflows/cppcheck-spr-list
           checked=0
           while IFS= read -r -d '' f; do
             if [ -d "$f" ]; then
@@ -153,7 +152,7 @@ jobs:
             *) continue ;; # skip others
             esac
 
-            "$CPPCHECK_PATH/cppcheck" --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --quiet --enable=warning "$f" 2>>"$result_file"
+            "$CPPCHECK_PATH/cppcheck" --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --language=c++ -DHAVE_INT64_T --quiet --enable=warning "$f" 2>>"$result_file"
             checked=$((checked + 1))
           done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "$ADDED_MODIFIED")
           echo "cppcheck checked $checked file(s) under server/src"
