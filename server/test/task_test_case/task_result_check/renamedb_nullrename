@@ -1,0 +1,7 @@
+{"task":"renamedb",
+"token":"",
+"dbname":"destinationdb",
+"exvolpath":"none",
+"advanced":"on",
+"forcedel":"y",
+"volume":[{"$CUBRID_DATABASES/destinationdb/destinationdb": "$CUBRID_DATABASES/anotherdb/anotherdb"}]}

@@ -1,0 +1,3 @@
+{"task":"resetlog",
+"token":"",
+"path":"$CUBRID/log/broker/cubrid_broker.log"}

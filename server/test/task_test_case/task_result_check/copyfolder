@@ -1,0 +1,4 @@
+{"task":"copyfolder",
+"token":"",
+"srcdir":"$CUBRID/tmp",
+"destdir":"$CUBRID/tmp1"}

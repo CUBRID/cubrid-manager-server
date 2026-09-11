@@ -1,0 +1,7 @@
+{"task":"addvoldb",
+"token":"",
+"dbname":"alatestdb",
+"volname":"",
+"purpose":"generic",
+"numberofpages":"100000",
+"size_need_mb":"999999"}

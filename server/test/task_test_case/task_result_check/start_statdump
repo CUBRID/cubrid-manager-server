@@ -1,0 +1,6 @@
+{"task":"start_statdump",
+"token":"",
+"dbname":"demodb",
+"dbuser":"dba",
+"dbpasswd":"",
+"interval":"5"}

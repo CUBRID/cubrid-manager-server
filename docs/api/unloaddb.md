@@ -25,6 +25,8 @@ The unloaddb interface will unload a database server.
 | prefix | PREFIX for output files; default: the database name |
 | cache | NUMBER of cached pages; default: 100 |
 | lofile | lo file COUNT per a directory; default: 0 |
+| dbuser | database user id |
+| dbpasswd | the password of the database user |
 
 ## Request Sample
 
@@ -49,5 +51,32 @@ The unloaddb interface will unload a database server.
   "prefix": "none",
   "cach": "none",
   "lofile": "none"
+}
+```
+
+## Response JSON Syntax
+
+| **Key** | **Description** |
+| --- | --- |
+| task | task name |
+| status | execution result, success or failed. |
+| note | if failed, a brief description will be given here |
+| result | the files which have been created by the unload |
+
+The same information is returned later by [unloadinfo](unloadinfo.md).
+
+## Response Sample
+
+```
+{
+   "__EXEC_TIME" : "99 ms",
+   "note" : "none",
+   "result" : [
+      {
+         "public.code" : "6 (100%/100%)"
+      }
+   ],
+   "status" : "success",
+   "task" : "unloaddb"
 }
 ```

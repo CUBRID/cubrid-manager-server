@@ -9,8 +9,6 @@ The gettransactioninfo interface fetches database transaction information.
 | task | task name |
 | token | token string encrypted. |
 | dbname | database name |
-| dbuser | database username |
-| dbpasswd | password for dbuser |
 
 ## Request Sample
 
@@ -18,9 +16,7 @@ The gettransactioninfo interface fetches database transaction information.
 {
   "task": "gettransactioninfo",
   "token": "cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
-  "dbname": "demodb",
-  "dbuser": "dba",
-  "dbpasswd": ""
+  "dbname": "demodb"
 }
 ```
 
@@ -39,12 +35,17 @@ The gettransactioninfo interface fetches database transaction information.
 | host | host name |
 | pid | process id |
 | program | process name |
+| query_time | the elapsed time of the running query |
+| tran_time | the elapsed time of the transaction |
+| SQL_ID | the id of the running SQL |
+| SQL_Text | the text of the running SQL |
+| wait_for_lock_holder | the transaction indexes this transaction waits for |
 
 ## Response Sample
 
 ```json
 {
-   "__EXEC_TIME" : "35 ms",
+   "__EXEC_TIME" : "49 ms",
    "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
@@ -54,14 +55,25 @@ The gettransactioninfo interface fetches database transaction information.
          "transaction" : [
             {
                "@user" : "DBA",
-               "host" : "huangqiyu-VirtualBox",
-               "SQL_ID" : "82353eb5cc51f",
-               "SQL_Text" : "select dept.department_id, dept.employee_name where dept.employee_id = 100",
-               "pid" : "6632",
-               "program" : "query_editor_cub_cas_1",
-               "query_time" : "0.40",
-               "tran_time" : "0.40",
-               "tranindex" : "1(ACTIVE)"
+               "SQL_ID" : "empty",
+               "host" : "ai-work-49",
+               "pid" : "2381237",
+               "program" : "csql",
+               "query_time" : "0.00",
+               "tran_time" : "6.00",
+               "tranindex" : "1(ACTIVE)",
+               "wait_for_lock_holder" : "-1"
+            },
+            {
+               "@user" : "DBA",
+               "SQL_ID" : "empty",
+               "host" : "ai-work-49",
+               "pid" : "2381236",
+               "program" : "csql",
+               "query_time" : "0.00",
+               "tran_time" : "6.00",
+               "tranindex" : "2(ACTIVE)",
+               "wait_for_lock_holder" : "-1"
             }
          ]
       }

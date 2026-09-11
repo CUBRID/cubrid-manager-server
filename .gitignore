@@ -37,3 +37,11 @@ Makefile.in
 
 ## CMake build (server/build_cmake.sh), named build_<arch>_<mode> like the server's
 /server/build_*/
+
+## For Test
+server/test/log/
+server/test/__pycache__/
+server/test/task_test_case/*/*/*.result
+server/test/*.log
+server/test/csql.*
+!server/test/task_test_config/*.log

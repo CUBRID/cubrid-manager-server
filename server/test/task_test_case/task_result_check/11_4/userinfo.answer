@@ -1,0 +1,50 @@
+{
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "task": "userinfo",
+   "user": [
+      {
+         "@id": "",
+         "@name": "PUBLIC",
+         "authorization": [
+            {
+               "db_attr_setdomain_elm": "1",
+               "db_attribute": "1",
+               "db_auth": "1",
+               "db_authorization": "65",
+               "db_authorizations": "65",
+               "db_charset": "1",
+               "db_class": "1",
+               "db_collation": "1",
+               "db_direct_super_class": "1",
+               "db_ha_apply_info": "1",
+               "db_index": "1",
+               "db_index_key": "1",
+               "db_meth_arg": "1",
+               "db_meth_arg_setdomain_elm": "1",
+               "db_meth_file": "1",
+               "db_method": "1",
+               "db_partition": "1",
+               "db_root": "65",
+               "db_serial": "1",
+               "db_server": "1",
+               "db_stored_procedure": "1",
+               "db_stored_procedure_args": "1",
+               "db_synonym": "1",
+               "db_trig": "1",
+               "db_user": "65",
+               "db_vclass": "1",
+               "dual": "1"
+            }
+         ],
+         "groups": null
+      },
+      {
+         "@id": "",
+         "@name": "DBA",
+         "authorization": null,
+         "groups": null
+      }
+   ]
+}

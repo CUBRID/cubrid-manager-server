@@ -16,6 +16,9 @@ Create database.
 | logvolpath | log volume path |
 | exvol | extend volume information |
 | charset | language and charset, ex. en_US.iso88591, ko_KR.utf8. please refer to $CUBRID/conf/cubrid_locales.all.txt |
+| logpagesize | the page size of the log volume |
+| overwrite_config_file | y or n, overwrite the configuration file when it already exists |
+| overwrite_exvol_file | y or n, overwrite the additional volume file when it already exists |
 
 ## Request Sample
 

@@ -1,0 +1,12 @@
+{"task":"setautoexecquery",
+"token":"",
+"dbname":"alatestdb",
+"planlist":[{
+"queryplan":[{"query_id":"bbaa",
+"username":"dba",
+"userpass":"none",
+"period":"ONE",
+"detail":"$AUTO_QUERY_TIME",
+"query_string":"select * from db_class;"}]
+}]
+}

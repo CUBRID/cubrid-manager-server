@@ -108,8 +108,10 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [addvoldb](addvoldb.md) | socket, http | DBC, DBO |
 | [class](class.md) | socket, http | ALL_AUTHORITY |
 | [classinfo](classinfo.md) | socket, http | ALL_AUTHORITY |
-| [start_statdump](start_statdump.md) | socket, http | DBO |
-| [stop_statdump](stop_statdump.md) | socket, http | DBO |
+| [start_statdump](start_statdump.md) | socket, http | ALL_AUTHORITY |
+| [stop_statdump](stop_statdump.md) | socket, http | ALL_AUTHORITY |
+| [unloadinfo](unloadinfo.md) | socket, http | ALL_AUTHORITY |
+| [dbspace](dbspace.md) | socket, http | ALL_AUTHORITY |
 
 ### DB User
 
@@ -128,7 +130,7 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [getdbmtuserinfo](getdbmtuserinfo.md) | socket, http | ALL_AUTHORITY |
 | [deletedbmtuser](deletedbmtuser.md) | socket, http | DBC |
 | [updatedbmtuser](updatedbmtuser.md) | socket, http | DBC |
-| [setdbmtpasswd](setdbmtpasswd.md) | socket, http | DBC and Owner |
+| [setdbmtpasswd](setdbmtpasswd.md) | socket, http | DBO, BRK, MON, JOB, VAR (ALL_AUTHORITY except DBC) |
 | [adddbmtuser](adddbmtuser.md) | socket, http | DBC |
 | [getaddvolstatus](getaddvolstatus.md) | socket, http | ALL_AUTHORITY |
 | [dbmtuserlogin](dbmtuserlogin.md) | socket, http | ALL_AUTHORITY |
@@ -168,12 +170,11 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
 | --- | --- | --- | --- |
 | [heartbeatlist](heartbeatlist.md) | socket, http | ALL_AUTHORITY |
-| [rolechange](rolechange.md) | socket, http | DBC, DBO |
 | [ha_reload](ha_reload.md) | socket, http | DBC, DBO |
 | [ha_status](ha_status.md) | socket, http | ALL_AUTHORITY |
 | [ha_start](ha_start.md) | socket, http | DBC, DBO |
 | [ha_stop](ha_stop.md) | socket, http | DBC, DBO |
-| [gethaapplyinfo](gethaapplyinfo.md) | http | DBC, DBO |
+| [gethaapplyinfo](gethaapplyinfo.md) | http | ALL_AUTHORITY |
 
 ### Monitoring
 
@@ -183,6 +184,10 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [set_mon_interval](set_mon_interval.md) | http | ADMIN |
 | [get_mon_statistic](get_mon_statistic.md) | http | MON |
 | [monitorprocess](monitorprocess.md) | socket, http | ALL_AUTHORITY |
+| [gethoststat](gethoststat.md) | socket, http | ALL_AUTHORITY |
+| [addstatustemplate](addstatustemplate.md) | socket, http | DBC, DBO, MON |
+| [updatestatustemplate](updatestatustemplate.md) | socket, http | DBC, DBO, MON |
+| [removestatustemplate](removestatustemplate.md) | socket, http | DBC, DBO, MON |
 
 ### Log
 
@@ -200,6 +205,15 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [getlogfileinfo](getlogfileinfo.md) | socket, http | ALL_AUTHORITY |
 | [analyzecaslog](analyzecaslog.md) | socket, http | ALL_AUTHORITY |
 | [getcaslogtopresult](getcaslogtopresult.md) | socket, http | ALL_AUTHORITY |
+| [resetlog](resetlog.md) | socket, http | DBC, DBO |
+| [removelog](removelog.md) | socket, http | ALL_AUTHORITY |
+| [errortrace](errortrace.md) | socket, http | ALL_AUTHORITY |
+
+### Shard
+
+| **Interface Name** | **Connection Type** | **Permission** | **Support Version** |
+| --- | --- | --- | --- |
+| [getshardinfo](getshardinfo.md) | socket, http | ALL_AUTHORITY |
 
 ### Others
 
@@ -218,3 +232,4 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [getcmsenv](getcmsenv.md) | socket, http | ALL_AUTHORITY |
 | [shard_start](shard_start.md) | socket, http | DBC, DBO, BRK |
 | [shard_stop](shard_stop.md) | socket, http | DBC, DBO, BRK |
+| [getenv](getenv.md) | socket, http | ALL_AUTHORITY |

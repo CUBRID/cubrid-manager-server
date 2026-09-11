@@ -1,0 +1,6 @@
+{"task":"updatedbmtuser",
+"token":"",
+"casauth":"admin",
+"dbcreate":"none",
+"statusmonitorauth":"admin",
+"dbauth":[{"dbname": "demodb", "dbid": "dba", "dbpassword": "", "dbbrokeraddress": "192.168.0.1,33000"}]}

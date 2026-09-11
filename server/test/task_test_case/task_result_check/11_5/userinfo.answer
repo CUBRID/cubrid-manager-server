@@ -1,0 +1,111 @@
+{
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "task": "userinfo",
+   "user": [
+      {
+         "@id": "",
+         "@name": "INFORMATION_SCHEMA",
+         "authorization": [
+            {
+               "_db_attribute": "1",
+               "_db_auth": "1",
+               "_db_authorization": "1",
+               "_db_charset": "1",
+               "_db_class": "1",
+               "_db_collation": "1",
+               "_db_data_type": "1",
+               "_db_domain": "1",
+               "_db_ha_apply_info": "1",
+               "_db_index": "1",
+               "_db_index_key": "1",
+               "_db_meth_arg": "1",
+               "_db_meth_file": "1",
+               "_db_meth_sig": "1",
+               "_db_method": "1",
+               "_db_partition": "1",
+               "_db_query_spec": "1",
+               "_db_serial": "1",
+               "_db_server": "1",
+               "_db_stored_procedure": "1",
+               "_db_stored_procedure_args": "1",
+               "_db_stored_procedure_code": "1",
+               "_db_synonym": "1",
+               "_db_trigger": "1",
+               "_db_user": "1",
+               "db_root": "1",
+               "dual": "1"
+            }
+         ],
+         "groups": [
+            {
+               "group": [
+                  "PUBLIC"
+               ]
+            }
+         ]
+      },
+      {
+         "@id": "",
+         "@name": "PUBLIC",
+         "authorization": [
+            {
+               "db_attr_setdomain_elm": "1",
+               "db_attribute": "1",
+               "db_auth": "1",
+               "db_authorization": "1",
+               "db_charset": "1",
+               "db_class": "1",
+               "db_collation": "1",
+               "db_direct_super_class": "1",
+               "db_ha_apply_info": "1",
+               "db_histogram": "1",
+               "db_index": "1",
+               "db_index_key": "1",
+               "db_meth_arg": "1",
+               "db_meth_arg_setdomain_elm": "1",
+               "db_meth_file": "1",
+               "db_method": "1",
+               "db_partition": "1",
+               "db_root": "65",
+               "db_serial": "1",
+               "db_server": "1",
+               "db_stored_procedure": "1",
+               "db_stored_procedure_args": "1",
+               "db_synonym": "1",
+               "db_trigger": "1",
+               "db_user": "65",
+               "db_vclass": "1",
+               "dual": "1",
+               "information_schema.column_privileges": "1",
+               "information_schema.columns": "1",
+               "information_schema.domains": "1",
+               "information_schema.foreign_servers": "1",
+               "information_schema.key_column_usage": "1",
+               "information_schema.parameters": "1",
+               "information_schema.partitions": "1",
+               "information_schema.referential_constraints": "1",
+               "information_schema.routine_privileges": "1",
+               "information_schema.routines": "1",
+               "information_schema.schemata": "1",
+               "information_schema.sequences": "1",
+               "information_schema.statistics": "1",
+               "information_schema.synonyms": "1",
+               "information_schema.table_constraints": "1",
+               "information_schema.table_privileges": "1",
+               "information_schema.tables": "1",
+               "information_schema.triggers": "1",
+               "information_schema.views": "1"
+            }
+         ],
+         "groups": null
+      },
+      {
+         "@id": "",
+         "@name": "DBA",
+         "authorization": null,
+         "groups": null
+      }
+   ]
+}
