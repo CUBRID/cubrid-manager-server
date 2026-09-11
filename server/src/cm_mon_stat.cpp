@@ -285,13 +285,13 @@ bool cm_mon_stat::initial()
   try
     {
       if (access (_meta_file.c_str(), F_OK) < 0)   /* file not exist */
-        {
-          _init = init_meta (DEFAULT_MON_STAT_INTERVAL);
-        }
+	{
+	  _init = init_meta (DEFAULT_MON_STAT_INTERVAL);
+	}
       else
-        {
-          _init = load_meta_file();
-        }
+	{
+	  _init = load_meta_file();
+	}
     }
   catch (exception &)
     {
@@ -393,10 +393,10 @@ void cm_mon_stat::aggregate_2_day (time_t gather_time)
 }
 
 void cm_mon_stat::aggregate_os (int read_offset,
-                                int buf_base,
-                                int write_offset,
-                                AGG_TYPE atype,
-                                time_t gather_time)
+				int buf_base,
+				int write_offset,
+				AGG_TYPE atype,
+				time_t gather_time)
 {
   string key;
   int mod = 0;
@@ -415,9 +415,9 @@ void cm_mon_stat::aggregate_os (int read_offset,
     {
       time_t last_time = _meta[key].asInt();
       if (last_time / mod >= gather_time / mod)
-        {
-          return;
-        }
+	{
+	  return;
+	}
     }
   int bufsize = buf_base * OS_METRICS_LEN;
   int *buf = new (int[bufsize]);
@@ -433,13 +433,13 @@ void cm_mon_stat::aggregate_os (int read_offset,
   for (int i = 0; i < 4; i++)
     {
       if (HOUR == atype)
-        {
-          mon_diff_avg (buf, bufsize, agg_data, i, OS_METRICS_LEN, _meta[K_INTERVAL].asInt());
-        }
+	{
+	  mon_diff_avg (buf, bufsize, agg_data, i, OS_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	}
       else
-        {
-          mon_avg (buf, bufsize, agg_data, i, OS_METRICS_LEN);
-        }
+	{
+	  mon_avg (buf, bufsize, agg_data, i, OS_METRICS_LEN);
+	}
     }
   mon_avg (buf, bufsize, agg_data, 4, OS_METRICS_LEN, 100);
   mon_avg (buf, bufsize, agg_data, 5, OS_METRICS_LEN, 100);
@@ -455,10 +455,10 @@ void cm_mon_stat::aggregate_os (int read_offset,
 }
 
 void cm_mon_stat::aggregate_dbs (int read_offset,
-                                 int buf_base,
-                                 int write_offset,
-                                 AGG_TYPE atype,
-                                 time_t gather_time)
+				 int buf_base,
+				 int write_offset,
+				 AGG_TYPE atype,
+				 time_t gather_time)
 {
   string key;
   int mod = 0;
@@ -476,9 +476,9 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
     {
       time_t last_time = _meta[key].asInt();
       if (last_time / mod >= gather_time / mod)
-        {
-          return;
-        }
+	{
+	  return;
+	}
     }
 
   // Fix for CUBRIDSUS-11976
@@ -493,10 +493,10 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
     {
       string dbname = active_dbs[i].asString();
       if (false == _meta[K_DB_RRD].isMember (dbname + "_idx"))
-        {
-          LOG_WARN ("can't find db [%s] index in meta file", dbname.c_str());
-          continue;
-        }
+	{
+	  LOG_WARN ("can't find db [%s] index in meta file", dbname.c_str());
+	  continue;
+	}
       int db_idx = _meta[K_DB_RRD][dbname + "_idx"].asInt();
       int read_idx = db_idx * MON_DATA_BLOCK + read_offset;
 
@@ -504,74 +504,74 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
       int *buf = new (int[bufsize]);
 
       if (false == get_rrdfile (_data_path + DB_MON, read_idx, buf, bufsize, DB_METRICS_LEN))
-        {
-          LOG_WARN ("read db rrd file failed");
-          delete [] buf;
-          return;
-        }
+	{
+	  LOG_WARN ("read db rrd file failed");
+	  delete [] buf;
+	  return;
+	}
 
       int agg_data[DB_METRICS_LEN];
       memset (agg_data, 0, DB_METRICS_LEN * sizeof (int));
 
       if (HOUR == atype)
-        {
-          mon_diff_avg (buf, bufsize, agg_data, 0, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[0] = agg_data[0] / _meta[K_INTERVAL].asInt();
-          mon_diff_avg (buf, bufsize, agg_data, 1, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[1] = agg_data[1] / _meta[K_INTERVAL].asInt();
-        }
+	{
+	  mon_diff_avg (buf, bufsize, agg_data, 0, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[0] = agg_data[0] / _meta[K_INTERVAL].asInt();
+	  mon_diff_avg (buf, bufsize, agg_data, 1, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[1] = agg_data[1] / _meta[K_INTERVAL].asInt();
+	}
       else
-        {
-          mon_avg (buf, bufsize, agg_data, 0, DB_METRICS_LEN);
-          mon_avg (buf, bufsize, agg_data, 1, DB_METRICS_LEN);
-        }
+	{
+	  mon_avg (buf, bufsize, agg_data, 0, DB_METRICS_LEN);
+	  mon_avg (buf, bufsize, agg_data, 1, DB_METRICS_LEN);
+	}
       mon_avg (buf,bufsize, agg_data, 2, DB_METRICS_LEN, 100);
       mon_avg (buf,bufsize, agg_data, 3, DB_METRICS_LEN, 100);
       if (HOUR == atype)
-        {
-          mon_diff_avg (buf, bufsize, agg_data, 4, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[4] = agg_data[4] / _meta[K_INTERVAL].asInt();
-          mon_diff_avg (buf, bufsize, agg_data, 5, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[5] = agg_data[5] / _meta[K_INTERVAL].asInt();
-        }
+	{
+	  mon_diff_avg (buf, bufsize, agg_data, 4, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[4] = agg_data[4] / _meta[K_INTERVAL].asInt();
+	  mon_diff_avg (buf, bufsize, agg_data, 5, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[5] = agg_data[5] / _meta[K_INTERVAL].asInt();
+	}
       else
-        {
-          mon_avg (buf, bufsize, agg_data, 4, DB_METRICS_LEN);
-          mon_avg (buf, bufsize, agg_data, 5, DB_METRICS_LEN);
-        }
+	{
+	  mon_avg (buf, bufsize, agg_data, 4, DB_METRICS_LEN);
+	  mon_avg (buf, bufsize, agg_data, 5, DB_METRICS_LEN);
+	}
       mon_avg (buf,bufsize, agg_data, 6, DB_METRICS_LEN);
       for (unsigned int i = 7; i < 11; i++)
-        {
-          if (HOUR == atype)
-            {
-              mon_diff_avg (buf,bufsize, agg_data, i, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-              agg_data[i] /= _meta[K_INTERVAL].asInt();
-            }
-          else
-            {
-              mon_avg (buf,bufsize, agg_data, i, DB_METRICS_LEN);
-            }
-        }
+	{
+	  if (HOUR == atype)
+	    {
+	      mon_diff_avg (buf,bufsize, agg_data, i, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	      agg_data[i] /= _meta[K_INTERVAL].asInt();
+	    }
+	  else
+	    {
+	      mon_avg (buf,bufsize, agg_data, i, DB_METRICS_LEN);
+	    }
+	}
       // HA metrics
       if (HOUR == atype)
-        {
-          mon_diff_avg (buf,bufsize, agg_data, 11, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[11] /= _meta[K_INTERVAL].asInt();
-        }
+	{
+	  mon_diff_avg (buf,bufsize, agg_data, 11, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[11] /= _meta[K_INTERVAL].asInt();
+	}
       else
-        {
-          mon_avg (buf,bufsize, agg_data, 11, DB_METRICS_LEN);
-        }
+	{
+	  mon_avg (buf,bufsize, agg_data, 11, DB_METRICS_LEN);
+	}
       mon_avg (buf,bufsize, agg_data, 12, DB_METRICS_LEN);
       if (HOUR == atype)
-        {
-          mon_diff_avg (buf,bufsize, agg_data, 13, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
-          agg_data[13] /= _meta[K_INTERVAL].asInt();
-        }
+	{
+	  mon_diff_avg (buf,bufsize, agg_data, 13, DB_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	  agg_data[13] /= _meta[K_INTERVAL].asInt();
+	}
       else
-        {
-          mon_avg (buf,bufsize, agg_data, 13, DB_METRICS_LEN);
-        }
+	{
+	  mon_avg (buf,bufsize, agg_data, 13, DB_METRICS_LEN);
+	}
       mon_avg (buf,bufsize, agg_data, 14, DB_METRICS_LEN);
       mon_last (buf,bufsize, agg_data, 15, DB_METRICS_LEN, 100);
       agg_data[16] = 0;
@@ -584,38 +584,38 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
       // volume
       Json::Value vols;
       if (false == get_volume_list (dbname, vols))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       for (unsigned int i = 0; i < vols.size(); i++)
-        {
-          string vol_name = vols[i].asString();
-          if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (vol_name))
-            {
-              LOG_WARN ("can't find db [%s] vol[%s] index in meta file", dbname.c_str(), vol_name.c_str());
-              continue;
-            }
-          int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][vol_name].asInt();
-          int read_idx = vol_idx * MON_DATA_BLOCK + read_offset;
-          int bufsize_vol = buf_base * VOL_METRICS_LEN;
-          int *buf_vol = new (int[bufsize_vol]);
-          if (false == get_rrdfile (_data_path + VOL_MON, read_idx, buf_vol, bufsize_vol, VOL_METRICS_LEN))
-            {
-              LOG_WARN ("read volume rrd file failed");
-              delete [] buf;
-              delete [] buf_vol;
-              return;
-            }
-          int agg_data[VOL_METRICS_LEN];
-          memset (agg_data, 0, VOL_METRICS_LEN * sizeof (int));
-          mon_last (buf_vol,bufsize_vol,agg_data,0,VOL_METRICS_LEN, 100);
-          agg_data[1] = int (gather_time);
+	{
+	  string vol_name = vols[i].asString();
+	  if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (vol_name))
+	    {
+	      LOG_WARN ("can't find db [%s] vol[%s] index in meta file", dbname.c_str(), vol_name.c_str());
+	      continue;
+	    }
+	  int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][vol_name].asInt();
+	  int read_idx = vol_idx * MON_DATA_BLOCK + read_offset;
+	  int bufsize_vol = buf_base * VOL_METRICS_LEN;
+	  int *buf_vol = new (int[bufsize_vol]);
+	  if (false == get_rrdfile (_data_path + VOL_MON, read_idx, buf_vol, bufsize_vol, VOL_METRICS_LEN))
+	    {
+	      LOG_WARN ("read volume rrd file failed");
+	      delete [] buf;
+	      delete [] buf_vol;
+	      return;
+	    }
+	  int agg_data[VOL_METRICS_LEN];
+	  memset (agg_data, 0, VOL_METRICS_LEN * sizeof (int));
+	  mon_last (buf_vol,bufsize_vol,agg_data,0,VOL_METRICS_LEN, 100);
+	  agg_data[1] = int (gather_time);
 
-          int rrdpos = vol_idx * MON_DATA_BLOCK + write_offset;
-          update_rrdfile (_data_path + VOL_MON, rrdpos, agg_data, VOL_METRICS_LEN, VOL_METRICS_LEN);
-          delete [] buf_vol;
-        }
+	  int rrdpos = vol_idx * MON_DATA_BLOCK + write_offset;
+	  update_rrdfile (_data_path + VOL_MON, rrdpos, agg_data, VOL_METRICS_LEN, VOL_METRICS_LEN);
+	  delete [] buf_vol;
+	}
       delete [] buf;
     }
   _meta[key] = int (gather_time);
@@ -664,75 +664,75 @@ bool cm_mon_stat::get_mon_statistic (const Json::Value req, Json::Value &res, st
       || DB_CPU_USER == metric)
     {
       if (false == m_get_mon_statistic (req, res, errmsg))
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
 
       Json::Value os_idle_req, os_idle_res;
       os_idle_req = req;
       os_idle_req["metric"] = OS_CPU_IDLE;
       if (false == m_get_mon_statistic (os_idle_req, os_idle_res, errmsg))
-        {
-          res.removeMember ("data");
-          return false;
-        }
+	{
+	  res.removeMember ("data");
+	  return false;
+	}
 
       Json::Value os_iowait_req, os_iowait_res;
       os_iowait_req = req;
       os_iowait_req["metric"] = OS_CPU_IOWAIT;
       if (false == m_get_mon_statistic (os_iowait_req, os_iowait_res, errmsg))
-        {
-          res.removeMember ("data");
-          return false;
-        }
+	{
+	  res.removeMember ("data");
+	  return false;
+	}
 
       Json::Value os_kernel_req, os_kernel_res;
       os_kernel_req = req;
       os_kernel_req["metric"] = OS_CPU_KERNEL;
       if (false == m_get_mon_statistic (os_kernel_req, os_kernel_res, errmsg))
-        {
-          res.removeMember ("data");
-          return false;
-        }
+	{
+	  res.removeMember ("data");
+	  return false;
+	}
 
       Json::Value os_user_req, os_user_res;
       os_user_req = req;
       os_user_req["metric"] = OS_CPU_USER;
       if (false == m_get_mon_statistic (os_user_req, os_user_res, errmsg))
-        {
-          res.removeMember ("data");
-          return false;
-        }
+	{
+	  res.removeMember ("data");
+	  return false;
+	}
 
       for (unsigned int i = 0; i < res["data"].size(); i++)
-        {
-          if (res["data"][i].asInt() == INIT_METRIC_VALUE)
-            {
-              continue;
-            }
-          else if (os_idle_res["data"][i].asInt() != INIT_METRIC_VALUE
-                   && os_iowait_req["data"][i].asInt() != INIT_METRIC_VALUE
-                   && os_kernel_res["data"][i].asInt() != INIT_METRIC_VALUE
-                   && os_user_res["data"][i].asInt() != INIT_METRIC_VALUE)
-            {
-              int total = os_idle_res["data"][i].asInt() + os_iowait_req["data"][i].asInt()
-                          + os_kernel_res["data"][i].asInt() + os_user_res["data"][i].asInt();
-              if (total <= 0)
-                {
-                  res["data"][i] = 0;
-                }
-              else
-                {
-                  // Because of percentage and accurating to the second decimal places,
-                  // so it should be multiply by 10000.
-                  res["data"][i] = int (float (res["data"][i].asInt()) * 10000 / total);
-                }
-            }
-          else
-            {
-              res["data"][i] = INIT_METRIC_VALUE;
-            }
-        }
+	{
+	  if (res["data"][i].asInt() == INIT_METRIC_VALUE)
+	    {
+	      continue;
+	    }
+	  else if (os_idle_res["data"][i].asInt() != INIT_METRIC_VALUE
+		   && os_iowait_req["data"][i].asInt() != INIT_METRIC_VALUE
+		   && os_kernel_res["data"][i].asInt() != INIT_METRIC_VALUE
+		   && os_user_res["data"][i].asInt() != INIT_METRIC_VALUE)
+	    {
+	      int total = os_idle_res["data"][i].asInt() + os_iowait_req["data"][i].asInt()
+			  + os_kernel_res["data"][i].asInt() + os_user_res["data"][i].asInt();
+	      if (total <= 0)
+		{
+		  res["data"][i] = 0;
+		}
+	      else
+		{
+		  // Because of percentage and accurating to the second decimal places,
+		  // so it should be multiply by 10000.
+		  res["data"][i] = int (float (res["data"][i].asInt()) * 10000 / total);
+		}
+	    }
+	  else
+	    {
+	      res["data"][i] = INIT_METRIC_VALUE;
+	    }
+	}
       return true;
     }
   else
@@ -767,28 +767,28 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       string dbname = req["dbname"].asString();
       res["dbname"] = dbname;
       if (false == _meta[K_DB_RRD].isMember (dbname + "_idx"))
-        {
-          errmsg = string ("Can't find dbname[") + dbname + "] in meta[k_db_rrd]";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find dbname[") + dbname + "] in meta[k_db_rrd]";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       int db_idx = _meta[K_DB_RRD][dbname + "_idx"].asInt();
       for (i = 0; i < DB_METRICS_LEN; i++)
-        {
-          if (DB_METRICS[i].metric == metric)
-            {
-              m_idx = i;
-              pfactor = DB_METRICS[i].pfactor;
-              d_diff = DB_METRICS[i].ddiff;
-              break;
-            }
-        }
+	{
+	  if (DB_METRICS[i].metric == metric)
+	    {
+	      m_idx = i;
+	      pfactor = DB_METRICS[i].pfactor;
+	      d_diff = DB_METRICS[i].ddiff;
+	      break;
+	    }
+	}
       if (i == DB_METRICS_LEN)
-        {
-          errmsg = string ("Can't find DB metric[") + metric + "] from request";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find DB metric[") + metric + "] from request";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       string data_path = _data_path + DB_MON;
       return get_rrd_data (mdtype, data_path, db_idx, m_idx, pfactor, d_diff, DB_METRICS_LEN, res, errmsg);
     }
@@ -800,24 +800,24 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       res["dbname"] = dbname;
       res["volname"] = volname;
       if (false == _meta[K_DB_RRD].isMember (dbname + "_vol"))
-        {
-          errmsg = string ("Can't find dbname_vol[") + dbname + "] in meta[k_db_rrd]";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find dbname_vol[") + dbname + "] in meta[k_db_rrd]";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (volname))
-        {
-          errmsg = string ("Can't find volname[") + volname + "] in DB [" + dbname + "] meta[k_db_rrd]";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find volname[") + volname + "] in DB [" + dbname + "] meta[k_db_rrd]";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][volname].asInt();
       if (VOL_FREESPACE != metric)
-        {
-          errmsg = string ("Can't find volume metric[") + metric + "] from request";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find volume metric[") + metric + "] from request";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       string data_path = _data_path + VOL_MON;
       return get_rrd_data (mdtype, data_path, vol_idx, m_idx, 100, d_diff, VOL_METRICS_LEN, res, errmsg);
     }
@@ -827,28 +827,28 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       string bname = req["bname"].asString();
       res["bname"] = bname;
       if (false == _meta[K_BROKER_RRD].isMember (bname + "_idx"))
-        {
-          errmsg = string ("Can't find broker [") + bname + "] in meta[k_db_rrd]";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find broker [") + bname + "] in meta[k_db_rrd]";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       int b_idx = _meta[K_BROKER_RRD][bname + "_idx"].asInt();
       for (i = 0; i < BROKER_METRICS_LEN; i++)
-        {
-          if (BROKER_METRICS[i].metric == metric)
-            {
-              m_idx = i;
-              pfactor = BROKER_METRICS[i].pfactor;
-              d_diff = BROKER_METRICS[i].ddiff;
-              break;
-            }
-        }
+	{
+	  if (BROKER_METRICS[i].metric == metric)
+	    {
+	      m_idx = i;
+	      pfactor = BROKER_METRICS[i].pfactor;
+	      d_diff = BROKER_METRICS[i].ddiff;
+	      break;
+	    }
+	}
       if (i == BROKER_METRICS_LEN)
-        {
-          errmsg = string ("Can't find broker metric[") + metric + "] from request";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find broker metric[") + metric + "] from request";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       string data_path = _data_path + BROKER_MON;
       return get_rrd_data (mdtype, data_path, b_idx, m_idx, pfactor, d_diff, BROKER_METRICS_LEN, res, errmsg);
     }
@@ -856,21 +856,21 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
   if (0 == strncmp ("os_", metric.c_str(), strlen ("os_")))
     {
       for (i = 0; i < OS_METRICS_LEN; i++)
-        {
-          if (OS_METRICS[i].metric == metric)
-            {
-              m_idx = i;
-              pfactor = OS_METRICS[i].pfactor;
-              d_diff = OS_METRICS[i].ddiff;
-              break;
-            }
-        }
+	{
+	  if (OS_METRICS[i].metric == metric)
+	    {
+	      m_idx = i;
+	      pfactor = OS_METRICS[i].pfactor;
+	      d_diff = OS_METRICS[i].ddiff;
+	      break;
+	    }
+	}
       if (i == OS_METRICS_LEN)
-        {
-          errmsg = string ("Can't find os metric[") + metric + "] from request";
-          LOG_WARN (errmsg.c_str());
-          return false;
-        }
+	{
+	  errmsg = string ("Can't find os metric[") + metric + "] from request";
+	  LOG_WARN (errmsg.c_str());
+	  return false;
+	}
       string data_path = _data_path + OS_MON;
       return get_rrd_data (mdtype, data_path, 0, m_idx, pfactor, d_diff, OS_METRICS_LEN, res, errmsg);
     }
@@ -879,8 +879,8 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
 }
 
 bool cm_mon_stat::get_rrd_data (MDTYPE mdtype, string dpath, int didx,
-                                int midx, int pfactor, bool ddiff, int mlen,
-                                Json::Value &res, string &errmsg) const
+				int midx, int pfactor, bool ddiff, int mlen,
+				Json::Value &res, string &errmsg) const
 {
   int read_rrd_idx = didx * MON_DATA_BLOCK;
   int bufsize = 0;
@@ -915,95 +915,95 @@ bool cm_mon_stat::get_rrd_data (MDTYPE mdtype, string dpath, int didx,
     {
     case DAILY:
       read_buf_idx = _daily_idx < 0 ?
-                     (cur_time % (60 * 60 * 24)) / _meta[K_INTERVAL].asInt():_daily_idx + 1;
+		     (cur_time % (60 * 60 * 24)) / _meta[K_INTERVAL].asInt():_daily_idx + 1;
       if (true == ddiff)
-        {
-          // Smoothing data functionality is added
-          int value = INIT_METRIC_VALUE;
-          int start = 0;      // for count the num if the it's not updated from the beginning
-          for (int i = 1; i < daily_mod; i++)
-            {
-              int cur = buf[ ((read_buf_idx + i) % daily_mod) * mlen + midx];
-              int cur_up = buf[ ((read_buf_idx + i) % daily_mod) * mlen + mlen - 1];
-              int pre = buf[ ((read_buf_idx + i - 1) % daily_mod) * mlen + midx];
-              int pre_up = buf[ ((read_buf_idx + i - 1) % daily_mod) * mlen + mlen - 1];
-              if ((cur_up < pre_up) || (cur_up - pre_up > 2 * _meta[K_INTERVAL].asInt()))
-                {
-                  if (-1 != start)
-                    {
-                      start++;
-                    }
-                  else
-                    {
-                      res["data"].append (value); // using last value
-                    }
-                }
-              else
-                {
-                  if (cur == INIT_METRIC_VALUE)
-                    {
-                      value = INIT_METRIC_VALUE;
-                    }
-                  else  if (pre == INIT_METRIC_VALUE)
-                    {
-                      value = int ((float (cur) * (100/pfactor)) / _meta[K_INTERVAL].asInt());
-                    }
-                  else
-                    {
-                      value = int ((float (cur >= pre ? cur - pre: cur) * (100/pfactor)) / _meta[K_INTERVAL].asInt());
-                    }
-                  res["data"].append (value);
-                  if (-1 != start)         // If from the start, add extra value
-                    {
-                      while (start >= 0)
-                        {
-                          res["data"].append (value);
-                          start--;
-                        }
-                    }
-                }
-            }
-          if (Json::Value::null == res["data"])
-            {
-              for (int i = 0; i < daily_mod; i++)
-                {
-                  res["data"].append (0);
-                }
-            }
-        }
+	{
+	  // Smoothing data functionality is added
+	  int value = INIT_METRIC_VALUE;
+	  int start = 0;      // for count the num if the it's not updated from the beginning
+	  for (int i = 1; i < daily_mod; i++)
+	    {
+	      int cur = buf[ ((read_buf_idx + i) % daily_mod) * mlen + midx];
+	      int cur_up = buf[ ((read_buf_idx + i) % daily_mod) * mlen + mlen - 1];
+	      int pre = buf[ ((read_buf_idx + i - 1) % daily_mod) * mlen + midx];
+	      int pre_up = buf[ ((read_buf_idx + i - 1) % daily_mod) * mlen + mlen - 1];
+	      if ((cur_up < pre_up) || (cur_up - pre_up > 2 * _meta[K_INTERVAL].asInt()))
+		{
+		  if (-1 != start)
+		    {
+		      start++;
+		    }
+		  else
+		    {
+		      res["data"].append (value); // using last value
+		    }
+		}
+	      else
+		{
+		  if (cur == INIT_METRIC_VALUE)
+		    {
+		      value = INIT_METRIC_VALUE;
+		    }
+		  else  if (pre == INIT_METRIC_VALUE)
+		    {
+		      value = int ((float (cur) * (100/pfactor)) / _meta[K_INTERVAL].asInt());
+		    }
+		  else
+		    {
+		      value = int ((float (cur >= pre ? cur - pre: cur) * (100/pfactor)) / _meta[K_INTERVAL].asInt());
+		    }
+		  res["data"].append (value);
+		  if (-1 != start)         // If from the start, add extra value
+		    {
+		      while (start >= 0)
+			{
+			  res["data"].append (value);
+			  start--;
+			}
+		    }
+		}
+	    }
+	  if (Json::Value::null == res["data"])
+	    {
+	      for (int i = 0; i < daily_mod; i++)
+		{
+		  res["data"].append (0);
+		}
+	    }
+	}
       else
-        {
-          for (int i = read_buf_idx; i < read_buf_idx + daily_mod; i++)
-            {
-              res["data"].append (buf[ (i % daily_mod) * mlen + midx] * (100/pfactor));
-            }
-        }
+	{
+	  for (int i = read_buf_idx; i < read_buf_idx + daily_mod; i++)
+	    {
+	      res["data"].append (buf[ (i % daily_mod) * mlen + midx] * (100/pfactor));
+	    }
+	}
       break;
     case WEEKLY:
       read_buf_idx = _monthly_idx < 0 ? (cur_time % (30 * 60 * 60 * 24)) / 3600 :_monthly_idx + 1;
       read_buf_idx += 30 * 24;
       for (int i = read_buf_idx - 24*7; i <  read_buf_idx; i++)
-        {
-          res["data"].append (buf[ (i% (30*24)) * mlen + midx]);
-        }
+	{
+	  res["data"].append (buf[ (i% (30*24)) * mlen + midx]);
+	}
       break;
     case MONTHLY:
       read_buf_idx = _monthly_idx < 0 ? (cur_time % (30 * 60 * 60 * 24)) / 3600 :_monthly_idx + 1;
       for (int i = read_buf_idx; i <  30 * 24 + read_buf_idx; i++)
-        {
-          res["data"].append (buf[ (i% (30*24)) * mlen + midx]);
-        }
+	{
+	  res["data"].append (buf[ (i% (30*24)) * mlen + midx]);
+	}
       break;
     case YEARLY:
       read_buf_idx = _yearly_idx < 0 ? (cur_time % (365 * 3600 * 24)) / (3600*24) :_yearly_idx + 1;
       for (int i = read_buf_idx; i <  365; i++)
-        {
-          res["data"].append (buf[i * mlen + midx]);
-        }
+	{
+	  res["data"].append (buf[i * mlen + midx]);
+	}
       for (int i = 0; i < read_buf_idx; i++)
-        {
-          res["data"].append (buf[i * mlen + midx]);
-        }
+	{
+	  res["data"].append (buf[i * mlen + midx]);
+	}
       break;
     }
   delete [] buf;
@@ -1019,7 +1019,7 @@ static bool get_volume_list (string dbname, Json::Value &vol_list)
   if (false == call_task (req, res, tsDbspaceInfo, errmsg))
     {
       LOG_WARN ("call getdbspaceinfo failed, error code[%d], error message [%s]",
-                res["retval"].asInt(), errmsg.c_str());
+		res["retval"].asInt(), errmsg.c_str());
       return false;
     }
   for (unsigned int i = 0; i < res["spaceinfo"].size(); i++)
@@ -1030,10 +1030,10 @@ static bool get_volume_list (string dbname, Json::Value &vol_list)
 }
 
 void cm_mon_stat::aggregate_brokers (int read_offset,
-                                     int buf_base,
-                                     int write_offset,
-                                     AGG_TYPE atype,
-                                     time_t gather_time)
+				     int buf_base,
+				     int write_offset,
+				     AGG_TYPE atype,
+				     time_t gather_time)
 {
   string key;
   int mod = 0;
@@ -1051,19 +1051,19 @@ void cm_mon_stat::aggregate_brokers (int read_offset,
     {
       time_t last_time = _meta[key].asInt();
       if (last_time / mod >= gather_time / mod)
-        {
-          return;
-        }
+	{
+	  return;
+	}
     }
 
   for (unsigned int i = 0; i < _brokers.size(); i++)
     {
       string bname = _brokers[i].asString();
       if (false == _meta[K_BROKER_RRD].isMember (bname + "_idx"))
-        {
-          LOG_WARN ("can't find broker [%s] index in meta file", bname.c_str());
-          continue;
-        }
+	{
+	  LOG_WARN ("can't find broker [%s] index in meta file", bname.c_str());
+	  continue;
+	}
       int broker_idx = _meta[K_BROKER_RRD][bname + "_idx"].asInt();
 
       int read_idx = broker_idx * MON_DATA_BLOCK + read_offset;
@@ -1072,26 +1072,26 @@ void cm_mon_stat::aggregate_brokers (int read_offset,
       int *buf = new (int[bufsize]);
 
       if (false == get_rrdfile (_data_path + BROKER_MON, read_idx, buf, bufsize, BROKER_METRICS_LEN))
-        {
-          LOG_WARN ("read broker rrd file failed");
-          delete [] buf;
-          return;
-        }
+	{
+	  LOG_WARN ("read broker rrd file failed");
+	  delete [] buf;
+	  return;
+	}
 
       int agg_data[BROKER_METRICS_LEN];
       memset (agg_data, 0, BROKER_METRICS_LEN * sizeof (int));
       for (int i = 0; i < 6; i ++)
-        {
-          if (HOUR == atype)
-            {
-              mon_diff_avg (buf, bufsize, agg_data, i, BROKER_METRICS_LEN, _meta[K_INTERVAL].asInt());
-              agg_data[i] = agg_data[i] / _meta[K_INTERVAL].asInt();
-            }
-          else
-            {
-              mon_avg (buf, bufsize, agg_data, i, BROKER_METRICS_LEN);
-            }
-        }
+	{
+	  if (HOUR == atype)
+	    {
+	      mon_diff_avg (buf, bufsize, agg_data, i, BROKER_METRICS_LEN, _meta[K_INTERVAL].asInt());
+	      agg_data[i] = agg_data[i] / _meta[K_INTERVAL].asInt();
+	    }
+	  else
+	    {
+	      mon_avg (buf, bufsize, agg_data, i, BROKER_METRICS_LEN);
+	    }
+	}
       mon_avg (buf, bufsize, agg_data, 6, BROKER_METRICS_LEN);
       agg_data[7] = 0;
       agg_data[8] = 0;
@@ -1125,10 +1125,10 @@ static void mon_avg (int *buf, int bufsize, int *agg_data, int idx, int mlen, in
   for (int i = 0; i < bufsize/mlen; i++)
     {
       if (buf[i * mlen + idx] != INIT_METRIC_VALUE)
-        {
-          agg_data[idx] += buf[i * mlen + idx];
-          count++;
-        }
+	{
+	  agg_data[idx] += buf[i * mlen + idx];
+	  count++;
+	}
     }
   if (count != 0)
     {
@@ -1152,20 +1152,20 @@ static void mon_diff_avg (int *buf, int bufsize, int *agg_data, int idx, int mle
       int next = buf[ (i + 1) * mlen + idx];
       int next_up = buf[ (i + 1) * mlen + mlen - 1];
       if (next == INIT_METRIC_VALUE)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (pre == INIT_METRIC_VALUE)
-        {
-          agg_data[idx] += next;
-          count++;
-          continue;
-        }
+	{
+	  agg_data[idx] += next;
+	  count++;
+	  continue;
+	}
       if ((pre <= next) && (next_up > pre_up) && (next_up - pre_up < 2*interval))
-        {
-          agg_data[idx] += (next - pre);
-          count++;
-        }
+	{
+	  agg_data[idx] += (next - pre);
+	  count++;
+	}
     }
   if (0 != count)
     {
@@ -1189,46 +1189,46 @@ void cm_mon_stat::gather_daily_brokers_mon (time_t gather_time)
   if (false == call_task (req, brokers_info, ts2_get_unicas_info, errmsg))
     {
       LOG_ERROR ("failed to get brokers infomation, time=[%d], error code[%d], error message [%s]",
-                 gather_time, brokers_info["retval"].asInt(), errmsg.c_str());
+		 gather_time, brokers_info["retval"].asInt(), errmsg.c_str());
       return;
     }
   if (brokers_info.isMember ("brokersinfo"))
     {
       for (unsigned int i = 0; i < brokers_info["brokersinfo"][0u]["broker"].size(); i++)
-        {
-          Json::Value &bdata = brokers_info["brokersinfo"][0u]["broker"][i];
-          string bname = bdata["name"].asString();
+	{
+	  Json::Value &bdata = brokers_info["brokersinfo"][0u]["broker"][i];
+	  string bname = bdata["name"].asString();
 
-          // resize broker rrdfile
-          if (false == _meta[K_BROKER_RRD].isMember (bname + "_idx"))
-            {
-              if (false == append_rrdfile (_data_path + BROKER_MON, MON_DATA_BLOCK, BROKER_METRICS_LEN))
-                {
-                  continue;
-                }
-              _meta[K_BROKER_RRD][bname + "_idx"] = _meta[K_BROKER_NUM].asInt();
-              _meta[K_BROKER_NUM] = _meta[K_BROKER_NUM].asInt() + 1;
-              if (false == flush_meta_file())
-                {
-                  continue;
-                }
-            }
+	  // resize broker rrdfile
+	  if (false == _meta[K_BROKER_RRD].isMember (bname + "_idx"))
+	    {
+	      if (false == append_rrdfile (_data_path + BROKER_MON, MON_DATA_BLOCK, BROKER_METRICS_LEN))
+		{
+		  continue;
+		}
+	      _meta[K_BROKER_RRD][bname + "_idx"] = _meta[K_BROKER_NUM].asInt();
+	      _meta[K_BROKER_NUM] = _meta[K_BROKER_NUM].asInt() + 1;
+	      if (false == flush_meta_file())
+		{
+		  continue;
+		}
+	    }
 
-          broker_data[0] = JSON_ATOI (bdata["tran"]);
-          broker_data[1] = JSON_ATOI (bdata["query"]);
-          broker_data[2] = JSON_ATOI (bdata["long_tran"]);
-          broker_data[3] = JSON_ATOI (bdata["long_query"]);
-          broker_data[4] = JSON_ATOI (bdata["req"]);
-          broker_data[5] = JSON_ATOI (bdata["error_query"]);
-          broker_data[6] = JSON_ATOI (bdata["jq"]);
-          broker_data[7] = 0;
-          broker_data[8] = 0;
-          broker_data[9] = int (gather_time);
+	  broker_data[0] = JSON_ATOI (bdata["tran"]);
+	  broker_data[1] = JSON_ATOI (bdata["query"]);
+	  broker_data[2] = JSON_ATOI (bdata["long_tran"]);
+	  broker_data[3] = JSON_ATOI (bdata["long_query"]);
+	  broker_data[4] = JSON_ATOI (bdata["req"]);
+	  broker_data[5] = JSON_ATOI (bdata["error_query"]);
+	  broker_data[6] = JSON_ATOI (bdata["jq"]);
+	  broker_data[7] = 0;
+	  broker_data[8] = 0;
+	  broker_data[9] = int (gather_time);
 
-          int broker_idx = _meta[K_BROKER_RRD][bname+"_idx"].asInt();
-          int rrdpos = broker_idx * MON_DATA_BLOCK + daily_idx;
-          update_rrdfile (_data_path + BROKER_MON, rrdpos, broker_data, BROKER_METRICS_LEN, BROKER_METRICS_LEN);
-        }
+	  int broker_idx = _meta[K_BROKER_RRD][bname+"_idx"].asInt();
+	  int rrdpos = broker_idx * MON_DATA_BLOCK + daily_idx;
+	  update_rrdfile (_data_path + BROKER_MON, rrdpos, broker_data, BROKER_METRICS_LEN, BROKER_METRICS_LEN);
+	}
     }
   else
     {
@@ -1253,44 +1253,44 @@ bool cm_mon_stat::gather_dbs_tran_query (time_t gather_time, Json::Value &db_tq)
       Json::Value b_as;
       // more than one broker
       if (as_res.isMember ("broker"))
-        {
-          b_as = as_res["broker"];
-        }
+	{
+	  b_as = as_res["broker"];
+	}
       else if (as_res.isMember ("asinfo"))  // one broker
-        {
-          b_as.append (as_res);
-        }
+	{
+	  b_as.append (as_res);
+	}
       else
-        {
-          LOG_WARN ("get broker status failed, time=[%d]", gather_time);
-          return false;
-        }
+	{
+	  LOG_WARN ("get broker status failed, time=[%d]", gather_time);
+	  return false;
+	}
 
       for (unsigned int i = 0; i < b_as.size(); i++)
-        {
-          for (unsigned int j = 0; j < b_as[i]["asinfo"].size(); j++)
-            {
-              string dbname = b_as[i]["asinfo"][j]["as_dbname"].asString();
-              if (0 != dbname.length())
-                {
-                  if (db_tq.isMember (dbname))
-                    {
-                      db_tq[dbname]["query"] = db_tq[dbname]["query"].asInt() + JSON_ATOI (b_as[i]["asinfo"][j]["as_num_query"]);
-                      db_tq[dbname]["tran"] = db_tq[dbname]["tran"].asInt() + JSON_ATOI (b_as[i]["asinfo"][j]["as_num_tran"]);
-                    }
-                  else
-                    {
-                      db_tq[dbname]["query"] = JSON_ATOI (b_as[i]["asinfo"][j]["as_num_query"]);
-                      db_tq[dbname]["tran"] = JSON_ATOI (b_as[i]["asinfo"][j]["as_num_tran"]);
-                    }
-                }
-            }
-        }
+	{
+	  for (unsigned int j = 0; j < b_as[i]["asinfo"].size(); j++)
+	    {
+	      string dbname = b_as[i]["asinfo"][j]["as_dbname"].asString();
+	      if (0 != dbname.length())
+		{
+		  if (db_tq.isMember (dbname))
+		    {
+		      db_tq[dbname]["query"] = db_tq[dbname]["query"].asInt() + JSON_ATOI (b_as[i]["asinfo"][j]["as_num_query"]);
+		      db_tq[dbname]["tran"] = db_tq[dbname]["tran"].asInt() + JSON_ATOI (b_as[i]["asinfo"][j]["as_num_tran"]);
+		    }
+		  else
+		    {
+		      db_tq[dbname]["query"] = JSON_ATOI (b_as[i]["asinfo"][j]["as_num_query"]);
+		      db_tq[dbname]["tran"] = JSON_ATOI (b_as[i]["asinfo"][j]["as_num_tran"]);
+		    }
+		}
+	    }
+	}
     }
   else
     {
       LOG_WARN ("get brokers status failed, time=[%d], error code [%d], error message [%s]",
-                gather_time, as_res["retval"].asInt(), errmsg.c_str());
+		gather_time, as_res["retval"].asInt(), errmsg.c_str());
       return false;
     }
   return true;
@@ -1323,18 +1323,18 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
     {
       has_ha_info = true;
       if ("master" == ha_res["current_node_state"].asString())
-        {
-          ha_rmt_hostname = ha_res["nodeA"].asString();
-        }
+	{
+	  ha_rmt_hostname = ha_res["nodeA"].asString();
+	}
       else
-        {
-          ha_rmt_hostname = ha_res["nodeB"].asString();
-        }
+	{
+	  ha_rmt_hostname = ha_res["nodeB"].asString();
+	}
     }
   else if (ERR_SYSTEM_CALL != ha_res["retval"].asInt())
     {
       LOG_WARN ("Get HA status failed, time=[%d], error code [%d], error message [%s]",
-                gather_time, ha_res["retval"].asInt(), errmsg.c_str());
+		gather_time, ha_res["retval"].asInt(), errmsg.c_str());
     }
 
   for (unsigned int i = 0; i < active_dbs.size(); i++)
@@ -1343,31 +1343,31 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
       string dbname = active_dbs[i].asString();
       // resize db rrdfile
       if (false == _meta[K_DB_RRD].isMember (dbname + "_idx"))
-        {
-          if (false == append_rrdfile (_data_path + DB_MON, MON_DATA_BLOCK, DB_METRICS_LEN))
-            {
-              LOG_WARN ("append rrd file for new db failed, time=[%d]", gather_time);
-              continue;
-            }
-          _meta[K_DB_RRD][dbname + "_idx"] = _meta[K_DB_NUM].asInt();
-          _meta[K_DB_NUM] = _meta[K_DB_NUM].asInt() + 1;
-          if (false == flush_meta_file())
-            {
-              LOG_WARN ("flush meta file failed, time=[%d]", gather_time);
-              continue;
-            }
-        }
+	{
+	  if (false == append_rrdfile (_data_path + DB_MON, MON_DATA_BLOCK, DB_METRICS_LEN))
+	    {
+	      LOG_WARN ("append rrd file for new db failed, time=[%d]", gather_time);
+	      continue;
+	    }
+	  _meta[K_DB_RRD][dbname + "_idx"] = _meta[K_DB_NUM].asInt();
+	  _meta[K_DB_NUM] = _meta[K_DB_NUM].asInt() + 1;
+	  if (false == flush_meta_file())
+	    {
+	      LOG_WARN ("flush meta file failed, time=[%d]", gather_time);
+	      continue;
+	    }
+	}
 
       Json::Value req, res;
       req["dbname"] = dbname;
       req["_DBNAME"] = dbname;
       errmsg = "";
       if (false == call_task (req, res, ts_get_dbproc_stat, errmsg))
-        {
-          LOG_WARN ("call getdbprocstatus failed, time=[%d], error code[%d], error message [%s]",
-                    gather_time, res["retval"].asInt(), errmsg.c_str());
-          continue;
-        }
+	{
+	  LOG_WARN ("call getdbprocstatus failed, time=[%d], error code[%d], error message [%s]",
+		    gather_time, res["retval"].asInt(), errmsg.c_str());
+	  continue;
+	}
 #if defined(WINDOWS)
       db_data[0] = JSON_ATOI (res["dbstat"][0u]["cpu_kernel"]) / CPU_BASE_FEQ_WIN;
       db_data[1] = JSON_ATOI (res["dbstat"][0u]["cpu_user"]) / CPU_BASE_FEQ_WIN;
@@ -1378,25 +1378,25 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
       db_data[2] = int (JSON_ATOL (res["dbstat"][0u]["mem_physical"]) * 100 / MB_SIZE);
       db_data[3] = int (JSON_ATOL (res["dbstat"][0u]["mem_virtual"]) * 100 / MB_SIZE);
       if (db_tq.isMember (dbname))
-        {
-          db_data[4] = db_tq[dbname]["query"].asInt();
-          db_data[5] = db_tq[dbname]["tran"].asInt();
-        }
+	{
+	  db_data[4] = db_tq[dbname]["query"].asInt();
+	  db_data[5] = db_tq[dbname]["tran"].asInt();
+	}
       else
-        {
-          db_data[4] = 0;
-          db_data[5] = 0;
-        }
+	{
+	  db_data[4] = 0;
+	  db_data[5] = 0;
+	}
 
       //statdump
       res.clear();
       errmsg = "";
       if (false == call_task (req, res, ts_statdump, errmsg))
-        {
-          LOG_WARN ("call statdump failed, time=[%d], error code[%d], error message [%s]",
-                    gather_time, res["retval"].asInt(), errmsg.c_str());
-          continue;
-        }
+	{
+	  LOG_WARN ("call statdump failed, time=[%d], error code[%d], error message [%s]",
+		    gather_time, res["retval"].asInt(), errmsg.c_str());
+	  continue;
+	}
       db_data[6] = JSON_ATOI (res["data_page_buffer_hit_ratio"]);
       db_data[7] = JSON_ATOI (res["num_data_page_fetches"]);
       db_data[8] = JSON_ATOI (res["num_data_page_dirties"]);
@@ -1405,49 +1405,49 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
 
       // HA monitoring
       if (true == has_ha_info)
-        {
-          // TODO: HA monitoring
-          for (unsigned int i = 0; i < ha_res["ha_info"].size(); i++)
-            {
-              if (dbname == ha_res["ha_info"][i]["dbname"].asString())
-                {
-                  Json::Value req, res;
-                  req["task"] = "gethaapplyinfo";
-                  req["dbname"] = dbname;
-                  req["remotehostname"] = ha_rmt_hostname;
-                  string copylog = ha_res["ha_info"][i]["copylogdb"].asString();
-                  unsigned int colon_idx = (unsigned int) copylog.find (':');
-                  if (string::npos == colon_idx)
-                    {
-                      LOG_WARN ("Error format of copylogdb, time=[%d], copylogdb=[%s]",
-                                gather_time, req["copylogdb"].asString().c_str());
-                      break;
-                    }
-                  req["copylogpath"] = copylog.substr (colon_idx + 1);
-                  if (false == call_task_ext (req, res, ext_get_ha_apply_info))
-                    {
-                      LOG_WARN ("Get HA apply info failed, time=[%d], dbname=[%s]",
-                                gather_time, req["dbname"].asString().c_str());
-                      break;
-                    }
-                  db_data[11] = JSON_ATOI (res["copyinglog_coun"]);
-                  db_data[12] = JSON_ATOI (res["copyinglog_estimated_time"]);
-                  db_data[13] = JSON_ATOI (res["applyinglog_count"]);
-                  db_data[14] = JSON_ATOI (res["applyinglog_estimated_time"]);
-                }
-            }
-        }
+	{
+	  // TODO: HA monitoring
+	  for (unsigned int i = 0; i < ha_res["ha_info"].size(); i++)
+	    {
+	      if (dbname == ha_res["ha_info"][i]["dbname"].asString())
+		{
+		  Json::Value req, res;
+		  req["task"] = "gethaapplyinfo";
+		  req["dbname"] = dbname;
+		  req["remotehostname"] = ha_rmt_hostname;
+		  string copylog = ha_res["ha_info"][i]["copylogdb"].asString();
+		  unsigned int colon_idx = (unsigned int) copylog.find (':');
+		  if (string::npos == colon_idx)
+		    {
+		      LOG_WARN ("Error format of copylogdb, time=[%d], copylogdb=[%s]",
+				gather_time, req["copylogdb"].asString().c_str());
+		      break;
+		    }
+		  req["copylogpath"] = copylog.substr (colon_idx + 1);
+		  if (false == call_task_ext (req, res, ext_get_ha_apply_info))
+		    {
+		      LOG_WARN ("Get HA apply info failed, time=[%d], dbname=[%s]",
+				gather_time, req["dbname"].asString().c_str());
+		      break;
+		    }
+		  db_data[11] = JSON_ATOI (res["copyinglog_coun"]);
+		  db_data[12] = JSON_ATOI (res["copyinglog_estimated_time"]);
+		  db_data[13] = JSON_ATOI (res["applyinglog_count"]);
+		  db_data[14] = JSON_ATOI (res["applyinglog_estimated_time"]);
+		}
+	    }
+	}
 
       // dbspaceinfo
       res.clear();
       req["_DBNAME"] = dbname;
       errmsg = "";
       if (false == call_task (req, res, tsDbspaceInfo, errmsg))
-        {
-          LOG_WARN ("call getdbspaceinfo failed, time=[%d], error code[%d], error message [%s]",
-                    gather_time, res["retval"].asInt(), errmsg.c_str());
-          continue;
-        }
+	{
+	  LOG_WARN ("call getdbspaceinfo failed, time=[%d], error code[%d], error message [%s]",
+		    gather_time, res["retval"].asInt(), errmsg.c_str());
+	  continue;
+	}
       db_data[15] = int (JSON_ATOL (res["freespace"]) * JSON_ATOL (res["pagesize"]) * 100 / MB_SIZE);
       db_data[16] = 0;
       db_data[17] = 0;
@@ -1458,36 +1458,36 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
       update_rrdfile (_data_path +"/"+ DB_MON, rrdpos, db_data, DB_METRICS_LEN, DB_METRICS_LEN);
       // volume
       for (unsigned int i = 0; i < res["spaceinfo"].size(); i++)
-        {
-          string vol_name = res["spaceinfo"][i]["spacename"].asString();
-          if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (vol_name))
-            {
-              if (0 == _meta[K_TOTAL_VOL_NUM].asInt())
-                {
-                  init_rrdfile (_data_path + VOL_MON, MON_DATA_BLOCK, VOL_METRICS_LEN);
-                }
-              else
-                {
-                  append_rrdfile (_data_path + VOL_MON, MON_DATA_BLOCK, VOL_METRICS_LEN);
-                }
-              _meta[K_DB_RRD][dbname + "_vol"][vol_name] = _meta[K_TOTAL_VOL_NUM].asInt();
-              _meta[K_TOTAL_VOL_NUM] = _meta[K_TOTAL_VOL_NUM].asInt() + 1;
-              if (false == flush_meta_file())
-                {
-                  LOG_WARN ("flush meta file failed, time=[%d]", gather_time);
-                  continue;
-                }
-            }
+	{
+	  string vol_name = res["spaceinfo"][i]["spacename"].asString();
+	  if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (vol_name))
+	    {
+	      if (0 == _meta[K_TOTAL_VOL_NUM].asInt())
+		{
+		  init_rrdfile (_data_path + VOL_MON, MON_DATA_BLOCK, VOL_METRICS_LEN);
+		}
+	      else
+		{
+		  append_rrdfile (_data_path + VOL_MON, MON_DATA_BLOCK, VOL_METRICS_LEN);
+		}
+	      _meta[K_DB_RRD][dbname + "_vol"][vol_name] = _meta[K_TOTAL_VOL_NUM].asInt();
+	      _meta[K_TOTAL_VOL_NUM] = _meta[K_TOTAL_VOL_NUM].asInt() + 1;
+	      if (false == flush_meta_file())
+		{
+		  LOG_WARN ("flush meta file failed, time=[%d]", gather_time);
+		  continue;
+		}
+	    }
 
-          // in MB
-          int vol_data[VOL_METRICS_LEN];
-          vol_data[0] = int (JSON_ATOL (res["spaceinfo"][i]["freepage"])
-                             * JSON_ATOL (res["pagesize"]) * 100 / MB_SIZE);
-          vol_data[1] = int (gather_time);
-          int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][vol_name].asInt();
-          int rrdpos = vol_idx * MON_DATA_BLOCK + daily_idx;
-          update_rrdfile (_data_path +"/"+ VOL_MON, rrdpos, vol_data, VOL_METRICS_LEN, VOL_METRICS_LEN);
-        }
+	  // in MB
+	  int vol_data[VOL_METRICS_LEN];
+	  vol_data[0] = int (JSON_ATOL (res["spaceinfo"][i]["freepage"])
+			     * JSON_ATOL (res["pagesize"]) * 100 / MB_SIZE);
+	  vol_data[1] = int (gather_time);
+	  int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][vol_name].asInt();
+	  int rrdpos = vol_idx * MON_DATA_BLOCK + daily_idx;
+	  update_rrdfile (_data_path +"/"+ VOL_MON, rrdpos, vol_data, VOL_METRICS_LEN, VOL_METRICS_LEN);
+	}
     }
 }
 
@@ -1520,7 +1520,7 @@ void cm_mon_stat::gather_daily_os_mon (time_t gather_time)
   else
     {
       LOG_WARN ("get host statu failed, time=[%d], error code[%d], error message [%s]",
-                gather_time, res["retval"].asInt(), errmsg.c_str());
+		gather_time, res["retval"].asInt(), errmsg.c_str());
       return;
     }
   res.clear();
@@ -1528,15 +1528,15 @@ void cm_mon_stat::gather_daily_os_mon (time_t gather_time)
     {
       int total_free = 0;
       for (unsigned int i = 0; i < res["disk_info"].size(); i++)
-        {
-          total_free += int (JSON_ATOL (res["disk_info"][i]["free_size"]) * 100 / MB_SIZE);
-        }
+	{
+	  total_free += int (JSON_ATOL (res["disk_info"][i]["free_size"]) * 100 / MB_SIZE);
+	}
       os_data[6] = total_free;
     }
   else
     {
       LOG_WARN ("get system disk info failed, time=[%d], error message [%s]",
-                gather_time, res["note"].asString().c_str());
+		gather_time, res["note"].asString().c_str());
       return;
     }
   os_data[7] = 0;
@@ -1556,7 +1556,7 @@ bool cm_mon_stat::init_meta (int interval)
   if (false == call_task (req, brokers_info, ts2_get_unicas_info, errmsg))
     {
       LOG_ERROR ("failed to get brokers infomation, error code[%d], error message [%s]",
-                 brokers_info["retval"].asInt(), errmsg.c_str());
+		 brokers_info["retval"].asInt(), errmsg.c_str());
       throw exception();
     }
   for (int i = 0; i < BROKER_METRICS_LEN; i++)
@@ -1567,11 +1567,11 @@ bool cm_mon_stat::init_meta (int interval)
     {
       _meta[K_BROKER_NUM] = brokers_info["brokersinfo"][0u]["broker"].size();
       for (int i = 0; i < _meta[K_BROKER_NUM].asInt(); i++)
-        {
-          string bname = brokers_info["brokersinfo"][0u]["broker"][i]["name"].asString();
-          _meta[K_BROKER_RRD][bname + "_idx"] = i;
+	{
+	  string bname = brokers_info["brokersinfo"][0u]["broker"][i]["name"].asString();
+	  _meta[K_BROKER_RRD][bname + "_idx"] = i;
 
-        }
+	}
       int rrdsize = MON_DATA_BLOCK * _meta[K_BROKER_NUM].asInt();
       init_rrdfile (_data_path + BROKER_MON, rrdsize, BROKER_METRICS_LEN);
     }
@@ -1585,7 +1585,7 @@ bool cm_mon_stat::init_meta (int interval)
   if (false == call_task (req, dbs_info, ts_startinfo, errmsg))
     {
       LOG_ERROR ("failed to get DBs infomation, error code[%d], error message [%s]",
-                 dbs_info["retval"].asInt(), errmsg.c_str());
+		 dbs_info["retval"].asInt(), errmsg.c_str());
       throw exception();
     }
 
@@ -1598,10 +1598,10 @@ bool cm_mon_stat::init_meta (int interval)
       Json::Value &dbs = dbs_info["dblist"][0u]["dbs"];
       _meta[K_DB_NUM] = dbs.size();
       for (int i = 0; i < _meta[K_DB_NUM].asInt(); i++)
-        {
-          string dbname = dbs[i]["dbname"].asString();
-          _meta[K_DB_RRD][dbname + "_idx"] = i;
-        }
+	{
+	  string dbname = dbs[i]["dbname"].asString();
+	  _meta[K_DB_RRD][dbname + "_idx"] = i;
+	}
       int rrdsize = MON_DATA_BLOCK * _meta[K_DB_NUM].asInt();
       init_rrdfile (_data_path + DB_MON, rrdsize, DB_METRICS_LEN);
     }
@@ -1682,11 +1682,11 @@ bool cm_mon_stat::reset_mon_file (string fpath, int block_num, int mlen, int new
       int *ptr = ori_buf + i * MON_DATA_BLOCK + old_daily_data_block;
       int rrdpos = i * new_mon_data_block + (24 * 60 * 60) / new_interval;
       if (false == update_rrdfile (fpath, rrdpos, ptr, (30 * 24 + 365) * mlen, mlen))
-        {
-          LOG_ERROR ("update_rrdfile failed, file name[%s], block number[%d]", fpath.c_str(), i);
-          delete [] ori_buf;
-          return false;
-        }
+	{
+	  LOG_ERROR ("update_rrdfile failed, file name[%s], block number[%d]", fpath.c_str(), i);
+	  delete [] ori_buf;
+	  return false;
+	}
     }
   delete [] ori_buf;
   return true;
@@ -1714,9 +1714,9 @@ bool cm_mon_stat::load_meta_file (void)
     {
       bool rtn = reader.parse (ifs, _meta);
       if (false == rtn)
-        {
-          LOG_ERROR ("failed to load monitoring meta file [%s]", _meta_file.c_str());
-        }
+	{
+	  LOG_ERROR ("failed to load monitoring meta file [%s]", _meta_file.c_str());
+	}
       ifs.close();
       return rtn;
     }
@@ -1807,16 +1807,16 @@ static bool get_dbs_list (Json::Value &db_list)
   if (false == call_task (req, dbs_info, ts_startinfo, errmsg))
     {
       LOG_ERROR ("failed to get DBs infomation, error code[%d], error message [%s]",
-                 dbs_info["retval"].asInt(), errmsg.c_str());
+		 dbs_info["retval"].asInt(), errmsg.c_str());
       return false;
     }
   if (dbs_info.isMember ("dblist"))
     {
       Json::Value &dbs = dbs_info["dblist"][0u]["dbs"];
       for (unsigned int i = 0; i < dbs.size(); i++)
-        {
-          db_list.append (dbs[i]["dbname"].asString());
-        }
+	{
+	  db_list.append (dbs[i]["dbname"].asString());
+	}
     }
   else
     {
@@ -1834,22 +1834,22 @@ static bool get_active_dbs_list (Json::Value &db_list)
   if (false == call_task (req, dbs_info, ts_startinfo, errmsg))
     {
       LOG_ERROR ("failed to get active DBs infomation, error code[%d], error message [%s]",
-                 dbs_info["retval"].asInt(), errmsg.c_str());
+		 dbs_info["retval"].asInt(), errmsg.c_str());
       return false;
     }
   if (dbs_info.isMember ("activelist"))
     {
       if (0 == dbs_info["activelist"].size()
-          || false == dbs_info["activelist"][0u].isMember ("active"))
-        {
-          return true;
-        }
+	  || false == dbs_info["activelist"][0u].isMember ("active"))
+	{
+	  return true;
+	}
       Json::Value &dbs = dbs_info["activelist"][0u]["active"];
 
       for (unsigned int i = 0; i < dbs.size(); i++)
-        {
-          db_list.append (dbs[i]["dbname"].asString());
-        }
+	{
+	  db_list.append (dbs[i]["dbname"].asString());
+	}
     }
   else
     {
@@ -1867,7 +1867,7 @@ static bool get_brokers_list (Json::Value &brokers_list)
   if (false == call_task (req, brokers_info, ts2_get_unicas_info, errmsg))
     {
       LOG_ERROR ("failed to get brokers infomation, error code[%d], error message [%s]",
-                 brokers_info["retval"].asInt(), errmsg.c_str());
+		 brokers_info["retval"].asInt(), errmsg.c_str());
       return false;
     }
   if (brokers_info.isMember ("brokersinfo"))
@@ -1875,9 +1875,9 @@ static bool get_brokers_list (Json::Value &brokers_list)
       Json::Value &brokers = brokers_info["brokersinfo"][0u]["broker"];
 
       for (unsigned int i = 0; i < brokers.size(); i++)
-        {
-          brokers_list.append (brokers[i]["name"].asString());
-        }
+	{
+	  brokers_list.append (brokers[i]["name"].asString());
+	}
     }
   else
     {
@@ -1905,14 +1905,14 @@ static bool call_task (Json::Value &req, Json::Value &res, T_TASK_FUNC func, str
       res["retval"] = retval;
       errmsg = dbmt_error;
       if ((1 == retval) || (ERR_NO_ERROR == retval))
-        {
-          ret = true;
-        }
+	{
+	  ret = true;
+	}
       else
-        {
-          //LOG_WARN("Failed with return value %d, error message is [%s]", retval, dbmt_error);
-          ret = false;
-        }
+	{
+	  //LOG_WARN("Failed with return value %d, error message is [%s]", retval, dbmt_error);
+	  ret = false;
+	}
     }
   catch (exception &)
     {
@@ -1929,9 +1929,9 @@ static bool call_task_ext (Json::Value &req, Json::Value &res, T_EXT_TASK_FUNC f
     {
       (*func) (req, res);
       if (STATUS_SUCCESS != res["status"].asString())
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
       return true;
     }
   catch (exception &e)

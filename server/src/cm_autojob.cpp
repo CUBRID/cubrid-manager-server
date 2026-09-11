@@ -163,11 +163,11 @@ typedef enum
 
 static void aj_load_execquery_conf (ajob *p_aj);
 static void aj_execquery_handler (void *hd, time_t prev_check_time,
-                                  time_t cur_time);
+				  time_t cur_time);
 static void aj_execquery_get_exec_time (autoexecquery_node *c,
-                                        query_period_details *d,
-                                        struct tm *exec_tm,
-                                        time_t prev_check_time);
+					query_period_details *d,
+					struct tm *exec_tm,
+					time_t prev_check_time);
 
 static void aj_execquery (autoexecquery_node *c);
 static void _aj_autoexecquery_error_log (autoexecquery_node *node,
@@ -177,11 +177,11 @@ static void aj_load_autoaddvoldb_config (ajob *ajp);
 static void aj_load_autohistory_conf (ajob *ajp);
 
 static void aj_autobackupdb_handler (void *ajp, time_t prev_check_time,
-                                     time_t cur_time);
+				     time_t cur_time);
 static void aj_autoaddvoldb_handler (void *hd, time_t prev_check_time,
-                                     time_t cur_time);
+				     time_t cur_time);
 static void aj_autohistory_handler (void *ajp, time_t prev_check_time,
-                                    time_t cur_time);
+				    time_t cur_time);
 
 static void aj_backupdb (autobackupdb_node *n);
 static void _aj_autobackupdb_error_log (autobackupdb_node *n, char *errmsg);
@@ -251,7 +251,7 @@ ajFreeSpace (GeneralSpacedbResult *cmd_res, const char *type)
 /* This function adds volume and write to file for fserver */
 void
 aj_add_volume (char *dbname, const char *type, int increase,
-               int pagesize)
+	       int pagesize)
 {
   char dbloca[512];
   char strbuf[1024];
@@ -316,7 +316,7 @@ aj_add_volume (char *dbname, const char *type, int increase,
       fprintf (outfile, "%s ", type);
       fprintf (outfile, "%d ", increase);
       time_to_str (mytime, "%d-%d-%d,%d:%d:%d", strbuf,
-                   TIME_STR_FMT_DATE_TIME);
+		   TIME_STR_FMT_DATE_TIME);
       fprintf (outfile, "%s ", strbuf);
       fprintf (outfile, "start\n");
       fclose (outfile);
@@ -336,26 +336,26 @@ aj_add_volume (char *dbname, const char *type, int increase,
     {
       fprintf (outfile, "%s ", dbname);
       if (retval == 0)
-        {
-          fprintf (outfile, "%s ", volname);
-        }
+	{
+	  fprintf (outfile, "%s ", volname);
+	}
       else
-        {
-          fprintf (outfile, "none ");
-        }
+	{
+	  fprintf (outfile, "none ");
+	}
       fprintf (outfile, "%s ", type);
       fprintf (outfile, "%d ", increase);
       time_to_str (mytime, "%d-%d-%d,%d:%d:%d", strbuf,
-                   TIME_STR_FMT_DATE_TIME);
+		   TIME_STR_FMT_DATE_TIME);
       fprintf (outfile, "%s ", strbuf);
       if (retval == 0)
-        {
-          fprintf (outfile, "success\n");
-        }
+	{
+	  fprintf (outfile, "success\n");
+	}
       else
-        {
-          fprintf (outfile, "failure\n");
-        }
+	{
+	  fprintf (outfile, "failure\n");
+	}
       fclose (outfile);
     }
 }
@@ -378,9 +378,9 @@ aj_autohistory_handler (void *ajp, time_t prev_check_time, time_t cur_time)
   if ((current_time < hsp->start_time) || (current_time > hsp->end_time))
     {
       if (hsp->hfile != NULL)
-        {
-          fclose (hsp->hfile);
-        }
+	{
+	  fclose (hsp->hfile);
+	}
       hsp->hfile = NULL;
       return;
     }
@@ -388,92 +388,92 @@ aj_autohistory_handler (void *ajp, time_t prev_check_time, time_t cur_time)
   /* auto histoy feature */
   current_cpu = (float) (1000 - mondata->ssbuf.cpu_states[0]);
   current_mem =
-    (float) (mondata->ssbuf.memory_stats[1]) /
-    (float) (mondata->ssbuf.memory_stats[0]) * 100.0;
+	  (float) (mondata->ssbuf.memory_stats[1]) /
+	  (float) (mondata->ssbuf.memory_stats[0]) * 100.0;
 
   if ((current_cpu > hsp->cpu_limit) || (current_mem > hsp->memory_limit))
     {
       mytime = time (&mytime);
 
       if (hsp->hfile == NULL)
-        {
-          time_to_str (mytime, "%04d%02d%02d.%02d%02d%02d", timestr,
-                       TIME_STR_FMT_DATE_TIME);
+	{
+	  time_to_str (mytime, "%04d%02d%02d.%02d%02d%02d", timestr,
+		       TIME_STR_FMT_DATE_TIME);
 #if !defined (DO_NOT_USE_CUBRIDENV)
-          sprintf (strbuf, "%s/logs/_dbmt_history.%s", sco.szCubrid, timestr);
+	  sprintf (strbuf, "%s/logs/_dbmt_history.%s", sco.szCubrid, timestr);
 #else
-          sprintf (strbuf, "%s/_dbmt_history.%s", CUBRID_LOGDIR, timestr);
+	  sprintf (strbuf, "%s/_dbmt_history.%s", CUBRID_LOGDIR, timestr);
 #endif
-          hsp->hfile = fopen (strbuf, "w");
-        }
+	  hsp->hfile = fopen (strbuf, "w");
+	}
       /* record system information */
       if (hsp->hfile != NULL)
-        {
-          time_to_str (mytime, "[%04d/%02d/%02d-%02d:%02d:%02d]", timestr,
-                       TIME_STR_FMT_DATE_TIME);
-          fprintf (hsp->hfile, "%s", timestr);
-          fprintf (hsp->hfile, "load average 1min:%d 5min:%d 15min:%d\n",
-                   mondata->ssbuf.load_avg[0],
-                   mondata->ssbuf.load_avg[1], mondata->ssbuf.load_avg[2]);
-          fprintf (hsp->hfile,
-                   "cpu time idle:%d user:%d kernel%d iowait:%d swap:%d\n",
-                   mondata->ssbuf.cpu_states[0],
-                   mondata->ssbuf.cpu_states[1],
-                   mondata->ssbuf.cpu_states[2],
-                   mondata->ssbuf.cpu_states[3],
-                   mondata->ssbuf.cpu_states[4]);
-          fprintf (hsp->hfile,
-                   "memory real:%dK active:%dK free:%dK swap:%dK swapfree:%dK\n",
-                   mondata->ssbuf.memory_stats[0],
-                   mondata->ssbuf.memory_stats[1],
-                   mondata->ssbuf.memory_stats[2],
-                   mondata->ssbuf.memory_stats[3],
-                   mondata->ssbuf.memory_stats[4]);
-          fflush (hsp->hfile);
-        }
+	{
+	  time_to_str (mytime, "[%04d/%02d/%02d-%02d:%02d:%02d]", timestr,
+		       TIME_STR_FMT_DATE_TIME);
+	  fprintf (hsp->hfile, "%s", timestr);
+	  fprintf (hsp->hfile, "load average 1min:%d 5min:%d 15min:%d\n",
+		   mondata->ssbuf.load_avg[0],
+		   mondata->ssbuf.load_avg[1], mondata->ssbuf.load_avg[2]);
+	  fprintf (hsp->hfile,
+		   "cpu time idle:%d user:%d kernel%d iowait:%d swap:%d\n",
+		   mondata->ssbuf.cpu_states[0],
+		   mondata->ssbuf.cpu_states[1],
+		   mondata->ssbuf.cpu_states[2],
+		   mondata->ssbuf.cpu_states[3],
+		   mondata->ssbuf.cpu_states[4]);
+	  fprintf (hsp->hfile,
+		   "memory real:%dK active:%dK free:%dK swap:%dK swapfree:%dK\n",
+		   mondata->ssbuf.memory_stats[0],
+		   mondata->ssbuf.memory_stats[1],
+		   mondata->ssbuf.memory_stats[2],
+		   mondata->ssbuf.memory_stats[3],
+		   mondata->ssbuf.memory_stats[4]);
+	  fflush (hsp->hfile);
+	}
       /* record db information */
 
       if (hsp->hfile != NULL)
-        {
-          FILE *infile;
-          int i;
-          infile =
-            fopen (conf_get_dbmt_file (FID_AUTO_HISTORY_CONF, strbuf), "r");
-          if (infile != NULL)
-            {
-              while (fgets (strbuf, sizeof (strbuf), infile))
-                {
-                  ut_trim (strbuf);
-                  for (i = 0; i < MAX_INSTALLED_DB; ++i)
-                    {
-                      if ((mondata->dbvect[i] == 1) &&
-                          (uStringEqual (strbuf, mondata->dbbuf[i].db_name)))
-                        {
-                          fprintf (hsp->hfile, "database name:%s ",
-                                   mondata->dbbuf[i].db_name);
-                          fprintf (hsp->hfile, "pid:%d ",
-                                   mondata->dbbuf[i].db_pid);
-                          fprintf (hsp->hfile, "size:%ld ",
-                                   mondata->dbbuf[i].db_size);
-                          fprintf (hsp->hfile, "status:%c ",
-                                   mondata->dbbuf[i].proc_stat[0]);
-                          mytime = mondata->dbbuf[i].db_start_time;
-                          time_to_str (mytime,
-                                       "%04d/%02d/%02d-%02d:%02d:%02d",
-                                       timestr, TIME_STR_FMT_DATE_TIME);
-                          fprintf (hsp->hfile, "start_time:%s ", timestr);
-                          fprintf (hsp->hfile, "cpu_usage:%f%% ",
-                                   mondata->dbbuf[i].db_cpu_usage);
-                          fprintf (hsp->hfile, "mem_usage:%f%%\n\n",
-                                   mondata->dbbuf[i].db_mem_usage);
-                          fflush (hsp->hfile);
-                        }
-                    }
-                }
-              fclose (infile);
-            }
-          fclose (hsp->hfile);
-        }
+	{
+	  FILE *infile;
+	  int i;
+	  infile =
+		  fopen (conf_get_dbmt_file (FID_AUTO_HISTORY_CONF, strbuf), "r");
+	  if (infile != NULL)
+	    {
+	      while (fgets (strbuf, sizeof (strbuf), infile))
+		{
+		  ut_trim (strbuf);
+		  for (i = 0; i < MAX_INSTALLED_DB; ++i)
+		    {
+		      if ((mondata->dbvect[i] == 1) &&
+			  (uStringEqual (strbuf, mondata->dbbuf[i].db_name)))
+			{
+			  fprintf (hsp->hfile, "database name:%s ",
+				   mondata->dbbuf[i].db_name);
+			  fprintf (hsp->hfile, "pid:%d ",
+				   mondata->dbbuf[i].db_pid);
+			  fprintf (hsp->hfile, "size:%ld ",
+				   mondata->dbbuf[i].db_size);
+			  fprintf (hsp->hfile, "status:%c ",
+				   mondata->dbbuf[i].proc_stat[0]);
+			  mytime = mondata->dbbuf[i].db_start_time;
+			  time_to_str (mytime,
+				       "%04d/%02d/%02d-%02d:%02d:%02d",
+				       timestr, TIME_STR_FMT_DATE_TIME);
+			  fprintf (hsp->hfile, "start_time:%s ", timestr);
+			  fprintf (hsp->hfile, "cpu_usage:%f%% ",
+				   mondata->dbbuf[i].db_cpu_usage);
+			  fprintf (hsp->hfile, "mem_usage:%f%%\n\n",
+				   mondata->dbbuf[i].db_mem_usage);
+			  fflush (hsp->hfile);
+			}
+		    }
+		}
+	      fclose (infile);
+	    }
+	  fclose (hsp->hfile);
+	}
     }
 #endif
 }
@@ -496,32 +496,32 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
   for (curr = (autoaddvoldb_node *) hd; curr != NULL; curr = curr->next)
     {
       if (curr->dbname == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if ((db_mode =
-             uIsDatabaseActive2 (server_status_res, curr->dbname)) == 0)
-        {
-          continue;
-        }
+		   uIsDatabaseActive2 (server_status_res, curr->dbname)) == 0)
+	{
+	  continue;
+	}
 
       /* if the HA mode is on, the db_mode equals 2. */
       if (db_mode == HA_MODE)
-        {
-          append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                 sizeof (dbname_at_hostname));
-          spacedb_res = cmd_spacedb (dbname_at_hostname, CUBRID_MODE_CS);
-        }
+	{
+	  append_host_to_dbname (dbname_at_hostname, curr->dbname,
+				 sizeof (dbname_at_hostname));
+	  spacedb_res = cmd_spacedb (dbname_at_hostname, CUBRID_MODE_CS);
+	}
       else
-        {
-          spacedb_res = cmd_spacedb (curr->dbname, CUBRID_MODE_CS);
-        }
+	{
+	  spacedb_res = cmd_spacedb (curr->dbname, CUBRID_MODE_CS);
+	}
 
       if (spacedb_res == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       spacedb_res->auto_add_volume (curr, db_mode, dbname_at_hostname);
       delete spacedb_res;
@@ -561,59 +561,59 @@ aj_load_autoaddvoldb_config (ajob *ajp)
     {
       ut_trim (strbuf);
       if (strbuf[0] == '#' || strbuf[0] == '\0')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (string_tokenize (strbuf, conf_item, AUTOADDVOL_CONF_ENTRY_NUM) < 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (curr == NULL)
-        {
-          curr = (autoaddvoldb_node *) malloc (sizeof (autoaddvoldb_node));
-          ajp->hd = curr;
-        }
+	{
+	  curr = (autoaddvoldb_node *) malloc (sizeof (autoaddvoldb_node));
+	  ajp->hd = curr;
+	}
       else
-        {
-          curr->next =
-            (autoaddvoldb_node *) malloc (sizeof (autoaddvoldb_node));
-          curr = curr->next;
-        }
+	{
+	  curr->next =
+		  (autoaddvoldb_node *) malloc (sizeof (autoaddvoldb_node));
+	  curr = curr->next;
+	}
       if (curr == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       memset (curr, 0, sizeof (autoaddvoldb_node));
       strcpy (curr->dbname, conf_item[0]);
 
       if (strcmp (conf_item[1], "ON") == 0)
-        {
-          curr->data_vol = 1;
-          ajp->is_on = 1;
-        }
+	{
+	  curr->data_vol = 1;
+	  ajp->is_on = 1;
+	}
 
       curr->data_warn_outofspace = atof (conf_item[2]);
       if (curr->data_warn_outofspace > MAX_AUTOADD_FREE_SPACE_RATE)
-        {
-          curr->data_warn_outofspace = MAX_AUTOADD_FREE_SPACE_RATE;
-        }
+	{
+	  curr->data_warn_outofspace = MAX_AUTOADD_FREE_SPACE_RATE;
+	}
 
       curr->data_ext_page = atoi (conf_item[3]);
 
       if (strcmp (conf_item[4], "ON") == 0)
-        {
-          curr->index_vol = 1;
-          ajp->is_on = 1;
-        }
+	{
+	  curr->index_vol = 1;
+	  ajp->is_on = 1;
+	}
 
       curr->index_warn_outofspace = atof (conf_item[5]);
       if (curr->index_warn_outofspace > MAX_AUTOADD_FREE_SPACE_RATE)
-        {
-          curr->index_warn_outofspace = MAX_AUTOADD_FREE_SPACE_RATE;
-        }
+	{
+	  curr->index_warn_outofspace = MAX_AUTOADD_FREE_SPACE_RATE;
+	}
 
       curr->index_ext_page = atoi (conf_item[6]);
       curr->next = NULL;
@@ -641,9 +641,9 @@ aj_load_autohistory_conf (ajob *ajp)
   if (ahist)
     {
       for (i = 0; i < ahist->dbcount; ++i)
-        {
-          FREE_MEM (ahist->dbname[i]);
-        }
+	{
+	  FREE_MEM (ahist->dbname[i]);
+	}
       FREE_MEM (ahist->dbname);
       FREE_MEM (ahist);
     }
@@ -668,10 +668,10 @@ aj_load_autohistory_conf (ajob *ajp)
     {
       ut_trim (strbuf);
       if (strbuf[0] == '#' || strbuf[0] == '\0')
-        {
-          memset (strbuf, 0, sizeof (strbuf));
-          continue;
-        }
+	{
+	  memset (strbuf, 0, sizeof (strbuf));
+	  continue;
+	}
       break;
     }
   if (string_tokenize (strbuf, conf_item, AUTOHISTORY_CONF_ENTRY_NUM) < 0)
@@ -713,11 +713,11 @@ aj_load_autohistory_conf (ajob *ajp)
       ut_trim (strbuf);
       ahist->dbcount++;
       ahist->dbname =
-        REALLOC (ahist->dbname, sizeof (char *) * (ahist->dbcount));
+	      REALLOC (ahist->dbname, sizeof (char *) * (ahist->dbcount));
       if (ahist->dbname == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
       ahist->dbname[ahist->dbcount - 1] = strdup (strbuf);
     }
 
@@ -745,7 +745,7 @@ set_query_period_details (query_period_details **details, char *conf_item)
 
 static void
 set_backup_period_details (backup_period_details **details,
-                           int period_type, char *conf_item)
+			   int period_type, char *conf_item)
 {
   char delim[] = " ,";
   char *token;
@@ -755,59 +755,59 @@ set_backup_period_details (backup_period_details **details,
   while (token != NULL)
     {
       *details =
-        (backup_period_details *) malloc (sizeof (backup_period_details));
+	      (backup_period_details *) malloc (sizeof (backup_period_details));
 
       switch (period_type)
-        {
-        case ABPT_MONTHLY:
-        case ABPT_HOURLY:
-          (*details)->date = atoi (token);
-          break;
+	{
+	case ABPT_MONTHLY:
+	case ABPT_HOURLY:
+	  (*details)->date = atoi (token);
+	  break;
 
-        case ABPT_WEEKLY:
-          if (!strcmp (token, WEEK_SUNDAY_L))
-            {
-              (*details)->date = 0;
-            }
-          else if (!strcmp (token, WEEK_MONDAY_L))
-            {
-              (*details)->date = 1;
-            }
-          else if (!strcmp (token, WEEK_TUESDAY_L))
-            {
-              (*details)->date = 2;
-            }
-          else if (!strcmp (token, WEEK_WEDNESDAY_L))
-            {
-              (*details)->date = 3;
-            }
-          else if (!strcmp (token, WEEK_THURSDAY_L))
-            {
-              (*details)->date = 4;
-            }
-          else if (!strcmp (token, WEEK_FRIDAY_L))
-            {
-              (*details)->date = 5;
-            }
-          else if (!strcmp (token, WEEK_SATURDAY_L))
-            {
-              (*details)->date = 6;
-            }
-          break;
+	case ABPT_WEEKLY:
+	  if (!strcmp (token, WEEK_SUNDAY_L))
+	    {
+	      (*details)->date = 0;
+	    }
+	  else if (!strcmp (token, WEEK_MONDAY_L))
+	    {
+	      (*details)->date = 1;
+	    }
+	  else if (!strcmp (token, WEEK_TUESDAY_L))
+	    {
+	      (*details)->date = 2;
+	    }
+	  else if (!strcmp (token, WEEK_WEDNESDAY_L))
+	    {
+	      (*details)->date = 3;
+	    }
+	  else if (!strcmp (token, WEEK_THURSDAY_L))
+	    {
+	      (*details)->date = 4;
+	    }
+	  else if (!strcmp (token, WEEK_FRIDAY_L))
+	    {
+	      (*details)->date = 5;
+	    }
+	  else if (!strcmp (token, WEEK_SATURDAY_L))
+	    {
+	      (*details)->date = 6;
+	    }
+	  break;
 
-        case ABPT_DAILY:
-          (*details)->date = -1;
-          break;
+	case ABPT_DAILY:
+	  (*details)->date = -1;
+	  break;
 
-        case ABPT_SPECIAL:
-          (*details)->date = atoi (token) * 10000;
-          (*details)->date += atoi (token + 5) * 100;
-          (*details)->date += atoi (token + 8);
-          break;
+	case ABPT_SPECIAL:
+	  (*details)->date = atoi (token) * 10000;
+	  (*details)->date += atoi (token + 5) * 100;
+	  (*details)->date += atoi (token + 8);
+	  break;
 
-        default:
-          break;
-        }
+	default:
+	  break;
+	}
 
       (*details)->next = head;
       head = *details;
@@ -833,11 +833,11 @@ aj_load_autobackupdb_conf (ajob *p_aj)
       backup_period_details *p;
 
       while (c->period_date != NULL)
-        {
-          p = c->period_date;
-          c->period_date = c->period_date->next;
-          FREE_MEM (p);
-        }
+	{
+	  p = c->period_date;
+	  c->period_date = c->period_date->next;
+	  FREE_MEM (p);
+	}
 
       t = c;
       FREE_MEM (t->dbname);
@@ -858,36 +858,36 @@ aj_load_autobackupdb_conf (ajob *p_aj)
       is_old_version_entry = 0;
       ut_trim (buf);
       if (buf[0] == '#' || buf[0] == '\0')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (string_tokenize (buf, conf_item, AUTOBACKUP_CONF_ENTRY_NUM) < 0)
-        {
-          if (string_tokenize (buf, conf_item, AUTOBACKUP_CONF_ENTRY_NUM - 3) < 0)
-            {
-              continue;
-            }
-          else
-            {
-              is_old_version_entry = 1;
-            }
-        }
+	{
+	  if (string_tokenize (buf, conf_item, AUTOBACKUP_CONF_ENTRY_NUM - 3) < 0)
+	    {
+	      continue;
+	    }
+	  else
+	    {
+	      is_old_version_entry = 1;
+	    }
+	}
 
       if (c == NULL)
-        {
-          c = (autobackupdb_node *) malloc (sizeof (autobackupdb_node));
-          p_aj->hd = c;
-        }
+	{
+	  c = (autobackupdb_node *) malloc (sizeof (autobackupdb_node));
+	  p_aj->hd = c;
+	}
       else
-        {
-          c->next = (autobackupdb_node *) malloc (sizeof (autobackupdb_node));
-          c = c->next;
-        }
+	{
+	  c->next = (autobackupdb_node *) malloc (sizeof (autobackupdb_node));
+	  c = c->next;
+	}
       if (c == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       c->lbt = -1;
       c->dbname = strdup (conf_item[0]);
@@ -895,49 +895,49 @@ aj_load_autobackupdb_conf (ajob *p_aj)
       c->path = strdup (conf_item[2]);
 
       if (!strcmp (conf_item[3], "Monthly"))
-        {
-          c->period_type = ABPT_MONTHLY;
-        }
+	{
+	  c->period_type = ABPT_MONTHLY;
+	}
       else if (!strcmp (conf_item[3], "Weekly"))
-        {
-          c->period_type = ABPT_WEEKLY;
-        }
+	{
+	  c->period_type = ABPT_WEEKLY;
+	}
       else if (!strcmp (conf_item[3], "Daily"))
-        {
-          c->period_type = ABPT_DAILY;
-        }
+	{
+	  c->period_type = ABPT_DAILY;
+	}
       else if (!strcmp (conf_item[3], "Hourly"))
-        {
-          c->period_type = ABPT_HOURLY;
-        }
+	{
+	  c->period_type = ABPT_HOURLY;
+	}
       else if (!strcmp (conf_item[3], "Special"))
-        {
-          c->period_type = ABPT_SPECIAL;
-        }
+	{
+	  c->period_type = ABPT_SPECIAL;
+	}
       else
-        {
-          if (c != NULL)
-            {
-              FREE_MEM (c->dbname);
-              FREE_MEM (c->backup_id);
-              FREE_MEM (c->path);
-              FREE_MEM (c);
-            }
-          continue;
-        }
+	{
+	  if (c != NULL)
+	    {
+	      FREE_MEM (c->dbname);
+	      FREE_MEM (c->backup_id);
+	      FREE_MEM (c->path);
+	      FREE_MEM (c);
+	    }
+	  continue;
+	}
 
       set_backup_period_details (& (c->period_date), c->period_type, conf_item[4]);
 
       if ('i' == conf_item[5][0])    // interval time is set
-        {
-          c->is_interval = 1;
-          c->time = atoi (conf_item[5] + 1);
-        }
+	{
+	  c->is_interval = 1;
+	  c->time = atoi (conf_item[5] + 1);
+	}
       else            // sepcific time is set
-        {
-          c->time = atoi (conf_item[5]);
-          c->is_interval = 0;
-        }
+	{
+	  c->time = atoi (conf_item[5]);
+	  c->is_interval = 0;
+	}
       c->level = atoi (conf_item[6]);
       c->archivedel = !strcmp (conf_item[7], "ON") ? 1 : 0;
       c->updatestatus = !strcmp (conf_item[8], "ON") ? 1 : 0;
@@ -945,19 +945,19 @@ aj_load_autobackupdb_conf (ajob *p_aj)
       c->onoff = !strcmp (conf_item[10], "ON") ? 1 : 0;
 
       if (is_old_version_entry)
-        {
-          c->zip = 0;
-          c->check = 0;
-          c->mt = 0;
-          c->bk_num = 1;
-        }
+	{
+	  c->zip = 0;
+	  c->check = 0;
+	  c->mt = 0;
+	  c->bk_num = 1;
+	}
       else
-        {
-          c->zip = !strcmp (conf_item[11], "y") ? 1 : 0;
-          c->check = !strcmp (conf_item[12], "y") ? 1 : 0;
-          c->mt = atoi (conf_item[13]);
-          c->bk_num = conf_item[14] ? atoi (conf_item[14]) : 1;
-        }
+	{
+	  c->zip = !strcmp (conf_item[11], "y") ? 1 : 0;
+	  c->check = !strcmp (conf_item[12], "y") ? 1 : 0;
+	  c->mt = atoi (conf_item[13]);
+	  c->bk_num = conf_item[14] ? atoi (conf_item[14]) : 1;
+	}
       c->next = NULL;
     }                /* end of while */
   fclose (infile);
@@ -982,11 +982,11 @@ aj_load_execquery_conf (ajob *p_aj)
       query_period_details *p;
 
       while (c->detail1 != NULL)
-        {
-          p = c->detail1;
-          c->detail1 = c->detail1->next;
-          FREE_MEM (p);
-        }
+	{
+	  p = c->detail1;
+	  c->detail1 = c->detail1->next;
+	  FREE_MEM (p);
+	}
 
       t = c;
       c = c->next;
@@ -1005,31 +1005,31 @@ aj_load_execquery_conf (ajob *p_aj)
     {
       ut_trim (buf);
       if (buf[0] == '#' || buf[0] == '\0')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (string_tokenize_accept_laststring_space
-          (buf, conf_item, AUTOEXECQUERY_CONF_ENTRY_NUM) < 0)
-        {
-          continue;
-        }
+	  (buf, conf_item, AUTOEXECQUERY_CONF_ENTRY_NUM) < 0)
+	{
+	  continue;
+	}
 
       if (c == NULL)
-        {
-          c = (autoexecquery_node *) malloc (sizeof (autoexecquery_node));
-          p_aj->hd = c;
-        }
+	{
+	  c = (autoexecquery_node *) malloc (sizeof (autoexecquery_node));
+	  p_aj->hd = c;
+	}
       else
-        {
-          c->next =
-            (autoexecquery_node *) malloc (sizeof (autoexecquery_node));
-          c = c->next;
-        }
+	{
+	  c->next =
+		  (autoexecquery_node *) malloc (sizeof (autoexecquery_node));
+	  c = c->next;
+	}
       if (c == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       snprintf (c->dbname, sizeof (c->dbname) - 1, "%s", conf_item[0]);
       snprintf (c->query_id, sizeof (c->query_id) - 1, "%s", conf_item[1]);
@@ -1039,21 +1039,21 @@ aj_load_execquery_conf (ajob *p_aj)
       snprintf (c->dbmt_uid, sizeof (c->dbmt_uid) - 1, "%s", conf_item[4]);
 
       if (strcmp (conf_item[5], "ONE") == 0)
-        {
-          c->period = AEQT_ONE;
-        }
+	{
+	  c->period = AEQT_ONE;
+	}
       else if (strcmp (conf_item[5], "DAY") == 0)
-        {
-          c->period = AEQT_DAY;
-        }
+	{
+	  c->period = AEQT_DAY;
+	}
       else if (strcmp (conf_item[5], "WEEK") == 0)
-        {
-          c->period = AEQT_WEEK;
-        }
+	{
+	  c->period = AEQT_WEEK;
+	}
       else if (strcmp (conf_item[5], "MONTH") == 0)
-        {
-          c->period = AEQT_MONTH;
-        }
+	{
+	  c->period = AEQT_MONTH;
+	}
 
       //      snprintf (c->detail1, sizeof (c->detail1) - 1, "%s", conf_item[6]);
 
@@ -1062,7 +1062,7 @@ aj_load_execquery_conf (ajob *p_aj)
 
       snprintf (c->detail2, sizeof (c->detail2) - 1, "%s", conf_item[7]);
       snprintf (c->query_string, sizeof (c->query_string) - 1, "%s",
-                conf_item[8]);
+		conf_item[8]);
       c->db_mode = 2;
       c->next = NULL;
     }                /* end of while */
@@ -1093,29 +1093,29 @@ aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
       detail1 = c->detail1;
 
       while (detail1 != NULL)
-        {
-          aj_execquery_get_exec_time (c, detail1, &exec_tm, prev_check_time);
+	{
+	  aj_execquery_get_exec_time (c, detail1, &exec_tm, prev_check_time);
 
-          // backup tm_wday, since mktime can change tm_wday field.
-          tm_wday = exec_tm.tm_wday;
-          execquery_time = mktime (&exec_tm);
+	  // backup tm_wday, since mktime can change tm_wday field.
+	  tm_wday = exec_tm.tm_wday;
+	  execquery_time = mktime (&exec_tm);
 
-          if (execquery_time <= prev_check_time || execquery_time > cur_time)
-            {
-              detail1 = detail1->next;
-              continue;
-            }
+	  if (execquery_time <= prev_check_time || execquery_time > cur_time)
+	    {
+	      detail1 = detail1->next;
+	      continue;
+	    }
 
-          if ((c->period == AEQT_ONE)
-              || (c->period == AEQT_DAY)
-              || ((c->period == AEQT_WEEK) && cur_tm.tm_wday == tm_wday)
-              || ((c->period == AEQT_MONTH)
-                  && cur_tm.tm_mday == exec_tm.tm_mday))
-            {
-              aj_execquery (c);
-            }
-          detail1 = detail1->next;
-        }
+	  if ((c->period == AEQT_ONE)
+	      || (c->period == AEQT_DAY)
+	      || ((c->period == AEQT_WEEK) && cur_tm.tm_wday == tm_wday)
+	      || ((c->period == AEQT_MONTH)
+		  && cur_tm.tm_mday == exec_tm.tm_mday))
+	    {
+	      aj_execquery (c);
+	    }
+	  detail1 = detail1->next;
+	}
     }
 
   return;
@@ -1123,14 +1123,14 @@ aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
 
 static void
 aj_execquery_get_exec_time (autoexecquery_node *c,
-                            query_period_details *d,
-                            struct tm *exec_tm, time_t prev_check_time)
+			    query_period_details *d,
+			    struct tm *exec_tm, time_t prev_check_time)
 {
   switch (c->period)
     {
     case AEQT_ONE:
       sscanf (d->detail, "%d/%d/%d", & (exec_tm->tm_year), & (exec_tm->tm_mon),
-              & (exec_tm->tm_mday));
+	      & (exec_tm->tm_mday));
       exec_tm->tm_year -= 1900;    /* year : since 1900 */
       exec_tm->tm_mon -= 1;    /* month : zero based month */
       break;
@@ -1141,33 +1141,33 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
 
     case AEQT_WEEK:
       if (strcmp (d->detail, WEEK_CAPITAL_SUNDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 0;
-        }
+	{
+	  exec_tm->tm_wday = 0;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_MONDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 1;
-        }
+	{
+	  exec_tm->tm_wday = 1;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_TUESDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 2;
-        }
+	{
+	  exec_tm->tm_wday = 2;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_WEDNESDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 3;
-        }
+	{
+	  exec_tm->tm_wday = 3;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_THURSDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 4;
-        }
+	{
+	  exec_tm->tm_wday = 4;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_FRIDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 5;
-        }
+	{
+	  exec_tm->tm_wday = 5;
+	}
       else if (strcmp (d->detail, WEEK_CAPITAL_SATURDAY_S) == 0)
-        {
-          exec_tm->tm_wday = 6;
-        }
+	{
+	  exec_tm->tm_wday = 6;
+	}
       break;
 
     case AEQT_MONTH:
@@ -1183,27 +1183,27 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
 
       tm_p = localtime (&prev_check_time);
       if (tm_p == NULL)
-        {
-          return;
-        }
+	{
+	  return;
+	}
       prev_tm = *tm_p;
 
       sscanf (c->detail2, "i%d", &interval);
 
       prev_day_sec =
-        prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
+	      prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
       if ((prev_day_sec + interval * 60) >= (24 * 3600))    // if across a day, start at 00:00
-        {
-          exec_tm->tm_hour = 0;
-          exec_tm->tm_min = 0;
-        }
+	{
+	  exec_tm->tm_hour = 0;
+	  exec_tm->tm_min = 0;
+	}
       else            // not across a day
-        {
-          time_t exec_sec =
-            (prev_day_sec / (interval * 60) + 1) * interval * 60;
-          exec_tm->tm_hour = (int) (exec_sec / 3600);
-          exec_tm->tm_min = (exec_sec % 3600) / 60;
-        }
+	{
+	  time_t exec_sec =
+		  (prev_day_sec / (interval * 60) + 1) * interval * 60;
+	  exec_tm->tm_hour = (int) (exec_sec / 3600);
+	  exec_tm->tm_min = (exec_sec % 3600) / 60;
+	}
     }
   else                // specific time for auto execute query
     {
@@ -1247,7 +1247,7 @@ aj_execquery (autoexecquery_node *c)
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, c->dbname,
-                             sizeof (dbname_at_hostname));
+			     sizeof (dbname_at_hostname));
       argv[argc++] = dbname_at_hostname;
     }
   else
@@ -1259,7 +1259,7 @@ aj_execquery (autoexecquery_node *c)
     {
     case DB_SERVICE_MODE_SA:
       sprintf (error_buffer, "Database(%s) is running in stand alone mode",
-               c->dbname);
+	       c->dbname);
       _aj_autoexecquery_error_log (c, ERR_GENERAL_ERROR, error_buffer);
       return;
     case DB_SERVICE_MODE_CS:
@@ -1310,40 +1310,40 @@ aj_execquery (autoexecquery_node *c)
       sprintf (error_buffer, "Failed to execute Query with");
       _aj_autoexecquery_error_log (c, ERR_SYSTEM_CALL, error_buffer);
       if (access (cubrid_err_file, F_OK) == 0)
-        {
-          unlink (cubrid_err_file);
-        }
+	{
+	  unlink (cubrid_err_file);
+	}
       return;
     }
   else
     {
       if (read_error_file2 (cubrid_err_file, error_buffer, DBMT_ERROR_MSG_SIZE, &error_code) < 0)
-        {
-          if (error_code == 0)
-            {
-              error_code = ERR_GENERAL_ERROR;
-            }
-          _aj_autoexecquery_error_log (c, error_code, error_buffer);
-          if (access (cubrid_err_file, F_OK) == 0)
-            {
-              unlink (cubrid_err_file);
-            }
-          return;
-        }
+	{
+	  if (error_code == 0)
+	    {
+	      error_code = ERR_GENERAL_ERROR;
+	    }
+	  _aj_autoexecquery_error_log (c, error_code, error_buffer);
+	  if (access (cubrid_err_file, F_OK) == 0)
+	    {
+	      unlink (cubrid_err_file);
+	    }
+	  return;
+	}
       else
-        {
-          _aj_autoexecquery_error_log (c, 0, "success");
-          if (access (cubrid_err_file, F_OK) == 0)
-            {
-              unlink (cubrid_err_file);
-            }
-        }
+	{
+	  _aj_autoexecquery_error_log (c, 0, "success");
+	  if (access (cubrid_err_file, F_OK) == 0)
+	    {
+	      unlink (cubrid_err_file);
+	    }
+	}
     }
 }
 
 static void
 _aj_autoexecquery_error_log (autoexecquery_node *node, int error_code,
-                             const char *errmsg)
+			     const char *errmsg)
 {
   /* open error file and write errmsg */
   time_t tt;
@@ -1365,10 +1365,10 @@ _aj_autoexecquery_error_log (autoexecquery_node *node, int error_code,
     }
 
   time_to_str (tt, "DATE:%04d/%02d/%02d TIME:%02d:%02d:%02d", strbuf,
-               TIME_STR_FMT_DATE_TIME);
+	       TIME_STR_FMT_DATE_TIME);
   fprintf (outfile, "%s\n", strbuf);
   fprintf (outfile, "DBNAME:%s EMGR-USERNAME:%s QUERY-ID:%s ERROR-CODE:%d\n",
-           node->dbname, node->dbmt_uid, node->query_id, error_code);
+	   node->dbname, node->dbmt_uid, node->query_id, error_code);
   fprintf (outfile, "=> %s\n", errmsg);
   fflush (outfile);
   fclose (outfile);
@@ -1396,67 +1396,67 @@ aj_autobackupdb_handler (void *hd, time_t prev_check_time, time_t cur_time)
       period_date = c->period_date;
 
       while (period_date != NULL)
-        {
-          if (c->period_type == ABPT_SPECIAL)
-            {
-              backup_tm.tm_year = period_date->date / 10000 - 1900;
-              backup_tm.tm_mon = (period_date->date % 10000) / 100 - 1;
-              backup_tm.tm_mday = period_date->date % 100;
-            }
-          if (1 == c->is_interval)    // interval time for auto backup
-            {
-              time_t prev_day_sec;
-              tm_p = localtime (&prev_check_time);
-              if (tm_p == NULL)
-                {
-                  return;
-                }
-              prev_tm = *tm_p;
+	{
+	  if (c->period_type == ABPT_SPECIAL)
+	    {
+	      backup_tm.tm_year = period_date->date / 10000 - 1900;
+	      backup_tm.tm_mon = (period_date->date % 10000) / 100 - 1;
+	      backup_tm.tm_mday = period_date->date % 100;
+	    }
+	  if (1 == c->is_interval)    // interval time for auto backup
+	    {
+	      time_t prev_day_sec;
+	      tm_p = localtime (&prev_check_time);
+	      if (tm_p == NULL)
+		{
+		  return;
+		}
+	      prev_tm = *tm_p;
 
-              prev_day_sec =
-                prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
-              if ((prev_day_sec + c->time * 60) >= 24 * 3600)    // if across a day, start at 00:00
-                {
-                  backup_tm.tm_hour = 0;
-                  backup_tm.tm_min = 0;
-                }
-              else        // not across a day
-                {
-                  time_t exec_sec =
-                    (prev_day_sec / (c->time * 60) + 1) * c->time * 60;
-                  backup_tm.tm_hour = (int) (exec_sec / 3600);
-                  backup_tm.tm_min = (exec_sec % 3600) / 60;
-                }
-            }
-          else            // specific time for auto backup
-            {
-              if (c->period_type != ABPT_HOURLY)
-                {
-                  backup_tm.tm_hour = c->time / 100;
-                }
-              backup_tm.tm_min = c->time % 100;
-            }
-          backup_tm.tm_sec = 0;
+	      prev_day_sec =
+		      prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
+	      if ((prev_day_sec + c->time * 60) >= 24 * 3600)    // if across a day, start at 00:00
+		{
+		  backup_tm.tm_hour = 0;
+		  backup_tm.tm_min = 0;
+		}
+	      else        // not across a day
+		{
+		  time_t exec_sec =
+			  (prev_day_sec / (c->time * 60) + 1) * c->time * 60;
+		  backup_tm.tm_hour = (int) (exec_sec / 3600);
+		  backup_tm.tm_min = (exec_sec % 3600) / 60;
+		}
+	    }
+	  else            // specific time for auto backup
+	    {
+	      if (c->period_type != ABPT_HOURLY)
+		{
+		  backup_tm.tm_hour = c->time / 100;
+		}
+	      backup_tm.tm_min = c->time % 100;
+	    }
+	  backup_tm.tm_sec = 0;
 
-          backup_time = mktime (&backup_tm);
-          if (backup_time <= prev_check_time || backup_time > cur_time)
-            {
-              period_date = period_date->next;
-              continue;
-            }
+	  backup_time = mktime (&backup_tm);
+	  if (backup_time <= prev_check_time || backup_time > cur_time)
+	    {
+	      period_date = period_date->next;
+	      continue;
+	    }
 
-          if ((c->period_type == ABPT_MONTHLY
-               && cur_tm.tm_mday == period_date->date)
-              || (c->period_type == ABPT_WEEKLY
-                  && cur_tm.tm_wday == period_date->date)
-              || (c->period_type == ABPT_DAILY)
-              || (c->period_type == ABPT_HOURLY)
-              || (c->period_type == ABPT_SPECIAL))
-            {
-              aj_backupdb (c);
-            }
-          period_date = period_date->next;
-        }            // while
+	  if ((c->period_type == ABPT_MONTHLY
+	       && cur_tm.tm_mday == period_date->date)
+	      || (c->period_type == ABPT_WEEKLY
+		  && cur_tm.tm_wday == period_date->date)
+	      || (c->period_type == ABPT_DAILY)
+	      || (c->period_type == ABPT_HOURLY)
+	      || (c->period_type == ABPT_SPECIAL))
+	    {
+	      aj_backupdb (c);
+	    }
+	  period_date = period_date->next;
+	}            // while
     }                // for
 }
 
@@ -1481,7 +1481,7 @@ _aj_autobackupdb_error_log (autobackupdb_node *n, char *errmsg)
       return;
     }
   time_to_str (tt, "DATE:%04d/%02d/%02d TIME:%02d:%02d:%02d", strbuf,
-               TIME_STR_FMT_DATE_TIME);
+	       TIME_STR_FMT_DATE_TIME);
   fprintf (outfile, "%s\n", strbuf);
   fprintf (outfile, "DBNAME:%s BACKUPID:%s\n", n->dbname, n->backup_id);
   fprintf (outfile, "=> %s\n", errmsg);
@@ -1524,7 +1524,7 @@ aj_backupdb (autobackupdb_node *n)
       return;
     }
   time_to_str (n->lbt, "%04d%02d%02d_%02d%02d%02d", strtime,
-               TIME_STR_FMT_DATE_TIME);
+	       TIME_STR_FMT_DATE_TIME);
   sprintf (backup_vol_name, "%s_auto_backup_lv%d", n->dbname, n->level);
   sprintf (bkpath, "%s/%s_%s", n->path, strtime, backup_vol_name);
 
@@ -1545,11 +1545,11 @@ aj_backupdb (autobackupdb_node *n)
   if (access (n->path, F_OK) < 0)
     {
       if (uCreateDir (n->path) != ERR_NO_ERROR)
-        {
-          sprintf (buf, "Directory creation failed: %s", n->path);
-          _aj_autobackupdb_error_log (n, buf);
-          return;
-        }
+	{
+	  sprintf (buf, "Directory creation failed: %s", n->path);
+	  _aj_autobackupdb_error_log (n, buf);
+	  return;
+	}
     }
 
   remove_extra_subdir (n->path, backup_vol_name, n->bk_num);
@@ -1557,22 +1557,22 @@ aj_backupdb (autobackupdb_node *n)
   if (access (bkpath, F_OK) < 0)
     {
       if (uCreateDir (bkpath) != ERR_NO_ERROR)
-        {
-          sprintf (buf, "Directory creation failed: %s", bkpath);
-          _aj_autobackupdb_error_log (n, buf);
-          return;
-        }
+	{
+	  sprintf (buf, "Directory creation failed: %s", bkpath);
+	  _aj_autobackupdb_error_log (n, buf);
+	  return;
+	}
     }
 
   /* if DB status is on then turn off */
   if (n->onoff == 0 && db_mode == DB_SERVICE_MODE_CS)
     {
       if (cmd_stop_server (n->dbname, NULL, 0) < 0)
-        {
-          sprintf (buf, "Failed to turn off DB");
-          _aj_autobackupdb_error_log (n, buf);
-          return;
-        }
+	{
+	  sprintf (buf, "Failed to turn off DB");
+	  _aj_autobackupdb_error_log (n, buf);
+	  return;
+	}
       db_start_flag = 1;
     }
 
@@ -1613,7 +1613,7 @@ aj_backupdb (autobackupdb_node *n)
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, n->dbname,
-                             sizeof (dbname_at_hostname));
+			     sizeof (dbname_at_hostname));
       argv[argc++] = dbname_at_hostname;
     }
   else
@@ -1623,10 +1623,10 @@ aj_backupdb (autobackupdb_node *n)
   argv[argc++] = NULL;
 
   snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
-            sco.dbmt_tmp_dir, "aj_backupdb", getpid ());
+	    sco.dbmt_tmp_dir, "aj_backupdb", getpid ());
 
   sprintf (inputfilepath, "%s/DBMT_task_%d.%d", sco.dbmt_tmp_dir, TS_BACKUPDB,
-           (int) getpid ());
+	   (int) getpid ());
   inputfile = fopen (inputfilepath, "w");
   if (inputfile)
     {
@@ -1647,9 +1647,9 @@ aj_backupdb (autobackupdb_node *n)
     {
       _aj_autobackupdb_error_log (n, buf);
       if (access (cubrid_err_file, F_OK) == 0)
-        {
-          unlink (cubrid_err_file);
-        }
+	{
+	  unlink (cubrid_err_file);
+	}
       return;
     }
   if (access (cubrid_err_file, F_OK) == 0)
@@ -1676,24 +1676,24 @@ aj_backupdb (autobackupdb_node *n)
       argv[2] = n->dbname;
       argv[3] = NULL;
       if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
-        {
-          /* optimizedb */
-          sprintf (buf, "Failed to update statistics");
-          _aj_autobackupdb_error_log (n, buf);
-          return;
-        }
+	{
+	  /* optimizedb */
+	  sprintf (buf, "Failed to update statistics");
+	  _aj_autobackupdb_error_log (n, buf);
+	  return;
+	}
     }
 
   if (db_start_flag)
     {
       char err_buf[ERR_MSG_SIZE];
       if (cmd_start_server (n->dbname, err_buf, sizeof (err_buf)) < 0)
-        {
-          int buf_len;
-          memset (buf, 0, sizeof (buf));
-          buf_len = sprintf (buf, "Failed to turn on DB : ");
-          snprintf (buf + buf_len, sizeof (buf) - buf_len - 1, "%s", err_buf);
-          _aj_autobackupdb_error_log (n, buf);
-        }
+	{
+	  int buf_len;
+	  memset (buf, 0, sizeof (buf));
+	  buf_len = sprintf (buf, "Failed to turn on DB : ");
+	  snprintf (buf + buf_len, sizeof (buf) - buf_len - 1, "%s", err_buf);
+	  _aj_autobackupdb_error_log (n, buf);
+	}
     }
 }

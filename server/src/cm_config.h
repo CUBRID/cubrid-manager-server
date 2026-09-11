@@ -628,7 +628,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version);
 
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
-                             char *dest_dbname);
+			     char *dest_dbname);
 extern int auto_conf_execquery_update_dbuser (const char *src_db_uid,
     const char *dest_db_uid,
     const char *dest_db_passwd);

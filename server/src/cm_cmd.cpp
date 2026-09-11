@@ -81,7 +81,7 @@ static void
 _print_help (void)
 {
   const char *title_pattern =
-    "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
+	  "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
   printf (title_pattern, CM_ADMIN_VERSION, CM_ADMIN_NAME);
   print_cmd ();
 

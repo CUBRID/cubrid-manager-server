@@ -371,9 +371,9 @@ int ts_get_access_log_files (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_error_log_files (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_check_dir (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_autobackupdb_error_log (nvplist *req, nvplist *res,
-                                   char *_dbmt_error);
+				   char *_dbmt_error);
 int ts_get_autoexecquery_error_log (nvplist *req, nvplist *res,
-                                    char *_dbmt_error);
+				    char *_dbmt_error);
 int tsGetAutoaddvolLog (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error);
@@ -389,17 +389,17 @@ int ts_getstatustemplate (nvplist *req, nvplist *res, char *diag_error);
 #if 0                /* ACTIVITY_PROFILE */
 int ts_addactivitytemplate (nvplist *req, nvplist *res, char *diag_error);
 int ts_removeactivitytemplate (nvplist *req, nvplist *res,
-                               char *diag_error);
+			       char *diag_error);
 int ts_updateactivitytemplate (nvplist *req, nvplist *res,
-                               char *diag_error);
+			       char *diag_error);
 int ts_getactivitytemplate (nvplist *req, nvplist *res, char *diag_error);
 #endif
 int ts_analyzecaslog (nvplist *req, nvplist *res, char *diag_error);
 int ts_executecasrunner (nvplist *req, nvplist *res, char *diag_error);
 int ts_removecasrunnertmpfile (nvplist *req, nvplist *res,
-                               char *diag_error);
+			       char *diag_error);
 int ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
-                           char *diag_error);
+			   char *diag_error);
 int ts_get_ldb_class_att (nvplist *req, nvplist *res, char *_dbmt_error);
 int tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_remove_log (nvplist *in, nvplist *out, char *_dbmt_error);
@@ -408,19 +408,19 @@ int ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_changemode (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_heartbeat_list (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_standby_server_stat (nvplist *req, nvplist *res,
-                                char *_dbmt_error);
+				char *_dbmt_error);
 int ts_get_db_mode (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_role_change (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_user_verify (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_folders_with_keyword (nvplist *req, nvplist *res,
-                                 char *_dbmt_error);
+				 char *_dbmt_error);
 int ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_file_total_line_num (nvplist *req, nvplist *res,
-                                char *_dbmt_error);
+				char *_dbmt_error);
 int ts_get_envvar_by_name (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_error_trace (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_login (nvplist *req, nvplist *res, char *_dbmt_error);
@@ -448,7 +448,7 @@ int ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error);
 int
 ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
-                 int type);
+		 int type);
 int ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
 

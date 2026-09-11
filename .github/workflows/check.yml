@@ -1,0 +1,168 @@
+#
+#
+#  Copyright 2016 CUBRID Corporation
+# 
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+# 
+#       http://www.apache.org/licenses/LICENSE-2.0
+# 
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+# 
+name: github-checks
+on: 
+  pull_request:
+    branches:
+      - develop
+# Least privilege by default; jobs widen this only where they must write.
+permissions:
+  contents: read
+jobs:
+  pr-style:
+    name: pr-style
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/check-pr-title
+  code-style:
+    name: code-style
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write # reviewdog posts review suggestions
+    env:
+      working-directory: .github/workflows
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install packages
+        run: |
+          # dependencies to build GNU indent
+          sudo apt-get -yq install build-essential texi2html wget
+          
+          # install astyle
+          sudo apt-get -yq install astyle
+        working-directory: ${{ env.working-directory }}
+      - id: files
+        uses: ./.github/actions/changed-files
+      - name: Check code style
+        id: stylecheck
+        env:
+          # The changed file list is controlled by the PR author, so it must never be
+          # interpolated into the script body. It is passed through the environment and
+          # parsed as JSON below.
+          ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
+        run: |
+          # The changed file list must never be silently empty: if the step above broke
+          # (API, permissions, network) the loop would check nothing and this required
+          # gate would pass. An empty list is only acceptable as a well-formed [].
+          # (jq -e exits 0 on empty input, so the emptiness must be tested separately.)
+          if [ -z "$ADDED_MODIFIED" ] || ! jq -e 'type == "array"' <<< "$ADDED_MODIFIED" > /dev/null 2>&1; then
+            echo "::error::changed file list is missing or malformed - refusing to report success without checking anything"
+            exit 1
+          fi
+
+          checked=0
+          while IFS= read -r -d '' f; do
+            # only files under server/src are checked.
+            if [[ $f != server/src/* ]]; then
+              continue
+            fi
+
+            .github/workflows/codestyle.sh "$f"
+            checked=$((checked + 1))
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "$ADDED_MODIFIED")
+          echo "code style checked $checked file(s) under server/src"
+          git diff | tee gitdiff
+          test ! -s gitdiff # is empty? yes: 0 no: 1
+      - name: Suggest code changes
+        if: ${{ failure() }}
+        uses: reviewdog/action-suggester@2558ba17e65a9039e73764a73009fc05fef28a46 # v1.24.3
+        with:
+          tool_name: code-style (indent, astyle)
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install packages
+        run: |
+          sudo apt-get install -yq wget build-essential
+
+          # Download cppcheck-2.13.0 source
+          wd=`pwd`
+          cd ..
+          wget https://github.com/CUBRID/3rdparty/raw/develop/cppcheck/2.13.0.tar.gz
+          tar xf 2.13.0.tar.gz
+
+          # build cppcheck-2.13.0
+          cd cppcheck-2.13.0
+          make -j4 MATCHCOMPILER=yes CFGDIR=cfg CXXFLAGS="-O2 -DNDEBUG -Wall -Wno-sign-compare -Wno-unused-function"
+          echo "CPPCHECK_PATH=`pwd`" >> $GITHUB_ENV
+
+          cd $wd
+      - uses: actions/checkout@v5
+      - id: files
+        uses: ./.github/actions/changed-files
+      - name: cppcheck
+        env:
+          # The changed file list is controlled by the PR author, so it must never be
+          # interpolated into the script body. It is passed through the environment and
+          # parsed as JSON below.
+          ADDED_MODIFIED: ${{ steps.files.outputs.added_modified }}
+        run: |
+          # The changed file list must never be silently empty: if the step above broke
+          # (API, permissions, network) the loop would check nothing and this required
+          # gate would pass. An empty list is only acceptable as a well-formed [].
+          # (jq -e exits 0 on empty input, so the emptiness must be tested separately.)
+          if [ -z "$ADDED_MODIFIED" ] || ! jq -e 'type == "array"' <<< "$ADDED_MODIFIED" > /dev/null 2>&1; then
+            echo "::error::changed file list is missing or malformed - refusing to report success without checking anything"
+            exit 1
+          fi
+
+          result_file="cppcheck.result"
+          summary_file="cppcheck.summary"
+
+          touch "$result_file"
+          touch "$summary_file"
+
+          checked=0
+          while IFS= read -r -d '' f; do
+            if [ -d "$f" ]; then
+              continue
+            fi
+
+            # only files under server/src are checked.
+            if [[ $f != server/src/* ]]; then
+              continue
+            fi
+
+            set +e
+            ext=$(expr "$f" : ".*\(\..*\)")
+            set -e
+
+            case $ext in
+            .c|.h|.cpp|.hpp|.C|.H|.CPP|.HPP) true;; # only these formats are checked.
+            *) continue ;; # skip others
+            esac
+
+            "$CPPCHECK_PATH/cppcheck" --force -j4 --inline-suppr --suppressions-list=.github/workflows/cppcheck-spr-list --language=c++ -DHAVE_INT64_T --quiet --enable=warning "$f" 2>>"$result_file"
+            checked=$((checked + 1))
+          done < <(jq -j '.[] | select(type == "string") | . + "\u0000"' <<< "$ADDED_MODIFIED")
+          echo "cppcheck checked $checked file(s) under server/src"
+
+          echo "errors: $(grep -c ' error: ' "$result_file" || true)" > "$summary_file"
+          echo "warnings: $(grep -c ' warning: ' "$result_file" || true)" >> "$summary_file"
+
+          echo "-----------------------------Result-------------------------------------"
+          cat "$result_file"
+          echo "-----------------------------Summary------------------------------------"
+          cat "$summary_file"
+
+          ! grep " error: " "$result_file" 1>/dev/null # if has errors, fail

@@ -75,7 +75,7 @@ typedef struct autoaddvoldb_t
 
 void aj_initialize (ajob *ajlist, void *ud);
 void aj_add_volume (char *dbname, const char *type,
-                    int increase, int pagesize);
+		    int increase, int pagesize);
 double
 ajFreeSpace (GeneralSpacedbResult *cmd_res, const char *type);
 

@@ -221,12 +221,12 @@ typedef struct
 } T_BROKER_DIAGDATA;
 
 #define MAX_STATDUMP_PROC 16
- typedef struct
- {
-   int pid;
-   char dbname [DB_NAME_LEN];
-   int status;
- } T_STATDUMP_STAT;
+typedef struct
+{
+  int pid;
+  char dbname [DB_NAME_LEN];
+  int status;
+} T_STATDUMP_STAT;
 
 typedef struct
 {
@@ -235,10 +235,10 @@ typedef struct
   int len;
 } TS_SQL_INFO;
 
- static T_STATDUMP_STAT *statdump_daemon = NULL;
+static T_STATDUMP_STAT *statdump_daemon = NULL;
 
- #define	STATD_IDLE	0
- #define	STATD_RUNNING	1
+#define	STATD_IDLE	0
+#define	STATD_RUNNING	1
 
 
 #if defined(WINDOWS)
@@ -359,7 +359,7 @@ static int find_new_statdumpd_info ();
 
 static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
-static int get_next_sqltext (FILE * qfp, char *qry_buf, int offset, int query_file_size);
+static int get_next_sqltext (FILE *qfp, char *qry_buf, int offset, int query_file_size);
 
 static void unlink_schema_files (const char *schema_list_file);
 
@@ -1083,9 +1083,9 @@ ts2_start_unicas (nvplist *in, nvplist *out, char *_dbmt_error)
   if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
-        {
-          retval = ERR_WITH_MSG;
-        }
+	{
+	  retval = ERR_WITH_MSG;
+	}
     }
 
   unlink (cubrid_err_file);
@@ -1581,9 +1581,9 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
   if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
-        {
-          retval = ERR_WITH_MSG;
-        }
+	{
+	  retval = ERR_WITH_MSG;
+	}
     }
 
   unlink (cubrid_err_file);
@@ -5467,7 +5467,7 @@ unlink_schema_files (const char *schema_list_file)
     char drive[_MAX_DRIVE];
     char dir[PATH_MAX];
 
-    if (_splitpath_s(schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+    if (_splitpath_s (schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
       {
 	snprintf (path, PATH_MAX, "%s%s", drive, dir);
       }
@@ -5478,7 +5478,7 @@ unlink_schema_files (const char *schema_list_file)
   }
 #else
   snprintf (path, PATH_MAX, "%s", schema_list_file);
-  if (dirname(path) == NULL)
+  if (dirname (path) == NULL)
     {
       return;
     }
@@ -7139,7 +7139,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *query_p = NULL;
   int query_file_size;
   TS_SQL_INFO *sql_info = NULL;
-  int has_comma[]={0, 0, 0, 0, 0, 0, 0, 1, 0};
+  int has_comma[]= {0, 0, 0, 0, 0, 0, 0, 1, 0};
 
   cmd_name[0] = '\0';
   buf[0] = '\0';
@@ -7242,20 +7242,20 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
       retval = get_sql_text (tmpfile, query_p, sql_info, query_file_size);
 
       if (retval != num_queries)
-        {
-          num_queries = 0;
-          if (query_p)
-            {
-              free (query_p);
-              query_p = NULL;
-            }
+	{
+	  num_queries = 0;
+	  if (query_p)
+	    {
+	      free (query_p);
+	      query_p = NULL;
+	    }
 
-          if (sql_info)
-            {
+	  if (sql_info)
+	    {
 	      free (sql_info);
 	      sql_info = NULL;
-            }
-        }
+	    }
+	}
     }
 
   if ((infile = fopen (tmpfile, "rt")) == NULL)
@@ -7305,16 +7305,16 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	  for (i = 0; i < num_queries; i++)
 	    {
 	      if (strncmp (sql_info[i].sql_id, tok[8], strlen (tok[8])) == 0)
-	        {
-	          qbuf = (char *) calloc (1, sql_info[i].len + 1);
-	          if (qbuf != NULL)
-	            {
-	              strncpy (qbuf, query_p + sql_info[i].offset, sql_info[i].len);
-	              nv_add_nvp (res, "SQL_Text", qbuf);
+		{
+		  qbuf = (char *) calloc (1, sql_info[i].len + 1);
+		  if (qbuf != NULL)
+		    {
+		      strncpy (qbuf, query_p + sql_info[i].offset, sql_info[i].len);
+		      nv_add_nvp (res, "SQL_Text", qbuf);
 
-	              free (qbuf);
-	            }
-	        }
+		      free (qbuf);
+		    }
+		}
 	    }
 	}
       nv_add_nvp (res, "close", "transaction");
@@ -7366,9 +7366,9 @@ get_sql_info (char *dbmt_file, int *file_size)
   while (fgets (buf, sizeof (buf), qry_fp))
     {
       if (strncmp (buf, sql_id_mark, sql_id_mark_len) == 0)
-      {
-        num_queries++;
-      }
+	{
+	  num_queries++;
+	}
     }
 
   *file_size = sb.st_size;
@@ -7407,34 +7407,34 @@ get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *sql_info, int query_fil
   while (fgets (buf, sizeof (buf), qry_fp))
     {
       if (strncmp (buf, sql_id_mark, sql_id_mark_len) != 0)
-      {
-        continue;
-      }
+	{
+	  continue;
+	}
 
       sqlid_p = strchr (buf, ':');
       if (sqlid_p == NULL || strlen (sqlid_p) < 2)
-      {
-        continue;
-      }
+	{
+	  continue;
+	}
 
       sqlid_p+= 2; /* example tranlit output look like: SQL_ID: 5d5807aaab63c */
 
       newline_p = strchr (sqlid_p, '\n');
       if (newline_p)
-      {
-        *newline_p = '\0';
-      }
+	{
+	  *newline_p = '\0';
+	}
 
       num_queries++;
       strncpy (sql_info[sql_index].sql_id, sqlid_p, strlen (sqlid_p));
 
       ret = get_next_sqltext (qry_fp, query_p, offset, query_file_size);
       if (ret > 0)
-        {
-          sql_info[sql_index].offset = offset;
-          sql_info[sql_index].len = ret - offset;
-          offset = ret;
-        }
+	{
+	  sql_info[sql_index].offset = offset;
+	  sql_info[sql_index].len = ret - offset;
+	  offset = ret;
+	}
 
       sql_index++;
 
@@ -7453,7 +7453,7 @@ get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *sql_info, int query_fil
  */
 
 static int
-get_next_sqltext (FILE * qfp, char *qry_buf, int offset_v, int query_file_size)
+get_next_sqltext (FILE *qfp, char *qry_buf, int offset_v, int query_file_size)
 {
   bool found = false;
   bool end_of_query = false;
@@ -7472,45 +7472,45 @@ get_next_sqltext (FILE * qfp, char *qry_buf, int offset_v, int query_file_size)
   while (fgets (buf, sizeof (buf), qfp))
     {
       if (found == false)         /* skip util we meet 'Tran Index :' line */
-      {
-        if (strncmp (buf, tran_index_mark, tran_index_mark_len) == 0)
-          {
-            found = true;
-            continue;
-          }
-      }
+	{
+	  if (strncmp (buf, tran_index_mark, tran_index_mark_len) == 0)
+	    {
+	      found = true;
+	      continue;
+	    }
+	}
 
       line_length = strlen (buf);
 
       if (line_length == 1)      /* it could be only newline */
-      {
-        char sbuf[4096];
+	{
+	  char sbuf[4096];
 
-        if (fgets (sbuf, sizeof (sbuf), qfp) == NULL || strncmp (sbuf, sql_id_mark, strlen (sql_id_mark)) == 0)
-          {
-            qry_buf[offset - 1] = '\0';
-            end_of_query = true;
+	  if (fgets (sbuf, sizeof (sbuf), qfp) == NULL || strncmp (sbuf, sql_id_mark, strlen (sql_id_mark)) == 0)
+	    {
+	      qry_buf[offset - 1] = '\0';
+	      end_of_query = true;
 
-            if (!feof (qfp))
-              {
-                fseek (qfp, -1 * strlen (sbuf), SEEK_CUR); /* push back to iostream */
-              }
-            break;
-          }
-      }
+	      if (!feof (qfp))
+		{
+		  fseek (qfp, -1 * strlen (sbuf), SEEK_CUR); /* push back to iostream */
+		}
+	      break;
+	    }
+	}
 
       if ((offset + line_length) >= query_file_size)
-      {
-        return -1;
-      }
+	{
+	  return -1;
+	}
 
       strncpy (qry_buf + offset, buf, line_length);     /* copy a SQL text into qry_buf */
 
       offset += line_length;
       if (end_of_query)
-      {
-        break;
-      }
+	{
+	  break;
+	}
     }
 
   return offset;
@@ -7637,11 +7637,11 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
   if (dbpasswd != NULL)
     {
       if (strcmp (type, "i") == 0 || strcmp (type, "u") == 0 || strcmp (type, "h") == 0 || strcmp (type, "p") == 0
-          || strcmp (type, "s") == 0)
-        {
-          argv[argc++] = "--" KILLTRAN_DBA_PASSWORD_L;
-          argv[argc++] = dbpasswd;
-        }
+	  || strcmp (type, "s") == 0)
+	{
+	  argv[argc++] = "--" KILLTRAN_DBA_PASSWORD_L;
+	  argv[argc++] = dbpasswd;
+	}
     }
 
   if (strcmp (type, "i") == 0)
@@ -13161,7 +13161,7 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      if (CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1104)
 		{
 		  scan_matched =
-		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+			  sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
 		  if (scan_matched != 1)
 		    {
 		      return -1;
@@ -13171,16 +13171,16 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      else
 		{
 		  scan_matched =
-		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+			  sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
 		  if (scan_matched != 1)
 		    {
 		      return -1;
 		    }
 		  nv_add_nvp (res, "numallocated", s2);
 
-	          fgets (buf, sizeof (buf), infile);
+		  fgets (buf, sizeof (buf), infile);
 		  scan_matched =
-		      sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
+			  sscanf (buf, "%*s %*s %*s %*s %*s %*s %*s %*s %255s", s2);
 		  if (scan_matched != 1)
 		    {
 		      return -1;
@@ -14956,7 +14956,7 @@ handle_ha_status_output (nvplist *res, char *_dbmt_error)
       value[len_tmp] = '\0';
       snprintf (buf, sizeof (buf), "node%c_state", node_index[i]);
       nv_add_nvp (res, buf_p, value);
-  }
+    }
 
   if (i < 2 || ret != ERR_NO_ERROR)
     {
@@ -16400,11 +16400,11 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   db_name = nv_get_val (req, "_DBNAME");
   interval_str = nv_get_val (req, "interval");
   if (!interval_str || !db_name)
-   {
-     nv_update_val (res, "note", "no sufficient arguments");
-     LOG_ERROR ("start_statdump: dbname or interval was not specified");
-     return -1;
-   }
+    {
+      nv_update_val (res, "note", "no sufficient arguments");
+      LOG_ERROR ("start_statdump: dbname or interval was not specified");
+      return -1;
+    }
 
   if (find_statdumpd_info (db_name) >= 0)
     {
@@ -16463,11 +16463,11 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   db_name = nv_get_val (req, "_DBNAME");
   if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
-   {
-     nv_update_val (res, "note", "no statdump running");
-     nv_update_val (res, "status", "failed");
-     return -1;
-   }
+    {
+      nv_update_val (res, "note", "no statdump running");
+      nv_update_val (res, "status", "failed");
+      return -1;
+    }
 
   nv_update_val (res, "note", db_name);
 
@@ -16488,22 +16488,22 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       sprintf (cmd, "/bin/ps -p %d", statdump_daemon[slot].pid);
       ret = system (cmd);
       if (ret < 0)
-        {
-          ret_val = 0;
-        }
+	{
+	  ret_val = 0;
+	}
       else
-        {
-          nv_add_nvp (res, "Linux_error", strerror (errno));
-        }
-   }
+	{
+	  nv_add_nvp (res, "Linux_error", strerror (errno));
+	}
+    }
 #endif
 
   if (ret_val < 0)
-      {
-        nv_add_nvp_int (res, "pid", statdump_daemon[slot].pid);
-        nv_update_val (res, "status", "failed");
-        return ret_val;
-      }
+    {
+      nv_add_nvp_int (res, "pid", statdump_daemon[slot].pid);
+      nv_update_val (res, "status", "failed");
+      return ret_val;
+    }
 
   statdump_daemon[slot].status = STATD_IDLE;
   nv_update_val (res, "status", "success");
@@ -16516,22 +16516,22 @@ find_new_statdumpd_info ()
   int i;
   if (statdump_daemon == NULL)
     {
-       statdump_daemon = (T_STATDUMP_STAT *) calloc (sizeof(T_STATDUMP_STAT), MAX_STATDUMP_PROC);
-       if (statdump_daemon == NULL)
-         {
-           return -1;
-         }
-         else
-          {
-            return 0;
-          }
+      statdump_daemon = (T_STATDUMP_STAT *) calloc (sizeof (T_STATDUMP_STAT), MAX_STATDUMP_PROC);
+      if (statdump_daemon == NULL)
+	{
+	  return -1;
+	}
+      else
+	{
+	  return 0;
+	}
     }
   for (i = 0; i < MAX_STATDUMP_PROC; i++)
     {
       if (statdump_daemon[i].status == STATD_IDLE)
-        {
-          return i;
-        }
+	{
+	  return i;
+	}
     }
   return -3;
 }
@@ -16548,9 +16548,9 @@ find_statdumpd_info (char *dbname)
   for (i = 0; i < MAX_STATDUMP_PROC; i++)
     {
       if (statdump_daemon[i].status == STATD_RUNNING && strcmp (statdump_daemon[i].dbname, dbname) == 0)
-        {
-          return i;
-        }
+	{
+	  return i;
+	}
     }
   return -1;
 }
@@ -16695,5 +16695,5 @@ is_filename_matched (const char *fname, const char *pattern)
       return 0;
     }
 
-    return 1;
+  return 1;
 }
