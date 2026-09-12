@@ -29,6 +29,10 @@
 #include <io.h>
 #endif
 
+#include <string>
+#include <vector>
+#include <ctime>
+
 #include "cm_dep.h"
 
 #define DBMT_ERROR_MSG_SIZE    5000
@@ -41,11 +45,8 @@
 #define SIZE_BUFFER_MAX        1024
 #endif
 
-#define SET_TRANSACTION_NO_WAIT_MODE_ENV()                                              \
-      do {                                                                              \
-      putenv((char *) "CUBRID_LOCK_TIMEOUT_IN_SECS=1");                                 \
-      putenv((char *) "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED");                    \
-    } while (0)
+#define TRANSACTION_NO_WAIT_MODE_ENVP                                                   \
+      { "CUBRID_LOCK_TIMEOUT_IN_SECS=1", "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED", NULL }
 
 typedef enum
 {
@@ -451,5 +452,25 @@ ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
                  int type);
 int ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error);
+
+/*
+ * T_STATDUMPD_INFO - point-in-time snapshot of one statdump_daemon entry
+ * (see statdump_daemon in cm_job_task.cpp), for callers outside
+ * cm_job_task.cpp (e.g. cm_server_interface.cpp's getserverstatus) that
+ * need to report statdump-daemon status without touching statdump_daemon
+ * or its mutex directly. "started" is already formatted as
+ * "YYYY-MM-DD HH:MM:SS" (empty if the daemon hasn't reached STATD_RUNNING
+ * yet), so callers can drop it straight into a JSON string field.
+ */
+typedef struct
+{
+  std::string db_name;
+  int interval;
+  int pid;
+  std::string status;
+  std::string started;
+} T_STATDUMPD_INFO;
+
+std::vector<T_STATDUMPD_INFO> get_statdump_daemon_list (void);
 
 #endif /* _CM_JOB_TASK_H_ */

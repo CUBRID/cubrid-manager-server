@@ -15,6 +15,10 @@ Copy database.
 | overwrite | on-off indicating whether to replace existing database |
 | move | on-off indicating whether to remove existing database |
 | advanced | on-off indicating whether to offer local control files |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -29,7 +33,8 @@ Copy database.
   "logpath":"$CUBRID_DATABASES/destinationdb",
   "overwrite":"y",
   "move":"n",
-  "advanced":"off"
+  "advanced":"off",
+  "async":"yes"
 }
 ```
 
@@ -48,6 +53,26 @@ Copy database.
    "__EXEC_TIME" : "33 ms",
    "note" : "none",
    "status" : "success",
+   "task" : "copydb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "14"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
    "task" : "copydb"
 }
 ```

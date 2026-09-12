@@ -17,6 +17,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
 
+SSL_RSA_BITS=2048
 
 SUBDIRS = conf
 
@@ -30,24 +31,27 @@ LIBS += @SYS_LIBS@
 bin_PROGRAMS = cm_admin cub_manager
 
 cm_admin_SOURCES = \
-	$(DBMT_DIR)/cm_text_encryption.c \
+	$(DBMT_DIR)/cm_text_encryption.cpp \
 	$(DBMT_DIR)/cm_config.cpp \
 	$(DBMT_DIR)/cm_server_util.cpp \
 	$(DBMT_DIR)/cm_user.cpp \
 	$(DBMT_DIR)/cm_cmd.cpp \
 	$(DBMT_DIR)/cm_cmd_util.cpp \
 	$(DBMT_DIR)/cm_connect_info.cpp \
-	$(DBMT_DIR)/cm_cmd_task.cpp
+	$(DBMT_DIR)/cm_cmd_task.cpp \
+	$(DBMT_DIR)/cm_server_status.cpp
 cm_admin_CFLAGS = -D_FILE_OFFSET_BITS=64
 cm_admin_LDFLAGS =  @CMDEP_LIB@ -D_FILE_OFFSET_BITS=64
 
 cub_manager_SOURCES = \
         $(DBMT_DIR)/cm_server_util.cpp \
         $(DBMT_DIR)/cm_autojob.cpp \
-        $(DBMT_DIR)/cm_text_encryption.c \
+        $(DBMT_DIR)/cm_text_encryption.cpp \
         $(DBMT_DIR)/cm_config.cpp \
         $(DBMT_DIR)/cm_job_task.cpp \
         $(DBMT_DIR)/cm_cmd_exec.cpp \
+        $(DBMT_DIR)/cm_server_status.cpp \
+        $(DBMT_DIR)/cm_mem_cpu_stat.cpp \
         $(DBMT_DIR)/cm_connect_info.cpp \
         $(DBMT_DIR)/cm_auto_task.cpp \
         $(DBMT_DIR)/cm_httpd.cpp \
@@ -60,3 +64,8 @@ cub_manager_SOURCES = \
 		$(DBMT_DIR)/cm_server_autoupdate.cpp
 cub_manager_CPPFLAGS = $(AM_CFLAGS) -DFSERVER_SLAVE -DJSON_SUPPORT -DEVENT__HAVE_OPENSSL -D_FILE_OFFSET_BITS=64 @EXTERNAL_INC@
 cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt -lcascci
+
+install-exec-hook:
+	$(RM) $(prefix)/conf/cm_ssl_cert.key $(prefix)/conf/cm_ssl_cert.crt
+	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).key $(prefix)/conf/cm_ssl_cert.key
+	$(LN_S) cm_ssl_cert_$(SSL_RSA_BITS).crt $(prefix)/conf/cm_ssl_cert.crt

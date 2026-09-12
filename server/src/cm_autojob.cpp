@@ -312,7 +312,7 @@ aj_add_volume (char *dbname, const char *type, int increase,
   argv[argc++] = inc_str;
   argv[argc++] = dbname;
   argv[argc++] = NULL;
-  retval = run_child (argv, 1, NULL, NULL, NULL, NULL);    /* addvoldb  */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL);    /* addvoldb  */
 
   mytime = time (NULL);
   conf_get_dbmt_file (FID_AUTO_ADDVOLDB_LOG, log_file_name);
@@ -493,7 +493,7 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
   T_SERVER_STATUS_RESULT *server_status_res;
   int db_mode = 0;
 
-  server_status_res = cmd_server_status ();
+  server_status_res = cmd_cms_server_status ();
   if (server_status_res == NULL)
     {
       return;
@@ -737,15 +737,16 @@ set_query_period_details (query_period_details **details, char *conf_item)
   char delim[] = " ,";
   char *token = NULL;
   query_period_details *head = NULL;
+  char *saveptr;
 
-  token = strtok (conf_item, delim);
+  token = STRTOK (conf_item, delim, &saveptr);
   while (token != NULL)
     {
       *details = (query_period_details *) malloc (sizeof (query_period_details));
       strncpy ((*details)->detail, token, DETAIL_LEN);
       (*details)->next = head;
       head = *details;
-      token = strtok (NULL, delim);
+      token = STRTOK (NULL, delim, &saveptr);
     }
 }
 
@@ -755,9 +756,10 @@ set_backup_period_details (backup_period_details **details,
 {
   char delim[] = " ,";
   char *token;
+  char *saveptr;
   backup_period_details *head = NULL;
 
-  token = strtok (conf_item, delim);
+  token = STRTOK (conf_item, delim, &saveptr);
   while (token != NULL)
     {
       *details =
@@ -817,7 +819,7 @@ set_backup_period_details (backup_period_details **details,
 
       (*details)->next = head;
       head = *details;
-      token = strtok (NULL, delim);
+      token = STRTOK (NULL, delim, &saveptr);
     }
 }
 
@@ -1090,12 +1092,11 @@ aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
   query_period_details *detail1 = NULL;
   int tm_wday = 0;
 
-  tm_p = localtime (&cur_time);
+  tm_p = LOCALTIME_R (&cur_time, &cur_tm);
   if (tm_p == NULL)
     {
       return;
     }
-  cur_tm = *tm_p;
 
   for (c = (autoexecquery_node *) (hd); c != NULL; c = c->next)
     {
@@ -1197,12 +1198,11 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
       time_t prev_day_sec = 0;
       struct tm prev_tm, *tm_p;
 
-      tm_p = localtime (&prev_check_time);
+      tm_p = LOCALTIME_R (&prev_check_time, &prev_tm);
       if (tm_p == NULL)
         {
           return 0;
         }
-      prev_tm = *tm_p;
 
       if (interval == 0)
 	{
@@ -1282,7 +1282,7 @@ aj_execquery (autoexecquery_node *c)
 #endif
   argv[argc++] = cmd_name;
 
-  db_mode = uDatabaseMode (c->dbname, &ha_mode);
+  db_mode = cms_database_mode (c->dbname, &ha_mode);
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, c->dbname,
@@ -1309,7 +1309,7 @@ aj_execquery (autoexecquery_node *c)
       break;
     }
 
-  make_temp_filepath (input_filename, sco.dbmt_tmp_dir, "dbmt_auto_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
+  gen_tempfile_path (input_filename, sco.dbmt_tmp_dir, "dbmt_auto_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
   argv[argc++] = "--" CSQL_INPUT_FILE_L;
   argv[argc++] = input_filename;
 
@@ -1341,8 +1341,8 @@ aj_execquery (autoexecquery_node *c)
       return;
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "aj_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
-  retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* csql auto-execute */
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "aj_execquery", TS_AUTOEXECQUERYERRLOG, PATH_MAX);
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, NULL);    /* csql auto-execute */
   unlink (input_filename);
   if (retval != 0)
     {
@@ -1422,12 +1422,11 @@ aj_autobackupdb_handler (void *hd, time_t prev_check_time, time_t cur_time)
 
   backup_period_details *period_date = NULL;
 
-  tm_p = localtime (&cur_time);
+  tm_p = LOCALTIME_R (&cur_time, &cur_tm);
   if (tm_p == NULL)
     {
       return;
     }
-  cur_tm = *tm_p;
 
   for (c = (autobackupdb_node *) (hd); c != NULL; c = c->next)
     {
@@ -1445,12 +1444,11 @@ aj_autobackupdb_handler (void *hd, time_t prev_check_time, time_t cur_time)
           if (1 == c->is_interval)    // interval time for auto backup
             {
               time_t prev_day_sec;
-              tm_p = localtime (&prev_check_time);
+              tm_p = LOCALTIME_R (&prev_check_time, &prev_tm);
               if (tm_p == NULL)
                 {
                   return;
                 }
-              prev_tm = *tm_p;
 
               prev_day_sec =
                 prev_tm.tm_hour * 3600 + prev_tm.tm_min * 60 + prev_tm.tm_sec;
@@ -1567,7 +1565,7 @@ aj_backupdb (autobackupdb_node *n)
   sprintf (backup_vol_name, "%s_auto_backup_lv%d", n->dbname, n->level);
   sprintf (bkpath, "%s/%s_%s", n->path, strtime, backup_vol_name);
 
-  db_mode = uDatabaseMode (n->dbname, &ha_mode);
+  db_mode = cms_database_mode (n->dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (buf, "Failed to execute backupdb: %s is in standalone mode", n->dbname);
@@ -1679,7 +1677,7 @@ aj_backupdb (autobackupdb_node *n)
       return;
     }
 
-  retval = run_child (argv, 1, inputfilepath, NULL, cubrid_err_file, NULL);    /* backupdb */
+  retval = run_child_env (argv, RUN_FOREGROUND, inputfilepath, NULL, cubrid_err_file, NULL);    /* backupdb */
   unlink (inputfilepath);
 
   if (read_error_file (cubrid_err_file, buf, sizeof (buf)) < 0)
@@ -1714,7 +1712,7 @@ aj_backupdb (autobackupdb_node *n)
       argv[1] = UTIL_OPTION_OPTIMIZEDB;
       argv[2] = n->dbname;
       argv[3] = NULL;
-      if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
+      if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL) < 0)
         {
           /* optimizedb */
           sprintf (buf, "Failed to update statistics");

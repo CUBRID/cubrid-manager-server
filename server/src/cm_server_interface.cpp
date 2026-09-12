@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <signal.h>
-#include <list>
+#include <map>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -40,14 +40,13 @@
 #include "cm_server_extend_interface.h"
 #include "cm_log.h"
 #include "cm_mon_stat.h"
+#include "cm_job_task.h"
 
 using namespace std;
 
 #ifndef MAX_PATH
 #define MAX_PATH 256
 #endif
-
-extern T_EMGR_VERSION CLIENT_VERSION;
 
 typedef struct
 {
@@ -135,7 +134,6 @@ cub_cm_init_env ()
   memset (&cub_httpd_env, 0, sizeof (cubrid_env_t));
   putenv (default_cubrid_lang_type);    /* set as default language type */
   putenv (default_cubrid_lang_msg_type);    /* set as default language type */
-  //putenv ("CUBRID_CHARSET=en_US");    /* set as default language type */
 
   snprintf (cub_httpd_env.cubrid_err_log, MAX_PATH,
             "CUBRID_ERROR_LOG=%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
@@ -148,19 +146,6 @@ cub_cm_init_env ()
             sco.szCubrid_databases);
   putenv (cub_httpd_env.cubrid_databases);
 
-  /*  charset = getenv ("CUBRID_CHARSET");
-  if (charset != NULL)
-  {
-      snprintf (cub_httpd_env.cubrid_charset, MAX_PATH, "CUBRID_CHARSET=%s",
-                charset);
-  }
-  else
-  {
-      snprintf (cub_httpd_env.cubrid_charset, MAX_PATH,
-                "CUBRID_CHARSET=en_US");
-      putenv (cub_httpd_env.cubrid_charset);
-  }
-  */
   mutex_init (cm_mutex);
   return;
 }
@@ -174,8 +159,8 @@ cub_cm_destory_env ()
 int
 ch_build_request (Json::Value &req, nvplist *cli_request)
 {
-  static int i = 0;
-  nv_add_nvp_int (cli_request, "_STAMP", i++);
+  static atomic_counter_t i = 0;
+  nv_add_nvp_int (cli_request, "_STAMP", (int) ATOMIC_FETCH_ADD1 (i));
   nv_add_nvp (cli_request, "_PROGNAME", CMS_NAME);
 
   return 1;
@@ -214,7 +199,6 @@ ch_process_request (nvplist *req, nvplist *res)
   char access_log_flag;
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
   int major_ver, minor_ver;
-  char *cli_ver;
 
   int elapsed_msec = 0;
   struct timeval task_begin, task_end;
@@ -264,12 +248,6 @@ ch_process_request (nvplist *req, nvplist *res)
         }
     }
 
-  /* set CLIENT_VERSION */
-  cli_ver = nv_get_val (req, "_CLIENT_VERSION");
-  make_version_info (cli_ver == NULL ? "1.0" : cli_ver, &major_ver,
-                     &minor_ver);
-  CLIENT_VERSION = EMGR_MAKE_VER (major_ver, minor_ver);    /* global variable */
-
   sprintf (_dbmt_error, "?");    /* prevent to have null string */
   if (task_code == TS_UNDEFINED)
     {
@@ -286,12 +264,6 @@ ch_process_request (nvplist *req, nvplist *res)
           ut_access_log (req, NULL);
         }
 
-      /*    if (charset != NULL)
-      {
-      snprintf (charsetenv, PATH_MAX, "CUBRID_CHARSET=%s", charset);
-      putenv (charsetenv);
-      }
-      */
       /* record the start time of running cub_manager */
       gettimeofday (&task_begin, NULL);
 
@@ -299,11 +271,7 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* record the end time of running cub_manager */
       gettimeofday (&task_end, NULL);
-      /*     if (charset != NULL)
-      {
-      putenv (cub_httpd_env.cubrid_charset);
-      }
-      */
+
       /* caculate the running time of cub_manager. */
       _ut_timeval_diff (&task_begin, &task_end, &elapsed_msec);
 
@@ -314,8 +282,6 @@ ch_process_request (nvplist *req, nvplist *res)
     }
 
   uGenerateStatus (req, res, retval, _dbmt_error);
-
-  //      FREE_MEM (cli_ver);
 
   return 0;
 }
@@ -455,20 +421,364 @@ cub_cm_extend_request (Json::Value &request, Json::Value &response)
   return 0;
 }
 
+/*
+ * task names that a client may run with "async":"yes". these are the
+ * handful of utility-wrapping tasks that are known to run long enough
+ * (compactdb, backupdb, ...) that blocking the caller
+ */
+static const char *async_capable_tasks[] =
+{
+  "addvoldb",
+  "backupdb",
+  "broker_restart",
+  "broker_start",
+  "broker_stop",
+  "checkdb",
+  "compactdb",
+  "copydb",
+  "createdb",
+  "deletedb",
+  "ha_reload",
+  "ha_start",
+  "ha_stop",
+  "loaddb",
+  "lockdb",
+  "optimizedb",
+  "renamedb",
+  "restoredb",
+  "start_statdump",
+  "startbroker",
+  "startdb",
+  "stop_statdump",
+  "stopbroker",
+  "stopdb",
+  "unloaddb",
+  NULL
+};
+
+static bool
+is_async_capable_task (const string &task_name)
+{
+  for (int i = 0; async_capable_tasks[i] != NULL; i++)
+    {
+      if (task_name == async_capable_tasks[i])
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
+/*
+ * task names for which only one instance may run against a given
+ * database at a time
+ */
+static const char *exclusive_db_tasks[] =
+{
+  "addvoldb",
+  "backupdb",
+  "checkdb",
+  "compactdb",
+  "copydb",
+  "createdb",
+  "deletedb",
+  "loaddb",
+  "optimizedb",
+  "renamedb",
+  "restoredb",
+  "startdb",
+  "stopdb",
+  "unloaddb",
+  NULL
+};
+
+static bool
+is_exclusive_db_task (const string &task_name)
+{
+  for (int i = 0; exclusive_db_tasks[i] != NULL; i++)
+    {
+      if (task_name == exclusive_db_tasks[i])
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
+static map <std::string, std::string> db_running_async;
+
+/*
+ * exclusive_dbnames_for_request () - the set of database names `task_name`
+ *   must hold the per-db exclusivity lock on before it's allowed to run.
+ *   locks both "srcdbname"/"destdbname" for copydb
+ */
+static vector <string>
+exclusive_dbnames_for_request (const Json::Value &request, const string &task_name)
+{
+  vector <string> names;
+
+  if (task_name == "copydb")
+    {
+      string src = request.get ("srcdbname", "").asString ();
+      string dest = request.get ("destdbname", "").asString ();
+
+      if (!src.empty ())
+        {
+          names.push_back (src);
+        }
+      if (!dest.empty () && dest != src)
+        {
+          names.push_back (dest);
+        }
+    }
+  else
+    {
+      names.push_back (request.get ("dbname", "").asString ());
+    }
+
+  return names;
+}
+
+/*
+ * join_dbnames () - comma-join a request's exclusive dbname(s), for
+ *   logging/diagnostics only (copydb can carry two).
+ */
+static string
+join_dbnames (const vector <string> &dbnames)
+{
+  string joined;
+
+  for (size_t i = 0; i < dbnames.size (); i++)
+    {
+      if (!joined.empty ())
+        {
+          joined += ",";
+        }
+      joined += dbnames[i];
+    }
+
+  return joined;
+}
+
+/*
+ * is_db_running_async () - pure query: is some async-capable task
+ * currently running against dbname? caller must hold cm_mutex.
+ */
+static bool
+is_db_running_async (const std::string &dbname)
+{
+  return !dbname.empty ()
+         && db_running_async.find (dbname) != db_running_async.end ();
+}
+
+static std::string
+db_running_async_task (const std::string &dbname)
+{
+  map <std::string, std::string> ::iterator it = db_running_async.find (dbname);
+  return (it != db_running_async.end ()) ? it->second : std::string ();
+}
+
+/*
+ * db_running_async_start ()
+ *  caller must hold cm_mutex.
+ */
+static bool
+db_running_async_start (const vector <string> &dbnames, const string &task_name,
+                        string *busy_name = NULL, string *busy_task = NULL)
+{
+  for (size_t i = 0; i < dbnames.size (); i++)
+    {
+      if (is_db_running_async (dbnames[i]))
+        {
+          if (busy_name != NULL)
+            {
+              *busy_name = dbnames[i];
+            }
+          if (busy_task != NULL)
+            {
+              *busy_task = db_running_async_task (dbnames[i]);
+            }
+          return false;
+        }
+    }
+
+  for (size_t i = 0; i < dbnames.size (); i++)
+    {
+      if (!dbnames[i].empty ())
+        {
+          db_running_async[dbnames[i]] = task_name;
+        }
+    }
+  return true;
+}
+
+/*
+ * db_running_async_done () - clear the running-task marker for every
+ *   (non-empty) name in `dbnames`, if any. caller must hold cm_mutex.
+ */
+static void
+db_running_async_done (const vector <string> &dbnames)
+{
+  for (size_t i = 0; i < dbnames.size (); i++)
+    {
+      if (!dbnames[i].empty ())
+        {
+          db_running_async.erase (dbnames[i]);
+        }
+    }
+}
+
+static int
+build_db_busy_response (Json::Value &response, const std::string &dbname,
+                        const std::string &running_task)
+{
+  string note = "database '" + dbname + "' is busy with another task";
+  if (!running_task.empty ())
+    {
+      note += " ('" + running_task + "')";
+    }
+  response["job-status"] = "rejected";
+  return build_server_header (response, ERR_WITH_MSG, note.c_str ());
+}
+
+static int num_running_async_tasks = 0;
+
+/*
+ * async_job_slot_try_acquire () - reserve one of the sco.iMaxNumAsyncTask
+ *   slots for a new background job. caller must hold cm_mutex.
+ */
+static bool
+async_job_slot_try_acquire (void)
+{
+  if (num_running_async_tasks >= sco.iMaxNumAsyncTask)
+    {
+      return false;
+    }
+  num_running_async_tasks++;
+  return true;
+}
+
+/*
+ * async_job_slot_release () - give back a slot reserved by
+ *   async_job_slot_try_acquire (). caller must hold cm_mutex.
+ */
+static void
+async_job_slot_release (void)
+{
+  if (num_running_async_tasks > 0)
+    {
+      num_running_async_tasks--;
+    }
+}
+
+/*
+ * async_job_slot_force_acquire () - unconditionally count one more job
+ *   into num_running_async_tasks, bypassing the sco.iMaxNumAsyncTask
+ *   check
+ *
+ *   NOTE: because this bypasses the sco.iMaxNumAsyncTask check,
+ *   num_running_async_tasks can end up temporarily larger than
+ *   sco.iMaxNumAsyncTask
+ *
+ *   caller must hold cm_mutex.
+ */
+static void
+async_job_slot_force_acquire (void)
+{
+  num_running_async_tasks++;
+}
+
+/*
+ * build_async_task_limit_response () - reply used when a client's
+ *   "async":"yes" request is rejected because sco.iMaxNumAsyncTask
+ *   background jobs are already running.
+ */
+static int
+build_async_task_limit_response (Json::Value &response)
+{
+  char note[128];
+
+  snprintf (note, sizeof (note),
+            "maximum number of concurrent async tasks (%d) reached; try again later",
+            sco.iMaxNumAsyncTask);
+  response["job-status"] = "rejected";
+  return build_server_header (response, ERR_WITH_MSG, note);
+}
+
 class async_request
 {
   public:
-    unsigned int uuid;
+    INT64 uuid;
     Json::Value request;
     Json::Value response;
     int status;
+    time_t created_at;
+    time_t finished_at;
+    std::vector <std::string> db_names;
+    std::string requester_id;
+    bool holds_async_slot;
+    bool is_long_async_job;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
     pthread_cond_t *cond;
 #endif
 };
 
-list < async_request * >request_list;
+std::map < INT64, async_request * > request_map;
+
+/*
+ * reap_stale_async_jobs () - drop finished jobs that have been sitting in
+ *   request_map for longer than sco.iAsyncJobTtlSec because the client
+ *   never called gettaskstatus / job_status to collect the result.
+ *   a job still in progress (status == 0) is never removed here.
+ *
+ *   caller must already hold cm_mutex.
+ */
+static void
+reap_stale_async_jobs (void)
+{
+  time_t now = time (NULL);
+  map < INT64, async_request * > ::iterator itor = request_map.begin ();
+
+  while (itor != request_map.end ())
+    {
+      async_request *cur = itor->second;
+
+      if (cur->status != 0 && (now - cur->finished_at) > sco.iAsyncJobTtlSec)
+        {
+          itor = request_map.erase (itor);
+#ifndef WINDOWS
+          pthread_mutex_destroy (cur->mutex);
+          pthread_cond_destroy (cur->cond);
+          delete cur->mutex;
+          delete cur->cond;
+#endif
+          delete cur;
+          continue;
+        }
+
+      if (cur->status == 0 && !cur->is_long_async_job
+          && (now - cur->created_at) > sco.iAsyncLongJobSec)
+        {
+          string task_name = cur->request.get ("task", "unknown").asString ();
+
+          LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
+                     "running for %d sec, past async_long_job_sec (%d sec); "
+                     "its worker thread cannot be safely cancelled, so it is being "
+                     "left in request_map until it actually finishes.",
+                     (long long) cur->uuid, task_name.c_str (), join_dbnames (cur->db_names).c_str (),
+                     (int) (now - cur->created_at), sco.iAsyncLongJobSec);
+
+          /* log this only once per job, not on every reap_stale_async_jobs () call */
+          cur->is_long_async_job = true;
+        }
+
+      ++itor;
+    }
+}
+
 
 #ifdef WINDOWS
 DWORD WINAPI
@@ -495,16 +805,35 @@ cm_async_request_handler (void *lpArg)
     }
   catch (exception &e)
     {
-      response["status"] = ERR_REQUEST_FORMAT;
+      response["status"] = STATUS_FAILURE;
       response["note"] = e.what ();
     }
+  catch (...)
+    {
+      LOG_ERROR ("cm_async_request_handler : unhandled non-standard exception "
+                "while processing an async task.");
+      response["status"] = STATUS_FAILURE;
+      response["note"] = "internal server error";
+    }
 
-  async_param->status = 1;
   nv_destroy (cli_request);
   nv_destroy (cli_response);
 
 #ifndef WINDOWS
   pthread_mutex_lock (async_param->mutex);
+#endif
+  mutex_lock (cm_mutex);
+  async_param->finished_at = time (NULL);
+  async_param->status = 1;
+
+  db_running_async_done (async_param->db_names);
+
+  if (async_param->holds_async_slot)
+    {
+      async_job_slot_release ();
+    }
+  mutex_unlock (cm_mutex);
+#ifndef WINDOWS
   pthread_cond_broadcast (async_param->cond);
   pthread_mutex_unlock (async_param->mutex);
 #endif
@@ -512,43 +841,153 @@ cm_async_request_handler (void *lpArg)
   return NULL;
 }
 
+/*
+ * put_uuid () - write a job's uuid into a response as a JSON string.
+ *   the vendored jsoncpp in this tree predates 64-bit JSON number
+ *   support (Json::Value only has a 32-bit Int/UInt, no Int64/UInt64),
+ *   so assigning an INT64 uuid straight into a Json::Value would
+ *   silently truncate it once req_id grows past 2^32. encoding it as a
+ *   string sidesteps that and round-trips losslessly through
+ *   parse_uuid (), which already accepts numeric strings.
+ */
+static void
+put_uuid (Json::Value &response, INT64 uuid)
+{
+  char buf[32];
+  snprintf (buf, sizeof (buf), "%lld", (long long) uuid);
+  response["uuid"] = buf;
+}
+
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+                          unsigned long time_out = 600, bool no_wait = false)
 {
   HANDLE hHandles;
   DWORD ThreadID;
   DWORD dwWaitResult;
-  static unsigned int req_id = 0;
+  static INT64 req_id = 0;
+  string task_name = request.get ("task", "").asString ();
+  vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
+  bool is_exclusive_task = is_exclusive_db_task (task_name);
+
+  if (is_exclusive_task)
+    {
+      string busy_name, busy_task;
+      mutex_lock (cm_mutex);
+      bool started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+      mutex_unlock (cm_mutex);
+      if (!started)
+        {
+          return build_db_busy_response (response, busy_name, busy_task);
+        }
+    }
+
+  if (no_wait)
+    {
+      mutex_lock (cm_mutex);
+      bool acquired = async_job_slot_try_acquire ();
+      mutex_unlock (cm_mutex);
+      if (!acquired)
+        {
+          if (is_exclusive_task)
+            {
+              mutex_lock (cm_mutex);
+              db_running_async_done (dbnames);
+              mutex_unlock (cm_mutex);
+            }
+          return build_async_task_limit_response (response);
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
       return ERR_MEM_ALLOC;
     }
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
+  pstmt->finished_at = 0;
+  pstmt->db_names = is_exclusive_task ? dbnames : vector <string> ();
+  pstmt->requester_id = request.get ("_ID", "").asString ();
+  pstmt->holds_async_slot = no_wait;
+  pstmt->is_long_async_job = false;
+  mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
+  mutex_unlock (cm_mutex);
 
   hHandles =
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to execute task");
     }
 
-  //dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
+  if (no_wait)
+    {
+      /* caller asked for "async":"yes": hand the uuid back right away
+       * and let the worker thread keep running in the background. */
+      CloseHandle (hHandles);
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_map[pstmt->uuid] = pstmt;
+      mutex_unlock (cm_mutex);
 
-  dwWaitResult = WaitForSingleObject (hHandles, INFINITE);    //no timeout.
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
+    }
 
-  if (dwWaitResult == WAIT_TIMEOUT)
+  dwWaitResult = WaitForSingleObject (hHandles, time_out * 1000);    //  time-out interval
+
+  if (dwWaitResult != WAIT_OBJECT_0)
     {
       CloseHandle (hHandles);
-      request_list.push_back (pstmt);
-      response["uuid"] = pstmt->uuid;
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_map[pstmt->uuid] = pstmt;
+       /*
+       * the pstmt->status == 0
+       * set slot to true for proper release.
+       */
+      if (pstmt->status == 0)
+        {
+          async_job_slot_force_acquire ();
+          pstmt->holds_async_slot = true;
+        }
+      mutex_unlock (cm_mutex);
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
@@ -560,203 +999,481 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 #else
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600)
+                          unsigned long time_out = 600, bool no_wait = false)
 {
   int err = 0;
   pthread_t async_thrd;
-#if defined(AIX)
-  pthread_attr_t thread_attr;
-#endif
-  pthread_cond_t cond;
-  pthread_mutex_t mutex;
   timespec to;
-  static unsigned int req_id = 0;
+  static INT64 req_id = 0;
+  string task_name = request.get ("task", "").asString ();
+  vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
+  bool is_exclusive_task = is_exclusive_db_task (task_name);
+
+  if (is_exclusive_task)
+    {
+      string busy_name, busy_task;
+      mutex_lock (cm_mutex);
+      bool started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+      mutex_unlock (cm_mutex);
+      if (!started)
+        {
+          return build_db_busy_response (response, busy_name, busy_task);
+        }
+    }
+
+  if (no_wait)
+    {
+      mutex_lock (cm_mutex);
+      bool acquired = async_job_slot_try_acquire ();
+      mutex_unlock (cm_mutex);
+      if (!acquired)
+        {
+          if (is_exclusive_task)
+            {
+              mutex_lock (cm_mutex);
+              db_running_async_done (dbnames);
+              mutex_unlock (cm_mutex);
+            }
+          return build_async_task_limit_response (response);
+        }
+    }
+
   async_request *pstmt = (async_request *) new (async_request);
   if (pstmt == NULL)
     {
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
       return ERR_MEM_ALLOC;
     }
 
-  err = pthread_mutex_init (&mutex, NULL);
+  pstmt->mutex = new pthread_mutex_t;
+  pstmt->cond = new pthread_cond_t;
+
+  err = pthread_mutex_init (pstmt->mutex, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
+      delete pstmt->mutex;
+      delete pstmt->cond;
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
 
-  err = pthread_cond_init (&cond, NULL);
+  err = pthread_cond_init (pstmt->cond, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
+      pthread_mutex_destroy (pstmt->mutex);
+      delete pstmt->mutex;
+      delete pstmt->cond;
+      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
 
   pstmt->request = request;
   pstmt->status = 0;
+  pstmt->created_at = time (NULL);
+  pstmt->finished_at = 0;
+  pstmt->db_names = is_exclusive_task ? dbnames : vector <string> ();
+  pstmt->requester_id = request.get ("_ID", "").asString ();
+  pstmt->holds_async_slot = no_wait;
+  pstmt->is_long_async_job = false;
 
+  mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
+  mutex_unlock (cm_mutex);
 
-  pstmt->mutex = &mutex;
-  pstmt->cond = &cond;
-
-#if defined(AIX)
-  err = pthread_attr_init (&thread_attr);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread attribute.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_attr_setdetachstate (&thread_attr, PTHREAD_CREATE_DETACHED);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread detach state.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  /* AIX's pthread is slightly different from other systems.
-  Its performance highly depends on the pthread's scope and it's related
-  kernel parameters. */
-  err = pthread_attr_setscope (&thread_attr, PTHREAD_SCOPE_PROCESS);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread scope.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_attr_setstacksize (&thread_attr, AIX_STACKSIZE_PER_THREAD);
-  if (err != 0)
-    {
-      LOG_ERROR ("cm_execute_request_async : fail to set thread stack size.");
-      return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
-    }
-
-  err = pthread_create (&async_thrd, &thread_attr, cm_async_request_handler, pstmt);
-#else /* except AIX */
   err = pthread_create (&async_thrd, NULL, cm_async_request_handler, pstmt);
-#endif
 
   if (err != 0)
     {
+      if (is_exclusive_task || no_wait)
+        {
+          mutex_lock (cm_mutex);
+          if (is_exclusive_task)
+            {
+              db_running_async_done (dbnames);
+            }
+          if (no_wait)
+            {
+              async_job_slot_release ();
+            }
+          mutex_unlock (cm_mutex);
+        }
+      pthread_mutex_destroy (pstmt->mutex);
+      pthread_cond_destroy (pstmt->cond);
+      delete pstmt->mutex;
+      delete pstmt->cond;
       delete (pstmt);
-      pthread_mutex_destroy (&mutex);
-      pthread_cond_destroy (&cond);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
-  pthread_mutex_lock (&mutex);
+
+  /* the thread is never pthread_join ()-ed (the no_wait and timeout
+   * paths below return without waiting for it), so detach it up front;
+   * otherwise it stays joinable forever and its resources are never
+   * released. */
+  pthread_detach (async_thrd);
+
+  if (no_wait)
+    {
+      /* caller asked for "async":"yes": hand the uuid back right away
+       * and let the worker thread keep running in the background. */
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_map[pstmt->uuid] = pstmt;
+      mutex_unlock (cm_mutex);
+
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
+    }
+
+  pthread_mutex_lock (pstmt->mutex);
   to.tv_sec = time (NULL) + time_out;
   to.tv_nsec = 0;
-  err = pthread_cond_timedwait (&cond, &mutex, &to);
-//  err = pthread_cond_wait (&cond, &mutex);
-  pthread_mutex_unlock (&mutex);
-  if (err == ETIMEDOUT)
+  err = 0;
+  while (pstmt->status == 0 && err == 0)
     {
-      string dbname, task_name;
-
-      task_name = request.get ("task", "unknown").asString();
-      dbname = request.get ("dbname", "").asString();
-
-      response["uuid"] = pstmt->uuid;
+      err = pthread_cond_timedwait (pstmt->cond, pstmt->mutex, &to);
+    }
+  bool finished = (pstmt->status != 0);
+  pthread_mutex_unlock (pstmt->mutex);
+  if (!finished)
+    {
+      string task_name = request.get ("task", "unknown").asString();
+      /* register the still-running job so gettaskstatus can
+       * find it later. the original code returned here without ever
+       */
+      mutex_lock (cm_mutex);
+      reap_stale_async_jobs ();
+      request_map[pstmt->uuid] = pstmt;
+      if (pstmt->status == 0)
+        {
+          async_job_slot_force_acquire ();
+          pstmt->holds_async_slot = true;
+        }
+      mutex_unlock (cm_mutex);
+      put_uuid (response, pstmt->uuid);
+      response["job-status"] = "running";
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
-		time_out, task_name.c_str(), dbname.c_str ());
+		time_out, task_name.c_str(), join_dbnames (dbnames).c_str ());
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
-  pthread_join (async_thrd, NULL);
-
-  pthread_mutex_destroy (&mutex);
-  pthread_cond_destroy (&cond);
+  pthread_mutex_destroy (pstmt->mutex);
+  pthread_cond_destroy (pstmt->cond);
+  delete pstmt->mutex;
+  delete pstmt->cond;
   response = pstmt->response;
   delete (pstmt);
   return ERR_NO_ERROR;
 }
 #endif
 
+static bool
+parse_uuid (const Json::Value &v, INT64 &out)
+{
+  if (v.isInt ())
+    {
+      out = v.asInt ();
+      return true;
+    }
+
+  if (v.isUInt ())
+    {
+      out = v.asUInt ();
+      return true;
+    }
+
+  if (v.isString ())
+    {
+      const string s = v.asString ();
+      if (s.empty ())
+        {
+          return false;
+        }
+
+      char *endptr = NULL;
+      /* strtoull (not strtoul): on Windows "unsigned long" is only 32
+       * bits, which would silently truncate a uuid here even though
+       * req_id/out are a full 64-bit INT64. */
+#if defined (WINDOWS)
+      unsigned long long parsed = _strtoui64 (s.c_str (), &endptr, 10);
+#else
+      unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
+#endif
+      if (endptr == s.c_str () || *endptr != '\0')
+        {
+          return false;
+        }
+
+      out = (INT64) parsed;
+      return true;
+    }
+
+  return false;
+}
+
+/*
+ * cub_check_async_status () - handle a "gettaskstatus"
+ *   poll for a job previously started with "async":"yes" (or one that
+ *   fell back to async because it ran past sco.iHttpTimeout).
+ */
 int
 cub_check_async_status (Json::Value &request, Json::Value &response)
 {
   string task;
-  unsigned int uuid;
-  list < async_request * >::iterator itor;
+  INT64 uuid;
+  map < INT64, async_request * > ::iterator itor;
   task = request["task"].asString ();
 
   if (task != "gettaskstatus")
     {
       return 0;
     }
-  if (request["uuid"] == Json::Value::null || !request["uuid"].isInt ())
+
+  reap_stale_async_jobs ();
+
+  if (!parse_uuid (request["uuid"], uuid))
     {
       return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
-  uuid = request["uuid"].asInt ();
-  for (itor = request_list.begin (); itor != request_list.end (); itor++)
-    {
-      if ((*itor)->uuid != uuid)
-        {
-          continue;
-        }
-      break;
-    }
-  if (itor == request_list.end ())
+
+  itor = request_map.find (uuid);
+  if (itor == request_map.end ())
     {
       return build_server_header (response, ERR_WITH_MSG, "uuid not found");
     }
 
-  if ((*itor)->status == 0)
+  if (request.get ("_ID", "").asString () != itor->second->requester_id)
     {
-      return build_server_header (response, ERR_WITH_MSG, "task not return");
+      return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
     }
-  response = (*itor)->response;
-  request_list.erase (itor);
+
+  if (itor->second->status == 0)
+    {
+      put_uuid (response, itor->second->uuid);
+      response["job-status"] = "running";
+      return build_server_header (response, ERR_NO_ERROR, "none");
+    }
+
+  /* NOTE: a finished job is intentionally left in request_map here,
+   * not erased/deleted on this first successful poll - a client is
+   * free to call gettaskstatus for the same uuid more than once (e.g.
+   * a status-check retry, or more than one part of the client polling
+   * independently) and should keep getting the same finished result
+   * each time. the job is only ever reclaimed by reap_stale_async_jobs
+   * (), once sco.iAsyncJobTtlSec seconds have passed since it was
+   * created (see cm.conf's "async_job_ttl_sec"). */
+  response = itor->second->response;
+  put_uuid (response, itor->second->uuid);
+  response["job-status"] = (response["status"].isString () &&
+			    response["status"].asString () == STATUS_SUCCESS) ? "success" : "error";
   return ERR_NO_ERROR;
+}
+
+/*
+ * ext_get_server_status () - handle a "getserverstatus" query: an
+ *   admin-only, instant (no worker thread, no external process) health
+ *   snapshot of the async-job subsystem.
+ */
+int
+ext_get_server_status (Json::Value &request, Json::Value &response)
+{
+  response["task"] = request["task"].asString ();
+
+  reap_stale_async_jobs ();
+
+  time_t now = time (NULL);
+
+  Json::Value conf;
+  conf["CUBRID_Version"] = cubrid_version_build;
+  conf["async_job_ttl_sec"] = sco.iAsyncJobTtlSec;
+  conf["async_long_job_sec"] = sco.iAsyncLongJobSec;
+  conf["max_num_async_task"] = sco.iMaxNumAsyncTask;
+  conf["http_timeout"] = sco.iHttpTimeout;
+  response["cm-conf"] = conf;
+
+  int total = 0, running = 0, finished_pending_ttl = 0, long_jobs = 0;
+  int oldest_running_sec = 0;
+  Json::Value long_job_list;
+
+  for (map < INT64, async_request * >::iterator itor = request_map.begin ();
+       itor != request_map.end (); ++itor)
+    {
+      async_request *cur = itor->second;
+
+      total++;
+
+      if (cur->status != 0)
+        {
+          finished_pending_ttl++;
+          continue;
+        }
+
+      running++;
+
+      int elapsed_sec = (int) (now - cur->created_at);
+      if (elapsed_sec > oldest_running_sec)
+        {
+          oldest_running_sec = elapsed_sec;
+        }
+
+      if (cur->is_long_async_job)
+        {
+          long_jobs++;
+
+          Json::Value j;
+          put_uuid (j, cur->uuid);
+          j["task"] = cur->request.get ("task", "unknown").asString ();
+          j["db_name"] = join_dbnames (cur->db_names);
+          j["requester_id"] = cur->requester_id;
+          j["elapsed_sec"] = elapsed_sec;
+          long_job_list.append (j);
+        }
+    }
+
+  Json::Value req_map_status;
+  req_map_status["map_size"] = total;
+  req_map_status["running"] = running;
+  req_map_status["finished_pending_ttl"] = finished_pending_ttl;
+  req_map_status["long_jobs"] = long_jobs;
+  req_map_status["longest_task_running_sec"] = oldest_running_sec;
+  req_map_status["long_job_list"] = long_job_list;
+  response["request-map"] = req_map_status;
+
+  /*
+   * num_running_async_tasks can be larger than sco.iMaxNumAsyncTask:
+   */
+  Json::Value slot;
+  slot["num_async_job_running"] = num_running_async_tasks;
+  slot["max_async_job"] = sco.iMaxNumAsyncTask;
+  response["async-slot"] = slot;
+
+  Json::Value db_busy;
+  for (map <string, string>::iterator itor = db_running_async.begin ();
+       itor != db_running_async.end (); ++itor)
+    {
+      Json::Value d;
+      d["task"] = itor->second;
+      d["db_name"] = itor->first;
+      db_busy.append (d);
+    }
+  response["db-running-async"] = db_busy;
+
+  Json::Value statdump_list;
+  vector <T_STATDUMPD_INFO> statdumpd_info = get_statdump_daemon_list ();
+  for (vector <T_STATDUMPD_INFO>::iterator itor = statdumpd_info.begin ();
+       itor != statdumpd_info.end (); ++itor)
+    {
+      Json::Value s;
+      s["db_name"] = itor->db_name;
+      s["interval"] = itor->interval;
+      s["pid"] = itor->pid;
+      s["status"] = itor->status;
+      s["started"] = itor->started;
+      statdump_list.append (s);
+    }
+  response["statdump-daemon"] = statdump_list;
+
+  return build_server_header (response, ERR_NO_ERROR, "none");
 }
 
 int
 cub_cm_request_handler (Json::Value &request, Json::Value &response)
 {
+  bool want_async = false;
 
   mutex_lock (cm_mutex);
 
-
-  // leave a back door for testing...
-  if (ext_ut_validate_token (request, response) != ERR_NO_ERROR && request["token"].asString() != "test")
+  /*
+   * everything in this try block runs with cm_mutex held.
+   */
+  try
     {
-      response["task"] = request["task"].asString();
-      mutex_unlock (cm_mutex);
-      return 1;
-    }
+      if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
+        {
+          response["task"] = request["task"].asString();
+          mutex_unlock (cm_mutex);
+          return 1;
+        }
 
-  // leave a back door for testing...
-  if (!ext_ut_validate_auth (request) && request["token"].asString() != "test")
-    {
-      response["status"] = STATUS_FAILURE;
-      response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
-      response["task"] = request["task"].asString();
+      if (!ext_ut_validate_auth (request))
+        {
+          response["status"] = STATUS_FAILURE;
+          response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
+          response["task"] = request["task"].asString();
 
-      mutex_unlock (cm_mutex);
-      return 1;
-    }
+          mutex_unlock (cm_mutex);
+          return 1;
+        }
 
-  if (cub_check_async_status (request, response))
+      if (cub_check_async_status (request, response))
+        {
+          mutex_unlock (cm_mutex);
+          return 1;
+        }
+      if (cub_cm_extend_request (request, response))
+        {
+          mutex_unlock (cm_mutex);
+          return 1;
+        }
+
+      const Json::Value &async_val = request.get ("async", "no");
+      want_async = async_val.isString ()
+                   && uStringEqual (async_val.asString ().c_str (), "yes")
+                   && is_async_capable_task (request["task"].asString ());
+    }
+  catch (...)
     {
       mutex_unlock (cm_mutex);
-      return 1;
+      throw;
     }
-  if (cub_cm_extend_request (request, response))
-    {
-      mutex_unlock (cm_mutex);
-      return 1;
-    }
-  cm_execute_request_async (request, response, sco.iHttpTimeout);
 
   mutex_unlock (cm_mutex);
+  cm_execute_request_async (request, response, sco.iHttpTimeout, want_async);
+
   return 1;
 }
+

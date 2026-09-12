@@ -32,6 +32,18 @@
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
 
+#define MAX_NUM_ASYNC_TASK_LIMIT        12
+#define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
+
+#define DEFAULT_ASYNC_JOB_TTL_SEC       3600    /* how long a finished async job kept around for gettaskstatus polling */
+#define MIN_ASYNC_JOB_TTL_SEC           60      /* min async job TTL, 60 sec */
+#define MAX_ASYNC_JOB_TTL_SEC           604800  /* max async job TTL, 1 week */
+
+#define DEFAULT_ASYNC_LONG_JOB_SEC      86400   /* 24 hours */
+#define MIN_ASYNC_LONG_JOB_SEC          60      /* min, 60 sec */
+#define MAX_ASYNC_LONG_JOB_SEC          604800  /* 1 week */
+
+
 #define MIN_ENCRYPT_LEN                 32
 #define ENCRYPT_SIGN                    "@"
 #define ENCRYPT_ARG(arg)                (ENCRYPT_SIGN arg)
@@ -596,6 +608,9 @@ typedef struct
   int iSupportWebManager;
   int iSupportMonStat;
   int iHttpTimeout;
+  int iAsyncJobTtlSec;
+  int iMaxNumAsyncTask;
+  int iAsyncLongJobSec;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   char szTokenActiveTime[PATH_MAX];
@@ -622,11 +637,14 @@ extern const char *autounicas_conf_entry[AUTOUNICAS_CONF_ENTRY_NUM];
 extern const char *autobackup_period_type[AUTOBACKUP_PERIOD_TYPE_NUM];
 extern const char *autobackup_period_week[AUTOBACKUP_PERIOD_WEEK_NUM];
 
+#define CUBRID_VERSION_BUILD_LEN	64
+
 extern int cubrid_version_major;
 extern int cubrid_version_minor;
-void find_and_parse_cub_admin_version (int &major_version, int &minor_version);
+extern char cubrid_version_build[CUBRID_VERSION_BUILD_LEN];
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size);
 #define IS_INVALID_CUBRID_VERS_MAJOR(major)	(major <= 0)
-#define CUBRID_VERS(major,minor)	(major*100 + minor)
+#define CUBRID_VERS(major,minor)	((major)*100 + (minor))
 
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,

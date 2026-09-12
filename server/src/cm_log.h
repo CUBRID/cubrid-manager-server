@@ -126,8 +126,9 @@ class CLog
     {
       char buff[MAX_DATE_TIME_LENGTH] = "unkonwn";
       time_t lt;
+      struct tm ltm;
       time (&lt);
-      tm *t = localtime (&lt);
+      tm *t = LOCALTIME_R (&lt, &ltm);
       if (t)
         {
           strftime (buff, MAX_DATE_TIME_LENGTH, "%Y%m%d %H:%M:%S", t);
@@ -154,9 +155,10 @@ class CLog
     _get_current_time_year_mon_day_hour_minute_second (char *current_time)
     {
       time_t cur_time;
+      struct tm cur_tm;
 
       time (&cur_time);
-      strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", localtime (&cur_time));
+      strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", LOCALTIME_R (&cur_time, &cur_tm));
     }
 
 #if defined(WINDOWS)

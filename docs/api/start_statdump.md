@@ -12,6 +12,9 @@ Activate *background* statdump process to accumulate values per seconds, to stop
 | dbuser | database username |
 | dbpasswd | password of dbuser |
 | interval | interval as seconds for dumping statistics periodically |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 
 ## Request Sample
 
@@ -22,7 +25,8 @@ Activate *background* statdump process to accumulate values per seconds, to stop
   "dbname": "demodb",
   "dbuser":"dba",
   "dbpasswd":"",
-  "interval":"5"
+  "interval":"5",
+  "async":"yes"
 }
 ```
 
@@ -44,5 +48,16 @@ Activate *background* statdump process to accumulate values per seconds, to stop
   "pid" : "24989",
   "status" : "success",
   "task" : "start_statdump"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "task" : "start_statdump",
+   "uuid" : "14"
 }
 ```

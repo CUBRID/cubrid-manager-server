@@ -33,6 +33,7 @@
 #if defined(WINDOWS)
 #include <process.h>
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <psapi.h>
 #include <sys/locking.h>
 #include <Tlhelp32.h>
@@ -282,7 +283,7 @@ static volatile NT_QUERY_SYSTEM_INFORMATION s_pfnNtQuerySystemInformation = NULL
 #endif
 
 static int _maybe_ip_addr (char *hostname);
-static int _ip_equal_hostent (struct hostent *hp, char *token);
+static int _ip_equal_addrinfo (struct addrinfo *ai, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
 static bool is_process_running (const char *process_name, unsigned int sleep_time);
@@ -327,21 +328,27 @@ is_process_running (const char *process_name, unsigned int sleep_time)
 int
 _op_check_is_localhost (char *token, char *hname)
 {
-  struct hostent *hp;
+  struct addrinfo hints;
+  struct addrinfo *res = NULL;
+  int ret = -1;
 
-  if ((hp = gethostbyname (hname)) == NULL)
-    {
-      return -1;
-    }
+  memset (&hints, 0, sizeof (hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
 
   /* if token is an ip address. */
   if (_maybe_ip_addr (token) > 0)
     {
       /* if token equal 127.0.0.1 or the ip is in the list of hname. */
-      if ((strcmp (token, "127.0.0.1") == 0)
-          || _ip_equal_hostent (hp, token) == 0)
+      if (getaddrinfo (hname, NULL, &hints, &res) != 0 || res == NULL)
         {
-          return 0;
+          return -1;
+        }
+
+      if ((strcmp (token, "127.0.0.1") == 0)
+          || _ip_equal_addrinfo (res, token) == 0)
+        {
+          ret = 0;
         }
     }
   else
@@ -353,10 +360,12 @@ _op_check_is_localhost (char *token, char *hname)
       if ((strcasecmp (token, hname) == 0)
           || (strcasecmp (token, "localhost") == 0))
         {
-          return 0;
+          ret = 0;
         }
     }
-  return -1;
+
+  freeaddrinfo (res);
+  return ret;
 }
 
 static int
@@ -370,23 +379,26 @@ _maybe_ip_addr (char *hostname)
 }
 
 static int
-_ip_equal_hostent (struct hostent *hp, char *token)
+_ip_equal_addrinfo (struct addrinfo *ai, char *token)
 {
-  int i;
+  struct addrinfo *cur;
   int retval = -1;
-  const char *tmpstr = NULL;
-  struct in_addr inaddr;
+  char tmpstr[INET_ADDRSTRLEN];
 
-  if (hp == NULL)
+  if (ai == NULL)
     {
       return retval;
     }
 
-  for (i = 0; hp->h_addr_list[i] != NULL; i++)
+  for (cur = ai; cur != NULL; cur = cur->ai_next)
     {
+      struct sockaddr_in *sin = (struct sockaddr_in *) cur->ai_addr;
+
       /* change ip address of hname to string. */
-      inaddr.s_addr = * (unsigned long *) hp->h_addr_list[i];
-      tmpstr = inet_ntoa (inaddr);
+      if (inet_ntop (AF_INET, &sin->sin_addr, tmpstr, sizeof (tmpstr)) == NULL)
+        {
+          continue;
+        }
 
       /* compare the ip string with token. */
       if (strcmp (token, tmpstr) == 0)
@@ -539,13 +551,12 @@ time_to_str (time_t t, const char *fmt, char *buf, int type)
   struct tm ltm;
   struct tm *tm_p;
 
-  tm_p = localtime (&t);
+  tm_p = LOCALTIME_R (&t, &ltm);
   if (tm_p == NULL)
     {
       *buf = '\0';
       return buf;
     }
-  ltm = *tm_p;
 
   if (type == TIME_STR_FMT_DATE)
     {
@@ -844,16 +855,6 @@ ut_daemon_start (void)
   signal (SIGTTIN, SIG_IGN);
   signal (SIGTSTP, SIG_IGN);
 
-#if 0
-  /* to make it run in background */
-  signal (SIGHUP, SIG_IGN);
-  childpid = PROC_FORK ();
-  if (childpid > 0)
-    {
-      exit (0);  /* kill parent */
-    }
-#endif
-
   /* setpgrp(); */
   setsid ();            /* become process group leader and  */
   /* disconnect from control terminal */
@@ -865,12 +866,6 @@ ut_daemon_start (void)
       exit (0);  /* kill parent */
     }
 
-#if 0
-  /* change current working directory */
-  chdir ("/");
-  /* clear umask */
-  umask (0);
-#endif
 #endif /* ifndef WINDOWS */
 }
 
@@ -997,7 +992,7 @@ uWriteDBnfo (void)
 {
   T_SERVER_STATUS_RESULT *cmd_res;
 
-  cmd_res = cmd_server_status ();
+  cmd_res = cmd_cms_server_status ();
   uWriteDBnfo2 (cmd_res);
   cmd_servstat_result_free (cmd_res);
 }
@@ -1052,6 +1047,28 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   uRemoveLockFile (lock_fd);
 }
 
+/*
+ * _host_is_resolvable () - thread-safe replacement for the gethostbyname (name) == NULL
+ */
+static int
+_host_is_resolvable (const char *name)
+{
+  struct addrinfo hints;
+  struct addrinfo *res = NULL;
+  int ok;
+
+  memset (&hints, 0, sizeof (hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  ok = (getaddrinfo (name, NULL, &hints, &res) == 0 && res != NULL);
+  if (res != NULL)
+    {
+      freeaddrinfo (res);
+    }
+  return ok;
+}
+
 int
 ut_get_dblist (nvplist *res, char dbdir_flag)
 {
@@ -1059,9 +1076,8 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
   char *dbinfo[4];
   char strbuf[1024], file[PATH_MAX];
   char hname[128];
-  struct hostent *hp;
-  unsigned char ip_addr[4];
   char *token = NULL;
+  char *saveptr;
 
   snprintf (file, PATH_MAX - 1, "%s/%s", sco.szCubrid_databases,
             CUBRID_DATABASE_TXT);
@@ -1072,12 +1088,11 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
 
   memset (hname, 0, sizeof (hname));
   gethostname (hname, sizeof (hname));
-  if ((hp = gethostbyname (hname)) == NULL)
+  if (!_host_is_resolvable (hname))
     {
       fclose (infile);
       return ERR_NO_ERROR;
     }
-  memcpy (ip_addr, hp->h_addr_list[0], 4);
 
   nv_add_nvp (res, "open", "dblist");
   while (fgets (strbuf, sizeof (strbuf), infile))
@@ -1089,10 +1104,10 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
           continue;
         }
 
-      for (token = strtok (dbinfo[2], ":"); token != NULL;
-           token = strtok (NULL, ":"))
+      for (token = STRTOK (dbinfo[2], ":", &saveptr); token != NULL;
+           token = STRTOK (NULL, ":", &saveptr))
         {
-          if ((hp = gethostbyname (token)) == NULL)
+          if (!_host_is_resolvable (token))
             {
               continue;
             }
@@ -2096,7 +2111,7 @@ is_cmserver_process (int pid, const char *module_name)
   argv[argc++] = "-e";
   argv[argc] = NULL;
 
-  if (run_child (argv, 1, NULL, result_file, NULL, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, result_file, NULL, NULL) < 0)
     {
       /* ps */
       return -1;
@@ -2531,12 +2546,190 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
   *res_msec = sec * 1000 + msec;
 }
 
+/*
+ * _env_mutex () - the lock behind env_mutex_lock ()/env_mutex_unlock ().
+ *
+ */
+static mutex_t *
+_env_mutex (void)
+{
+  struct env_mutex_holder
+  {
+    mutex_t m;
+
+    env_mutex_holder (void)
+    {
+      mutex_init (m);
+    }
+    ~env_mutex_holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static env_mutex_holder holder;
+
+  return &holder.m;
+}
+
+/*
+ * env_mutex_lock ()/env_mutex_unlock () - the lock run_child_env () holds
+ * while it snapshots the process environment (see cm_server_util.cpp).
+ */
+void
+env_mutex_lock (void)
+{
+  mutex_lock (*_env_mutex ());
+}
+
+void
+env_mutex_unlock (void)
+{
+  mutex_unlock (*_env_mutex ());
+}
+
+/*
+ * _env_key_len () - length of the "KEY" part of a "KEY=VALUE" string
+ *                    (or the whole string, if there is no '=').
+ */
+static size_t
+_env_key_len (const char *kv)
+{
+  const char *eq = strchr (kv, '=');
+
+  return (eq != NULL) ? (size_t) (eq - kv) : strlen (kv);
+}
+
+/*
+ * _env_entry_is_delete () - true if kv is a "KEY=" entry with no value
+ */
+static int
+_env_entry_is_delete (const char *kv)
+{
+  const char *eq = strchr (kv, '=');
+
+  return (eq != NULL) && (eq[1] == '\0');
+}
 
 #if defined(WINDOWS)
+
+/*
+ * _build_env_block () - build a Windows environment block (a sequence of
+ * NUL-terminated "KEY=VALUE" strings, terminated by an extra NUL)
+ */
+static char *
+_build_env_block (const char *const envp[])
+{
+  char *base_block;
+  char *merged_block;
+  const char *p;
+  char *q;
+  size_t merged_size;
+  int extra_count, j;
+
+  env_mutex_lock ();
+
+  base_block = GetEnvironmentStrings ();
+  if (base_block == NULL)
+    {
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  for (extra_count = 0; envp != NULL && envp[extra_count] != NULL; extra_count++)
+    ;
+
+  /* pass 1: compute the merged block size, skipping any base entry that
+   * envp[] overrides (Windows env var names are case-insensitive) */
+  merged_size = 0;
+  for (p = base_block; *p != '\0'; p += strlen (p) + 1)
+    {
+      size_t key_len = _env_key_len (p);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && _strnicmp (p, envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         merged_size += strlen (p) + 1;
+       }
+    }
+  for (j = 0; j < extra_count; j++)
+    {
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
+      merged_size += strlen (envp[j]) + 1;
+    }
+  merged_size += 1;    /* final block-terminating NUL */
+
+  merged_block = (char *) malloc (merged_size);
+  if (merged_block == NULL)
+    {
+      FreeEnvironmentStrings (base_block);
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  /* pass 2: copy */
+  q = merged_block;
+  for (p = base_block; *p != '\0'; p += strlen (p) + 1)
+    {
+      size_t len = strlen (p);
+      size_t key_len = _env_key_len (p);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && _strnicmp (p, envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         memcpy (q, p, len + 1);
+         q += len + 1;
+       }
+    }
+  for (j = 0; j < extra_count; j++)
+    {
+      size_t len;
+
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
+      len = strlen (envp[j]);
+
+      memcpy (q, envp[j], len + 1);
+      q += len + 1;
+    }
+  *q = '\0';
+
+  FreeEnvironmentStrings (base_block);
+  env_mutex_unlock ();
+
+  return merged_block;
+}
+
+/*
+ * envp (in) : NULL-terminated array of "KEY=VALUE" strings to add to (or
+ *             override in) the child's environment. An entry of the form
+ *             "KEY=" (no value) removes KEY from the child's environment
+ */
 int
-ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
-              const char *stdin_file, const char *stdout_file,
-              const char *stderr_file, int *exit_status)
+run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+              char *stderr_file, int *exit_status, const char *envp[])
 {
   int new_pid;
   STARTUPINFO start_info;
@@ -2548,11 +2741,10 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   HANDLE hStdIn = INVALID_HANDLE_VALUE;
   HANDLE hStdOut = INVALID_HANDLE_VALUE;
   HANDLE hStdErr = INVALID_HANDLE_VALUE;
+  char *env_block = NULL;
 
   if (exit_status != NULL)
-    {
-      *exit_status = 0;
-    }
+    *exit_status = 0;
 
   for (i = 0, cmd_arg_len = 0; argv[i]; i++)
     {
@@ -2562,52 +2754,78 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   GetStartupInfo (&start_info);
   start_info.wShowWindow = SW_HIDE;
 
+  /*
+   * mirrors the POSIX side: if a redirect the caller explicitly asked for
+   * can't be set up, fail the whole call
+   */
   if (stdin_file)
     {
-      hStdIn =
-        CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL,
-                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdIn != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdInput = hStdIn;
-          inherit_flag = TRUE;
-        }
+      hStdIn = CreateFile (stdin_file, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdIn == INVALID_HANDLE_VALUE)
+       {
+         return -1;
+       }
+      SetHandleInformation (hStdIn, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdInput = hStdIn;
+      inherit_flag = TRUE;
     }
   if (stdout_file)
     {
       hStdOut =
-        CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdOut != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdOutput = hStdOut;
-          inherit_flag = TRUE;
-        }
+       CreateFile (stdout_file, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdOut == INVALID_HANDLE_VALUE)
+       {
+         if (hStdIn != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdIn);
+           }
+         return -1;
+       }
+      SetHandleInformation (hStdOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdOutput = hStdOut;
+      inherit_flag = TRUE;
     }
   if (stderr_file)
     {
       hStdErr =
-        CreateFile (stderr_file, GENERIC_WRITE,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                    NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-      if (hStdErr != INVALID_HANDLE_VALUE)
-        {
-          SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT,
-                                HANDLE_FLAG_INHERIT);
-          start_info.dwFlags = STARTF_USESTDHANDLES;
-          start_info.hStdError = hStdErr;
-          inherit_flag = TRUE;
-        }
+       CreateFile (stderr_file, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                   CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+      if (hStdErr == INVALID_HANDLE_VALUE)
+       {
+         if (hStdIn != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdIn);
+           }
+         if (hStdOut != INVALID_HANDLE_VALUE)
+           {
+             CloseHandle (hStdOut);
+           }
+         return -1;
+       }
+      SetHandleInformation (hStdErr, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+      start_info.dwFlags = STARTF_USESTDHANDLES;
+      start_info.hStdError = hStdErr;
+      inherit_flag = TRUE;
     }
 
-  res = CreateProcess (bin_path, cmd_arg, NULL, NULL, inherit_flag,
-                       CREATE_NO_WINDOW, NULL, NULL, &start_info, &proc_info);
+  if (envp != NULL)
+    {
+      /* NULL on failure just means "inherit parent env unchanged", same as run_child () */
+      env_block = _build_env_block (envp);
+    }
+
+  /* env_block is an ANSI block from GetEnvironmentStrings (), so we must NOT pass
+   * CREATE_UNICODE_ENVIRONMENT here. */
+  res =
+    CreateProcess (argv[0], cmd_arg, NULL, NULL, inherit_flag, CREATE_NO_WINDOW, env_block, NULL, &start_info,
+                  &proc_info);
+
+  if (env_block != NULL)
+    {
+      free (env_block);
+    }
 
   if (hStdIn != INVALID_HANDLE_VALUE)
     {
@@ -2632,12 +2850,10 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   if (wait_flag)
     {
       DWORD status = 0;
-      //WaitForSingleObject (proc_info.hProcess, INFINITE);
-      //GetExitCodeProcess (proc_info.hProcess, &status);
+      WaitForSingleObject (proc_info.hProcess, INFINITE);
+      GetExitCodeProcess (proc_info.hProcess, &status);
       if (exit_status != NULL)
-        {
-          *exit_status = status;
-        }
+       *exit_status = status;
       CloseHandle (proc_info.hProcess);
       CloseHandle (proc_info.hThread);
       return 0;
@@ -2649,67 +2865,201 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
       return new_pid;
     }
 }
-#else
+
+#else /* !WINDOWS */
+
+/*
+ * _merge_envp () - build a NULL-terminated envp[] array (for execve ()).
+ */
+static char **
+_merge_envp (const char *const envp[])
+{
+  extern char **environ;
+  int base_count, extra_count, i, j;
+  int total_count = 0;
+  char **merged;
+
+  env_mutex_lock ();
+
+  for (base_count = 0; environ != NULL && environ[base_count] != NULL; base_count++)
+    ;
+  for (extra_count = 0; envp != NULL && envp[extra_count] != NULL; extra_count++)
+    ;
+
+  merged = (char **) malloc (sizeof (char *) * (base_count + extra_count + 1));
+  if (merged == NULL)
+    {
+      LOG_ERROR ("malloc () for execve failed (critical), try execv () instead");
+      env_mutex_unlock ();
+      return NULL;
+    }
+
+  for (i = 0; i < base_count; i++)
+    {
+      size_t key_len = _env_key_len (environ[i]);
+      int overridden = 0;
+
+      for (j = 0; j < extra_count; j++)
+       {
+         if (key_len == _env_key_len (envp[j]) && strncmp (environ[i], envp[j], key_len) == 0)
+           {
+             overridden = 1;
+             break;
+           }
+       }
+
+      if (!overridden)
+       {
+         merged[total_count] = strdup (environ[i]);
+         if (merged[total_count] == NULL)
+           {
+             goto error;
+           }
+         total_count++;
+       }
+    }
+
+  for (j = 0; j < extra_count; j++)
+    {
+      if (_env_entry_is_delete (envp[j]))
+       {
+         continue;
+       }
+
+      merged[total_count] = strdup (envp[j]);
+      if (merged[total_count] == NULL)
+       {
+         goto error;
+       }
+      total_count++;
+    }
+
+  merged[total_count] = NULL;
+
+  env_mutex_unlock ();
+  return merged;
+
+error:
+  merged[total_count] = NULL;
+  for (i = 0; merged[i] != NULL; i++)
+    {
+      free (merged[i]);
+    }
+  free (merged);
+  env_mutex_unlock ();
+  LOG_ERROR ("strdup () for execve failed (critical), try execv () instead");
+  return NULL;
+}
+
+static void
+_free_envp (char **merged)
+{
+  int i;
+
+  if (merged == NULL)
+    {
+      return;
+    }
+  for (i = 0; merged[i] != NULL; i++)
+    {
+      free (merged[i]);
+    }
+  free (merged);
+}
+
+/*
+ * _reap_child_async (), blocks in waitpid () for exactly one child
+ */
+static void *
+_reap_child_async (void *arg)
+{
+  pid_t *pid_ptr = (pid_t *) arg;
+  pid_t pid = *pid_ptr;
+
+  delete pid_ptr;
+
+  while (waitpid (pid, NULL, 0) < 0 && errno == EINTR)
+    ;
+  return NULL;
+}
+
 int
-ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
-              const char *stdin_file, const char *stdout_file,
-              const char *stderr_file, int *exit_status)
+run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+              char *stderr_file, int *exit_status, const char *envp[])
 {
   int pid;
+  char **merged_envp = NULL;
 
   if (exit_status != NULL)
+    *exit_status = 0;
+
+  if (envp != NULL)
     {
-      *exit_status = 0;
+      merged_envp = _merge_envp (envp);
     }
 
-  if (wait_flag)
-    {
-      signal (SIGCHLD, SIG_DFL);
-    }
-  else
-    {
-      signal (SIGCHLD, SIG_IGN);
-    }
   pid = fork ();
   if (pid == 0)
     {
-      FILE *fp;
+      /*
+       * use async-signal-safe system calls only
+       */
+      int fd;
 
       close_all_fds (3);
 
       if (stdin_file != NULL)
-        {
-          fp = fopen (stdin_file, "r");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 0);
-              fclose (fp);
-            }
-        }
+       {
+         fd = open (stdin_file, O_RDONLY);
+         if (fd >= 0)
+           {
+             dup2 (fd, 0);
+             close (fd);
+           }
+         else
+           {
+             _exit (126);
+           }
+       }
       if (stdout_file != NULL)
-        {
-          unlink (stdout_file);
-          fp = fopen (stdout_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 1);
-              fclose (fp);
-            }
-        }
+       {
+         fd = open (stdout_file, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0666);
+         if (fd >= 0)
+           {
+             dup2 (fd, 1);
+             close (fd);
+           }
+         else
+           {
+             _exit (126);
+           }
+       }
       if (stderr_file != NULL)
-        {
-          unlink (stderr_file);
-          fp = fopen (stderr_file, "w");
-          if (fp != NULL)
-            {
-              dup2 (fileno (fp), 2);
-              fclose (fp);
-            }
-        }
+       {
+         fd = open (stderr_file, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0666);
+         if (fd >= 0)
+           {
+             dup2 (fd, 2);
+             close (fd);
+           }
+         else
+           {
+             _exit (126);
+           }
+       }
 
-      execv (bin_path, (char *const *) argv);
-      exit (0);
+      if (merged_envp != NULL)
+       {
+         execve ((const char *) argv[0], (char *const *) argv, merged_envp);
+       }
+      else
+       {
+         execv ((const char *) argv[0], (char *const *) argv);
+       }
+      _exit (127); /* when execve () failed, just _exit () immediately */
     }
+
+  _free_envp (merged_envp);
 
   if (pid < 0)
     {
@@ -2719,15 +3069,35 @@ ut_run_child (const char *bin_path, const char *const argv[], int wait_flag,
   if (wait_flag)
     {
       int status = 0;
-      waitpid (pid, &status, 0);
+      int wait_rc;
+
+      while ((wait_rc = waitpid (pid, &status, 0)) < 0 && errno == EINTR)
+       ;
+      if (wait_rc < 0)
+       {
+         return -1;
+       }
       if (exit_status != NULL)
-        {
-          *exit_status = status;
-        }
+       {
+         *exit_status = status;
+       }
       return 0;
     }
   else
     {
+      pthread_t reaper;
+      pid_t *reap_pid = new pid_t (pid);
+
+      if (pthread_create (&reaper, NULL, _reap_child_async, reap_pid) == 0)
+       {
+         pthread_detach (reaper);
+       }
+      else
+       {
+         delete reap_pid;
+         while (waitpid (pid, NULL, 0) < 0 && errno == EINTR)
+           ;
+       }
       return pid;
     }
 }
@@ -3123,13 +3493,13 @@ get_short_filename (char *ret_name, int ret_name_len,
   ptr = strrchr (short_filename, '.');
   if (ptr == NULL)
     {
-      snprintf (ret_name, strlen (short_filename) + 1, short_filename);
+      snprintf (ret_name, strlen (short_filename) + 1, "%s", short_filename);
       return -1;
     }
 
   filename_len = (unsigned int) (ptr - short_filename);
 
-  snprintf (ret_name, filename_len + 1, short_filename);
+  snprintf (ret_name, filename_len + 1, "%s", short_filename);
 
   return 0;
 }
@@ -3160,7 +3530,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
 
   if (with_ext == 1)
     {
-      snprintf (ret_filename, PATH_MAX, filename + 1);
+      snprintf (ret_filename, PATH_MAX, "%s", filename + 1);
       return 0;
     }
   else
@@ -3169,7 +3539,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
         {
           return -1;
         }
-      snprintf (ret_filename, PATH_MAX, short_filename);
+      snprintf (ret_filename, PATH_MAX, "%s", short_filename);
     }
   return 0;
 }
@@ -3787,4 +4157,54 @@ is_positive_number (const char *str)
     }
 
   return (int) num;
+}
+
+int
+gen_tempfile_path (char *tempfile, const char *tempdir, const char *prefix, int task_code, size_t size)
+{
+  static atomic_counter_t seq = 0;
+  time_t now;
+  long tid;
+  int ret = -1;
+  int myseq = ATOMIC_FETCH_ADD1 (seq);
+
+  if (tempfile == NULL)
+    {
+      return -1;
+    }
+
+  tempfile[0] = '\0';
+
+  if (tempdir == NULL || size < 1)
+    {
+      return -1;
+    }
+
+#if defined (WINDOWS)
+  tid = GetCurrentThreadId ();
+#else
+  tid = (long) (intptr_t) pthread_self ();
+#endif
+
+  now = time (NULL);
+
+  ret = snprintf (tempfile, size - 1, "%s/%s_%03d_%ld_%ld_%d", tempdir, prefix ? prefix : "", task_code,
+           (long) now, tid, myseq);
+
+  return (ret > 0 && ret < (int) (size - 1)) ? 0 : -1;
+}
+
+/*
+ * ut_child_exited_ok () - true if a run_child_env () (wait_flag ==
+ * RUN_FOREGROUND) child both ran to completion and exited with status 0.
+ */
+
+bool
+ut_child_exited_ok (int exit_code)
+{
+#if defined(WINDOWS)
+  return (exit_code == 0);
+#else
+  return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
+#endif
 }

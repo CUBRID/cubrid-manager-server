@@ -13,6 +13,10 @@ Rename database.
 | exvolpath | extend volume path |
 | advanced | on-off indicating whether to offer local control files |
 | forcedel | on-off indicating whether to remove backup files |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -25,7 +29,8 @@ Rename database.
   "exvolpath":"none",
   "advanced":"on",
   "volume":{"$CUBRID_DATABASES/destinationdb/destinationdb":"$CUBRID_DATABASES/anotherdb/anotherdb"},
-  "forcedel":"y"
+  "forcedel":"y",
+  "async":"yes"
 }
 ```
 
@@ -45,5 +50,25 @@ Rename database.
   "note": "none",
   "status": "success",
   "task": "renamedb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "14"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
+   "task" : "renamedb"
 }
 ```

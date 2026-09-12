@@ -83,6 +83,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"get_mon_interval", 0, ext_get_mon_interval, AU_MON},
   {"set_mon_interval", 0, ext_set_mon_interval, AU_ADMIN},
   {"get_mon_statistic", 0, ext_get_mon_statistic, AU_MON},
+  {"getserverstatus", 0, ext_get_server_status, AU_ADMIN},
   {NULL, 0, NULL, 0}
 };
 
@@ -460,7 +461,7 @@ int ext_get_active_dbs (Json::Value &activedbs)
 {
   T_SERVER_STATUS_RESULT *cmd_res;
   int i;
-  cmd_res = cmd_server_status ();
+  cmd_res = cmd_cms_server_status ();
   if (cmd_res == NULL)
     {
       return 1;
@@ -511,6 +512,7 @@ static void
 ext_autojobs_log (const char *service, const char *serv_name, const char *errmsg)
 {
   time_t tt;
+  struct tm tm_buf;
   tm *t;
   FILE *outfile;
   char logfile[MAX_PATH];
@@ -525,7 +527,7 @@ ext_autojobs_log (const char *service, const char *serv_name, const char *errmsg
     {
       return;
     }
-  t = localtime (&tt);
+  t = LOCALTIME_R (&tt, &tm_buf);
   if (t)
     {
       strftime ( strbuf, MAX_PATH, "%Y%m%d_%H:%M:%S", t);
@@ -1299,7 +1301,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
     }
 
   // open a temp file for new auto query config.
-  make_temp_filepath (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", TS_EXT_SET_AUTO_EXEC_QRY, PATH_MAX);
+  gen_tempfile_path (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", TS_EXT_SET_AUTO_EXEC_QRY, PATH_MAX);
   tmp_file.open (tmp_conf_file, ios::out);
   if (!tmp_file.good())
     {
@@ -1568,8 +1570,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   JSON_FIND_V (request, "dbname",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   copy_log_path = request["copylogpath"].asString();
   remote_host_name = request["remotehostname"].asString();
@@ -1587,7 +1589,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   argv[7] = dbname.c_str();
   argv[8] = NULL;
 
-  run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if ((retval=_read_apply_info_cmd_output (stdout_log_file, stderr_log_file, str_result)) != ERR_NO_ERROR)
     {
