@@ -88,7 +88,7 @@
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeBuildCommandLine>nmake SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(Configuration)_$(Platform)</NMakeBuildCommandLine>
     <NMakeReBuildCommandLine>nmake SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(Configuration)_$(Platform)</NMakeReBuildCommandLine>
-    <NMakeCleanCommandLine>nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CUBRID_$(Configuration)_$(Platform)</NMakeCleanCommandLine>
+    <NMakeCleanCommandLine>nmake clean SRC_DIR=$(OutDir) DEST_DIR=$(ProjectDir)CMServer_$(Configuration)_$(Platform)</NMakeCleanCommandLine>
     <NMakeOutput />
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
