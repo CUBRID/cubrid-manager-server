@@ -673,21 +673,25 @@ async_job_slot_release (void)
     }
 }
 
+static int num_timeout_fallback_jobs = 0;
+
+static void
+async_timeout_fallback_acquire (void)
+{
+  num_timeout_fallback_jobs++;
+}
+
 /*
- * async_job_slot_force_acquire () - unconditionally count one more job
- *   into num_running_async_tasks, bypassing the sco.iMaxNumAsyncTask
- *   check
- *
- *   NOTE: because this bypasses the sco.iMaxNumAsyncTask check,
- *   num_running_async_tasks can end up temporarily larger than
- *   sco.iMaxNumAsyncTask
- *
- *   caller must hold cm_mutex.
+ * async_timeout_fallback_release () - give back a count reserved by
+ *   async_timeout_fallback_acquire (). caller must hold cm_mutex.
  */
 static void
-async_job_slot_force_acquire (void)
+async_timeout_fallback_release (void)
 {
-  num_running_async_tasks++;
+  if (num_timeout_fallback_jobs > 0)
+    {
+      num_timeout_fallback_jobs--;
+    }
 }
 
 /*
@@ -780,6 +784,7 @@ class async_request
     std::vector <std::string> db_names;
     std::string requester_id;
     bool holds_async_slot;
+    bool holds_timeout_fallback_slot;
     bool is_long_async_job;
 #ifndef WINDOWS
     pthread_mutex_t *mutex;
@@ -893,6 +898,10 @@ cm_async_request_handler (void *lpArg)
     {
       async_job_slot_release ();
     }
+  if (async_param->holds_timeout_fallback_slot)
+    {
+      async_timeout_fallback_release ();
+    }
   mutex_unlock (cm_mutex);
 #ifndef WINDOWS
   pthread_cond_broadcast (async_param->cond);
@@ -967,6 +976,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_names = is_exclusive_task ? dbnames : vector <string> ();
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
+  pstmt->holds_timeout_fallback_slot = false;
   pstmt->is_long_async_job = false;
   mutex_lock (cm_mutex);
   pstmt->uuid = req_id++;
@@ -1010,13 +1020,14 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       reap_stale_async_jobs ();
       request_map[pstmt->uuid] = pstmt;
        /*
-       * the pstmt->status == 0
-       * set slot to true for proper release.
+       * the pstmt->status == 0: the job is still running past
+       * sco.iHttpTimeout and can't be cancelled, so track it as a
+       * timeout fallback job
        */
       if (pstmt->status == 0)
         {
-          async_job_slot_force_acquire ();
-          pstmt->holds_async_slot = true;
+          async_timeout_fallback_acquire ();
+          pstmt->holds_timeout_fallback_slot = true;
         }
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
@@ -1103,6 +1114,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->db_names = is_exclusive_task ? dbnames : vector <string> ();
   pstmt->requester_id = request.get ("_ID", "").asString ();
   pstmt->holds_async_slot = no_wait;
+  pstmt->holds_timeout_fallback_slot = false;
   pstmt->is_long_async_job = false;
 
   mutex_lock (cm_mutex);
@@ -1168,10 +1180,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
       request_map[pstmt->uuid] = pstmt;
+      /*
+       * track this as a timeout fallback job
+       */
       if (pstmt->status == 0)
         {
-          async_job_slot_force_acquire ();
-          pstmt->holds_async_slot = true;
+          async_timeout_fallback_acquire ();
+          pstmt->holds_timeout_fallback_slot = true;
         }
       mutex_unlock (cm_mutex);
       put_uuid (response, pstmt->uuid);
@@ -1363,12 +1378,10 @@ ext_get_server_status (Json::Value &request, Json::Value &response)
   req_map_status["long_job_list"] = long_job_list;
   response["request-map"] = req_map_status;
 
-  /*
-   * num_running_async_tasks can be larger than sco.iMaxNumAsyncTask:
-   */
   Json::Value slot;
   slot["num_async_job_running"] = num_running_async_tasks;
   slot["max_async_job"] = sco.iMaxNumAsyncTask;
+  slot["num_timeout_fallback_jobs"] = num_timeout_fallback_jobs;
   response["async-slot"] = slot;
 
   Json::Value db_busy;
