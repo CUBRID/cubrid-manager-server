@@ -707,6 +707,67 @@ build_async_task_limit_response (Json::Value &response)
   return build_server_header (response, ERR_WITH_MSG, note);
 }
 
+/*
+ * async_job_state_guard - RAII guard for the exclusive-db "busy" marker
+ *   (db_running_async) and/or the async job slot (num_running_async_tasks)
+ *   reserved by cm_execute_request_async () before its worker thread
+ *   (cm_async_request_handler ()) takes over responsibility for
+ *   releasing them exactly once.
+ */
+class async_job_state_guard
+{
+  public:
+    async_job_state_guard (void)
+      : m_has_marker (false), m_has_slot (false), m_armed (true)
+    {
+    }
+
+    ~async_job_state_guard (void)
+    {
+      if (!m_armed)
+        {
+          return;
+        }
+
+      mutex_lock (cm_mutex);
+      if (m_has_marker)
+        {
+          db_running_async_done (m_dbnames);
+        }
+      if (m_has_slot)
+        {
+          async_job_slot_release ();
+        }
+      mutex_unlock (cm_mutex);
+    }
+
+    void set_marker (const vector <string> &dbnames)
+    {
+      m_dbnames = dbnames;
+      m_has_marker = true;
+    }
+
+    void set_slot (void)
+    {
+      m_has_slot = true;
+    }
+
+    void disarm (void)
+    {
+      m_armed = false;
+    }
+
+  private:
+    vector <string> m_dbnames;
+    bool m_has_marker;
+    bool m_has_slot;
+    bool m_armed;
+
+    /* non-copyable: releasing the same marker/slot twice would be wrong */
+    async_job_state_guard (const async_job_state_guard &);
+    async_job_state_guard &operator= (const async_job_state_guard &);
+};
+
 class async_request
 {
   public:
@@ -870,6 +931,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   string task_name = request.get ("task", "").asString ();
   vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
   bool is_exclusive_task = is_exclusive_db_task (task_name);
+  async_job_state_guard state_guard;
 
   if (is_exclusive_task)
     {
@@ -881,6 +943,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
         {
           return build_db_busy_response (response, busy_name, busy_task);
         }
+      state_guard.set_marker (dbnames);
     }
 
   if (no_wait)
@@ -890,34 +953,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       mutex_unlock (cm_mutex);
       if (!acquired)
         {
-          if (is_exclusive_task)
-            {
-              mutex_lock (cm_mutex);
-              db_running_async_done (dbnames);
-              mutex_unlock (cm_mutex);
-            }
           return build_async_task_limit_response (response);
         }
+      state_guard.set_slot ();
     }
 
-  async_request *pstmt = (async_request *) new (async_request);
-  if (pstmt == NULL)
-    {
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
-      return ERR_MEM_ALLOC;
-    }
+  async_request *pstmt = new async_request;
 
   pstmt->request = request;
   pstmt->status = 0;
@@ -935,28 +976,20 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
       delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to execute task");
     }
 
+  /*
+   * the worker thread now owns pstmt and is solely responsible for
+   * releasing the marker/slot exactly once (see
+   * cm_async_request_handler ()); this guard's job here is done.
+   */
+  state_guard.disarm ();
+
   if (no_wait)
     {
-      /* caller asked for "async":"yes": hand the uuid back right away
-       * and let the worker thread keep running in the background. */
       CloseHandle (hHandles);
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
@@ -1008,6 +1041,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   string task_name = request.get ("task", "").asString ();
   vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
   bool is_exclusive_task = is_exclusive_db_task (task_name);
+  async_job_state_guard state_guard;
 
   if (is_exclusive_task)
     {
@@ -1019,6 +1053,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
         {
           return build_db_busy_response (response, busy_name, busy_task);
         }
+      state_guard.set_marker (dbnames);
     }
 
   if (no_wait)
@@ -1028,34 +1063,12 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       mutex_unlock (cm_mutex);
       if (!acquired)
         {
-          if (is_exclusive_task)
-            {
-              mutex_lock (cm_mutex);
-              db_running_async_done (dbnames);
-              mutex_unlock (cm_mutex);
-            }
           return build_async_task_limit_response (response);
         }
+      state_guard.set_slot ();
     }
 
-  async_request *pstmt = (async_request *) new (async_request);
-  if (pstmt == NULL)
-    {
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
-      return ERR_MEM_ALLOC;
-    }
+  async_request *pstmt = new async_request;
 
   pstmt->mutex = new pthread_mutex_t;
   pstmt->cond = new pthread_cond_t;
@@ -1064,19 +1077,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
       delete pstmt->mutex;
       delete pstmt->cond;
       delete (pstmt);
@@ -1088,19 +1088,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
       pthread_mutex_destroy (pstmt->mutex);
       delete pstmt->mutex;
       delete pstmt->cond;
@@ -1126,19 +1113,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
-      if (is_exclusive_task || no_wait)
-        {
-          mutex_lock (cm_mutex);
-          if (is_exclusive_task)
-            {
-              db_running_async_done (dbnames);
-            }
-          if (no_wait)
-            {
-              async_job_slot_release ();
-            }
-          mutex_unlock (cm_mutex);
-        }
       pthread_mutex_destroy (pstmt->mutex);
       pthread_cond_destroy (pstmt->cond);
       delete pstmt->mutex;
@@ -1149,16 +1123,22 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
                                   "failed to run task.");
     }
 
-  /* the thread is never pthread_join ()-ed (the no_wait and timeout
+  /*
+   * the thread is never pthread_join ()-ed (the no_wait and timeout
    * paths below return without waiting for it), so detach it up front;
    * otherwise it stays joinable forever and its resources are never
-   * released. */
+   * released.
+   */
   pthread_detach (async_thrd);
+
+  /*
+   * the worker thread now owns pstmt (including pstmt->mutex/cond) and
+   * is solely responsible for releasing the marker/slot exactly once
+   */
+  state_guard.disarm ();
 
   if (no_wait)
     {
-      /* caller asked for "async":"yes": hand the uuid back right away
-       * and let the worker thread keep running in the background. */
       mutex_lock (cm_mutex);
       reap_stale_async_jobs ();
       request_map[pstmt->uuid] = pstmt;
