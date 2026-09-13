@@ -70,23 +70,27 @@
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 
+#if defined (_MSC_VER) && _MSC_VER >= 1900
 /*
  * required until the libraries are rebuilt
  * old-CRT FILE is 48 bytes on x64; place real streams at the strides it expects
  */
-#if defined (_MSC_VER) && _MSC_VER >= 1900
-static char _iob_shim[3 * 64] = { 0 };
+#define OLD_CRT_FILE_SIZE 48
+struct iob_shim_t
+{
+  char buf[3 * OLD_CRT_FILE_SIZE];
+  iob_shim_t ()
+  {
+    memcpy (buf + 0 * OLD_CRT_FILE_SIZE, stdin,  sizeof (FILE));
+    memcpy (buf + 1 * OLD_CRT_FILE_SIZE, stdout, sizeof (FILE));
+    memcpy (buf + 2 * OLD_CRT_FILE_SIZE, stderr, sizeof (FILE));
+  }
+};
+
 extern "C" FILE * __cdecl __iob_func (void)
 {
-  static bool inited = false;
-  if (!inited)
-    {
-          memcpy (_iob_shim + 0 * 48, stdin,  sizeof (FILE));
-          memcpy (_iob_shim + 1 * 48, stdout, sizeof (FILE));
-          memcpy (_iob_shim + 2 * 48, stderr, sizeof (FILE));
-          inited = true;
-    }
-  return (FILE *) _iob_shim;
+  static iob_shim_t shim;   /* C++11 magic static: thread-safe */
+  return (FILE *) shim.buf;
 }
 #endif
 

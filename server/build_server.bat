@@ -125,10 +125,12 @@ if not "%exitcode%" == "0" (
     )
 )
 
-IF NOT EXIST "%INSTALL_DIR%" (echo build_server.bat: "%INSTALL_DIR%" was not created by devenv - aborting.)
+IF NOT EXIST "%INSTALL_DIR%" (
+	echo build_server.bat: "%INSTALL_DIR%" was not created by devenv - aborting.
+	exit /b 1
+)
 
-cd win/install
-cd CMServer_%mode%_%platform%
+cd win\install\CMServer_%mode%_%platform% || exit /b 1
 
 echo build_server.bat: diag - copying from "%CD%" to "%prefix%" ...
 
