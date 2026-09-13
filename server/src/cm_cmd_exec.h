@@ -196,13 +196,13 @@ class SpaceDbResultNewFormat : public GeneralSpacedbResult
     void get_total_and_free_page (const char *type, double &free_page, double &total_page)
     {
       for (unsigned int i = 0; i < volumes.size(); i++)
-        {
-          if (strcmp (volumes[i].purpose, type) == 0)
-            {
-              total_page += volumes[i].total_size;
-              free_page += volumes[i].free_size;
-            }
-        }
+	{
+	  if (strcmp (volumes[i].purpose, type) == 0)
+	    {
+	      total_page += volumes[i].total_size;
+	      free_page += volumes[i].free_size;
+	    }
+	}
     }
     time_t get_my_time (char *dbloca);
     void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname);
@@ -225,9 +225,9 @@ class SpaceDbResultOldFormat : public GeneralSpacedbResult
       SpaceDbVolumeInfoOldFormat volume;
       int rc = get_volume_info (str_buf, volume);
       if (rc == TRUE)
-        {
-          volumes.push_back (volume);
-        }
+	{
+	  volumes.push_back (volume);
+	}
       return rc;
     }
 
@@ -236,9 +236,9 @@ class SpaceDbResultOldFormat : public GeneralSpacedbResult
       SpaceDbVolumeInfoOldFormat volume;
       int rc = get_volume_info (str_buf, volume);
       if (rc == TRUE)
-        {
-          temporary_volumes.push_back (volume);
-        }
+	{
+	  temporary_volumes.push_back (volume);
+	}
       return rc;
     }
 
@@ -246,13 +246,13 @@ class SpaceDbResultOldFormat : public GeneralSpacedbResult
     void get_total_and_free_page (const char *type, double &free_page, double &total_page)
     {
       for (unsigned int i = 0; i < volumes.size(); i++)
-        {
-          if (strcmp (volumes[i].purpose, type) == 0)
-            {
-              total_page += volumes[i].total_size;
-              free_page += volumes[i].free_size;
-            }
-        }
+	{
+	  if (strcmp (volumes[i].purpose, type) == 0)
+	    {
+	      total_page += volumes[i].total_size;
+	      free_page += volumes[i].free_size;
+	    }
+	}
     }
     int get_cnt_tpage();
     time_t get_my_time (char *dbloca);
@@ -267,7 +267,7 @@ typedef T_CMD_RESULT T_CSQL_RESULT;
 
 GeneralSpacedbResult *cmd_spacedb (const char *dbname, T_CUBRID_MODE mode);
 T_CSQL_RESULT *cmd_csql (char *dbname, char *uid, char *passwd,
-                         T_CUBRID_MODE mode, char *infile, char *command, char *error_continue);
+			 T_CUBRID_MODE mode, char *infile, char *command, char *error_continue);
 int cmd_start_server (char *dbname, char *err_buf, int err_buf_size);
 int cmd_stop_server (char *dbname, char *err_buf, int err_buf_size);
 void cmd_start_master (void);

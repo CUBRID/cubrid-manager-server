@@ -1,0 +1,35 @@
+# Replaces the unmaintained github.com/jitterbit/get-changed-files action.
+name: 'Get changed files'
+description: 'List added/modified files in the pull request via the GitHub compare API'
+outputs:
+  added_modified:
+    description: 'JSON array of added/modified file paths'
+    value: ${{ steps.diff.outputs.added_modified }}
+runs:
+  using: 'composite'
+  steps:
+    - id: diff
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: |
+        set -euo pipefail
+
+        # The list is emitted as a JSON array, not a space-separated string: paths are
+        # then safe to hand to a shell loop even when they contain spaces or shell
+        # metacharacters, and callers can tell an empty list from a failed lookup.
+        #
+        # No "|| files=''" fallback here on purpose. gh prints its error body to stdout
+        # on failure, and swallowing the failure would leave the caller checking nothing
+        # while still reporting success. pipefail makes any API error fail this step.
+        #
+        # --paginate keeps PRs with more than one page of files from being truncated;
+        # jq -s folds the per-page objects back into one array.
+        files=$(gh api --paginate "repos/${REPO}/compare/${BASE_SHA}...${HEAD_SHA}" \
+          | jq -c -s '[.[].files[]? | select(.status == "added" or .status == "modified") | .filename]')
+
+        echo "changed files: $files"
+        echo "added_modified=$files" >> "$GITHUB_OUTPUT"

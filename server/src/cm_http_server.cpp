@@ -104,9 +104,9 @@ static const char *guess_content_type (const char *path)
   for (ent = &content_type_table[0]; ent->extension; ++ent)
     {
       if (!evutil_ascii_strcasecmp (ent->extension, extension))
-        {
-          return ent->content_type;
-        }
+	{
+	  return ent->content_type;
+	}
     }
 
   return "application/misc";
@@ -155,17 +155,17 @@ struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg)
   SSL_CTX *ctx = (SSL_CTX *) arg;
 
   r = bufferevent_openssl_socket_new (base,
-                                      -1,
-                                      SSL_new (ctx),
-                                      BUFFEREVENT_SSL_ACCEPTING,
-                                      BEV_OPT_CLOSE_ON_FREE);
+				      -1,
+				      SSL_new (ctx),
+				      BUFFEREVENT_SSL_ACCEPTING,
+				      BEV_OPT_CLOSE_ON_FREE);
   if (r == NULL)
     {
       LOG_ERROR ("-- Web server: Failed to create SSL connection.");
       return NULL;
     }
 
-  bufferevent_openssl_set_allow_dirty_shutdown(r, 1);
+  bufferevent_openssl_set_allow_dirty_shutdown (r, 1);
   return r;
 }
 
@@ -181,8 +181,8 @@ struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg)
  * @return
  */
 static void server_setup_certs (SSL_CTX *ctx,
-                                const char *certificate_chain,
-                                const char *private_key)
+				const char *certificate_chain,
+				const char *private_key)
 {
   if (1 != SSL_CTX_use_certificate_chain_file (ctx, certificate_chain))
     {
@@ -287,9 +287,9 @@ void thread_cleanup_SSL (void)
       total_locks = CRYPTO_num_locks ();
 
       for (i = 0; i < total_locks; i++)
-        {
-          MUTEX_DESTROY (lock_array[i]);
-        }
+	{
+	  MUTEX_DESTROY (lock_array[i]);
+	}
 
       OPENSSL_free (lock_array);
       lock_array = NULL;
@@ -326,10 +326,10 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
     }
   SSL_CTX_set_options (ctx,
-                       SSL_OP_SINGLE_DH_USE |
-                       SSL_OP_SINGLE_ECDH_USE |
+		       SSL_OP_SINGLE_DH_USE |
+		       SSL_OP_SINGLE_ECDH_USE |
 		       SSL_OP_NO_SSLv3 |
-                       SSL_OP_NO_SSLv2);
+		       SSL_OP_NO_SSLv2);
 
   /* Find and set up our server certificate. */
   server_setup_certs (ctx, certificate_chain, private_key);

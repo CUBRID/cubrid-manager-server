@@ -63,7 +63,7 @@
 
 #ifdef HOST_MONITOR_PROC
 static long percentages (int cnt, int *out1, register long *new1,
-                         register long *old, long *diffs);
+			 register long *old, long *diffs);
 static void get_swapinfo (int *total, int *fr);
 static int get_system_info (kstat_ctl_t *kc, sys_stat *sst);
 #ifdef HOST_MONITOR_IO
@@ -104,28 +104,28 @@ record_cubrid_proc_info (userdata *ud)
   for (i = 0; i < MAX_INSTALLED_DB; ++i)
     {
       if (vect[i])
-        {
-          sprintf (procbuf, "/proc/%d", buff[i].db_pid);
-          if ((fd = open (procbuf, O_RDONLY)) == -1)
-            {
-              ud->dbsrv_refresh_flag = 1;
-              continue;
-            }
-          if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
-            {
-              ud->dbsrv_refresh_flag = 1;
-              close (fd);
-              continue;
-            }
-          close (fd);
+	{
+	  sprintf (procbuf, "/proc/%d", buff[i].db_pid);
+	  if ((fd = open (procbuf, O_RDONLY)) == -1)
+	    {
+	      ud->dbsrv_refresh_flag = 1;
+	      continue;
+	    }
+	  if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
+	    {
+	      ud->dbsrv_refresh_flag = 1;
+	      close (fd);
+	      continue;
+	    }
+	  close (fd);
 
-          /* fill in the structure */
-          buff[i].db_size = (unsigned long) psbuff.pr_bysize >> 10;
-          buff[i].proc_stat[0] = psbuff.pr_sname;
-          buff[i].db_start_time = psbuff.pr_start.tv_sec;
-          buff[i].db_cpu_usage = (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
-          buff[i].db_mem_usage = (((double) psbuff.pr_pctmem) / 0x8000 * 100);
-        }
+	  /* fill in the structure */
+	  buff[i].db_size = (unsigned long) psbuff.pr_bysize >> 10;
+	  buff[i].proc_stat[0] = psbuff.pr_sname;
+	  buff[i].db_start_time = psbuff.pr_start.tv_sec;
+	  buff[i].db_cpu_usage = (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
+	  buff[i].db_mem_usage = (((double) psbuff.pr_pctmem) / 0x8000 * 100);
+	}
     }
 #endif
 }
@@ -141,29 +141,29 @@ record_unicas_proc_info (int vect[], cas_stat buff[])
   for (i = 0; i < MAX_UNICAS_PROC; ++i)
     {
       if (vect[i])
-        {
-          sprintf (procbuf, "/proc/%d", buff[i].cas_pid);
+	{
+	  sprintf (procbuf, "/proc/%d", buff[i].cas_pid);
 
-          if ((fd = open (procbuf, O_RDONLY)) == -1)
-            {
-              vect[i] = 0;
-              continue;
-            }
-          if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
-            {
-              continue;
-            }
-          close (fd);
+	  if ((fd = open (procbuf, O_RDONLY)) == -1)
+	    {
+	      vect[i] = 0;
+	      continue;
+	    }
+	  if (ioctl (fd, PIOCPSINFO, &psbuff) == -1)
+	    {
+	      continue;
+	    }
+	  close (fd);
 
-          /* fill in the structure */
-          buff[i].cas_size = (unsigned long) psbuff.pr_bysize >> 10;
-          buff[i].proc_stat[0] = psbuff.pr_sname;
-          buff[i].cas_start_time = psbuff.pr_start.tv_sec;
-          buff[i].cas_cpu_usage =
-            (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
-          buff[i].cas_mem_usage =
-            (((double) psbuff.pr_pctmem) / 0x8000 * 100);
-        }
+	  /* fill in the structure */
+	  buff[i].cas_size = (unsigned long) psbuff.pr_bysize >> 10;
+	  buff[i].proc_stat[0] = psbuff.pr_sname;
+	  buff[i].cas_start_time = psbuff.pr_start.tv_sec;
+	  buff[i].cas_cpu_usage =
+		  (((double) psbuff.pr_pctcpu) / 0x8000 * 100);
+	  buff[i].cas_mem_usage =
+		  (((double) psbuff.pr_pctmem) / 0x8000 * 100);
+	}
     }
 #endif
 }
@@ -171,7 +171,7 @@ record_unicas_proc_info (int vect[], cas_stat buff[])
 #ifdef HOST_MONITOR_PROC
 static long
 percentages (int cnt, int *out1, register long *new1, register long *old,
-             long *diffs)
+	     long *diffs)
 {
   register int i;
   register long change;
@@ -187,10 +187,10 @@ percentages (int cnt, int *out1, register long *new1, register long *old,
   for (i = 0; i < cnt; i++)
     {
       if ((change = *new1 - *old) < 0)
-        {
-          /* this only happens when the counter wraps */
-          change = (int) ((unsigned long) *new1 - (unsigned long) *old);
-        }
+	{
+	  /* this only happens when the counter wraps */
+	  change = (int) ((unsigned long) *new1 - (unsigned long) *old);
+	}
       total_change += (*dp++ = change);
       *old++ = *new1++;
     }
@@ -236,8 +236,8 @@ get_swapinfo (int *total, int *fr)
 
   /* allocate enough space to hold count + n swapents */
   swt =
-    (struct swaptable *) malloc (sizeof (int) +
-                                 cnt * sizeof (struct swapent));
+	  (struct swaptable *) malloc (sizeof (int) +
+				       cnt * sizeof (struct swapent));
   if (swt == NULL)
     {
       *total = 0;
@@ -266,10 +266,10 @@ get_swapinfo (int *total, int *fr)
     {
       /* don't count slots being deleted */
       if (! (ste->ste_flags & ST_INDEL) && ! (ste->ste_flags & ST_DOINGDEL))
-        {
-          t += ste->ste_pages;
-          f += ste->ste_free;
-        }
+	{
+	  t += ste->ste_pages;
+	  f += ste->ste_free;
+	}
       ste++;
     }
 
@@ -331,15 +331,15 @@ kcid_changed:
     {
       ncpu = 0;
       for (ksp = kc->kc_chain; ksp && ncpu < MAX_CPU; ksp = ksp->ks_next)
-        {
-          if (strncmp (ksp->ks_name, "cpu_stat", 8) == 0)
-            {
-              nkcid = kstat_read (kc, ksp, NULL);
-              CHECK_KCID (nkcid, kcid);
-              cpu_ks[ncpu] = ksp;
-              ncpu++;
-            }
-        }
+	{
+	  if (strncmp (ksp->ks_name, "cpu_stat", 8) == 0)
+	    {
+	      nkcid = kstat_read (kc, ksp, NULL);
+	      CHECK_KCID (nkcid, kcid);
+	      cpu_ks[ncpu] = ksp;
+	      ncpu++;
+	    }
+	}
     }
 
   for (i = 0; i < ncpu; i++)
@@ -356,12 +356,12 @@ kcid_changed:
   for (i = 0; i < ncpu; i++)
     {
       for (j = 0; j < CPU_WAIT; j++)
-        {
-          cp_time[j] += (long) cpu_stat[i].cpu_sysinfo.cpu[j];
-        }
+	{
+	  cp_time[j] += (long) cpu_stat[i].cpu_sysinfo.cpu[j];
+	}
 
       cp_time[CPUSTATE_IOWAIT] += (long) cpu_stat[i].cpu_sysinfo.wait[W_IO] +
-                                  (long) cpu_stat[i].cpu_sysinfo.wait[W_PIO];
+				  (long) cpu_stat[i].cpu_sysinfo.wait[W_PIO];
       cp_time[CPUSTATE_SWAP] = (long) cpu_stat[i].cpu_sysinfo.wait[W_SWAP];
     }
 
@@ -390,9 +390,9 @@ kcid_changed:
       sst->memory_stats[2] = PAGETOM (kn->value.ui32, pagesize);
 
       if (sst->memory_stats[0] - sst->memory_stats[2] > 0)
-        {
-          sst->memory_stats[1] = sst->memory_stats[0] - sst->memory_stats[2];
-        }
+	{
+	  sst->memory_stats[1] = sst->memory_stats[0] - sst->memory_stats[2];
+	}
       freemem_check_time = time (NULL);
     }
 
@@ -431,10 +431,10 @@ record_iostat (nvplist *res)
   while (fgets (buf, 1024, infile))
     {
       if (sscanf (buf, "%s %s %s %s %s %s %s %s %s %s",
-                  d, rs, ws, krs, kws, wait, actv, svc_t, w, b) != 10)
-        {
-          continue;
-        }
+		  d, rs, ws, krs, kws, wait, actv, svc_t, w, b) != 10)
+	{
+	  continue;
+	}
       /* name of the disk */
       nv_add_nvp (res, "device", d);
       /* reads per second */

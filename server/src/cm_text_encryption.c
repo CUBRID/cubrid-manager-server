@@ -150,19 +150,19 @@ tea_encrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-        {
-          memset (ulbuf, ' ', sizeof (ulbuf));
-          memcpy (ulbuf, text, len);
-          _encrypt (key, ulbuf);
-          memcpy (text, ulbuf, len);
-          break;
-        }
+	{
+	  memset (ulbuf, ' ', sizeof (ulbuf));
+	  memcpy (ulbuf, text, len);
+	  _encrypt (key, ulbuf);
+	  memcpy (text, ulbuf, len);
+	  break;
+	}
       else
-        {
-          memcpy (ulbuf, text, sizeof (ulbuf));
-          _encrypt (key, ulbuf);
-          memcpy (text, ulbuf, sizeof (ulbuf));
-        }
+	{
+	  memcpy (ulbuf, text, sizeof (ulbuf));
+	  _encrypt (key, ulbuf);
+	  memcpy (text, ulbuf, sizeof (ulbuf));
+	}
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }
@@ -178,20 +178,20 @@ tea_decrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-        {
-          memset (ulbuf, ' ', sizeof (ulbuf));
-          /*memcpy(ulbuf,text,len); */
-          memcpy (ulbuf, text, sizeof (ulbuf));
-          _decrypt (key, ulbuf);
-          memcpy (text, ulbuf, len);
-          break;
-        }
+	{
+	  memset (ulbuf, ' ', sizeof (ulbuf));
+	  /*memcpy(ulbuf,text,len); */
+	  memcpy (ulbuf, text, sizeof (ulbuf));
+	  _decrypt (key, ulbuf);
+	  memcpy (text, ulbuf, len);
+	  break;
+	}
       else
-        {
-          memcpy (ulbuf, text, sizeof (ulbuf));
-          _decrypt (key, ulbuf);
-          memcpy (text, ulbuf, sizeof (ulbuf));
-        }
+	{
+	  memcpy (ulbuf, text, sizeof (ulbuf));
+	  _decrypt (key, ulbuf);
+	  memcpy (text, ulbuf, sizeof (ulbuf));
+	}
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }

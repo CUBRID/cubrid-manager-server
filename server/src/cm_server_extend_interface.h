@@ -38,7 +38,7 @@
         return err;
 
 typedef int (*T_EXT_TASK_FUNC) (Json::Value &request,
-                                Json::Value &response);
+				Json::Value &response);
 
 typedef struct
 {
@@ -49,9 +49,9 @@ typedef struct
 } T_EXTEND_TASK_INFO;
 
 int build_server_header (Json::Value &response, const int status,
-                         const char *note);
+			 const char *note);
 int get_ext_task_info (const char *task, int access_flag,
-                       T_EXT_TASK_FUNC *task_func, T_USER_AUTH *auth);
+		       T_EXT_TASK_FUNC *task_func, T_USER_AUTH *auth);
 int ext_get_sys_diskinfo (Json::Value &request, Json::Value &response);
 int ext_get_proc_info (Json::Value &request, Json::Value &response);
 int ext_set_log_level (Json::Value &request, Json::Value &response);
@@ -76,7 +76,7 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &reponse);
 int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_get_dbmt_user_info_new (Json::Value &request,
-                                Json::Value &response);
+				Json::Value &response);
 
 #define EXT_JOBS_AUTO_START      "auto_start"
 #define EXT_JOBS_MAIL_CONF       "mail_config"
@@ -87,13 +87,13 @@ bool ext_set_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
 bool ext_get_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
 bool ext_ut_validate_userid (const std::string userid);
 int ext_ut_add_dblist_to_response (Json::Value &res, bool is_add_dbpath =
-                                     false);
+    false);
 int ext_ut_add_userlist_to_response (Json::Value &response,
-                                     const T_DBMT_USER &dbmt_user,
-                                     bool is_add_pwd = false);
+				     const T_DBMT_USER &dbmt_user,
+				     bool is_add_pwd = false);
 std::string ext_ut_generate_token (const std::string &client_ip,
-                                   const std::string &client_id, int proc_id,
-                                   time_t login_time);
+				   const std::string &client_id, int proc_id,
+				   time_t login_time);
 int ext_ut_validate_token (Json::Value &resquest, Json::Value &response);
 bool ext_ut_validate_token (const char *token);
 bool ext_ut_validate_auth (Json::Value &request);

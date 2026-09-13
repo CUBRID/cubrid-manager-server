@@ -160,12 +160,12 @@ uReadEnvVariables (char *progname)
     {
 #if !defined (DO_NOT_USE_CUBRIDENV)
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : Environment variable CUBRID not set. - %s\n",
-                sco.szProgname);
+		"CUBRID Manager Server : Environment variable CUBRID not set. - %s\n",
+		sco.szProgname);
 #else
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : CUBRID prefix directory was not set. - %s\n",
-                sco.szProgname);
+		"CUBRID Manager Server : CUBRID prefix directory was not set. - %s\n",
+		sco.szProgname);
 #endif
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
@@ -174,12 +174,12 @@ uReadEnvVariables (char *progname)
     {
 #if !defined (DO_NOT_USE_CUBRIDENV)
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : Environment variable CUBRID_DATABASES not set. - %s\n",
-                sco.szProgname);
+		"CUBRID Manager Server : Environment variable CUBRID_DATABASES not set. - %s\n",
+		sco.szProgname);
 #else
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : CUBRID databases directory was not set. - %s\n",
-                sco.szProgname);
+		"CUBRID Manager Server : CUBRID databases directory was not set. - %s\n",
+		sco.szProgname);
 #endif
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
@@ -187,7 +187,7 @@ uReadEnvVariables (char *progname)
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
   sco.dbmt_tmp_dir =
-    (char *) malloc (strlen (sco.szCubrid) + strlen (DBMT_TMP_DIR) + 2);
+	  (char *) malloc (strlen (sco.szCubrid) + strlen (DBMT_TMP_DIR) + 2);
 #else
   sco.dbmt_tmp_dir = (char *) malloc (strlen (CUBRID_TMPDIR) + 1);
 #endif
@@ -242,7 +242,7 @@ uReadSystemConfig (void)
   strcpy (sco.szCMSVersion, "");
   strncpy (sco.szTokenActiveTime, "7200", PATH_MAX);
   snprintf (sco.szCWMPath, PATH_MAX, "%s%s", sco.szCubrid,
-            DEFAULT_CWM_PATH_SHORT);
+	    DEFAULT_CWM_PATH_SHORT);
 
   conf_get_dbmt_file (FID_CMS_LOG, access_log_buf);
   conf_get_dbmt_file (FID_CMS_ERROR_LOG, error_log_buf);
@@ -254,18 +254,18 @@ uReadSystemConfig (void)
     {
       ut_trim (cbuf);
       if (cbuf[0] == '\0' || cbuf[0] == '#')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       /*
       * put the first token into var ent_name,
       * the separator is ' ', '\t', '='
       */
       if ((token = strtok (cbuf, separator)) == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       ut_trim (token);
       strcpy_limit (ent_name, token, sizeof (ent_name));
 
@@ -273,127 +273,127 @@ uReadSystemConfig (void)
       * put the rest of the string into var ent_val.
       */
       if ((token = strtok (NULL, "\0")) == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (ut_trim (token) == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       /*
       * if the first charactor is '=',
       * the token should move one more step.
       */
       if (token[0] == '=')
-        {
-          token++;
-        }
+	{
+	  token++;
+	}
 
       if (ut_trim (token) == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       strcpy_limit (ent_val, token, sizeof (ent_val));
 
       if (strcasecmp (ent_name, "cm_port") == 0)
-        {
-          cm_port = atoi (ent_val);
-          sco.iCMS_port = cm_port;
-        }
+	{
+	  cm_port = atoi (ent_val);
+	  sco.iCMS_port = cm_port;
+	}
       else if (strcasecmp (ent_name, "MonitorInterval") == 0 ||
-               strcasecmp (ent_name, "cm_process_monitor_interval") == 0)
-        {
-          sco.iMonitorInterval = atoi (ent_val);
+	       strcasecmp (ent_name, "cm_process_monitor_interval") == 0)
+	{
+	  sco.iMonitorInterval = atoi (ent_val);
 
-          /* check value range of system parameters */
-          if (sco.iMonitorInterval < DEFAULT_MONITOR_INTERVAL)
-            {
-              sco.iMonitorInterval = DEFAULT_MONITOR_INTERVAL;
-            }
+	  /* check value range of system parameters */
+	  if (sco.iMonitorInterval < DEFAULT_MONITOR_INTERVAL)
+	    {
+	      sco.iMonitorInterval = DEFAULT_MONITOR_INTERVAL;
+	    }
 
-        }
+	}
       else if (strcasecmp (ent_name, "Allow_UserMultiCon") == 0 ||
-               strcasecmp (ent_name, "allow_user_multi_connection") == 0)
-        {
-          if (strcasecmp (ent_val, "yes") == 0)
-            {
-              sco.iAllow_AdminMultiCon = 1;
-            }
-          else
-            {
-              sco.iAllow_AdminMultiCon = 0;
-            }
-        }
+	       strcasecmp (ent_name, "allow_user_multi_connection") == 0)
+	{
+	  if (strcasecmp (ent_val, "yes") == 0)
+	    {
+	      sco.iAllow_AdminMultiCon = 1;
+	    }
+	  else
+	    {
+	      sco.iAllow_AdminMultiCon = 0;
+	    }
+	}
       else if (strcasecmp (ent_name, "auto_job_timeout") == 0)
-        {
-          int timeout = atoi (ent_val);
-          if (MIN_AUTOJOB_TIMEOUT <= timeout)
-            {
-              sco.iAutoJobTimeout = timeout;
-            }
-          else
-            {
-              sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
-            }
-        }
+	{
+	  int timeout = atoi (ent_val);
+	  if (MIN_AUTOJOB_TIMEOUT <= timeout)
+	    {
+	      sco.iAutoJobTimeout = timeout;
+	    }
+	  else
+	    {
+	      sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
+	    }
+	}
       else if (strcasecmp (ent_name, "max_log_filesize") == 0)
-        {
-            str_len = (int) strlen(ent_val);
-          if ((ent_val[str_len - 1] == 'M') || (ent_val[str_len - 1] == 'm'))
-            {
-              ent_val[str_len - 1] = '\0';
-            }
-          if (atoi (ent_val) > 0)
-            {
-              sco.iMaxLogFileSize = (atoi (ent_val) * 1024 * 1024);
-            }
-        }
+	{
+	  str_len = (int) strlen (ent_val);
+	  if ((ent_val[str_len - 1] == 'M') || (ent_val[str_len - 1] == 'm'))
+	    {
+	      ent_val[str_len - 1] = '\0';
+	    }
+	  if (atoi (ent_val) > 0)
+	    {
+	      sco.iMaxLogFileSize = (atoi (ent_val) * 1024 * 1024);
+	    }
+	}
       else if (strcasecmp (ent_name, "max_log_files") == 0)
-        {
-          if (atoi (ent_val) > 0)
-            {
-              sco.iMaxLogFiles = atoi (ent_val);
-            }
-        }
+	{
+	  if (atoi (ent_val) > 0)
+	    {
+	      sco.iMaxLogFiles = atoi (ent_val);
+	    }
+	}
       else if (strcasecmp (ent_name, "web_manager_path") == 0)
-        {
-          /* The path validation will be checked in uCheckSystemConfig */
-          snprintf (sco.szCWMPath, PATH_MAX, "%s", ent_val);
-        }
+	{
+	  /* The path validation will be checked in uCheckSystemConfig */
+	  snprintf (sco.szCWMPath, PATH_MAX, "%s", ent_val);
+	}
 
       else if (strcasecmp (ent_name, "support_mon_statistic") == 0)
-        {
-          if (strcasecmp (ent_val, "yes") == 0)
-            {
-              sco.iSupportMonStat = TRUE;
-            }
-          else
-            {
-              sco.iSupportMonStat = FALSE;
-            }
-        }
+	{
+	  if (strcasecmp (ent_val, "yes") == 0)
+	    {
+	      sco.iSupportMonStat = TRUE;
+	    }
+	  else
+	    {
+	      sco.iSupportMonStat = FALSE;
+	    }
+	}
       else if (strcasecmp (ent_name, "http_timeout") == 0 ||
-               strcasecmp (ent_name, "HttpTimeout") == 0)
-        {
-          sco.iHttpTimeout = atoi (ent_val);
-        }
+	       strcasecmp (ent_name, "HttpTimeout") == 0)
+	{
+	  sco.iHttpTimeout = atoi (ent_val);
+	}
       else if (strcasecmp (ent_name, "auto_update_url") == 0 ||
-               strcasecmp (ent_name, "AutoUpdateURL") == 0)
-        {
-          snprintf (sco.szAutoUpdateURL, PATH_MAX, "%s", ent_val);
-        }
+	       strcasecmp (ent_name, "AutoUpdateURL") == 0)
+	{
+	  snprintf (sco.szAutoUpdateURL, PATH_MAX, "%s", ent_val);
+	}
       else if (strcasecmp (ent_name, "cubrid_server_ver") == 0 ||
-               strcasecmp (ent_name, "CubridServerVer") == 0)
-        {
-          snprintf (sco.szCMSVersion, PATH_MAX, "%s", ent_val);
-        }
+	       strcasecmp (ent_name, "CubridServerVer") == 0)
+	{
+	  snprintf (sco.szCMSVersion, PATH_MAX, "%s", ent_val);
+	}
       else if (strcasecmp (ent_name, "token_active_time") == 0 ||
-               strcasecmp (ent_name, "TokenActiveTime") == 0)
-        {
-          ut_trim (ent_val);
-          snprintf (sco.szTokenActiveTime, PATH_MAX, "%s", ent_val);
-        }
+	       strcasecmp (ent_name, "TokenActiveTime") == 0)
+	{
+	  ut_trim (ent_val);
+	  snprintf (sco.szTokenActiveTime, PATH_MAX, "%s", ent_val);
+	}
     }
   fclose (conf_file);
 
@@ -446,9 +446,9 @@ uCheckSystemConfig (char *progname)
       FILE *fp;
       fp = fopen (filepath, "w");
       if (fp)
-        {
-          fclose (fp);
-        }
+	{
+	  fclose (fp);
+	}
     }
   retval = check_file (filepath, progname);
   if (retval < 0)
@@ -518,15 +518,15 @@ conf_get_dbmt_file (T_DBMT_FILE_ID dbmt_fid, char *buf)
   for (i = 0; i < NUM_DBMT_FILE; i++)
     {
       if (dbmt_fid == dbmt_file[i].fid)
-        {
+	{
 #if !defined (DO_NOT_USE_CUBRIDENV)
-          sprintf (buf, "%s/%s/%s", sco.szCubrid, dbmt_file[i].dir_name,
-                   dbmt_file[i].file_name);
+	  sprintf (buf, "%s/%s/%s", sco.szCubrid, dbmt_file[i].dir_name,
+		   dbmt_file[i].file_name);
 #else
-          sprintf (buf, "%s/%s", dbmt_file[i].dir_name, dbmt_file[i].file_name);
+	  sprintf (buf, "%s/%s", dbmt_file[i].dir_name, dbmt_file[i].file_name);
 #endif
-          break;
-        }
+	  break;
+	}
     }
   return buf;
 }
@@ -540,10 +540,10 @@ conf_get_dbmt_file2 (T_DBMT_FILE_ID dbmt_fid, char *buf)
   for (i = 0; i < NUM_DBMT_FILE; i++)
     {
       if (dbmt_fid == dbmt_file[i].fid)
-        {
-          strcpy (buf, dbmt_file[i].file_name);
-          break;
-        }
+	{
+	  strcpy (buf, dbmt_file[i].file_name);
+	  break;
+	}
     }
   return buf;
 }
@@ -571,13 +571,13 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
   while (fgets (strbuf, sizeof (strbuf), infp))
     {
       if (sscanf (strbuf, "%127s", conf_dbname) < 1)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strcmp (dbname, conf_dbname) != 0)
-        {
-          fputs (strbuf, outfp);
-        }
+	{
+	  fputs (strbuf, outfp);
+	}
     }
   fclose (infp);
   fclose (outfp);
@@ -612,19 +612,19 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
   while (fgets (strbuf, sizeof (strbuf), infp))
     {
       if (sscanf (strbuf, "%127s", conf_dbname) < 1)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strcmp (conf_dbname, src_dbname) == 0)
-        {
-          p = strstr (strbuf, src_dbname);
-          p += strlen (src_dbname);
-          fprintf (outfp, "%s%s", dest_dbname, p);
-        }
+	{
+	  p = strstr (strbuf, src_dbname);
+	  p += strlen (src_dbname);
+	  fprintf (outfp, "%s%s", dest_dbname, p);
+	}
       else
-        {
-          fputs (strbuf, outfp);
-        }
+	{
+	  fputs (strbuf, outfp);
+	}
     }
   fclose (infp);
   fclose (outfp);
@@ -638,8 +638,8 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
 
 int
 auto_conf_execquery_update_dbuser (const char *src_db_uid,
-                                   const char *dest_db_uid,
-                                   const char *dest_db_passwd)
+				   const char *dest_db_uid,
+				   const char *dest_db_passwd)
 {
   char conf_file_path[PATH_MAX], tmpfile_path[PATH_MAX];
   char dbname[64], query_id[64], db_uid[64], dbmt_uid[64];
@@ -664,25 +664,25 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   while ((get_len = ut_getline (&strbuf, &buf_len, conf_file)) != -1)
     {
       if (sscanf
-          (strbuf, "%64s %64s %64s %*s %64s", dbname, query_id, db_uid, dbmt_uid) < 4)
-        {
-          continue;
-        }
+	  (strbuf, "%64s %64s %64s %*s %64s", dbname, query_id, db_uid, dbmt_uid) < 4)
+	{
+	  continue;
+	}
 
       if (uStringEqual (db_uid, src_db_uid))
-        {
-          p = strstr (strbuf, dbmt_uid);
-          if (p)
-            {
-              p = strchr (p, ' ');
-            }
-          fprintf (tmpfile, "%s %s %s %s %s%s", dbname, query_id, dest_db_uid,
-                   dest_db_passwd, dbmt_uid, p);
-        }
+	{
+	  p = strstr (strbuf, dbmt_uid);
+	  if (p)
+	    {
+	      p = strchr (p, ' ');
+	    }
+	  fprintf (tmpfile, "%s %s %s %s %s%s", dbname, query_id, dest_db_uid,
+		   dest_db_passwd, dbmt_uid, p);
+	}
       else
-        {
-          fputs (strbuf, tmpfile);
-        }
+	{
+	  fputs (strbuf, tmpfile);
+	}
       FREE_MEM (strbuf);
       buf_len = 0;
     }
@@ -729,18 +729,18 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   while ((get_len = ut_getline (&strbuf, &buf_len, conf_file)) != -1)
     {
       if (sscanf (strbuf, "%*s %*s %64s", db_uid) < 1)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (uStringEqual (db_uid, target_db_uid))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       else
-        {
-          fputs (strbuf, tmpfile);
-        }
+	{
+	  fputs (strbuf, tmpfile);
+	}
       FREE_MEM (strbuf);
       buf_len = 0;
     }
@@ -771,7 +771,7 @@ check_file (char *fname, char *pname)
   if (access (fname, F_OK | R_OK | W_OK) < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : %s - %s. - %s\n", fname, strerror (errno), pname);
+		"CUBRID Manager Server : %s - %s. - %s\n", fname, strerror (errno), pname);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
@@ -789,7 +789,7 @@ check_path (char *dirname, char *pname)
   if (access (dirname, F_OK | W_OK | R_OK | X_OK) < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server :  %s - %s. - %s\n", dirname, strerror (errno), pname);
+		"CUBRID Manager Server :  %s - %s. - %s\n", dirname, strerror (errno), pname);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }

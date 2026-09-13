@@ -87,7 +87,7 @@ class CLog
     };
 
     CLog (bool bappend, LOGLEVEL loglevel =
-            CLog::DEFAULT_LOG_LEVEL, long maxloglen = sco.iMaxLogFileSize)
+		  CLog::DEFAULT_LOG_LEVEL, long maxloglen = sco.iMaxLogFileSize)
     {
       sLogLevel = loglevel;
       m_lTruncate = maxloglen;
@@ -102,16 +102,16 @@ class CLog
     ~CLog ()
     {
       if (m_pLogFile)
-        {
-          fclose (m_pLogFile);
-          m_pLogFile = NULL;
-        }
+	{
+	  fclose (m_pLogFile);
+	  m_pLogFile = NULL;
+	}
 
       if (m_pErrFile)
-        {
-          fclose (m_pErrFile);
-          m_pErrFile = NULL;
-        }
+	{
+	  fclose (m_pErrFile);
+	  m_pErrFile = NULL;
+	}
 
       mutex_destory (m_cs);
     }
@@ -129,9 +129,9 @@ class CLog
       time (&lt);
       tm *t = localtime (&lt);
       if (t)
-        {
-          strftime (buff, MAX_DATE_TIME_LENGTH, "%Y%m%d %H:%M:%S", t);
-        }
+	{
+	  strftime (buff, MAX_DATE_TIME_LENGTH, "%Y%m%d %H:%M:%S", t);
+	}
       return string (buff);
     }
 
@@ -139,15 +139,15 @@ class CLog
     _init_file_hander (void)
     {
       if (m_pLogFile != NULL)
-        {
-          fclose (m_pLogFile);
-          m_pLogFile = NULL;
-        }
+	{
+	  fclose (m_pLogFile);
+	  m_pLogFile = NULL;
+	}
       if (m_pErrFile != NULL)
-        {
-          fclose (m_pErrFile);
-          m_pErrFile = NULL;
-        }
+	{
+	  fclose (m_pErrFile);
+	  m_pErrFile = NULL;
+	}
     }
 
     void
@@ -172,32 +172,32 @@ class CLog
 
       handle = FindFirstFile (find_path, &ffd);
       if (handle == INVALID_HANDLE_VALUE)
-        {
-          return 0;
-        }
+	{
+	  return 0;
+	}
       while (FindNextFile (handle, &ffd))
-        {
-          if (ffd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN
-              || ffd.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
-            {
-              continue;
-            }
-          else if (! (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-            {
-              cms_log_name = ffd.cFileName;
-              if (special_key.length() == 0)
-                {
-                  files_list.push_back (cms_log_name);
-                }
-              else
-                {
-                  if (cms_log_name.find (special_key) < cms_log_name.length())
-                    {
-                      files_list.push_back (cms_log_name);
-                    }
-                }
-            }
-        }
+	{
+	  if (ffd.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN
+	      || ffd.dwFileAttributes & FILE_ATTRIBUTE_SYSTEM)
+	    {
+	      continue;
+	    }
+	  else if (! (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+	    {
+	      cms_log_name = ffd.cFileName;
+	      if (special_key.length() == 0)
+		{
+		  files_list.push_back (cms_log_name);
+		}
+	      else
+		{
+		  if (cms_log_name.find (special_key) < cms_log_name.length())
+		    {
+		      files_list.push_back (cms_log_name);
+		    }
+		}
+	    }
+	}
       FindClose (handle);
 
       return (unsigned int) files_list.size();
@@ -213,31 +213,31 @@ class CLog
       string cms_log_name;
 
       if ((dirptr = opendir (roor_dir)) == NULL)
-        {
-          return 0;
-        }
+	{
+	  return 0;
+	}
       while ((entry = readdir (dirptr)) != NULL)
-        {
-          if (strcmp (entry->d_name, ".") == 0 || strcmp (entry->d_name, "..") == 0)
-            {
-              continue;
-            }
+	{
+	  if (strcmp (entry->d_name, ".") == 0 || strcmp (entry->d_name, "..") == 0)
+	    {
+	      continue;
+	    }
 
-          cms_log_name = entry->d_name;
+	  cms_log_name = entry->d_name;
 
-          if (special_key.length() == 0)
-            {
-              files_list.push_back (cms_log_name);
-            }
-          else
-            {
-              if (cms_log_name.find (special_key) < cms_log_name.length())
-                {
+	  if (special_key.length() == 0)
+	    {
+	      files_list.push_back (cms_log_name);
+	    }
+	  else
+	    {
+	      if (cms_log_name.find (special_key) < cms_log_name.length())
+		{
 
-                  files_list.push_back (cms_log_name);
-                }
-            }
-        }
+		  files_list.push_back (cms_log_name);
+		}
+	    }
+	}
 
       closedir (dirptr);
       return files_list.size();
@@ -258,20 +258,20 @@ class CLog
       snprintf (log_path, PATH_MAX, "%s/%s", sco.szCubrid, DBMT_LOG_DIR);
 
       if (files_list.empty() == true)
-        {
-          return;
-        }
+	{
+	  return;
+	}
 
       for (itor = files_list.begin(); itor != files_list.end(); itor++)
-        {
-          snprintf (log_full_path, PATH_MAX, "%s/%s", log_path, (*itor).c_str());
-          stat (log_full_path, &st);
-          if ((long) st.st_mtime < oldest_time)
-            {
-              oldest_time = (long) st.st_mtime;
-              snprintf (oldest_file, PATH_MAX, "%s", log_full_path);
-            }
-        }
+	{
+	  snprintf (log_full_path, PATH_MAX, "%s/%s", log_path, (*itor).c_str());
+	  stat (log_full_path, &st);
+	  if ((long) st.st_mtime < oldest_time)
+	    {
+	      oldest_time = (long) st.st_mtime;
+	      snprintf (oldest_file, PATH_MAX, "%s", log_full_path);
+	    }
+	}
 
       unlink (oldest_file);
     }
@@ -297,9 +297,9 @@ class CLog
       ret_backup_err = rename (sco.szErrorLog, backup_err_name);
 
       if ((ret_backup_log == -1) || (ret_backup_err == -1))
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
       return true;
     }
 
@@ -312,24 +312,24 @@ class CLog
       static CLog *instance_err = NULL;
 
       if ((logLevel <= CLog::xWARN) && (logLevel >= CLog::xFATAL))
-        {
-          // write log into error log file
+	{
+	  // write log into error log file
 
-          if ((instance_err == NULL) || (access (sco.szErrorLog, F_OK) < 0))
-            {
-              instance_err = new CLog (TRUE);
-            }
-          return instance_err;
-        }
+	  if ((instance_err == NULL) || (access (sco.szErrorLog, F_OK) < 0))
+	    {
+	      instance_err = new CLog (TRUE);
+	    }
+	  return instance_err;
+	}
       else
-        {
-          // write log into normal log file
-          if ((instance_log == NULL) || (access (sco.szAccessLog, F_OK) < 0))
-            {
-              instance_log = new CLog (TRUE);
-            }
-          return instance_log;
-        }
+	{
+	  // write log into normal log file
+	  if ((instance_log == NULL) || (access (sco.szAccessLog, F_OK) < 0))
+	    {
+	      instance_log = new CLog (TRUE);
+	    }
+	  return instance_log;
+	}
     }
 
     void setLogLevel (const unsigned int level)
@@ -350,50 +350,50 @@ class CLog
 
       //check log level
       if (iPriority > _logLevel ())
-        {
-          return;
-        }
+	{
+	  return;
+	}
 
       //format log message
       const char *strLevel;
       bool isErrorLog = false;
       switch (iPriority)
-        {
-        case CLog::xFATAL:
-          strLevel = "FATAL";
-          isErrorLog = true;
-          break;
-        case CLog::xERROR:
-          strLevel = "ERROR";
-          isErrorLog = true;
-          break;
-        case CLog::xWARN:
-          strLevel = " WARN";
-          isErrorLog = true;
-          break;
-        case CLog::xINFO:
-          strLevel = " INFO";
-          break;
-        case CLog::xDEBUG:
-        default:
-          strLevel = "DEBUG";
-          break;
-        }
+	{
+	case CLog::xFATAL:
+	  strLevel = "FATAL";
+	  isErrorLog = true;
+	  break;
+	case CLog::xERROR:
+	  strLevel = "ERROR";
+	  isErrorLog = true;
+	  break;
+	case CLog::xWARN:
+	  strLevel = " WARN";
+	  isErrorLog = true;
+	  break;
+	case CLog::xINFO:
+	  strLevel = " INFO";
+	  break;
+	case CLog::xDEBUG:
+	default:
+	  strLevel = "DEBUG";
+	  break;
+	}
 
       if (isErrorLog == true)
-        {
-          if (m_pErrFile == NULL)
-            {
-              return;
-            }
-        }
+	{
+	  if (m_pErrFile == NULL)
+	    {
+	      return;
+	    }
+	}
       else
-        {
-          if (m_pLogFile == NULL)
-            {
-              return;
-            }
-        }
+	{
+	  if (m_pLogFile == NULL)
+	    {
+	      return;
+	    }
+	}
 
       //format log data
       size_t size = 1024;
@@ -401,75 +401,75 @@ class CLog
       memset (buffer, 0, size);
 
       while (1)
-        {
-          va_list args;
-          va_start (args, fmt);
+	{
+	  va_list args;
+	  va_start (args, fmt);
 #ifdef _WIN32
-          int n = _vsnprintf (buffer, size, fmt, args);
+	  int n = _vsnprintf (buffer, size, fmt, args);
 #else
-          int n = vsnprintf (buffer, size, fmt, args);
+	  int n = vsnprintf (buffer, size, fmt, args);
 #endif
-          va_end (args);
-          if ((n > -1) && (static_cast < size_t > (n) < size))
-            {
-              break;
-            }
+	  va_end (args);
+	  if ((n > -1) && (static_cast < size_t > (n) < size))
+	    {
+	      break;
+	    }
 
-          size = (n > -1) ? n + 1 : size * 2;
-          delete[]buffer;
-          buffer = new char[size];
-          memset (buffer, 0, size);
-        }
+	  size = (n > -1) ? n + 1 : size * 2;
+	  delete[]buffer;
+	  buffer = new char[size];
+	  memset (buffer, 0, size);
+	}
 
       bool shouldBackupFiles = false;
 
       mutex_lock (m_cs);
       if (isErrorLog == true)
-        {
-          fprintf (m_pErrFile, "[%s] [%s] [%6d] %s\n",
-                   _get_format_time ().c_str (), strLevel, getpid (), buffer);
-          fflush (m_pErrFile);
+	{
+	  fprintf (m_pErrFile, "[%s] [%s] [%6d] %s\n",
+		   _get_format_time ().c_str (), strLevel, getpid (), buffer);
+	  fflush (m_pErrFile);
 
-          if (ftell (m_pErrFile) > m_lTruncate)
-            {
-              shouldBackupFiles = true;
-            }
-        }
+	  if (ftell (m_pErrFile) > m_lTruncate)
+	    {
+	      shouldBackupFiles = true;
+	    }
+	}
       else
-        {
-          fprintf (m_pLogFile, "[%s] [%s] [%6d] %s\n",
-                   _get_format_time ().c_str (), strLevel, getpid (), buffer);
+	{
+	  fprintf (m_pLogFile, "[%s] [%s] [%6d] %s\n",
+		   _get_format_time ().c_str (), strLevel, getpid (), buffer);
 
-          fflush (m_pLogFile);
+	  fflush (m_pLogFile);
 
-          if (ftell (m_pLogFile) > m_lTruncate)
-            {
-              shouldBackupFiles = true;
-            }
-        }
+	  if (ftell (m_pLogFile) > m_lTruncate)
+	    {
+	      shouldBackupFiles = true;
+	    }
+	}
 
       // backup log when the file grow too large
       if (shouldBackupFiles == true)
-        {
-          // init open file - close them firstly
-          _init_file_hander ();
+	{
+	  // init open file - close them firstly
+	  _init_file_hander ();
 
-          // then move the cub_manager.log into new name log file.
-          _backup_log_files (log_path, error_log_name, log_name);
+	  // then move the cub_manager.log into new name log file.
+	  _backup_log_files (log_path, error_log_name, log_name);
 
-          // remove the oldest file
-          if (_get_files_count (log_files_list, log_path, error_log_name) > (unsigned int) sco.iMaxLogFiles)
-            {
-              _remove_oldest_file (log_files_list);
-            }
+	  // remove the oldest file
+	  if (_get_files_count (log_files_list, log_path, error_log_name) > (unsigned int) sco.iMaxLogFiles)
+	    {
+	      _remove_oldest_file (log_files_list);
+	    }
 
-          log_files_list.clear();
-          // remove the oldest file
-          if (_get_files_count (log_files_list, log_path, log_name) > (unsigned int) sco.iMaxLogFiles)
-            {
-              _remove_oldest_file (log_files_list);
-            }
-        }
+	  log_files_list.clear();
+	  // remove the oldest file
+	  if (_get_files_count (log_files_list, log_path, log_name) > (unsigned int) sco.iMaxLogFiles)
+	    {
+	      _remove_oldest_file (log_files_list);
+	    }
+	}
       mutex_unlock (m_cs);
       delete[]buffer;
     }
