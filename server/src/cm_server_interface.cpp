@@ -902,23 +902,18 @@ cm_async_request_handler (void *lpArg)
     {
       async_timeout_fallback_release ();
     }
-  mutex_unlock (cm_mutex);
 #ifndef WINDOWS
   /*
    * NOTE: pthread_cond_broadcast () must happen while async_param->mutex
    * is still held, and pthread_mutex_unlock () must come strictly after
-   * it - do not reorder these two calls. cm_execute_request_async ()'s
-   * waiter reacquires this same mutex inside pthread_cond_timedwait ()
-   * before it can return, so it cannot observe status != 0 and proceed
-   * to pthread_mutex_destroy ()/pthread_cond_destroy () until both the
-   * broadcast and this unlock have fully completed here. Broadcasting
-   * after unlocking (the classic anti-pattern) would let the waiter
-   * destroy the mutex/cond while this thread is still inside
-   * pthread_cond_broadcast (), racing with it.
+   * it - do not reorder these two calls.
+   *
+   * cm_mutex must also stay held across this broadcast+unlock
    */
   pthread_cond_broadcast (async_param->cond);
   pthread_mutex_unlock (async_param->mutex);
 #endif
+  mutex_unlock (cm_mutex);
 
   return NULL;
 }
