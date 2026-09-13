@@ -44,7 +44,7 @@ If CMS can start the job, it returns a response right away, without waiting for 
 CMS rejects the request instead of starting the job when either of these is true:
 
 * the server already has `max_num_async_task` async jobs running (see [Configuration](#configuration) below), or
-* the task is one that must run exclusively against its database (for example `backupdb`, `restoredb`, `copydb`) and another async job is already running against that same database.
+* the task is one that must run exclusively against its database (for example `backupdb`, `restoredb`, `copydb`) and another job is already running against that same database.
 
 A rejected request never gets a `uuid`, since the job never started:
 
@@ -53,6 +53,9 @@ A rejected request never gets a `uuid`, since the job never started:
    "job-status" : "rejected",
    "note" : "maximum number of concurrent async tasks (8) reached; try again later",
    "status" : "failure"
+   "task" : "compactdb"
+}
+
 }
 ```
 
