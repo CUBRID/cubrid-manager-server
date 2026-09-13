@@ -47,6 +47,14 @@ CMS rejects the request instead of starting the job when either of these is true
 * the task is one that must run exclusively against its database (for example `backupdb`, `restoredb`, `copydb`) and another job is already running against that same database.
 
 A rejected request never gets a `uuid`, since the job never started:
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
+   "task" : "startdb"
+}
+```
 
 ```
 {
@@ -54,8 +62,6 @@ A rejected request never gets a `uuid`, since the job never started:
    "note" : "maximum number of concurrent async tasks (8) reached; try again later",
    "status" : "failure"
    "task" : "compactdb"
-}
-
 }
 ```
 
