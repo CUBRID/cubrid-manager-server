@@ -904,6 +904,18 @@ cm_async_request_handler (void *lpArg)
     }
   mutex_unlock (cm_mutex);
 #ifndef WINDOWS
+  /*
+   * NOTE: pthread_cond_broadcast () must happen while async_param->mutex
+   * is still held, and pthread_mutex_unlock () must come strictly after
+   * it - do not reorder these two calls. cm_execute_request_async ()'s
+   * waiter reacquires this same mutex inside pthread_cond_timedwait ()
+   * before it can return, so it cannot observe status != 0 and proceed
+   * to pthread_mutex_destroy ()/pthread_cond_destroy () until both the
+   * broadcast and this unlock have fully completed here. Broadcasting
+   * after unlocking (the classic anti-pattern) would let the waiter
+   * destroy the mutex/cond while this thread is still inside
+   * pthread_cond_broadcast (), racing with it.
+   */
   pthread_cond_broadcast (async_param->cond);
   pthread_mutex_unlock (async_param->mutex);
 #endif
@@ -1196,6 +1208,17 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
+  /*
+   * safe to destroy immediately: this point is only reached once
+   * pstmt->status != 0, which the worker thread (cm_async_request_handler)
+   * only sets while holding pstmt->mutex, and it broadcasts pstmt->cond
+   * before releasing that same mutex (see the NOTE there). since this
+   * waiter had to reacquire pstmt->mutex inside pthread_cond_timedwait ()
+   * to observe that status and then unlocked it just above, the worker
+   * has necessarily already finished both its broadcast and its unlock
+   * by the time we get here - so there is no thread left touching
+   * pstmt->mutex/cond for these destroys to race with.
+   */
   pthread_mutex_destroy (pstmt->mutex);
   pthread_cond_destroy (pstmt->cond);
   delete pstmt->mutex;
