@@ -31,7 +31,7 @@ Check the status of a task asynchronously running
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
 | uuid | uuid given in the request |
-| task | task name in the request |
+| task | name of the original async task (e.g. \`createdb\`); absent while the job is still running |
 
 * `rejected` is returned directly in the response to the original task request, when CMS could not start the async job at all - for example because the concurrent async job limit (`max_num_async_task`) was reached, or another async job was already running against the same database. See [Request Rejected](async_readme.md#request-rejected) for details. A rejected request never receives a `uuid`, so `job-status` is never `rejected` in an actual `gettaskstatus` response - it is listed here only for a complete reference of the possible `job-status` values.
 
@@ -78,7 +78,8 @@ This is not a `gettaskstatus` response - it is the response CMS gives directly t
 {
    "job-status" : "rejected",
    "note" : "maximum number of concurrent async tasks (8) reached; try again later",
-   "status" : "failure"
+   "status" : "failure",
+   "task" : "compactdb"
 }
 ```
 

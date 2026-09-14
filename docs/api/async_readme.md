@@ -60,7 +60,7 @@ A rejected request never gets a `uuid`, since the job never started:
 {
    "job-status" : "rejected",
    "note" : "maximum number of concurrent async tasks (8) reached; try again later",
-   "status" : "failure"
+   "status" : "failure",
    "task" : "compactdb"
 }
 ```
