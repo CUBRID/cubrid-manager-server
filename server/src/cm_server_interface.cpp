@@ -728,8 +728,13 @@ class async_job_state_guard
 
     ~async_job_state_guard (void)
     {
-      if (!m_armed)
+      if (!m_armed || (!m_has_marker && !m_has_slot))
         {
+          /*
+           * nothing was ever actually acquired (either disarmed, or an
+           * exception unwound through here before set_marker ()/
+           * set_slot ())
+           */
           return;
         }
 
