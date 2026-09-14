@@ -1318,7 +1318,7 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
    * independently) and should keep getting the same finished result
    * each time. the job is only ever reclaimed by reap_stale_async_jobs
    * (), once sco.iAsyncJobTtlSec seconds have passed since it was
-   * created (see cm.conf's "async_job_ttl_sec"). */
+   * finished (see cm.conf's "async_job_ttl_sec"). */
   response = itor->second->response;
   put_uuid (response, itor->second->uuid);
   response["job-status"] = (response["status"].isString () &&
