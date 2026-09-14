@@ -712,6 +712,36 @@ build_async_task_limit_response (Json::Value &response)
 }
 
 /*
+ * cm_lock_guard - minimal RAII wrapper around cm_mutex.
+ *
+ *   Scoping the lock to the guard's lifetime instead means the destructor
+ *   still runs (and unlocks) during stack unwinding, regardless of how the
+ *   scope is exited: a normal fall-through, an early return, or an
+ *   exception.
+ *
+ *   NOTE: this does not, by itself, make it safe to construct one while
+ *   the current thread already holds cm_mutex - cm_mutex is a plain,
+ *   non-recursive mutex, so that would still self-deadlock.
+ */
+class cm_lock_guard
+{
+  public:
+    cm_lock_guard (void)
+    {
+      mutex_lock (cm_mutex);
+    }
+
+    ~cm_lock_guard (void)
+    {
+      mutex_unlock (cm_mutex);
+    }
+
+  private:
+    cm_lock_guard (const cm_lock_guard &);
+    cm_lock_guard &operator= (const cm_lock_guard &);
+};
+
+/*
  * async_job_state_guard - RAII guard for the exclusive-db "busy" marker
  *   (db_running_async) and/or the async job slot (num_running_async_tasks)
  *   reserved by cm_execute_request_async () before its worker thread
@@ -738,7 +768,7 @@ class async_job_state_guard
           return;
         }
 
-      mutex_lock (cm_mutex);
+      cm_lock_guard lg;
       if (m_has_marker)
         {
           db_running_async_done (m_dbnames);
@@ -747,7 +777,6 @@ class async_job_state_guard
         {
           async_job_slot_release ();
         }
-      mutex_unlock (cm_mutex);
     }
 
     void set_marker (const vector <string> &dbnames)
@@ -893,32 +922,38 @@ cm_async_request_handler (void *lpArg)
 #ifndef WINDOWS
   pthread_mutex_lock (async_param->mutex);
 #endif
-  mutex_lock (cm_mutex);
-  async_param->finished_at = time (NULL);
-  async_param->status = 1;
+  {
+    /*
+     * scoped so cm_lock_guard's destructor (mutex_unlock (cm_mutex))
+     * fires only at the closing brace below - i.e. strictly after the
+     * broadcast+unlock on the POSIX branch, preserving the invariant
+     * documented there.
+     */
+    cm_lock_guard lg;
+    async_param->finished_at = time (NULL);
+    async_param->status = 1;
 
-  db_running_async_done (async_param->db_names);
+    db_running_async_done (async_param->db_names);
 
-  if (async_param->holds_async_slot)
-    {
-      async_job_slot_release ();
-    }
-  if (async_param->holds_timeout_fallback_slot)
-    {
-      async_timeout_fallback_release ();
-    }
+    if (async_param->holds_async_slot)
+      {
+        async_job_slot_release ();
+      }
+    if (async_param->holds_timeout_fallback_slot)
+      {
+        async_timeout_fallback_release ();
+      }
 #ifndef WINDOWS
-  /*
-   * NOTE: pthread_cond_broadcast () must happen while async_param->mutex
-   * is still held, and pthread_mutex_unlock () must come strictly after
-   * it - do not reorder these two calls.
-   *
-   * cm_mutex must also stay held across this broadcast+unlock
-   */
-  pthread_cond_broadcast (async_param->cond);
-  pthread_mutex_unlock (async_param->mutex);
+    /*
+     * NOTE: pthread_cond_broadcast () must happen while async_param->mutex
+     * is still held, and pthread_mutex_unlock () must come strictly after
+     * it - do not reorder these two calls.
+     * cm_mutex must also stay held across this broadcast+unlock
+     */
+    pthread_cond_broadcast (async_param->cond);
+    pthread_mutex_unlock (async_param->mutex);
 #endif
-  mutex_unlock (cm_mutex);
+  }
 
   return NULL;
 }
@@ -957,9 +992,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (is_exclusive_task)
     {
       string busy_name, busy_task;
-      mutex_lock (cm_mutex);
-      bool started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
-      mutex_unlock (cm_mutex);
+      bool started;
+      {
+        cm_lock_guard lg;
+        started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+      }
       if (!started)
         {
           return build_db_busy_response (response, busy_name, busy_task);
@@ -969,9 +1006,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (no_wait)
     {
-      mutex_lock (cm_mutex);
-      bool acquired = async_job_slot_try_acquire ();
-      mutex_unlock (cm_mutex);
+      bool acquired;
+      {
+        cm_lock_guard lg;
+        acquired = async_job_slot_try_acquire ();
+      }
       if (!acquired)
         {
           return build_async_task_limit_response (response);
@@ -990,9 +1029,10 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->holds_async_slot = no_wait;
   pstmt->holds_timeout_fallback_slot = false;
   pstmt->is_long_async_job = false;
-  mutex_lock (cm_mutex);
-  pstmt->uuid = req_id++;
-  mutex_unlock (cm_mutex);
+  {
+    cm_lock_guard lg;
+    pstmt->uuid = req_id++;
+  }
 
   hHandles =
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
@@ -1013,10 +1053,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (no_wait)
     {
       CloseHandle (hHandles);
-      mutex_lock (cm_mutex);
-      reap_stale_async_jobs ();
-      request_map[pstmt->uuid] = pstmt;
-      mutex_unlock (cm_mutex);
+      {
+        cm_lock_guard lg;
+        reap_stale_async_jobs ();
+        request_map[pstmt->uuid] = pstmt;
+      }
 
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -1028,20 +1069,21 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (dwWaitResult != WAIT_OBJECT_0)
     {
       CloseHandle (hHandles);
-      mutex_lock (cm_mutex);
-      reap_stale_async_jobs ();
-      request_map[pstmt->uuid] = pstmt;
-       /*
-       * the pstmt->status == 0: the job is still running past
-       * sco.iHttpTimeout and can't be cancelled, so track it as a
-       * timeout fallback job
-       */
-      if (pstmt->status == 0)
-        {
-          async_timeout_fallback_acquire ();
-          pstmt->holds_timeout_fallback_slot = true;
-        }
-      mutex_unlock (cm_mutex);
+      {
+        cm_lock_guard lg;
+        reap_stale_async_jobs ();
+        request_map[pstmt->uuid] = pstmt;
+        /*
+         * the pstmt->status == 0: the job is still running past
+         * sco.iHttpTimeout and can't be cancelled, so track it as a
+         * timeout fallback job
+         */
+        if (pstmt->status == 0)
+          {
+            async_timeout_fallback_acquire ();
+            pstmt->holds_timeout_fallback_slot = true;
+          }
+      }
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
       return build_server_header (response, ERR_WITH_MSG, "timeout");
@@ -1069,9 +1111,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (is_exclusive_task)
     {
       string busy_name, busy_task;
-      mutex_lock (cm_mutex);
-      bool started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
-      mutex_unlock (cm_mutex);
+      bool started;
+      {
+        cm_lock_guard lg;
+        started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+      }
       if (!started)
         {
           return build_db_busy_response (response, busy_name, busy_task);
@@ -1081,9 +1125,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (no_wait)
     {
-      mutex_lock (cm_mutex);
-      bool acquired = async_job_slot_try_acquire ();
-      mutex_unlock (cm_mutex);
+      bool acquired;
+      {
+        cm_lock_guard lg;
+        acquired = async_job_slot_try_acquire ();
+      }
       if (!acquired)
         {
           return build_async_task_limit_response (response);
@@ -1129,9 +1175,10 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->holds_timeout_fallback_slot = false;
   pstmt->is_long_async_job = false;
 
-  mutex_lock (cm_mutex);
-  pstmt->uuid = req_id++;
-  mutex_unlock (cm_mutex);
+  {
+    cm_lock_guard lg;
+    pstmt->uuid = req_id++;
+  }
 
   err = pthread_create (&async_thrd, NULL, cm_async_request_handler, pstmt);
 
@@ -1163,10 +1210,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (no_wait)
     {
-      mutex_lock (cm_mutex);
-      reap_stale_async_jobs ();
-      request_map[pstmt->uuid] = pstmt;
-      mutex_unlock (cm_mutex);
+      {
+        cm_lock_guard lg;
+        reap_stale_async_jobs ();
+        request_map[pstmt->uuid] = pstmt;
+      }
 
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -1189,18 +1237,19 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       /* register the still-running job so gettaskstatus can
        * find it later. the original code returned here without ever
        */
-      mutex_lock (cm_mutex);
-      reap_stale_async_jobs ();
-      request_map[pstmt->uuid] = pstmt;
-      /*
-       * track this as a timeout fallback job
-       */
-      if (pstmt->status == 0)
-        {
-          async_timeout_fallback_acquire ();
-          pstmt->holds_timeout_fallback_slot = true;
-        }
-      mutex_unlock (cm_mutex);
+      {
+        cm_lock_guard lg;
+        reap_stale_async_jobs ();
+        request_map[pstmt->uuid] = pstmt;
+        /*
+         * track this as a timeout fallback job
+         */
+        if (pstmt->status == 0)
+          {
+            async_timeout_fallback_acquire ();
+            pstmt->holds_timeout_fallback_slot = true;
+          }
+      }
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
@@ -1441,53 +1490,43 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
 {
   bool want_async = false;
 
-  mutex_lock (cm_mutex);
+  {
+    /*
+     * everything in this scope runs with cm_mutex held; cm_lock_guard's
+     * destructor releases it on every exit path below
+     */
+    cm_lock_guard lg;
 
-  /*
-   * everything in this try block runs with cm_mutex held.
-   */
-  try
-    {
-      if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
-        {
-          response["task"] = request["task"].asString();
-          mutex_unlock (cm_mutex);
-          return 1;
-        }
+    if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
+      {
+        response["task"] = request["task"].asString();
+        return 1;
+      }
 
-      if (!ext_ut_validate_auth (request))
-        {
-          response["status"] = STATUS_FAILURE;
-          response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
-          response["task"] = request["task"].asString();
+    if (!ext_ut_validate_auth (request))
+      {
+        response["status"] = STATUS_FAILURE;
+        response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
+        response["task"] = request["task"].asString();
 
-          mutex_unlock (cm_mutex);
-          return 1;
-        }
+        return 1;
+      }
 
-      if (cub_check_async_status (request, response))
-        {
-          mutex_unlock (cm_mutex);
-          return 1;
-        }
-      if (cub_cm_extend_request (request, response))
-        {
-          mutex_unlock (cm_mutex);
-          return 1;
-        }
+    if (cub_check_async_status (request, response))
+      {
+        return 1;
+      }
+    if (cub_cm_extend_request (request, response))
+      {
+        return 1;
+      }
 
-      const Json::Value &async_val = request.get ("async", "no");
-      want_async = async_val.isString ()
-                   && uStringEqual (async_val.asString ().c_str (), "yes")
-                   && is_async_capable_task (request["task"].asString ());
-    }
-  catch (...)
-    {
-      mutex_unlock (cm_mutex);
-      throw;
-    }
+    const Json::Value &async_val = request.get ("async", "no");
+    want_async = async_val.isString ()
+                 && uStringEqual (async_val.asString ().c_str (), "yes")
+                 && is_async_capable_task (request["task"].asString ());
+  }
 
-  mutex_unlock (cm_mutex);
   cm_execute_request_async (request, response, sco.iHttpTimeout, want_async);
 
   return 1;
