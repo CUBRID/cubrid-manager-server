@@ -83,6 +83,8 @@ Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
 
 A `uuid` is only valid for a limited time after the job finishes; see `async_job_ttl_sec` below.
 
+To see the async subsystem's overall state instead of one specific job - how many slots are in use, which databases are currently busy, any long-running jobs - use [getserverstatus](getserverstatus.md).
+
 ## Configuration
 
 The following parameters, configurable in `cm.conf`, control async job behavior:
@@ -105,4 +107,6 @@ async_long_job_sec=259200
 
 ## See Also
 
+* [gettaskstatus](gettaskstatus.md)
+* [getserverstatus](getserverstatus.md)
 * [CUBRID Manager Server API Manual](README.md)

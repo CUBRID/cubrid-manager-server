@@ -186,6 +186,7 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [get_mon_interval](get_mon_interval.md) | http | MON |
 | [set_mon_interval](set_mon_interval.md) | http | ADMIN |
 | [get_mon_statistic](get_mon_statistic.md) | http | MON |
+| [getserverstatus](getserverstatus.md) | http | ADMIN |
 | [monitorprocess](monitorprocess.md) | socket, http | ALL_AUTHORITY |
 
 ### Log
