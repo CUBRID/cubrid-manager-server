@@ -124,7 +124,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>legacy_stdio_definitions.lib;ws2_32.lib;cascci.lib;cmstat.lib;cmdep.lib;ssleay32.lib;libeay32.lib;libevent.lib;libevent_openssl.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>legacy_stdio_definitions.lib;ws2_32.lib;cascci.lib;cmstat.lib;cmdep.lib;libssl.lib;libcrypto.lib;crypt32.lib;iphlpapi.lib;libevent.lib;libevent_openssl.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(cubrid_libdir);..\..\external\openssl\win_64\lib;..\..\external\libevent\lib64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
