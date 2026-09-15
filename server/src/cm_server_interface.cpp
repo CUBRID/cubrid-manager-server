@@ -781,8 +781,8 @@ class async_job_state_guard
 
     void set_marker (const vector <string> &dbnames)
     {
-      m_dbnames = dbnames;
       m_has_marker = true;
+      m_dbnames = dbnames;
     }
 
     void set_slot (void)
