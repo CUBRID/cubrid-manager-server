@@ -512,7 +512,8 @@ static map <std::string, std::string> db_running_async;
 /*
  * exclusive_dbnames_for_request () - the set of database names `task_name`
  *   must hold the per-db exclusivity lock on before it's allowed to run.
- *   locks both "srcdbname"/"destdbname" for copydb
+ *   locks both "srcdbname"/"destdbname" for copydb, and both "dbname"/
+ *   "rename" for renamedb
  */
 static vector <string>
 exclusive_dbnames_for_request (const Json::Value &request, const string &task_name)
@@ -523,6 +524,20 @@ exclusive_dbnames_for_request (const Json::Value &request, const string &task_na
     {
       string src = request.get ("srcdbname", "").asString ();
       string dest = request.get ("destdbname", "").asString ();
+
+      if (!src.empty ())
+        {
+          names.push_back (src);
+        }
+      if (!dest.empty () && dest != src)
+        {
+          names.push_back (dest);
+        }
+    }
+  else if (task_name == "renamedb")
+    {
+      string src = request.get ("dbname", "").asString ();
+      string dest = request.get ("rename", "").asString ();
 
       if (!src.empty ())
         {
