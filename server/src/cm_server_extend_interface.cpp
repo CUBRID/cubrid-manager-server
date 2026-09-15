@@ -471,7 +471,7 @@ int ext_get_active_dbs (Json::Value &activedbs)
     {
       activedbs .append (info[i].db_name);
     }
-  cmd_servstat_result_free (cmd_res);
+  cmd_cms_result_free (cmd_res);
   return 0;
 }
 

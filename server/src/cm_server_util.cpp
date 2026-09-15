@@ -994,7 +994,7 @@ uWriteDBnfo (void)
 
   cmd_res = cmd_cms_server_status ();
   uWriteDBnfo2 (cmd_res);
-  cmd_servstat_result_free (cmd_res);
+  cmd_cms_result_free (cmd_res);
 }
 
 void

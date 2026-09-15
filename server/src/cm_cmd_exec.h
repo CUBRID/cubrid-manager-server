@@ -304,6 +304,7 @@ int cmd_optimizedb_sa (const char *dbname, const char *classname, char *_dbmt_er
  * T_SERVER_STATUS_INFO shape the engine's version returns
  */
 T_SERVER_STATUS_RESULT *cmd_cms_server_status (void);
+void cmd_cms_result_free (T_SERVER_STATUS_RESULT *res);
 
 /*
  * cms_is_database_active () / cms_database_mode () - CMS-native ports of

@@ -6164,7 +6164,7 @@ ts_startinfo (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "close", "activelist");
 
   uWriteDBnfo2 (cmd_res);
-  cmd_servstat_result_free (cmd_res);
+  cmd_cms_result_free (cmd_res);
 
   return ERR_NO_ERROR;
 }

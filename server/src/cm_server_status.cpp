@@ -172,7 +172,7 @@ cmd_cms_server_status (void)
    */
   if (gen_tempfile_path (out_file, sco.dbmt_tmp_dir, "DBMT_util_001", 0, PATH_MAX) < 0)
     {
-      cmd_result_free (res);
+      cmd_cms_result_free (res);
       return NULL;
     }
 
@@ -192,7 +192,7 @@ cmd_cms_server_status (void)
       || !ut_child_exited_ok (exit_code))
     {
       unlink (out_file);
-      cmd_result_free (res);
+      cmd_cms_result_free (res);
       return NULL;
     }
 
@@ -200,6 +200,28 @@ cmd_cms_server_status (void)
 
   unlink (out_file);
   return res;
+}
+
+/*
+ * cmd_cms_result_free () - CMS-native counterpart to the engine's
+ * cmd_result_free (). cmd_cms_server_status () allocates its
+ * T_SERVER_STATUS_RESULT with CMS's own malloc (), so it
+ * must be released with CMS's own free () too:
+ *
+ * on Windows, cub_manager.exe and the engine's cmdep.dll each statically
+ * link their own CRT and so each has its own private heap,
+ * so freeing CMS-allocated memory through the engine's cmd_result_free ()
+ * corrupts the heap
+ */
+void
+cmd_cms_result_free (T_SERVER_STATUS_RESULT *res)
+{
+  if (res != NULL)
+    {
+      if (res->result != NULL)
+	free (res->result);
+      free (res);
+    }
 }
 
 /*
@@ -225,7 +247,7 @@ cms_is_database_active (char *dbn)
   if (cmd_res != NULL)
     {
       retval = uIsDatabaseActive2 (cmd_res, dbn);
-      cmd_servstat_result_free (cmd_res);
+      cmd_cms_result_free (cmd_res);
     }
   return retval;
 }
