@@ -39,7 +39,7 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | async_job_ttl_sec | see `async_job_ttl_sec` in [Asynchronous Task Execution](async_readme.md#configuration) |
 | async_long_job_sec | see `async_long_job_sec` in [Asynchronous Task Execution](async_readme.md#configuration) |
 | max_num_async_task | see `max_num_async_task` in [Asynchronous Task Execution](async_readme.md#configuration) |
-| http_timeout | seconds an `"async":"yes"` request waits for the job to finish before falling back to a `"job-status":"running"` response (see `http_timeout` in `cm.conf`) |
+| http_timeout | seconds an `"async":"no"` request waits for the job to finish before falling back to background running and give a `"job-status":"running"` response (see `http_timeout` in `cm.conf`) |
 
 ### async-slot
 
