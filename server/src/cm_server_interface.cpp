@@ -690,10 +690,26 @@ async_job_slot_release (void)
 
 static int num_timeout_fallback_jobs = 0;
 
+/*
+ * async_timeout_fallback_acquire () - count a synchronous ("async":"no")
+ *   request that ran past sco.iHttpTimeout, we do not define another
+ *   cm.conf parameter for this. We think we can use sco.iMaxNumAsyncTask
+ *   as a threshold for this.
+ */
 static void
 async_timeout_fallback_acquire (void)
 {
   num_timeout_fallback_jobs++;
+
+  if (num_timeout_fallback_jobs >= sco.iMaxNumAsyncTask)
+    {
+      LOG_ERROR ("async_timeout_fallback_acquire : %d synchronous requests are "
+                 "currently tracked as timeout fallbacks after exceeding "
+                 "http_timeout (%d sec), at or past max_num_async_task (%d); "
+                 "this may mean http_timeout is set too low for the tasks "
+                 "being run, or the server is degraded.",
+                 num_timeout_fallback_jobs, sco.iHttpTimeout, sco.iMaxNumAsyncTask);
+    }
 }
 
 /*
