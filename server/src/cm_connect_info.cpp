@@ -50,7 +50,7 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 
   /* check if ip is an existing ip */
   retval = 0;
-  file_resource_guard guard (conn_list_mutex, FID_LOCK_CONN_LIST);
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -95,7 +95,7 @@ dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
   char strbuf[512];
   int retval;
 
-  file_resource_guard guard (conn_list_mutex, FID_LOCK_CONN_LIST);
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
       return -1;
@@ -130,7 +130,7 @@ dbmt_con_delete (const char *ip, const char *port)
   char conn_list_file[512];
   int retval;
 
-  file_resource_guard guard (conn_list_mutex, FID_LOCK_CONN_LIST);
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
       return -1;
@@ -197,7 +197,7 @@ dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
   char sbuf[512];
   int buf_len, get_len;
 
-  file_resource_guard guard (conn_list_mutex, FID_LOCK_CONN_LIST);
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");
@@ -327,7 +327,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
   T_DBMT_CON_INFO con_info;
   memset (&con_info, 0, sizeof (T_DBMT_CON_INFO));
 
-  file_resource_guard guard (conn_list_mutex, FID_LOCK_CONN_LIST);
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");

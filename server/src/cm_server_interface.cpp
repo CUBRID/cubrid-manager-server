@@ -41,7 +41,6 @@
 #include "cm_log.h"
 #include "cm_mon_stat.h"
 #include "cm_job_task.h"
-#include "cm_server_util.h"    /* cmdb_pass_mutex / cmdbinfo_temp_mutex / conn_list_mutex */
 
 using namespace std;
 
@@ -148,10 +147,6 @@ cub_cm_init_env ()
   putenv (cub_httpd_env.cubrid_databases);
 
   mutex_init (cm_mutex);
-  mutex_init (cmdb_pass_mutex);
-  mutex_init (cmdbinfo_temp_mutex);
-  mutex_init (conn_list_mutex);
-
   return;
 }
 
@@ -159,9 +154,6 @@ void
 cub_cm_destory_env ()
 {
   mutex_destory (cm_mutex);
-  mutex_destory (cmdb_pass_mutex);
-  mutex_destory (cmdbinfo_temp_mutex);
-  mutex_destory (conn_list_mutex);
 }
 
 int

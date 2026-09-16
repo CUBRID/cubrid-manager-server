@@ -84,12 +84,73 @@
 #endif
 
 /*
- * in-process mutexes backing file_resource_guard (see cm_server_util.h)
- * for cmdb.pass, cmdbinfo.temp and the connection list
+ * cm_cmdb_pass_mutex ()/cm_cmdbinfo_temp_mutex ()/cm_conn_list_mutex () -
+ * see cm_server_util.h. Function-local static holders, same pattern as
+ * _statdumpd_mutex () in cm_job_task.cpp: each holder's constructor runs
+ * exactly once, the first time this function is called by any thread of
+ * this process (C++11 guarantees the init itself is thread-safe), so
+ * there is no separate init/destroy call for cub_cm_init_env () (or any
+ * other binary's startup) to remember to make.
  */
-mutex_t cmdb_pass_mutex;
-mutex_t cmdbinfo_temp_mutex;
-mutex_t conn_list_mutex;
+mutex_t *
+cm_cmdb_pass_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
+mutex_t *
+cm_cmdbinfo_temp_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
+mutex_t *
+cm_conn_list_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
 
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
@@ -1015,7 +1076,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   FILE *outfp;
   T_SERVER_STATUS_INFO *info;
 
-  file_resource_guard guard (cmdbinfo_temp_mutex, FID_LOCK_PSVR_DBINFO);
+  file_resource_guard guard (*cm_cmdbinfo_temp_mutex (), FID_LOCK_PSVR_DBINFO);
   if (!guard.ok ())
     {
       return;

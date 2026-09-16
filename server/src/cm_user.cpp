@@ -63,7 +63,7 @@ dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 
   memset (dbmt_user, 0, sizeof (T_DBMT_USER));
 
-  file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+  file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
   if (!guard.ok ())
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -377,7 +377,7 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   fclose (fp);
 
   {
-    file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
     if (!guard.ok ())
       {
         unlink (tmpfile);
@@ -476,7 +476,7 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   fclose (fp);
 
   {
-    file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
     if (!guard.ok ())
       {
         unlink (tmpfile);
