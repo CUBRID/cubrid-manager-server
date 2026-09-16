@@ -582,6 +582,7 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   if (!ctx)
     {
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
+      return NULL;
     }
   SSL_CTX_set_options (ctx,
                        SSL_OP_SINGLE_DH_USE |

@@ -517,6 +517,13 @@ start_service ()
   thread_setup_SSL ();
 
   SSL_CTX *ctx = init_SSL (sco.szSSLCertificate, sco.szSSLKey);
+  if (ctx == NULL)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+                "CUBRID Manager Server : cannot initialize SSL context");
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      return -1;
+    }
 
   nfd = bind_socket (sco.iCMS_port);
 
@@ -941,9 +948,16 @@ main (int argc, char **argv)
   start_auto_thread ();
 
   find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build, sizeof (cubrid_version_build));
-  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
 
-  start_service ();
+  if (start_service () < 0)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+                "CUBRID Manager Server : Fail to start service");
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      exit (1);
+    }
+
+  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
 
   return 0;
 }
