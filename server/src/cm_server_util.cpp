@@ -83,6 +83,14 @@
 #define DEF_TASK_FUNC(TASK_FUNC_PTR)    NULL
 #endif
 
+/*
+ * in-process mutexes backing file_resource_guard (see cm_server_util.h)
+ * for cmdb.pass, cmdbinfo.temp and the connection list
+ */
+mutex_t cmdb_pass_mutex;
+mutex_t cmdbinfo_temp_mutex;
+mutex_t conn_list_mutex;
+
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
@@ -1004,13 +1012,11 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   int dbcnt;
   char strbuf[1024];
   int dbvect[MAX_INSTALLED_DB];
-  int lock_fd;
   FILE *outfp;
   T_SERVER_STATUS_INFO *info;
 
-  lock_fd =
-    uCreateLockFile (conf_get_dbmt_file (FID_LOCK_PSVR_DBINFO, strbuf));
-  if (lock_fd < 0)
+  file_resource_guard guard (cmdbinfo_temp_mutex, FID_LOCK_PSVR_DBINFO);
+  if (!guard.ok ())
     {
       return;
     }
@@ -1043,8 +1049,6 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
         }
       fclose (outfp);
     }
-
-  uRemoveLockFile (lock_fd);
 }
 
 /*

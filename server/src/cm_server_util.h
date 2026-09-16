@@ -29,6 +29,7 @@
 #include "cm_dep.h"
 #include "cm_cmd_exec.h"
 #include "cm_job_task.h"
+#include "cm_log.h"    /* mutex_t / mutex_init () / mutex_lock () / mutex_unlock () */
 
 #ifndef WINDOWS
 #include <sys/select.h>
@@ -158,6 +159,55 @@ void uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res);
 int ut_get_dblist (nvplist *res, char dbdir_flag);
 int uCreateLockFile (char *filename);
 void uRemoveLockFile (int fd);
+
+extern mutex_t cmdb_pass_mutex;
+extern mutex_t cmdbinfo_temp_mutex;
+extern mutex_t conn_list_mutex;
+
+/*
+ * file_resource_guard - RAII guard combining one of the in-process
+ *   mutexes above with the existing uCreateLockFile ()/uRemoveLockFile ()
+ *   cross-process file lock (see the comment above).
+ */
+class file_resource_guard
+{
+  public:
+    file_resource_guard (mutex_t &proc_mutex, T_DBMT_FILE_ID lock_fid)
+      : m_proc_mutex (proc_mutex), m_fd (-1)
+    {
+      char path[PATH_MAX];
+
+      mutex_lock (m_proc_mutex);
+
+      m_fd = uCreateLockFile (conf_get_dbmt_file (lock_fid, path));
+      if (m_fd < 0)
+        {
+          mutex_unlock (m_proc_mutex);
+        }
+    }
+
+    ~file_resource_guard (void)
+    {
+      if (m_fd >= 0)
+        {
+          uRemoveLockFile (m_fd);
+          mutex_unlock (m_proc_mutex);
+        }
+    }
+
+    bool ok (void) const
+    {
+      return m_fd >= 0;
+    }
+
+  private:
+    mutex_t &m_proc_mutex;
+    int m_fd;
+
+    /* non-copyable: releasing the same lock/mutex twice would be wrong */
+    file_resource_guard (const file_resource_guard &);
+    file_resource_guard &operator= (const file_resource_guard &);
+};
 int uCreateDir (char *path);
 int folder_copy (const char *src_dir, const char *dest_dir);
 int uRemoveDir (char *dir, int remove_file_in_dir);

@@ -60,12 +60,11 @@ dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   char strbuf[1024];
   char cur_user[DBMT_USER_NAME_LEN];
   int retval = ERR_NO_ERROR;
-  int lock_fd;
 
   memset (dbmt_user, 0, sizeof (T_DBMT_USER));
 
-  lock_fd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_DBMT_PASS, strbuf));
-  if (lock_fd < 0)
+  file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+  if (!guard.ok ())
     {
       return ERR_TMPFILE_OPEN_FAIL;
     }
@@ -278,7 +277,6 @@ dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     }
   fclose (fp);
 
-  uRemoveLockFile (lock_fd);
   return ERR_NO_ERROR;
 
 read_dbmt_user_error:
@@ -299,7 +297,6 @@ read_dbmt_user_error:
       free (user_dbinfo);
     }
   dbmt_user_free (dbmt_user);
-  uRemoveLockFile (lock_fd);
 
   return retval;
 }
@@ -333,7 +330,6 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   char tmpfile[PATH_MAX];
   int i, j;
   char strbuf[1024];
-  int lock_fd;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
   gen_tempfile_path (tmpfile, sco.szCubrid, "DBMT_util_pass", TS_USER_WRITE_AUTH, PATH_MAX);
@@ -380,14 +376,15 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     }
   fclose (fp);
 
-  lock_fd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_DBMT_PASS, strbuf));
-  if (lock_fd < 0)
-    {
-      unlink (tmpfile);
-      return ERR_TMPFILE_OPEN_FAIL;
-    }
-  move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf));
-  uRemoveLockFile (lock_fd);
+  {
+    file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+    if (!guard.ok ())
+      {
+        unlink (tmpfile);
+        return ERR_TMPFILE_OPEN_FAIL;
+      }
+    move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf));
+  }
 
   return ERR_NO_ERROR;
 }
@@ -454,7 +451,7 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
   char tmpfile[PATH_MAX], strbuf[1024];
   FILE *fp;
-  int i, lock_fd;
+  int i;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
   gen_tempfile_path (tmpfile, sco.szCubrid, "DBMT_util_pass", TS_USER_WRITE_PASS, PATH_MAX);
@@ -478,14 +475,15 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     }
   fclose (fp);
 
-  lock_fd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_DBMT_PASS, strbuf));
-  if (lock_fd < 0)
-    {
-      unlink (tmpfile);
-      return ERR_TMPFILE_OPEN_FAIL;
-    }
-  move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_PASS, strbuf));
-  uRemoveLockFile (lock_fd);
+  {
+    file_resource_guard guard (cmdb_pass_mutex, FID_LOCK_DBMT_PASS);
+    if (!guard.ok ())
+      {
+        unlink (tmpfile);
+        return ERR_TMPFILE_OPEN_FAIL;
+      }
+    move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_PASS, strbuf));
+  }
 
   return ERR_NO_ERROR;
 }
