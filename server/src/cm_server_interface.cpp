@@ -727,7 +727,7 @@ async_timeout_fallback_acquire (void)
 {
   num_timeout_fallback_jobs++;
 
-  if (num_timeout_fallback_jobs >= sco.iMaxNumAsyncTask)
+  if (num_timeout_fallback_jobs == sco.iMaxNumAsyncTask)
     {
       LOG_ERROR ("async_timeout_fallback_acquire : %d synchronous requests are "
                  "currently tracked as timeout fallbacks after exceeding "
