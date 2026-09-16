@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       actions: read          # to read the artifact of the run that triggered this
+      pull-requests: write   # to post the comment
 
     steps:
       - name: Download the report
@@ -49,20 +50,10 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
           echo "commenting on #$number"
 
-      # The same app the other CUBRID workflows use; its token can write to a
-      # pull request that GITHUB_TOKEN cannot.
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.TC_APP_ID }}
-          private-key: ${{ secrets.TC_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
       - name: Post or update the comment
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: cms-api-test
           number: ${{ steps.pr.outputs.number }}
           path: report/summary_result.md
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}

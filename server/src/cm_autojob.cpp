@@ -277,7 +277,8 @@ aj_add_volume (char *dbname, const char *type, int increase,
     }
   else
     {
-      strncpy (tmp_dbname, dbname, strlen (dbname) + 1);
+      strncpy (tmp_dbname, dbname, sizeof (tmp_dbname) - 1);
+      tmp_dbname[sizeof (tmp_dbname) - 1] = '\0';
     }
 
   if (uRetrieveDBDirectory (tmp_dbname, dbloca) != ERR_NO_ERROR)
@@ -736,7 +737,8 @@ set_query_period_details (query_period_details **details, char *conf_item)
   while (token != NULL)
     {
       *details = (query_period_details *) malloc (sizeof (query_period_details));
-      strncpy ((*details)->detail, token, DETAIL_LEN);
+      strncpy ((*details)->detail, token, DETAIL_LEN - 1);
+      (*details)->detail[DETAIL_LEN - 1] = '\0';
       (*details)->next = head;
       head = *details;
       token = strtok (NULL, delim);

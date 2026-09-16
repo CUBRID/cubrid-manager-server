@@ -420,7 +420,7 @@ void cm_mon_stat::aggregate_os (int read_offset,
 	}
     }
   int bufsize = buf_base * OS_METRICS_LEN;
-  int *buf = new (int[bufsize]);
+  int *buf = new int[bufsize];
   if (false == get_rrdfile (_data_path + OS_MON, read_offset, buf, bufsize, OS_METRICS_LEN))
     {
       LOG_WARN ("read os rrd file failed");
@@ -501,7 +501,7 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
       int read_idx = db_idx * MON_DATA_BLOCK + read_offset;
 
       int bufsize = buf_base * DB_METRICS_LEN;
-      int *buf = new (int[bufsize]);
+      int *buf = new int[bufsize];
 
       if (false == get_rrdfile (_data_path + DB_MON, read_idx, buf, bufsize, DB_METRICS_LEN))
 	{
@@ -599,7 +599,7 @@ void cm_mon_stat::aggregate_dbs (int read_offset,
 	  int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][vol_name].asInt();
 	  int read_idx = vol_idx * MON_DATA_BLOCK + read_offset;
 	  int bufsize_vol = buf_base * VOL_METRICS_LEN;
-	  int *buf_vol = new (int[bufsize_vol]);
+	  int *buf_vol = new int[bufsize_vol];
 	  if (false == get_rrdfile (_data_path + VOL_MON, read_idx, buf_vol, bufsize_vol, VOL_METRICS_LEN))
 	    {
 	      LOG_WARN ("read volume rrd file failed");
@@ -899,7 +899,7 @@ bool cm_mon_stat::get_rrd_data (MDTYPE mdtype, string dpath, int didx,
       read_rrd_idx += 24 * 60 * 60 / _meta[K_INTERVAL].asInt() + 24 * 30;
       break;
     }
-  int *buf = new (int[bufsize]);
+  int *buf = new int[bufsize];
   if (false == get_rrdfile (dpath, read_rrd_idx, buf, bufsize, mlen))
     {
       errmsg = string ("read rrd file failed [") + dpath + "]";
@@ -1069,7 +1069,7 @@ void cm_mon_stat::aggregate_brokers (int read_offset,
       int read_idx = broker_idx * MON_DATA_BLOCK + read_offset;
 
       int bufsize = buf_base * BROKER_METRICS_LEN;
-      int *buf = new (int[bufsize]);
+      int *buf = new int[bufsize];
 
       if (false == get_rrdfile (_data_path + BROKER_MON, read_idx, buf, bufsize, BROKER_METRICS_LEN))
 	{
@@ -1416,7 +1416,9 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
 		  req["dbname"] = dbname;
 		  req["remotehostname"] = ha_rmt_hostname;
 		  string copylog = ha_res["ha_info"][i]["copylogdb"].asString();
-		  unsigned int colon_idx = (unsigned int) copylog.find (':');
+		  /* string::npos does not fit in an unsigned int: the cast made the
+		     'not found' test below always false and substr() then threw. */
+		  size_t colon_idx = copylog.find (':');
 		  if (string::npos == colon_idx)
 		    {
 		      LOG_WARN ("Error format of copylogdb, time=[%d], copylogdb=[%s]",
@@ -1659,7 +1661,7 @@ bool cm_mon_stat::reset_meta (int new_interval)
 bool cm_mon_stat::reset_mon_file (string fpath, int block_num, int mlen, int new_interval)
 {
   int ori_bufsize = MON_DATA_BLOCK * block_num * mlen;
-  int *ori_buf = new (int[ori_bufsize]);
+  int *ori_buf = new int[ori_bufsize];
   if (false == get_rrdfile (fpath, 0, ori_buf, ori_bufsize, mlen))
     {
       LOG_ERROR ("get_rrdfile failed, file name[%s]", fpath.c_str());
@@ -1733,7 +1735,7 @@ int nv_to_json (nvplist *ref, char *value, int &index, Json::Value &root);
 static bool init_rrdfile (string filename, int rrdsize, int metrics_len)
 {
   int bufsize = rrdsize * metrics_len;
-  int *buf = new (int[bufsize]);
+  int *buf = new int[bufsize];
   memset ((void *)buf, INIT_METRIC_VALUE, bufsize * sizeof (int));
   ofstream ofs (filename.c_str(), ios_base::out | ios_base::binary | ios_base::trunc);
   if (ofs.fail())
@@ -1784,7 +1786,7 @@ static bool get_rrdfile (string filename, int rrdpos, int *buf, int bufsize, int
 static bool append_rrdfile (string filename, int rrdsize, int metrics_len )
 {
   int bufsize = rrdsize * metrics_len;
-  int *buf = new (int[bufsize]);
+  int *buf = new int[bufsize];
   memset (buf, 0, bufsize * sizeof (int));
   ofstream ofs (filename.c_str(), ios_base::out | ios_base::binary | ios_base::app);
   if (ofs.fail())

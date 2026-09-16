@@ -60,6 +60,16 @@
 #define NAME_MAX 256
 #endif
 
+/*
+ * Size of a buffer that holds a path composed of another PATH_MAX sized path
+ * and a directory entry name. Declaring such a buffer as PATH_MAX lets the
+ * composition truncate silently and leaves the caller working on a path that
+ * points somewhere else; with the extra room the name is always built in full
+ * and the following open()/stat() fails cleanly when it is too long for the
+ * filesystem.
+ */
+#define COMPOSED_PATH_MAX (PATH_MAX + NAME_MAX + 2)
+
 #define MOVE_FILE(SRC_FILE, DEST_FILE)    \
     (unlink(DEST_FILE) || 1 ? rename(SRC_FILE, DEST_FILE) : -1)
 
@@ -116,6 +126,13 @@
 #define TIMEVAL_GET_MSEC(X)    ((int) (((X)->tv_usec) / 1000))
 #endif
 
+/*
+ * Starts a detached thread. ARG stays owned by the caller: the macro used to
+ * free() it when the thread could not be started, which is wrong for the caller
+ * that passes the address of a static object. The test it did that on could
+ * never fire either - pthread_create() returns an errno value, never a negative
+ * one - so nothing that worked before depends on it.
+ */
 #if defined(WINDOWS)
 #define THREAD_BEGIN(THR_ID, FUNC, ARG)                                   \
     do {                                                                  \
@@ -134,10 +151,7 @@
       pthread_attr_init(&thread_attr);                                    \
       pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED); \
       pthread_attr_setstacksize(&thread_attr, 100 * 1024);                \
-      if (pthread_create(&(THR_ID), &thread_attr, FUNC, ARG) < 0){        \
-        free ((void *) ARG);                                              \
-        ARG = NULL;                                                       \
-      }                                                                   \
+      (void) pthread_create(&(THR_ID), &thread_attr, FUNC, ARG);          \
       pthread_attr_destroy(&thread_attr);                                 \
     } while (0)
 #else
@@ -146,10 +160,7 @@
       pthread_attr_t    thread_attr;                                      \
       pthread_attr_init(&thread_attr);                                    \
       pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED); \
-      if (pthread_create(&(THR_ID), &thread_attr, FUNC, ARG) < 0){        \
-        free ((void *) ARG);                                              \
-        ARG = NULL;                                                       \
-      }                                                                   \
+      (void) pthread_create(&(THR_ID), &thread_attr, FUNC, ARG);          \
       pthread_attr_destroy(&thread_attr);                                 \
     } while (0)
 #endif

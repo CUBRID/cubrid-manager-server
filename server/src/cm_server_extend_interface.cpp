@@ -1251,7 +1251,8 @@ static int _find_dba_password (const string &dbname, const string &query_id, cha
 
       if (tmp_dbname == dbname || tmp_queryid == query_id)
 	{
-	  strncpy (userpass, tmp_password.c_str(), PASSWD_ENC_LENGTH);
+	  strncpy (userpass, tmp_password.c_str(), PASSWD_ENC_LENGTH - 1);
+	  userpass[PASSWD_ENC_LENGTH - 1] = '\0';
 	  is_find = true;
 	  break;
 	}
@@ -2407,7 +2408,7 @@ static bool _validate_token_active_time (time_t &active_time)
       return false;
     }
 
-  for (int i = 0; i < len; ++i)
+  for (size_t i = 0; i < len; ++i)
     {
       if (!isdigit (sco.szTokenActiveTime[i]))
 	{

@@ -1217,7 +1217,7 @@ _get_cmd_nvplist (nvplist *arg_list, const char *argv[], int argc,
       char longname[OPT_STR_LEN];
 
       opt_key =
-	      getopt_long (argc, (char **const) argv, opt_str, opt, &opt_index);
+	      getopt_long (argc, (char **) argv, opt_str, opt, &opt_index);
 
       /* end of args */
       if (opt_key == -1)

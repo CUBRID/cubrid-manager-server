@@ -159,7 +159,7 @@ set(CMS_VERSION_DEFS
   MAJOR_RELEASE_STRING=${CMS_MAJOR_RELEASE_STRING}
   BUILD_NUMBER=${CMS_BUILD_NUMBER}
   )
-set(CMS_WARN_FLAGS -Wall -W -Wwrite-strings -Wno-cast-qual -Wlong-long -Wno-unused -pthread)
+set(CMS_WARN_FLAGS -Wall -W -Wwrite-strings -Wno-cast-qual -Wno-unused -pthread)
 
 # ---------------------------------------------------------------------------- targets
 set(CM_ADMIN_SOURCES

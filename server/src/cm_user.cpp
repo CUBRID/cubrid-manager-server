@@ -567,10 +567,16 @@ dbmt_user_new_token_info (const char *user_id,
       user_token_info->prev = new_node;
     }
 
-  strncpy (new_node->user_id, user_id, DBMT_USER_NAME_LEN);
-  strncpy (new_node->user_ip, user_ip, 20);
-  strncpy (new_node->user_port, user_port, 10);
-  strncpy (new_node->token, token_enc, TOKEN_ENC_LENGTH);
+  /* the bound has to leave room for the terminator, otherwise a value that
+     exactly fills the field leaves it unterminated */
+  strncpy (new_node->user_id, user_id, sizeof (new_node->user_id) - 1);
+  new_node->user_id[sizeof (new_node->user_id) - 1] = '\0';
+  strncpy (new_node->user_ip, user_ip, sizeof (new_node->user_ip) - 1);
+  new_node->user_ip[sizeof (new_node->user_ip) - 1] = '\0';
+  strncpy (new_node->user_port, user_port, sizeof (new_node->user_port) - 1);
+  new_node->user_port[sizeof (new_node->user_port) - 1] = '\0';
+  strncpy (new_node->token, token_enc, sizeof (new_node->token) - 1);
+  new_node->token[sizeof (new_node->token) - 1] = '\0';
   new_node->proc_id = proc_id;
   new_node->login_time = login_time;
 

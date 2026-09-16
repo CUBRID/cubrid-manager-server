@@ -919,8 +919,8 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
   else
     {
       *p = '\0';
-      snprintf (volume.location, sizeof (volume.location) - 1, "%s", vol_name);
-      snprintf (volume.vol_name, sizeof (volume.vol_name) - 1, "%s", p + 1);
+      snprintf (volume.location, sizeof (volume.location), "%s", vol_name);
+      snprintf (volume.vol_name, sizeof (volume.vol_name), "%s", p + 1);
       *p = '/';
     }
 
@@ -933,7 +933,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
   nv_update_val_int (res, "pagesize", page_size);
   nv_update_val_int (res, "logpagesize", log_page_size);
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", volumes[i].vol_name);
@@ -946,7 +946,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
       nv_add_nvp (res, "close", "spaceinfo");
     }
 
-  for (int i = 0; i < temporary_volumes.size(); i++)
+  for (size_t i = 0; i < temporary_volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", temporary_volumes[i].vol_name);
@@ -977,7 +977,7 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
       nv_add_nvp (res, "close", "dbinfo");
     }
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "type", volumes[i].type);
@@ -1008,7 +1008,8 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
 
 int SpaceDbResultOldFormat::get_cnt_tpage()
 {
-  int cnt_tpage = 0, i;
+  int cnt_tpage = 0;
+  size_t i;
 
   for (i = 0; i < volumes.size(); i++)
     {
@@ -1026,7 +1027,7 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 {
   int cnt_tpage = 0;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       cnt_tpage += volumes[i].total_size;
     }
@@ -1036,18 +1037,18 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 
 time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "DATA")
 	  || uStringEqual (volumes[i].purpose, "INDEX"))
 	{
 	  strcpy (volname, volumes[i].vol_name);
-	  snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
 	  if (!stat (strbuf, &statbuf))
 	    {
 	      mytime = statbuf.st_mtime;
@@ -1060,17 +1061,17 @@ time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 
 time_t SpaceDbResultNewFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "PERMANENT"))
 	{
 	  strcpy (volname, volumes[i].volume_name);
-	  snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
 	  if (!stat (strbuf, &statbuf))
 	    {
 	      mytime = statbuf.st_mtime;

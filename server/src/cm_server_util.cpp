@@ -527,14 +527,19 @@ ut_getline (char **lineptr, int *n, FILE *fp)
 void
 uRemoveCRLF (char *str)
 {
-  size_t i;
+  size_t len;
+
   if (str == NULL)
     {
       return;
     }
-  for (i = strlen (str) - 1; (i >= 0) && (str[i] == 10 || str[i] == 13); i--)
+
+  /* i >= 0 is always true for a size_t, so the old loop ran off the front of an
+     empty or all-CRLF string and indexed str[(size_t) -1]. */
+  len = strlen (str);
+  while (len > 0 && (str[len - 1] == 10 || str[len - 1] == 13))
     {
-      str[i] = '\0';
+      str[--len] = '\0';
     }
 }
 
@@ -1336,12 +1341,12 @@ folder_copy (const char *src_folder, const char *dest_folder)
 
   while ((dirp = readdir (dp)) != NULL)
     {
-      char src_path[PATH_MAX];
-      char dest_path[PATH_MAX];
+      char src_path[COMPOSED_PATH_MAX];
+      char dest_path[COMPOSED_PATH_MAX];
 
-      snprintf (src_path, sizeof (src_path) - 1, "%s/%s", src_dir,
+      snprintf (src_path, sizeof (src_path), "%s/%s", src_dir,
 		dirp->d_name);
-      snprintf (dest_path, sizeof (dest_path) - 1, "%s/%s", dest_dir,
+      snprintf (dest_path, sizeof (dest_path), "%s/%s", dest_dir,
 		dirp->d_name);
 
       stat (src_path, &statbuf);

@@ -80,7 +80,9 @@ uEncrypt (int len, const char *src, char *trg)
       return;
     }
 
-  array_init_random_value (encstr, sizeof (encstr));
+  /* sizeof of the pointer only seeded the first 8 bytes and left the rest of the
+     buffer holding uninitialised heap contents */
+  array_init_random_value (encstr, len + 1);
   strcpy (encstr, src);
 
   tea_encrypt (key, len, encstr);
@@ -121,7 +123,7 @@ uDecrypt (int len, const char *src, char *trg)
       return;
     }
 
-  memset (hexacode, 0, sizeof (hexacode));
+  memset (hexacode, 0, len * 2 + 1);
   strcpy (hexacode, src);
 
   for (i = 0; i < len; ++i)
