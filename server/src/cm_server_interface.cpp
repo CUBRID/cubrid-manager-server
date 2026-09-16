@@ -1361,7 +1361,17 @@ parse_uuid (const Json::Value &v, INT64 &out)
           return false;
         }
 
+      /*
+       * strtoull ()/_strtoui64 () accept a leading '-' and wrap it into
+       * a huge unsigned value instead of failing
+       */
+      if (s[0] == '-')
+        {
+          return false;
+        }
+
       char *endptr = NULL;
+      errno = 0;
       /* strtoull (not strtoul): on Windows "unsigned long" is only 32
        * bits, which would silently truncate a uuid here even though
        * req_id/out are a full 64-bit INT64. */
@@ -1370,7 +1380,7 @@ parse_uuid (const Json::Value &v, INT64 &out)
 #else
       unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
 #endif
-      if (endptr == s.c_str () || *endptr != '\0')
+      if (endptr == s.c_str () || *endptr != '\0' || errno == ERANGE)
         {
           return false;
         }
