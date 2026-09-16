@@ -598,6 +598,13 @@ db_running_async_task (const std::string &dbname)
 /*
  * db_running_async_start ()
  *  caller must hold cm_mutex.
+ *
+ *  copydb/renamedb pass two names here (src/dest); if registering the
+ *  second one throws (std::bad_alloc from the map node allocation, or
+ *  from copying the key/value strings themselves) after the first one
+ *  already succeeded, roll back whatever this call itself registered
+ *  before letting the exception propagate.
+ *
  */
 static bool
 db_running_async_start (const vector <string> &dbnames, const string &task_name,
@@ -619,13 +626,32 @@ db_running_async_start (const vector <string> &dbnames, const string &task_name,
         }
     }
 
-  for (size_t i = 0; i < dbnames.size (); i++)
+  size_t i = 0;
+  try
     {
-      if (!dbnames[i].empty ())
+      for (i = 0; i < dbnames.size (); i++)
         {
-          db_running_async[dbnames[i]] = task_name;
+          if (!dbnames[i].empty ())
+            {
+              db_running_async[dbnames[i]] = task_name;
+            }
         }
     }
+  catch (...)
+    {
+      /*
+       * roll back names 0..i erase () on a key that was never
+       */
+      for (size_t j = 0; j <= i && j < dbnames.size (); j++)
+        {
+          if (!dbnames[j].empty ())
+            {
+              db_running_async.erase (dbnames[j]);
+            }
+        }
+      throw;
+    }
+
   return true;
 }
 
