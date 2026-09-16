@@ -31,6 +31,7 @@
 #pragma warning( disable : 4786 )
 // tell the linker which libraries to find functions in
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <sys/socket.h>
 #include <netdb.h>
@@ -319,6 +320,37 @@ private:
   bool ok;
 };
 
+/*
+ * resolve_ipv4_into () - thread-safe replacement for the gethostbyname(name)
+ */
+static
+bool resolve_ipv4_into(const std::string& name, char* out_addr4) {
+   struct addrinfo hints;
+   struct addrinfo* res = 0;
+   bool ok;
+
+   memset(&hints, 0, sizeof(hints));
+   hints.ai_family = AF_INET;
+   hints.ai_socktype = SOCK_STREAM;
+
+   ok = (getaddrinfo(name.c_str(), 0, &hints, &res) == 0 && res != 0);
+   if(ok) {
+      sockaddr_in* sin = (sockaddr_in*)res->ai_addr;
+      std::copy((char*)&sin->sin_addr, (char*)&sin->sin_addr + 4, out_addr4);
+   }
+   if(res != 0) {
+      freeaddrinfo(res);
+   }
+   return ok;
+}
+
+static
+bool verify_via_reverse_dns(char* in_addr4, char* out_addr4) {
+   if(in_addr4 != out_addr4) {
+      std::copy(in_addr4, in_addr4 + 4, out_addr4);
+   }
+   return true;
+}
 
 bool Connect(SOCKET sockfd, const SOCKADDR_IN& addr) {
 #ifdef WIN32
@@ -504,18 +536,18 @@ public:
    }
    else { // connect directly to an SMTP server.
       SOCKADDR_IN addr(nameserver, port, AF_INET);
-      hostent* host = 0;
       if(addr) {
-         host = gethostbyaddr(addr.get_sin_addr(), sizeof(addr.ADDR.sin_addr), AF_INET);
+         if(!verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr())) {
+            returnstring = "451 Requested action aborted: local error in processing";
+            return; // error!!!
+         }
       }
-      else
-         host = gethostbyname(nameserver.c_str());
-      if(!host) {
-         returnstring = "451 Requested action aborted: local error in processing";
-         return; // error!!!
+      else {
+         if(!resolve_ipv4_into(nameserver, addr.get_sin_addr())) {
+            returnstring = "451 Requested action aborted: local error in processing";
+            return;
+         }
       }
-      //memcpy(addr.get_sin_addr(), host->h_addr, host->h_length);
-      std::copy(host->h_addr_list[0], host->h_addr_list[0] + host->h_length, addr.get_sin_addr());
       adds.push_back(addr);
    }
 
@@ -1130,7 +1162,13 @@ private:
    time(&t);
    char timestring[128] = "";
    const char * timeformat = "Date: %d %b %y %H:%M:%S %Z";
-   if(strftime(timestring, 127, timeformat, localtime(&t))) { // got the date
+   struct tm tm_buf;
+#ifdef WIN32
+   struct tm *tm_p = (localtime_s(&tm_buf, &t) == 0) ? &tm_buf : NULL;
+#else
+   struct tm *tm_p = localtime_r(&t, &tm_buf);
+#endif
+   if(tm_p && strftime(timestring, 127, timeformat, tm_p)) { // got the date
       headerline = timestring;
       headerline += "\r\n";
       ret.insert(ret.end(), headerline.begin(), headerline.end());
@@ -1402,13 +1440,15 @@ private:
 
    SOCKADDR_IN addr(nameserver, htons(DNS_PORT), AF_INET);
 
-   hostent* host = 0;
-   if(addr)
-      host = gethostbyaddr(addr.get_sin_addr(), sizeof(addr.ADDR.sin_addr), AF_INET);
-   else
-      host = gethostbyname(nameserver.c_str());
+   bool resolved;
+   if(addr) {
+      resolved = verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr());
+   }
+   else {
+      resolved = resolve_ipv4_into(nameserver, addr.get_sin_addr());
+   }
 
-   if(!host) { // couldn't get to dns, try to connect directly to 'server' instead.
+   if(!resolved) { // couldn't get to dns, try to connect directly to 'server' instead.
       ////////////////////////////////////////////////////////////////////////////////
       // just try to deliver mail directly to "server"
       // as we didn't get an MX record.
@@ -1416,25 +1456,21 @@ private:
       addr = SOCKADDR_IN(server, port);
       addr.ADDR.sin_port = port; // smtp port!! 25
       if(addr) {
-         host = gethostbyaddr(addr.get_sin_addr(), sizeof(addr.ADDR.sin_addr), AF_INET);
+         resolved = verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr());
       }
-      else
-         host = gethostbyname(server.c_str());
+      else {
+         resolved = resolve_ipv4_into(server, addr.get_sin_addr());
+      }
 
-      if(!host) {
+      if(!resolved) {
          returnstring = "550 Requested action not taken: mailbox unavailable";
          return false; // error!!!
       }
 
-      //memcpy((char*)&addr.sin_addr, host->h_addr, host->h_length);
-      std::copy(host->h_addr_list[0], host->h_addr_list[0] + host->h_length, addr.get_sin_addr());
       adds.push_back(addr);
 
       return true;
    }
-   else
-      //memcpy((char*)&addr.sin_addr, host->h_addr, host->h_length);
-      std::copy(host->h_addr_list[0], host->h_addr_list[0] + host->h_length, addr.get_sin_addr());
 
    SOCKET s;
    if(!Socket(s, AF_INET, SOCK_DGRAM, 0)) {
@@ -1558,14 +1594,11 @@ private:
             // now get all the MX records IP addresess
             addr.ADDR.sin_family = AF_INET;
             addr.ADDR.sin_port = port; // smtp port!! 25
-            hostent* host = 0;
             for(vec_str_const_iter it = names.begin(); it < names.end(); ++it) {
-               host = gethostbyname(it->c_str());
-               if(!host) {
+               if(!resolve_ipv4_into(*it, addr.get_sin_addr())) {
                   addr.zeroaddress();
                   continue; // just skip it!!!
                }
-               std::copy(host->h_addr_list[0], host->h_addr_list[0] + host->h_length, addr.get_sin_addr());
                adds.push_back(addr);
             }
             // got the addresses

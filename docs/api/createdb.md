@@ -16,6 +16,10 @@ Create database.
 | logvolpath | log volume path |
 | exvol | extend volume information |
 | charset | language and charset, ex. en_US.iso88591, ko_KR.utf8. please refer to $CUBRID/conf/cubrid_locales.all.txt |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -32,7 +36,8 @@ Create database.
    "logvolpath":"$CUBRID_DATABASES/alatestdb",
    "exvol":{"alatestdb_data_x001":"data;100;$CUBRID_DATABASES/alatestdb"},
    "charset":"en_US.utf8",
-   "overwrite_config_file":"YES"
+   "overwrite_config_file":"YES",
+  "async":"yes"
  }
 ```
 
@@ -55,4 +60,22 @@ Create database.
 }
 ```
 
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "14"
+}
+```
 
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('startdb')",
+   "status" : "failure",
+   "task" : "createdb"
+}
+```

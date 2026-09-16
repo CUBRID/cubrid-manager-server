@@ -77,6 +77,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_get_dbmt_user_info_new (Json::Value &request,
                                 Json::Value &response);
+int ext_get_server_status (Json::Value &request, Json::Value &response); /* defined in cm_server_interface.cpp */
 
 #define EXT_JOBS_AUTO_START      "auto_start"
 #define EXT_JOBS_MAIL_CONF       "mail_config"

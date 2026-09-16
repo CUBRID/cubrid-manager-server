@@ -31,6 +31,8 @@
 #include "config.h"
 
 #include <errno.h>
+#include <time.h>
+#include <string.h>
 
 #if defined(WINDOWS) && !defined (EOVERFLOW)
 #define EOVERFLOW    75
@@ -335,5 +337,70 @@ typedef long INT64;
 #define COND_BROADCAST(c)            pthread_cond_broadcast(&(c))
 #define COND_DESTROY(condvar)        pthread_cond_destroy(&(condvar))
 #endif
+
+#if defined(WINDOWS)
+typedef volatile LONG atomic_counter_t;
+#define ATOMIC_FETCH_ADD1(cnt)  InterlockedExchangeAdd(&(cnt), 1)
+#else
+typedef volatile int atomic_counter_t;
+#define ATOMIC_FETCH_ADD1(cnt)  __sync_fetch_and_add(&(cnt), 1)
+#endif
+
+/*
+ * LOCALTIME_R (time_p, tm_p) - thread-safe localtime (), unified across
+ *   platforms.
+ *
+ *   POSIX  : localtime_r (const time_t *, struct tm *) returns struct tm *
+ *            (tm_p on success, NULL on failure).
+ *   Windows: localtime_s (struct tm *, const time_t *) - note the reversed
+ *            argument order versus localtime_r () - returns errno_t (0 on
+ *            success).
+ */
+#define ERR_MSG_LEN 256
+#if defined(WINDOWS)
+#define LOCALTIME_R(time_p, tm_p) \
+    (localtime_s ((tm_p), (time_p)) == 0 ? (tm_p) : NULL)
+#else
+#define LOCALTIME_R(time_p, tm_p) \
+    localtime_r ((time_p), (tm_p))
+#endif
+
+/*
+ * STRERROR_R (errnum, buf, buflen) - thread-safe strerror (), unified
+ *   across platforms.
+ *
+ *   POSIX  : 1. XSI-compliant
+ *               int strerror_r (int, char *, size_t)
+ *                    returns 0 on success
+ *            2. GNU-specific
+ *               char *strerror_r (int, char *, size_t)
+ *                    returns a message pointer
+ *            the two overloads below pick the right one and
+ *            works regardless of which one this translation unit's glibc
+ *            headers select.
+ *   Windows: strerror_s (char *, size_t, int)
+ *                       returns errno_t (0 on success)
+ */
+#ifdef __cplusplus
+#if defined(WINDOWS)
+#define STRERROR_R(errnum, buf, buflen) \
+    (strerror_s ((buf), (buflen), (errnum)) == 0 ? (buf) : (char *) "unknown error")
+#else
+static inline char *
+_cm_strerror_r_result (int xsi_ret, char *buf)
+{
+  return (xsi_ret == 0) ? buf : (char *) "unknown error";
+}
+
+static inline char *
+_cm_strerror_r_result (char *gnu_ret, char *)
+{
+  return gnu_ret;
+}
+
+#define STRERROR_R(errnum, buf, buflen) \
+    _cm_strerror_r_result (strerror_r ((errnum), (buf), (buflen)), (buf))
+#endif
+#endif /* __cplusplus */
 
 #endif /* _CM_PORTING_H_ */

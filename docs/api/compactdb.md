@@ -12,6 +12,10 @@ Compact database.
 | verbose | on-off indicating whether to show detailed information |
 | input-class-file | path of a file that lists the classes to compact, one class name per line. cannot be given together with class-names |
 | class-names | a list of class names to compact. cannot be given together with input-class-file |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -21,7 +25,8 @@ Compact database.
   "token":"cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
   "dbname":"alatestdb",
   "input-class-file":"$CUBRID/tmp/alatestdb-input-class-file",
-  "verbose":"y"
+  "verbose":"y",
+  "async":"yes"
 }
 ```
 
@@ -52,6 +57,26 @@ Compact database.
    "__EXEC_TIME" : "320 ms",
    "note" : "none",
    "status" : "success",
+   "task" : "compactdb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "14"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
    "task" : "compactdb"
 }
 ```

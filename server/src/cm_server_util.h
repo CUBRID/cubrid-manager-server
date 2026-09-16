@@ -95,6 +95,15 @@ typedef unsigned __int64 uint64_t;
 #define AIX_STACKSIZE_PER_THREAD           (10*1024*1024)
 #endif
 
+#if defined (WINDOWS)
+#define STRTOK(buf,delim,saveptr)  strtok_s (buf, delim, saveptr)
+#else
+#define STRTOK(buf,delim,saveptr)  strtok_r (buf, delim, saveptr)
+#endif
+
+#define RUN_FOREGROUND 1
+#define RUN_BACKGROUND 0
+
 typedef enum
 {
   TIME_STR_FMT_DATE = NV_ADD_DATE,
@@ -174,6 +183,7 @@ int write_to_socket (SOCKET fd, const char *buf, int size);
 int is_cmserver_process (int pid, const char *module_name);
 int make_default_env (void);
 int is_positive_number (const char *str);
+int gen_tempfile_path (char *tempfile, const char *tempdir, const char *prefix, int task_code, size_t size);
 
 #if defined(WINDOWS)
 void remove_end_of_dir_ch (char *path);
@@ -199,9 +209,11 @@ void _accept_connection (nvplist *cli_request, nvplist *cli_response);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
-int ut_run_child (const char *bin_path, const char *const argv[],
-                  int wait_flag, const char *stdin_file,
-                  const char *stdout_file, const char *stderr_file, int *exit_status);
+int run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+                   char *stderr_file, int *exit_status, const char *envp[] = NULL);
+
+void env_mutex_lock (void);
+void env_mutex_unlock (void);
 
 int IsValidUserName (const char *pUserName);
 int ut_validate_auth (nvplist *req);
@@ -215,5 +227,7 @@ int ut_record_cubrid_utility_log_stderr (const char *msg);
 int ut_record_cubrid_utility_log_stdout (const char *msg);
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
+
+bool ut_child_exited_ok (int exit_code);
 
 #endif                /* _CM_SERVER_UTIL_H_ */

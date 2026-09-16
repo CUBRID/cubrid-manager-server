@@ -32,6 +32,7 @@
 #include <io.h>
 #include <process.h>
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include "cm_win_wsa.h"
 #else
 #include <unistd.h>
@@ -1439,9 +1440,13 @@ static int
 _get_localhost_ip (char *ipaddr, int ipaddr_len)
 {
   char hostname[64];
-  char *ip = NULL;
-  int i = 0;
-  struct hostent *hostent_p = NULL;
+  char ip[INET_ADDRSTRLEN];
+  char last_ip[INET_ADDRSTRLEN];
+  int found_non_loopback = 0;
+  struct addrinfo hints;
+  struct addrinfo *res = NULL;
+  struct addrinfo *cur;
+  int ret = -1;
 
 #if defined(WINDOWS)
   WSADATA wsaData;
@@ -1449,42 +1454,58 @@ _get_localhost_ip (char *ipaddr, int ipaddr_len)
 #endif
 
   hostname[0] = '\0';
+  last_ip[0] = '\0';
 
   if (gethostname (hostname, sizeof (hostname)) < 0)
     {
       goto exit_err;
     }
 
-  hostent_p = gethostbyname (hostname);
+  /*
+   * use getaddrinfo ()/freeaddrinfo () instead gethostbyname () for thread-safety
+   */
+  memset (&hints, 0, sizeof (hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
 
-  if (hostent_p == NULL)
+  if (getaddrinfo (hostname, NULL, &hints, &res) != 0 || res == NULL)
     {
       ipaddr = NULL;
       goto exit_err;
     }
-  else
-    {
-      for (i = 0; hostent_p->h_addr_list[i] != NULL; i++)
-        {
-          ip = inet_ntoa (* ((struct in_addr *) hostent_p->h_addr_list[i]));
-          /* ignore the 127.0.0.1 */
-          if (strcmp (ip, "127.0.0.1") == 0)
-            {
-              continue;
-            }
-          break;
-        }
-      if (ip)
-        {
-          strcpy_limit (ipaddr, ip, ipaddr_len);
-          return 0;
-        }
 
-      goto exit_err;
+  for (cur = res; cur != NULL; cur = cur->ai_next)
+    {
+      struct sockaddr_in *sin = (struct sockaddr_in *) cur->ai_addr;
+
+      if (inet_ntop (AF_INET, &sin->sin_addr, ip, sizeof (ip)) == NULL)
+        {
+          continue;
+        }
+      strcpy_limit (last_ip, ip, sizeof (last_ip));
+
+      /* ignore the 127.0.0.1 */
+      if (strcmp (ip, "127.0.0.1") == 0)
+        {
+          continue;
+        }
+      found_non_loopback = 1;
+      break;
     }
+  freeaddrinfo (res);
+
+  /*
+   * if every address was 127.0.0.1, return the last one seen instead of failing.
+   */
+  if (found_non_loopback || last_ip[0] != '\0')
+    {
+      strcpy_limit (ipaddr, found_non_loopback ? ip : last_ip, ipaddr_len);
+      ret = 0;
+    }
+
 exit_err:
 #if defined(WINDOWS)
   WSACleanup ();
 #endif
-  return -1;
+  return ret;
 }

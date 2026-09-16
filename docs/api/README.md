@@ -60,6 +60,10 @@ There are seven permissions. These permissions can indicate which authorities ar
 | ADMIN | Indicate the authority of admin |
 | ALL_AUTHORITY | This value is equal to "DBC | DBO | BRK | MON | JOB | VAR" |
 
+## Asynchronous Task Execution
+
+Some tasks can be run in the background instead of blocking until they finish; see [Asynchronous Task Execution](async_readme.md) for the list of supported tasks, how to request async mode, and the related `cm.conf` settings.
+
 ## CMS Interfaces
 
 CMS Interfaces are composed by JSON and is used for communication between CMS and Cubrid Manager.
@@ -182,6 +186,8 @@ CMS Interfaces are composed by JSON and is used for communication between CMS an
 | [get_mon_interval](get_mon_interval.md) | http | MON |
 | [set_mon_interval](set_mon_interval.md) | http | ADMIN |
 | [get_mon_statistic](get_mon_statistic.md) | http | MON |
+| [getserverstatus](getserverstatus.md) | http | ADMIN |
+| [gettaskstatus](gettaskstatus.md) | http | no authority check (owner-only) |
 | [monitorprocess](monitorprocess.md) | socket, http | ALL_AUTHORITY |
 
 ### Log
