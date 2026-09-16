@@ -778,12 +778,14 @@ class cm_lock_guard
  *   reserved by cm_execute_request_async () before its worker thread
  *   (cm_async_request_handler ()) takes over responsibility for
  *   releasing them exactly once.
+ *
+ *   set_marker () stores a POINTER to the caller's `dbnames`, not a copy.
  */
 class async_job_state_guard
 {
   public:
     async_job_state_guard (void)
-      : m_has_marker (false), m_has_slot (false), m_armed (true)
+      : m_dbnames (NULL), m_has_marker (false), m_has_slot (false), m_armed (true)
     {
     }
 
@@ -802,7 +804,7 @@ class async_job_state_guard
       cm_lock_guard lg;
       if (m_has_marker)
         {
-          db_running_async_done (m_dbnames);
+          db_running_async_done (*m_dbnames);
         }
       if (m_has_slot)
         {
@@ -810,10 +812,11 @@ class async_job_state_guard
         }
     }
 
+    /* stores &dbnames, not a copy - see the class comment above */
     void set_marker (const vector <string> &dbnames)
     {
+      m_dbnames = &dbnames;
       m_has_marker = true;
-      m_dbnames = dbnames;
     }
 
     void set_slot (void)
@@ -827,7 +830,7 @@ class async_job_state_guard
     }
 
   private:
-    vector <string> m_dbnames;
+    const vector <string> *m_dbnames;
     bool m_has_marker;
     bool m_has_slot;
     bool m_armed;
