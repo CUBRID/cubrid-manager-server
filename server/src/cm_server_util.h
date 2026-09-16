@@ -160,32 +160,6 @@ int ut_get_dblist (nvplist *res, char dbdir_flag);
 int uCreateLockFile (char *filename);
 void uRemoveLockFile (int fd);
 
-/*
- * cm_cmdb_pass_mutex ()/cm_cmdbinfo_temp_mutex ()/cm_conn_list_mutex () -
- *   one in-process mutex per file (cmdb.pass, cmdbinfo.temp, the
- *   connection list), each returned by a function-local static "holder"
- *   (see the definitions in cm_server_util.cpp - same pattern already
- *   used by _statdumpd_mutex () in cm_job_task.cpp).
- *
- *   This is deliberately NOT a plain "extern mutex_t x;" initialized by
- *   an explicit mutex_init () call from process startup: a CRITICAL_
- *   SECTION (the Windows backing for mutex_t) has no static/zero-
- *   initialized form the way a POSIX pthread_mutex_t does, so
- *   EnterCriticalSection ()/LeaveCriticalSection () on one that nobody
- *   explicitly initialized is undefined behavior (reliably crashes on
- *   Windows; it can look harmless on POSIX only because glibc's zero-
- *   filled pthread_mutex_t already happens to equal
- *   PTHREAD_MUTEX_INITIALIZER). An explicit-init design also has to be
- *   called once by *every* executable that links cm_server_util.cpp and
- *   can reach a file_resource_guard - not just cub_manager - which is
- *   easy to miss for a binary like cm_admin that never links
- *   cm_server_interface.cpp/cub_cm_init_env (). A function-local static
- *   sidesteps both problems: its constructor runs exactly once, on
- *   whichever thread of whichever binary first calls the accessor, with
- *   the initialization itself guaranteed thread-safe since C++11 (MSVC
- *   too, since VS2015) - no separate init call, and nothing to forget to
- *   wire up when a third binary starts using this header.
- */
 mutex_t *cm_cmdb_pass_mutex (void);
 mutex_t *cm_cmdbinfo_temp_mutex (void);
 mutex_t *cm_conn_list_mutex (void);
