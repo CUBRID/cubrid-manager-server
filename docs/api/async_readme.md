@@ -65,7 +65,7 @@ A rejected request never gets a `uuid`, since the job never started:
 }
 ```
 
-Check `note` for the reason and retry the request later.
+Check `note` for the reason and retry the request later. (This exclusivity check only serializes async job bookkeeping; access to shared credential/connection files such as `cmdb.pass` is separately protected by an in-process mutex, `file_resource_guard`.)
 
 ## Checking Job Status
 
