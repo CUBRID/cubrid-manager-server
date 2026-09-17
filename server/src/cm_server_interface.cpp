@@ -732,7 +732,7 @@ async_timeout_fallback_acquire (void)
     {
       LOG_ERROR ("async_timeout_fallback_acquire : %d synchronous requests are "
                  "currently tracked as timeout fallbacks after exceeding "
-                 "http_timeout (%d sec), at or past max_num_async_task (%d); "
+                 "http_timeout (%d sec), reached max_num_async_task (%d); "
                  "this may mean http_timeout is set too low for the tasks "
                  "being run, or the server is degraded.",
                  num_timeout_fallback_jobs, sco.iHttpTimeout, sco.iMaxNumAsyncTask);

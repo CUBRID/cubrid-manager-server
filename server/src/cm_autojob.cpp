@@ -532,7 +532,7 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
       spacedb_res->auto_add_volume (curr, db_mode, dbname_at_hostname);
       delete spacedb_res;
     }
-  cmd_cms_result_free  (server_status_res);
+  cmd_cms_result_free (server_status_res);
 }
 
 static void
