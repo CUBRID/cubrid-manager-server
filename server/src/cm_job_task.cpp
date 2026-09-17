@@ -6785,6 +6785,16 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
+  /*
+   * autobackupdb.conf is also rewritten by auto_conf_delete ()/
+   * auto_conf_rename ()
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
   if (access (autofilepath, F_OK) < 0)
     {
@@ -6956,6 +6966,12 @@ ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
 		"Backup plan does not exist. backupid is %s.", backupid);
       return ERR_WITH_MSG;
+    }
+
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
     }
 
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
@@ -7287,6 +7303,12 @@ ts_set_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
 	  strcpy (_dbmt_error, autoaddvol_conf_entry[i]);
 	  return ERR_PARAM_MISSING;
 	}
+    }
+
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
     }
 
   conf_get_dbmt_file (FID_AUTO_ADDVOLDB_CONF, auto_addvol_conf_file);
@@ -8907,6 +8929,12 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       sprintf (_dbmt_error, "%s", "database user");
       return ERR_PARAM_MISSING;
+    }
+
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
     }
 
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);

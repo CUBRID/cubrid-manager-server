@@ -1284,6 +1284,17 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   line_buf[0] = '\0';
   _dbmt_error[0] = '\0';
 
+  /*
+   * autoexecquery.conf is also rewritten by auto_conf_execquery_delete ()/
+   * auto_conf_execquery_rename ()/auto_conf_execquery_update_dbuser (),
+   * which take cm_auto_conf_mutex ().
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+    }
+
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);
   if (access (autoexecquery_conf_file, F_OK) == 0)
     {
