@@ -1228,7 +1228,6 @@ _dbmt_user_get (char *error_msg)
   return dbmt_user;
 }
 
-/* see the usage note on the declaration near the top of this file */
 static T_DBMT_USER *
 _dbmt_user_get_locked (char *error_msg)
 {
