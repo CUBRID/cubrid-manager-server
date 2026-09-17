@@ -1095,6 +1095,11 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
           info = (T_SERVER_STATUS_INFO *) cmd_res->result;
           for (i = 0; i < cmd_res->num_result; i++)
             {
+              if (dbcnt >= MAX_INSTALLED_DB)
+                {
+                  break;
+                }
+
               if (_isRegisteredDB (info[i].db_name))
                 {
                   dbvect[dbcnt] = i;
