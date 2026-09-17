@@ -48,6 +48,19 @@ T_USER_TOKEN_INFO *user_token_info = NULL;
 int
 dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
+  file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
+  return dbmt_user_read_locked (dbmt_user, _dbmt_error);
+}
+
+/* see the usage note on the declaration in cm_user.h */
+int
+dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
+{
   T_DBMT_USER_INFO *user_info = NULL;
   T_DBMT_USER_DBINFO *user_dbinfo = NULL;
   T_DBMT_USER_AUTHINFO *user_authinfo = NULL;
@@ -62,12 +75,6 @@ dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   int retval = ERR_NO_ERROR;
 
   memset (dbmt_user, 0, sizeof (T_DBMT_USER));
-
-  file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
-  if (!guard.ok ())
-    {
-      return ERR_TMPFILE_OPEN_FAIL;
-    }
 
   fp = fopen (conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf), "r");
   if (fp == NULL)
@@ -326,6 +333,19 @@ dbmt_user_free (T_DBMT_USER *dbmt_user)
 int
 dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
+  file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
+  return dbmt_user_write_auth_locked (dbmt_user, _dbmt_error);
+}
+
+/* see the usage note on the declaration in cm_user.h */
+int
+dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
+{
   FILE *fp;
   char tmpfile[PATH_MAX];
   int i, j;
@@ -376,15 +396,7 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     }
   fclose (fp);
 
-  {
-    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
-    if (!guard.ok ())
-      {
-        unlink (tmpfile);
-        return ERR_TMPFILE_OPEN_FAIL;
-      }
-    move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf));
-  }
+  move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf));
 
   return ERR_NO_ERROR;
 }
@@ -449,6 +461,19 @@ dbmt_user_search (T_DBMT_USER_INFO *user_info, const char *dbname)
 int
 dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
+  file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
+  return dbmt_user_write_pass_locked (dbmt_user, _dbmt_error);
+}
+
+/* see the usage note on the declaration in cm_user.h */
+int
+dbmt_user_write_pass_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
+{
   char tmpfile[PATH_MAX], strbuf[1024];
   FILE *fp;
   int i;
@@ -475,15 +500,7 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     }
   fclose (fp);
 
-  {
-    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
-    if (!guard.ok ())
-      {
-        unlink (tmpfile);
-        return ERR_TMPFILE_OPEN_FAIL;
-      }
-    move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_PASS, strbuf));
-  }
+  move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_PASS, strbuf));
 
   return ERR_NO_ERROR;
 }

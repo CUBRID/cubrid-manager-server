@@ -881,27 +881,31 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       char hexacoded[PASSWD_ENC_LENGTH];
       /* update cmdb.pass dbinfo */
-      if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-	{
-	  int src_dbinfo;
+      {
+	file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-	  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	    {
-	      src_dbinfo =
-		      dbmt_user_search (& (dbmt_user.user_info[i]), db_name);
-	      if (src_dbinfo < 0)
-		{
-		  continue;
-		}
-	      if (strcmp
-		  (dbmt_user.user_info[i].dbinfo[src_dbinfo].uid, new_db_user_name) != 0)
-		{
-		  continue;
-		}
-	    }
-	  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-	  dbmt_user_free (&dbmt_user);
-	}
+	if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+	  {
+	    int src_dbinfo;
+
+	    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	      {
+		src_dbinfo =
+			dbmt_user_search (& (dbmt_user.user_info[i]), db_name);
+		if (src_dbinfo < 0)
+		  {
+		    continue;
+		  }
+		if (strcmp
+		    (dbmt_user.user_info[i].dbinfo[src_dbinfo].uid, new_db_user_name) != 0)
+		  {
+		    continue;
+		  }
+	      }
+	    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	    dbmt_user_free (&dbmt_user);
+	  }
+      }
 
       /* update db_user's passwd in autoexecquery.conf */
       uEncrypt (PASSWD_LENGTH, new_db_user_pass, hexacoded);
@@ -1906,96 +1910,105 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
   uEncrypt (PASSWD_LENGTH, passwd_p, dbmt_passwd);
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
-    }
-  num_dbmt_user = dbmt_user.num_dbmt_user;
-  for (i = 0; i < num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  dbmt_user_free (&dbmt_user);
-	  sprintf (_dbmt_error, "%s", dbmt_id);
-	  return ERR_DBMTUSER_EXIST;
-	}
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  /* set authority info */
-  if ((casauth = nv_get_val (req, "casauth")) == NULL)
-    {
-      casauth = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "unicas", casauth);
+    if (!guard.ok ())
+      {
+	return ERR_TMPFILE_OPEN_FAIL;
+      }
 
-  if ((dbcreate = nv_get_val (req, "dbcreate")) == NULL)
-    {
-      dbcreate = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "dbcreate", dbcreate);
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+    num_dbmt_user = dbmt_user.num_dbmt_user;
+    for (i = 0; i < num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    sprintf (_dbmt_error, "%s", dbmt_id);
+	    return ERR_DBMTUSER_EXIST;
+	  }
+      }
 
-  if ((status_monitor = nv_get_val (req, "statusmonitorauth")) == NULL)
-    {
-      status_monitor = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "statusmonitorauth", status_monitor);
+    /* set authority info */
+    if ((casauth = nv_get_val (req, "casauth")) == NULL)
+      {
+	casauth = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "unicas", casauth);
 
-  /* set user info */
-  dbmt_user.user_info =
-	  (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info,
-	      sizeof (T_DBMT_USER_INFO),
-	      num_dbmt_user, num_dbmt_user + 1);
-  if (dbmt_user.user_info == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      if (authinfo != NULL)
-	{
-	  free (authinfo);
-	}
-      return ERR_MEM_ALLOC;
-    }
-  num_dbmt_user++;
-  dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user - 1]), dbmt_id,
-			  dbmt_passwd, num_authinfo, authinfo, 0, NULL);
-  dbmt_user.num_dbmt_user = num_dbmt_user;
+    if ((dbcreate = nv_get_val (req, "dbcreate")) == NULL)
+      {
+	dbcreate = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "dbcreate", dbcreate);
 
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
-  dbmt_user_write_pass (&dbmt_user, _dbmt_error);
+    if ((status_monitor = nv_get_val (req, "statusmonitorauth")) == NULL)
+      {
+	status_monitor = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "statusmonitorauth", status_monitor);
+
+    /* set user info */
+    dbmt_user.user_info =
+	    (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info,
+		sizeof (T_DBMT_USER_INFO),
+		num_dbmt_user, num_dbmt_user + 1);
+    if (dbmt_user.user_info == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	if (authinfo != NULL)
+	  {
+	    free (authinfo);
+	  }
+	return ERR_MEM_ALLOC;
+      }
+    num_dbmt_user++;
+    dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user - 1]), dbmt_id,
+			    dbmt_passwd, num_authinfo, authinfo, 0, NULL);
+    dbmt_user.num_dbmt_user = num_dbmt_user;
+
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+    dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2026,35 +2039,44 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  dbmt_user.user_info[i].user_name[0] = '\0';
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	return ERR_TMPFILE_OPEN_FAIL;
+      }
 
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
-  dbmt_user_write_pass (&dbmt_user, _dbmt_error);
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    dbmt_user.user_info[i].user_name[0] = '\0';
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	return ERR_FILE_INTEGRITY;
+      }
+
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+    dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2205,154 +2227,171 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 			      "statusmonitorauth", status_monitor);
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      if (usr_dbinfo != NULL)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo != NULL)
-	{
-	  free (usr_authinfo);
-	}
-      return retval;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      if (usr_dbinfo != NULL)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo != NULL)
-	{
-	  free (usr_authinfo);
-	}
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return ERR_TMPFILE_OPEN_FAIL;
+      }
 
-  /* auth info */
-  if (dbmt_user.user_info[usr_index].authinfo == NULL)
-    {
-      dbmt_user.user_info[usr_index].num_authinfo = num_authinfo;
-      dbmt_user.user_info[usr_index].authinfo = usr_authinfo;
-      usr_authinfo = NULL;
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return retval;
+      }
 
-    }
-  else if (usr_authinfo != NULL)
-    {
-      T_DBMT_USER_INFO *current_user_info =
-	      (T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return ERR_FILE_INTEGRITY;
+      }
 
-      for (j = 0; j < num_authinfo; j++)
-	{
-	  int find_idx = -1;
-	  for (i = 0; i < current_user_info->num_authinfo; i++)
-	    {
-	      if (strcmp (current_user_info->authinfo[i].domain, usr_authinfo[j].domain) == 0)
-		{
-		  find_idx = i;
-		  break;
-		}
-	    }
-	  if (find_idx == -1)
-	    {
-	      current_user_info->authinfo =
-		      (T_DBMT_USER_AUTHINFO *) increase_capacity (current_user_info->authinfo,
-			  sizeof (T_DBMT_USER_AUTHINFO),
-			  current_user_info->num_authinfo,
-			  current_user_info->num_authinfo + 1);
-	      if (current_user_info->authinfo == NULL)
-		{
-		  if (usr_dbinfo)
-		    {
-		      free (usr_dbinfo);
-		    }
-		  if (usr_authinfo)
-		    {
-		      free (usr_authinfo);
-		    }
-		  return ERR_MEM_ALLOC;
-		}
-	      current_user_info->num_authinfo++;
-	      find_idx = current_user_info->num_authinfo - 1;
-	    }
-	  dbmt_user_set_authinfo (& (current_user_info->authinfo[find_idx]),
-				  usr_authinfo[j].domain, usr_authinfo[j].auth);
-	}
-    }
+    /* auth info */
+    if (dbmt_user.user_info[usr_index].authinfo == NULL)
+      {
+	dbmt_user.user_info[usr_index].num_authinfo = num_authinfo;
+	dbmt_user.user_info[usr_index].authinfo = usr_authinfo;
+	usr_authinfo = NULL;
 
-  /* db info */
-  if (dbmt_user.user_info[usr_index].dbinfo == NULL)
-    {
-      dbmt_user.user_info[usr_index].num_dbinfo = num_dbinfo;
-      dbmt_user.user_info[usr_index].dbinfo = usr_dbinfo;
-      usr_dbinfo = NULL;
+      }
+    else if (usr_authinfo != NULL)
+      {
+	T_DBMT_USER_INFO *current_user_info =
+		(T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
 
-    }
-  else if (usr_dbinfo != NULL)
-    {
-      T_DBMT_USER_INFO *current_user_info =
-	      (T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+	for (j = 0; j < num_authinfo; j++)
+	  {
+	    int find_idx = -1;
+	    for (i = 0; i < current_user_info->num_authinfo; i++)
+	      {
+		if (strcmp (current_user_info->authinfo[i].domain, usr_authinfo[j].domain) == 0)
+		  {
+		    find_idx = i;
+		    break;
+		  }
+	      }
+	    if (find_idx == -1)
+	      {
+		current_user_info->authinfo =
+			(T_DBMT_USER_AUTHINFO *) increase_capacity (current_user_info->authinfo,
+			    sizeof (T_DBMT_USER_AUTHINFO),
+			    current_user_info->num_authinfo,
+			    current_user_info->num_authinfo + 1);
+		if (current_user_info->authinfo == NULL)
+		  {
+		    if (usr_dbinfo)
+		      {
+			free (usr_dbinfo);
+		      }
+		    if (usr_authinfo)
+		      {
+			free (usr_authinfo);
+		      }
+		    return ERR_MEM_ALLOC;
+		  }
+		current_user_info->num_authinfo++;
+		find_idx = current_user_info->num_authinfo - 1;
+	      }
+	    dbmt_user_set_authinfo (& (current_user_info->authinfo[find_idx]),
+				    usr_authinfo[j].domain, usr_authinfo[j].auth);
+	  }
+      }
 
-      for (j = 0; j < num_dbinfo; j++)
-	{
-	  int find_idx = -1;
-	  for (i = 0; i < current_user_info->num_dbinfo; i++)
-	    {
-	      if (strcmp (current_user_info->dbinfo[i].dbname, usr_dbinfo[j].dbname) == 0)
-		{
-		  find_idx = i;
-		  break;
-		}
-	    }
-	  if (find_idx == -1)
-	    {
-	      current_user_info->dbinfo =
-		      (T_DBMT_USER_DBINFO *) increase_capacity (current_user_info->dbinfo,
-			  sizeof (T_DBMT_USER_DBINFO),
-			  current_user_info->num_dbinfo,
-			  current_user_info->num_dbinfo + 1);
-	      if (current_user_info->dbinfo == NULL)
-		{
-		  FREE_MEM (usr_dbinfo);
-		  FREE_MEM (usr_authinfo);
-		  return ERR_MEM_ALLOC;
-		}
-	      current_user_info->num_dbinfo++;
-	      find_idx = current_user_info->num_dbinfo - 1;
-	    }
-	  dbmt_user_set_dbinfo (& (current_user_info->dbinfo[find_idx]),
-				usr_dbinfo[j].dbname, usr_dbinfo[j].auth,
-				usr_dbinfo[j].uid, usr_dbinfo[j].broker_address);
-	}
-    }
+    /* db info */
+    if (dbmt_user.user_info[usr_index].dbinfo == NULL)
+      {
+	dbmt_user.user_info[usr_index].num_dbinfo = num_dbinfo;
+	dbmt_user.user_info[usr_index].dbinfo = usr_dbinfo;
+	usr_dbinfo = NULL;
 
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      if (usr_dbinfo)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo)
-	{
-	  free (usr_authinfo);
-	}
-      return retval;
-    }
+      }
+    else if (usr_dbinfo != NULL)
+      {
+	T_DBMT_USER_INFO *current_user_info =
+		(T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+
+	for (j = 0; j < num_dbinfo; j++)
+	  {
+	    int find_idx = -1;
+	    for (i = 0; i < current_user_info->num_dbinfo; i++)
+	      {
+		if (strcmp (current_user_info->dbinfo[i].dbname, usr_dbinfo[j].dbname) == 0)
+		  {
+		    find_idx = i;
+		    break;
+		  }
+	      }
+	    if (find_idx == -1)
+	      {
+		current_user_info->dbinfo =
+			(T_DBMT_USER_DBINFO *) increase_capacity (current_user_info->dbinfo,
+			    sizeof (T_DBMT_USER_DBINFO),
+			    current_user_info->num_dbinfo,
+			    current_user_info->num_dbinfo + 1);
+		if (current_user_info->dbinfo == NULL)
+		  {
+		    FREE_MEM (usr_dbinfo);
+		    FREE_MEM (usr_authinfo);
+		    return ERR_MEM_ALLOC;
+		  }
+		current_user_info->num_dbinfo++;
+		find_idx = current_user_info->num_dbinfo - 1;
+	      }
+	    dbmt_user_set_dbinfo (& (current_user_info->dbinfo[find_idx]),
+				  usr_dbinfo[j].dbname, usr_dbinfo[j].auth,
+				  usr_dbinfo[j].uid, usr_dbinfo[j].broker_address);
+	  }
+      }
+
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	if (usr_dbinfo)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo)
+	  {
+	    free (usr_authinfo);
+	  }
+	return retval;
+      }
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2399,43 +2438,52 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
-    }
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  if (new_passwd == NULL)
-	    {
-	      dbmt_user.user_info[i].user_passwd[0] = '\0';
-	    }
-	  else
-	    {
-	      char hexacoded[PASSWD_ENC_LENGTH];
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-	      uEncrypt (PASSWD_LENGTH, new_passwd, hexacoded);
-	      strcpy (dbmt_user.user_info[i].user_passwd, hexacoded);
-	    }
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	return ERR_TMPFILE_OPEN_FAIL;
+      }
 
-  retval = dbmt_user_write_pass (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    if (new_passwd == NULL)
+	      {
+		dbmt_user.user_info[i].user_passwd[0] = '\0';
+	      }
+	    else
+	      {
+		char hexacoded[PASSWD_ENC_LENGTH];
+
+		uEncrypt (PASSWD_LENGTH, new_passwd, hexacoded);
+		strcpy (dbmt_user.user_info[i].user_passwd, hexacoded);
+	      }
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	return ERR_FILE_INTEGRITY;
+      }
+
+    retval = dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2949,29 +2997,33 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* add dbinfo to cmdb.pass */
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-    {
-      int i;
-      T_DBMT_USER_DBINFO tmp_dbinfo;
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-      memset (&tmp_dbinfo, 0, sizeof (tmp_dbinfo));
-      dbmt_user_set_dbinfo (&tmp_dbinfo, dbname, dbmt_user_name, "dba", "");
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	int i;
+	T_DBMT_USER_DBINFO tmp_dbinfo;
 
-      dbmt_user_db_delete (&dbmt_user, dbname);
-      for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	{
-	  if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
-	    {
-	      if (dbmt_user_add_dbinfo
-		  (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR)
-		{
-		  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-		}
-	      break;
-	    }
-	}
-      dbmt_user_free (&dbmt_user);
-    }
+	memset (&tmp_dbinfo, 0, sizeof (tmp_dbinfo));
+	dbmt_user_set_dbinfo (&tmp_dbinfo, dbname, dbmt_user_name, "dba", "");
+
+	dbmt_user_db_delete (&dbmt_user, dbname);
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
+	      {
+		if (dbmt_user_add_dbinfo
+		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR)
+		  {
+		    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+		  }
+		break;
+	      }
+	  }
+	dbmt_user_free (&dbmt_user);
+      }
+  }
 
   /* add dbinfo to conlist */
   memset (&con_dbinfo, 0, sizeof (con_dbinfo));
@@ -3116,12 +3168,16 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname);
   auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname);
 
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-    {
-      dbmt_user_db_delete (&dbmt_user, dbname);
-      dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-      dbmt_user_free (&dbmt_user);
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	dbmt_user_db_delete (&dbmt_user, dbname);
+	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	dbmt_user_free (&dbmt_user);
+      }
+  }
 
   /* The following delete sequence can delete folder hierarchy like :
   * <database log folder>/<database vol folder>
@@ -3346,22 +3402,26 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
   auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname);
   auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname);
 
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-    {
-      int i, j;
-      for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	{
-	  for (j = 0; j < dbmt_user.user_info[i].num_dbinfo; j++)
-	    {
-	      if (strcmp (dbmt_user.user_info[i].dbinfo[j].dbname, dbname) == 0)
-		{
-		  strcpy (dbmt_user.user_info[i].dbinfo[j].dbname, newdbname);
-		}
-	    }
-	}
-      dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-      dbmt_user_free (&dbmt_user);
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	int i, j;
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    for (j = 0; j < dbmt_user.user_info[i].num_dbinfo; j++)
+	      {
+		if (strcmp (dbmt_user.user_info[i].dbinfo[j].dbname, dbname) == 0)
+		  {
+		    strcpy (dbmt_user.user_info[i].dbinfo[j].dbname, newdbname);
+		  }
+	      }
+	  }
+	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	dbmt_user_free (&dbmt_user);
+      }
+  }
 
   return ERR_NO_ERROR;
 }
@@ -3973,36 +4033,40 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* cmdb.pass update after delete */
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
-    {
-      goto copydb_finale;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  dbmt_user_db_delete (&dbmt_user, destdbname);
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      int dbinfo_idx;
-      T_DBMT_USER_DBINFO tmp_info;
+    if (!guard.ok () || dbmt_user_read_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+      {
+	goto copydb_finale;
+      }
 
-      dbinfo_idx = dbmt_user_search (& (dbmt_user.user_info[i]), srcdbname);
-      if (dbinfo_idx < 0)
-	{
-	  continue;
-	}
-      tmp_info = dbmt_user.user_info[i].dbinfo[dbinfo_idx];
-      strcpy (tmp_info.dbname, destdbname);
-      if (dbmt_user_add_dbinfo (& (dbmt_user.user_info[i]), &tmp_info) != ERR_NO_ERROR)
-	{
-	  dbmt_user_free (&dbmt_user);
-	  goto copydb_finale;
-	}
-    }
-  if (move_flag)
-    {
-      dbmt_user_db_delete (&dbmt_user, srcdbname);
-    }
-  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  dbmt_user_free (&dbmt_user);
+    dbmt_user_db_delete (&dbmt_user, destdbname);
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	int dbinfo_idx;
+	T_DBMT_USER_DBINFO tmp_info;
+
+	dbinfo_idx = dbmt_user_search (& (dbmt_user.user_info[i]), srcdbname);
+	if (dbinfo_idx < 0)
+	  {
+	    continue;
+	  }
+	tmp_info = dbmt_user.user_info[i].dbinfo[dbinfo_idx];
+	strcpy (tmp_info.dbname, destdbname);
+	if (dbmt_user_add_dbinfo (& (dbmt_user.user_info[i]), &tmp_info) != ERR_NO_ERROR)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    goto copydb_finale;
+	  }
+      }
+    if (move_flag)
+      {
+	dbmt_user_db_delete (&dbmt_user, srcdbname);
+      }
+    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    dbmt_user_free (&dbmt_user);
+  }
 
 copydb_finale:
   return ERR_NO_ERROR;

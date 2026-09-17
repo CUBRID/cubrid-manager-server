@@ -1661,7 +1661,15 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "Invalid password! The length should be between 4 and 32.");
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+      }
+
+  if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
     {
       return build_server_header (response, retval, dbmt_error);
     }
@@ -1863,18 +1871,19 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
 
   LOG_DEBUG ("store to dbmt_user successfully.");
 
-  if ((retval = dbmt_user_write_auth (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+  if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
       dbmt_user_free (&dbmt_user);
 
       return build_server_header (response, retval, dbmt_error);
     }
-  if ((retval = dbmt_user_write_pass (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+  if ((retval = dbmt_user_write_pass_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
       dbmt_user_free (&dbmt_user);
 
       return build_server_header (response, retval, dbmt_error);
     }
+  }
 
   if ((retval = ext_ut_add_dblist_to_response (response)) != ERR_NO_ERROR)
     {
@@ -2085,7 +2094,17 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
         }
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+  {
+  file_resource_guard user_write_guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+  if (!user_write_guard.ok ())
+    {
+      FREE_MEM (authinfo);
+      FREE_MEM (dbinfo);
+      return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+    }
+
+  if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
       FREE_MEM (authinfo);
       FREE_MEM (dbinfo);
@@ -2167,13 +2186,14 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
         }
     }
 
-  if ((retval = dbmt_user_write_auth (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+  if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
       FREE_MEM (dbinfo);
       dbmt_user_free (&dbmt_user);
 
       return build_server_header (response, retval, dbmt_error);
     }
+  }
 
 
   if ((retval = ext_ut_add_dblist_to_response (response)) != ERR_NO_ERROR)

@@ -112,6 +112,7 @@ static const char *createdb_auth_list[] =
 
 static int _get_dbmt_user_index (T_DBMT_USER *dbmt_user, const char *username);
 static T_DBMT_USER *_dbmt_user_get (char *error_msg);
+static T_DBMT_USER *_dbmt_user_get_locked (char *error_msg);
 static void _dbmt_user_free (T_DBMT_USER *dbmt_user);
 static void _errmsg_output (int cmd_id, const char *error_msg);
 static void _print_dbmtuser_info (T_DBMT_USER_INFO *dbmtuser_info);
@@ -214,39 +215,50 @@ cmd_deluser (int argc, const char *in_argv[])
       goto error_clean_return;
     }
 
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  strcpy_limit (dbmt_user_name, in_argv[1], sizeof (dbmt_user_name));
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (uStringEqual (DBMT_USER_ADMIN_NAME, dbmt_user_name))
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_DEL), DBMT_USER_ADMIN_NAME);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmt_user_name);
+    strcpy_limit (dbmt_user_name, in_argv[1], sizeof (dbmt_user_name));
 
-  if (dbmt_user_index < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (uStringEqual (DBMT_USER_ADMIN_NAME, dbmt_user_name))
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_DEL), DBMT_USER_ADMIN_NAME);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  dbmt_user->user_info[dbmt_user_index].user_name[0] = '\0';
+    dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmt_user_name);
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (dbmt_user_index < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+
+    dbmt_user->user_info[dbmt_user_index].user_name[0] = '\0';
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   retval = E_SUCCESS;
   goto clean_return;
@@ -334,63 +346,74 @@ cmd_adduser (int argc, const char *in_argv[])
         }
     }
 
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      retval = E_FAILURE;
-      goto error_return;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if (_get_dbmt_user_index (dbmt_user, username) >= 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_EXIST), username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        retval = E_FAILURE;
+        goto error_return;
+      }
 
-  /* set dbmt user auth info. */
-  if ((auth_info =
-         (T_DBMT_USER_AUTHINFO *) malloc (AUTH_NUM_TOTAL * sizeof (T_DBMT_USER_AUTHINFO))) == NULL)
-    {
-      goto error_mem_alloc_return;
-    }
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        retval = E_FAILURE;
+        goto error_return;
+      }
 
-  dbmt_user_set_authinfo (&auth_info[0], "unicas", unicas);
-  dbmt_user_set_authinfo (&auth_info[1], "dbcreate", dbcreate);
-  dbmt_user_set_authinfo (&auth_info[2], "statusmonitorauth", monitor);
+    if (_get_dbmt_user_index (dbmt_user, username) >= 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_EXIST), username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  /* encrypt the password. */
-  uEncrypt (PASSWD_LENGTH, userpass, dbmt_pass);
+    /* set dbmt user auth info. */
+    if ((auth_info =
+           (T_DBMT_USER_AUTHINFO *) malloc (AUTH_NUM_TOTAL * sizeof (T_DBMT_USER_AUTHINFO))) == NULL)
+      {
+        goto error_mem_alloc_return;
+      }
 
-  num_dbmt_user = dbmt_user->num_dbmt_user;
+    dbmt_user_set_authinfo (&auth_info[0], "unicas", unicas);
+    dbmt_user_set_authinfo (&auth_info[1], "dbcreate", dbcreate);
+    dbmt_user_set_authinfo (&auth_info[2], "statusmonitorauth", monitor);
 
-  /* set dbmt user info struct. */
-  dbmt_user->user_info =
-    (T_DBMT_USER_INFO *) increase_capacity (dbmt_user->user_info, sizeof (T_DBMT_USER_INFO),
-        num_dbmt_user, num_dbmt_user + 1);
+    /* encrypt the password. */
+    uEncrypt (PASSWD_LENGTH, userpass, dbmt_pass);
 
-  if (dbmt_user->user_info == NULL)
-    {
-      goto error_mem_alloc_return;
-    }
+    num_dbmt_user = dbmt_user->num_dbmt_user;
 
-  dbmt_user_set_userinfo (& (dbmt_user->user_info[num_dbmt_user]),
-                          (char *) username, (char *) dbmt_pass,
-                          AUTH_NUM_TOTAL, auth_info, num_db, db_info);
-  dbmt_user->num_dbmt_user++;
+    /* set dbmt user info struct. */
+    dbmt_user->user_info =
+      (T_DBMT_USER_INFO *) increase_capacity (dbmt_user->user_info, sizeof (T_DBMT_USER_INFO),
+          num_dbmt_user, num_dbmt_user + 1);
 
-  /* update the cmdbpass & cm.pass conf file. */
-  if (dbmt_user_write_pass (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (dbmt_user->user_info == NULL)
+      {
+        goto error_mem_alloc_return;
+      }
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    dbmt_user_set_userinfo (& (dbmt_user->user_info[num_dbmt_user]),
+                            (char *) username, (char *) dbmt_pass,
+                            AUTH_NUM_TOTAL, auth_info, num_db, db_info);
+    dbmt_user->num_dbmt_user++;
+
+    /* update the cmdbpass & cm.pass conf file. */
+    if (dbmt_user_write_pass_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   _dbmt_user_free (dbmt_user);
   nv_destroy (arg_list);
@@ -522,59 +545,70 @@ cmd_chguser_pwd (int argc, const char *in_argv[])
   adminpass = nv_get_val (arg_list, ARG_ADMIN_PASS);
 
   /* get dbmt user. */
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmtusername)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmtusername);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (oldpass != NULL)
-    {
-      /* check old password. */
-      if (_check_dbmt_user_passwd
-          (dbmt_user, dbmtusername, oldpass, error_msg) < 0)
-        {
-          retval = E_FAILURE;
-          goto error_clean_return;
-        }
-    }
-  else if (adminpass != NULL)
-    {
-      /* check admin password. */
-      if (_check_dbmt_user_passwd
-          (dbmt_user, DBMT_USER_ADMIN_NAME, adminpass, error_msg) < 0)
-        {
-          retval = E_FAILURE;
-          goto error_clean_return;
-        }
-    }
-  else
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
-                ARG_OLD_PASS ", " ARG_ADMIN_PASS);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  /* reset the new password. */
-  uEncrypt (PASSWD_LENGTH, newpass, pwd_tmp);
-  strcpy_limit (dbmt_user->user_info[dbmt_user_index].user_passwd, pwd_tmp,
-                PASSWD_ENC_LENGTH);
+    if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmtusername)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmtusername);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (dbmt_user_write_pass (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (oldpass != NULL)
+      {
+        /* check old password. */
+        if (_check_dbmt_user_passwd
+            (dbmt_user, dbmtusername, oldpass, error_msg) < 0)
+          {
+            retval = E_FAILURE;
+            goto error_clean_return;
+          }
+      }
+    else if (adminpass != NULL)
+      {
+        /* check admin password. */
+        if (_check_dbmt_user_passwd
+            (dbmt_user, DBMT_USER_ADMIN_NAME, adminpass, error_msg) < 0)
+          {
+            retval = E_FAILURE;
+            goto error_clean_return;
+          }
+      }
+    else
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_ARG_MUST_APPEAR_ERR),
+                  ARG_OLD_PASS ", " ARG_ADMIN_PASS);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+
+    /* reset the new password. */
+    uEncrypt (PASSWD_LENGTH, newpass, pwd_tmp);
+    strcpy_limit (dbmt_user->user_info[dbmt_user_index].user_passwd, pwd_tmp,
+                  PASSWD_ENC_LENGTH);
+
+    if (dbmt_user_write_pass_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   nv_destroy (arg_list);
   _dbmt_user_free (dbmt_user);
@@ -647,48 +681,59 @@ cmd_chguser_auth (int argc, const char *in_argv[])
     }
 
   /* get dbmt user. */
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      _errmsg_output (cmd_id, error_msg);
-      return E_FAILURE;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  dbmt_user_info_t = & (dbmt_user->user_info[dbmt_user_index]);
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  for (i = 0; i < dbmt_user_info_t->num_authinfo; i++)
-    {
-      T_DBMT_USER_AUTHINFO *auth_t;
+    if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-      auth_t = & (dbmt_user_info_t->authinfo[i]);
+    dbmt_user_info_t = & (dbmt_user->user_info[dbmt_user_index]);
 
-      if (uStringEqual (auth_t->domain, "unicas") && unicas != NULL)
-        {
-          strcpy_limit (auth_t->auth, unicas, sizeof (auth_t->auth));
-        }
-      else if (uStringEqual (auth_t->domain, "dbcreate") && dbcreate != NULL)
-        {
-          strcpy_limit (auth_t->auth, dbcreate, sizeof (auth_t->auth));
-        }
-      else if (uStringEqual (auth_t->domain, "statusmonitorauth")
-               && monitor != NULL)
-        {
-          strcpy_limit (auth_t->auth, monitor, sizeof (auth_t->auth));
-        }
-    }
+    for (i = 0; i < dbmt_user_info_t->num_authinfo; i++)
+      {
+        T_DBMT_USER_AUTHINFO *auth_t;
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+        auth_t = & (dbmt_user_info_t->authinfo[i]);
+
+        if (uStringEqual (auth_t->domain, "unicas") && unicas != NULL)
+          {
+            strcpy_limit (auth_t->auth, unicas, sizeof (auth_t->auth));
+          }
+        else if (uStringEqual (auth_t->domain, "dbcreate") && dbcreate != NULL)
+          {
+            strcpy_limit (auth_t->auth, dbcreate, sizeof (auth_t->auth));
+          }
+        else if (uStringEqual (auth_t->domain, "statusmonitorauth")
+                 && monitor != NULL)
+          {
+            strcpy_limit (auth_t->auth, monitor, sizeof (auth_t->auth));
+          }
+      }
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   nv_destroy (arg_list);
   _dbmt_user_free (dbmt_user);
@@ -820,54 +865,65 @@ cmd_adddbinfo (int argc, const char *in_argv[])
       goto error_clean_return;
     }
 
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      _errmsg_output (cmd_id, error_msg);
-      return E_FAILURE;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  snprintf (broker_addr, sizeof (broker_addr), "%s,%s", host, port);
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  t_info = & (dbmt_user->user_info[dbmt_user_index]);
+    if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  /* check whether this user has been authorized to this DB. */
-  if (dbmt_user_search (t_info, dbname) >= 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_ALREADY_AUTH), dbname, username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    snprintf (broker_addr, sizeof (broker_addr), "%s,%s", host, port);
 
-  num_db = t_info->num_dbinfo;
-  t_info->dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (t_info->dbinfo,
-                   sizeof (T_DBMT_USER_DBINFO),
-                   num_db, num_db + 1);
-  if (t_info->dbinfo == NULL)
-    {
-      strcpy_limit (error_msg, get_msg_by_id (PTN_MEM_ALLOC_ERR), DBMT_ERROR_MSG_SIZE);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    t_info = & (dbmt_user->user_info[dbmt_user_index]);
 
-  /* add dbinfo to dbmt user. */
-  dbmt_user_set_dbinfo (& (t_info->dbinfo[num_db]), dbname, auth, uid, broker_addr);
+    /* check whether this user has been authorized to this DB. */
+    if (dbmt_user_search (t_info, dbname) >= 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DB_ALREADY_AUTH), dbname, username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  t_info->num_dbinfo++;
+    num_db = t_info->num_dbinfo;
+    t_info->dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (t_info->dbinfo,
+                     sizeof (T_DBMT_USER_DBINFO),
+                     num_db, num_db + 1);
+    if (t_info->dbinfo == NULL)
+      {
+        strcpy_limit (error_msg, get_msg_by_id (PTN_MEM_ALLOC_ERR), DBMT_ERROR_MSG_SIZE);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    /* add dbinfo to dbmt user. */
+    dbmt_user_set_dbinfo (& (t_info->dbinfo[num_db]), dbname, auth, uid, broker_addr);
+
+    t_info->num_dbinfo++;
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   retval = E_SUCCESS;
   goto memory_clean_return;
@@ -922,41 +978,52 @@ cmd_deldbinfo (int argc, const char *in_argv[])
       goto error_clean_return;
     }
 
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  strcpy_limit (dbmt_user_name, in_argv[1], sizeof (dbmt_user_name));
-  strcpy_limit (dbname, in_argv[2], sizeof (dbname));
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmt_user_name);
-  if (dbmt_user_index < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    strcpy_limit (dbmt_user_name, in_argv[1], sizeof (dbmt_user_name));
+    strcpy_limit (dbname, in_argv[2], sizeof (dbname));
 
-  if ((db_index =
-         dbmt_user_search (&dbmt_user->user_info[dbmt_user_index], dbname)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_NOT_AUTH), dbname, dbmt_user_name);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    dbmt_user_index = _get_dbmt_user_index (dbmt_user, dbmt_user_name);
+    if (dbmt_user_index < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), dbmt_user_name);
 
-  dbmt_user->user_info[dbmt_user_index].dbinfo[db_index].dbname[0] = '\0';
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if ((db_index =
+           dbmt_user_search (&dbmt_user->user_info[dbmt_user_index], dbname)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DB_NOT_AUTH), dbname, dbmt_user_name);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+
+    dbmt_user->user_info[dbmt_user_index].dbinfo[db_index].dbname[0] = '\0';
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   retval = E_SUCCESS;
   goto clean_return;
@@ -1020,64 +1087,75 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
   username = nv_get_val (arg_list, ARG_DBMT_USER_NAME);
   dbname = nv_get_val (arg_list, ARG_DB_NAME);
 
-  if ((dbmt_user = _dbmt_user_get (error_msg)) == NULL)
-    {
-      _errmsg_output (cmd_id, error_msg);
-      return E_FAILURE;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (!guard.ok ())
+      {
+        strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  userinfo_t = & (dbmt_user->user_info[dbmt_user_index]);
+    if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
+      {
+        _errmsg_output (cmd_id, error_msg);
+        return E_FAILURE;
+      }
 
-  if ((dbinfo_index = dbmt_user_search (userinfo_t, dbname)) < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_DB_NOT_EXIST), dbname, username);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DBMT_USER_NOT_EXIST), username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  dbinfo_t = & (userinfo_t->dbinfo[dbinfo_index]);
+    userinfo_t = & (dbmt_user->user_info[dbmt_user_index]);
 
-  strcpy_limit (broker_addr_t, dbinfo_t->broker_address,
-                sizeof (broker_addr_t));
-  if (string_tokenize2 (broker_addr_t, broker_tok, 2, ',') < 0)
-    {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
-                get_msg_by_id (PTN_BROKER_ADDR_ERR), dbinfo_t->broker_address);
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if ((dbinfo_index = dbmt_user_search (userinfo_t, dbname)) < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_DB_NOT_EXIST), dbname, username);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  snprintf (broker_addr, sizeof (broker_addr) - 1, "%s,%s",
-            ((host == NULL) ? broker_tok[0] : host),
-            ((port == NULL) ? broker_tok[1] : port));
+    dbinfo_t = & (userinfo_t->dbinfo[dbinfo_index]);
 
-  strcpy_limit (dbinfo_t->broker_address, broker_addr,
-                sizeof (dbinfo_t->broker_address));
+    strcpy_limit (broker_addr_t, dbinfo_t->broker_address,
+                  sizeof (broker_addr_t));
+    if (string_tokenize2 (broker_addr_t, broker_tok, 2, ',') < 0)
+      {
+        snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+                  get_msg_by_id (PTN_BROKER_ADDR_ERR), dbinfo_t->broker_address);
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
 
-  if (auth != NULL)
-    {
-      strcpy_limit (dbinfo_t->auth, auth, sizeof (dbinfo_t->auth));
-    }
+    snprintf (broker_addr, sizeof (broker_addr) - 1, "%s,%s",
+              ((host == NULL) ? broker_tok[0] : host),
+              ((port == NULL) ? broker_tok[1] : port));
 
-  if (uid != NULL)
-    {
-      strcpy_limit (dbinfo_t->uid, uid, sizeof (dbinfo_t->uid));
-    }
+    strcpy_limit (dbinfo_t->broker_address, broker_addr,
+                  sizeof (dbinfo_t->broker_address));
 
-  if (dbmt_user_write_auth (dbmt_user, error_msg) != ERR_NO_ERROR)
-    {
-      retval = E_FAILURE;
-      goto error_clean_return;
-    }
+    if (auth != NULL)
+      {
+        strcpy_limit (dbinfo_t->auth, auth, sizeof (dbinfo_t->auth));
+      }
+
+    if (uid != NULL)
+      {
+        strcpy_limit (dbinfo_t->uid, uid, sizeof (dbinfo_t->uid));
+      }
+
+    if (dbmt_user_write_auth_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
+      {
+        retval = E_FAILURE;
+        goto error_clean_return;
+      }
+  }
 
   retval = E_SUCCESS;
   goto memory_clean_return;
@@ -1142,6 +1220,25 @@ _dbmt_user_get (char *error_msg)
     }
 
   if (dbmt_user_read (dbmt_user, error_msg) < 0)
+    {
+      return NULL;
+    }
+
+  return dbmt_user;
+}
+
+/* see the usage note on the declaration near the top of this file */
+static T_DBMT_USER *
+_dbmt_user_get_locked (char *error_msg)
+{
+  T_DBMT_USER *dbmt_user = NULL;
+
+  if ((dbmt_user = (T_DBMT_USER *) malloc (sizeof (T_DBMT_USER))) == NULL)
+    {
+      return NULL;
+    }
+
+  if (dbmt_user_read_locked (dbmt_user, error_msg) < 0)
     {
       return NULL;
     }
