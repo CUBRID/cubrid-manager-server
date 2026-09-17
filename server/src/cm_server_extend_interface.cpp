@@ -1680,220 +1680,220 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
         return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
       }
 
-  if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
-    {
-      return build_server_header (response, retval, dbmt_error);
-    }
+    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
+      {
+        return build_server_header (response, retval, dbmt_error);
+      }
 
-  uEncrypt (PASSWD_LENGTH, password.c_str(), dbmt_password);
+    uEncrypt (PASSWD_LENGTH, password.c_str(), dbmt_password);
 
-  num_dbmt_user = dbmt_user.num_dbmt_user;
-  for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
-        {
-          dbmt_user_free (&dbmt_user);
-          sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
-          return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
-        }
-    }
+    num_dbmt_user = dbmt_user.num_dbmt_user;
+    for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
+      {
+        if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
+          {
+            dbmt_user_free (&dbmt_user);
+            sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
+            return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
+          }
+      }
 
-  // set user authority info
-  JSON_FIND_V (request, "authoritylist", build_server_header (response, ERR_PARAM_MISSING,
-               "Parameter(authoritylist) missing in the request"));
-  authoritylist = request["authoritylist"];
-  Json::Value json_value = authoritylist;
+    // set user authority info
+    JSON_FIND_V (request, "authoritylist", build_server_header (response, ERR_PARAM_MISSING,
+                 "Parameter(authoritylist) missing in the request"));
+    authoritylist = request["authoritylist"];
+    Json::Value json_value = authoritylist;
 
-  if (json_value["admin"] != Json::Value::null)
-    {
-      if (json_value["admin"].asString() != "yes")
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
-        }
-      auth |= AU_ADMIN;
+    if (json_value["admin"] != Json::Value::null)
+      {
+        if (json_value["admin"].asString() != "yes")
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
+          }
+        auth |= AU_ADMIN;
 
-      authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                 num_authinfo + 2);
-      if (authinfo == NULL)
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
+        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+                   num_authinfo + 2);
+        if (authinfo == NULL)
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
 
-      dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
-      num_authinfo += 2;
-    }
-  else
-    {
-      JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbc or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbo or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(brk or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(mon or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(job or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(var or admin) missing in the authoritylist"));
+        dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
+        num_authinfo += 2;
+      }
+    else
+      {
+        JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbc or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbo or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(brk or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(mon or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(job or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(var or admin) missing in the authoritylist"));
 
-      if (json_value["dbc"].asString() == "yes")
-        {
-          auth |= AU_DBC;
-        }
-      else if (json_value["dbc"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["dbc"].asString() == "yes")
+          {
+            auth |= AU_DBC;
+          }
+        else if (json_value["dbc"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["dbo"].asString() == "yes")
-        {
-          auth |= AU_DBO;
-        }
-      else if (json_value["dbo"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["dbo"].asString() == "yes")
+          {
+            auth |= AU_DBO;
+          }
+        else if (json_value["dbo"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["brk"].asString() == "yes")
-        {
-          auth |= AU_BRK;
-        }
-      else if (json_value["brk"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["brk"].asString() == "yes")
+          {
+            auth |= AU_BRK;
+          }
+        else if (json_value["brk"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["mon"].asString() == "yes")
-        {
-          auth |= AU_MON;
-        }
-      else if (json_value["mon"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["mon"].asString() == "yes")
+          {
+            auth |= AU_MON;
+          }
+        else if (json_value["mon"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["job"].asString() == "yes")
-        {
-          auth |= AU_JOB;
-        }
-      else if (json_value["job"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["job"].asString() == "yes")
+          {
+            auth |= AU_JOB;
+          }
+        else if (json_value["job"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["var"].asString() == "yes")
-        {
-          auth |= AU_VAR;
-        }
-      else if (json_value["var"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["var"].asString() == "yes")
+          {
+            auth |= AU_VAR;
+          }
+        else if (json_value["var"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
+          }
 
-      // all authorites are set as 'no'
-      if (auth == 0)
-        {
-          return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
-        }
+        // all authorites are set as 'no'
+        if (auth == 0)
+          {
+            return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
+          }
 
-      authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                 num_authinfo + 7);
-      if (authinfo == NULL)
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
-      num_authinfo += 7;
+        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+                   num_authinfo + 7);
+        if (authinfo == NULL)
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
+        num_authinfo += 7;
 
-      // maybe only for debug
-      dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
-    }
+        // maybe only for debug
+        dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
+      }
 
-  sprintf (str_auth, "%u", auth);
-  dbmt_user_set_authinfo (& (authinfo[0]), "user_auth", str_auth);
+    sprintf (str_auth, "%u", auth);
+    dbmt_user_set_authinfo (& (authinfo[0]), "user_auth", str_auth);
 
-  LOG_DEBUG ("set user authority info successfully.");
+    LOG_DEBUG ("set user authority info successfully.");
 
-  // set db authority info
-  JSON_FIND_V (request, "dbauth", build_server_header (response, ERR_PARAM_MISSING,
-               "Parameter(dbauth) missing in the request"));
+    // set db authority info
+    JSON_FIND_V (request, "dbauth", build_server_header (response, ERR_PARAM_MISSING,
+                 "Parameter(dbauth) missing in the request"));
 
-  dbauthlist = request["dbauth"];
+    dbauthlist = request["dbauth"];
 
-  for (unsigned int i = 0; i < dbauthlist.size(); ++i)
-    {
-      string dbname, dbid, dbpassword, broker_address;
+    for (unsigned int i = 0; i < dbauthlist.size(); ++i)
+      {
+        string dbname, dbid, dbpassword, broker_address;
 
-      JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbname) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbid) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbpassword) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbbrokeraddress) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbname) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbid) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbpassword) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbbrokeraddress) missing in the authoritylist"));
 
-      dbname = dbauthlist[i]["dbname"].asString();
-      dbid = dbauthlist[i]["dbid"].asString();
-      dbpassword = dbauthlist[i]["dbpassword"].asString();
-      broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
+        dbname = dbauthlist[i]["dbname"].asString();
+        dbid = dbauthlist[i]["dbid"].asString();
+        dbpassword = dbauthlist[i]["dbpassword"].asString();
+        broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
 
-      dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
-               num_dbinfo, num_dbinfo + 1);
-      if (dbinfo == NULL)
-        {
-          FREE_MEM (authinfo);
-          dbmt_user_free (&dbmt_user);
+        dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
+                 num_dbinfo, num_dbinfo + 1);
+        if (dbinfo == NULL)
+          {
+            FREE_MEM (authinfo);
+            dbmt_user_free (&dbmt_user);
 
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
-      num_dbinfo++;
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
+        num_dbinfo++;
 
-      dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
-    }
+        dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
+      }
 
-  LOG_DEBUG ("set db authority info successfully.");
+    LOG_DEBUG ("set db authority info successfully.");
 
-  // store user authority info & db authority info into dbmt_user
-  dbmt_user.user_info = (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info, sizeof (T_DBMT_USER_INFO),
-                        num_dbmt_user, num_dbmt_user + 1);
-
-
-  if (dbmt_user.user_info == NULL)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
-    }
-
-  num_dbmt_user++;
-  dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
-                          authinfo, num_dbinfo, dbinfo);
-  dbmt_user.num_dbmt_user = num_dbmt_user;
+    // store user authority info & db authority info into dbmt_user
+    dbmt_user.user_info = (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info, sizeof (T_DBMT_USER_INFO),
+                          num_dbmt_user, num_dbmt_user + 1);
 
 
-  LOG_DEBUG ("store to dbmt_user successfully.");
+    if (dbmt_user.user_info == NULL)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
+      }
 
-  if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
+    num_dbmt_user++;
+    dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
+                            authinfo, num_dbinfo, dbinfo);
+    dbmt_user.num_dbmt_user = num_dbmt_user;
 
-      return build_server_header (response, retval, dbmt_error);
-    }
-  if ((retval = dbmt_user_write_pass_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
 
-      return build_server_header (response, retval, dbmt_error);
-    }
+    LOG_DEBUG ("store to dbmt_user successfully.");
+
+    if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        dbmt_user_free (&dbmt_user);
+
+        return build_server_header (response, retval, dbmt_error);
+      }
+    if ((retval = dbmt_user_write_pass_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        dbmt_user_free (&dbmt_user);
+
+        return build_server_header (response, retval, dbmt_error);
+      }
   }
 
   if ((retval = ext_ut_add_dblist_to_response (response)) != ERR_NO_ERROR)
@@ -2106,104 +2106,104 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
     }
 
   {
-  file_resource_guard user_write_guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+    file_resource_guard user_write_guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  if (!user_write_guard.ok ())
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
-    }
+    if (!user_write_guard.ok ())
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+      }
 
-  if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      return build_server_header (response, retval, dbmt_error);
-    }
+    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, retval, dbmt_error);
+      }
 
-  pos = -1;
-  for (int i = 0;  i < dbmt_user.num_dbmt_user; ++i)
-    {
-      if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
-        {
-          pos = i;
-          break;
-        }
-    }
+    pos = -1;
+    for (int i = 0;  i < dbmt_user.num_dbmt_user; ++i)
+      {
+        if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
+          {
+            pos = i;
+            break;
+          }
+      }
 
-  if (pos < 0)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      dbmt_user_free (&dbmt_user);
+    if (pos < 0)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        dbmt_user_free (&dbmt_user);
 
-      return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
-    }
+        return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
+      }
 
-  if (authinfo != NULL)
-    {
-      free (dbmt_user.user_info[pos].authinfo);
-      dbmt_user.user_info[pos].authinfo = authinfo;
-      dbmt_user.user_info[pos].num_authinfo = num_authinfo;
+    if (authinfo != NULL)
+      {
+        free (dbmt_user.user_info[pos].authinfo);
+        dbmt_user.user_info[pos].authinfo = authinfo;
+        dbmt_user.user_info[pos].num_authinfo = num_authinfo;
 
-    }
+      }
 
-  if (dbinfo != NULL)
-    {
-      if (dbmt_user.user_info[pos].dbinfo == NULL)
-        {
-          dbmt_user.user_info[pos].dbinfo = dbinfo;
-          dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
-        }
-      else
-        {
-          T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
-          for (int i = 0; i < num_dbinfo; ++i )
-            {
-              int tmp_pos = -1;
-              for (int j = 0; j < current_user->num_dbinfo; ++j)
-                {
-                  if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
-                    {
-                      tmp_pos = j;
-                    }
-                }
+    if (dbinfo != NULL)
+      {
+        if (dbmt_user.user_info[pos].dbinfo == NULL)
+          {
+            dbmt_user.user_info[pos].dbinfo = dbinfo;
+            dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
+          }
+        else
+          {
+            T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
+            for (int i = 0; i < num_dbinfo; ++i )
+              {
+                int tmp_pos = -1;
+                for (int j = 0; j < current_user->num_dbinfo; ++j)
+                  {
+                    if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
+                      {
+                        tmp_pos = j;
+                      }
+                  }
 
-              if (tmp_pos < 0)
-                {
-                  current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
-                                         sizeof (T_DBMT_USER_DBINFO),
-                                         current_user->num_dbinfo,
-                                         current_user->num_dbinfo+1);
+                if (tmp_pos < 0)
+                  {
+                    current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
+                                           sizeof (T_DBMT_USER_DBINFO),
+                                           current_user->num_dbinfo,
+                                           current_user->num_dbinfo+1);
 
-                  if (current_user->dbinfo == NULL)
-                    {
-                      FREE_MEM (dbinfo);
-                      dbmt_user_free (&dbmt_user);
+                    if (current_user->dbinfo == NULL)
+                      {
+                        FREE_MEM (dbinfo);
+                        dbmt_user_free (&dbmt_user);
 
-                      return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
-                    }
-                  tmp_pos = current_user->num_dbinfo;
-                  current_user->num_dbinfo++;
-                }
+                        return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
+                      }
+                    tmp_pos = current_user->num_dbinfo;
+                    current_user->num_dbinfo++;
+                  }
 
-              dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
-                                    dbinfo[i].dbname,
-                                    dbinfo[i].auth,
-                                    dbinfo[i].uid,
-                                    dbinfo[i].broker_address);
-            }
-        }
-    }
+                dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
+                                      dbinfo[i].dbname,
+                                      dbinfo[i].auth,
+                                      dbinfo[i].uid,
+                                      dbinfo[i].broker_address);
+              }
+          }
+      }
 
-  if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      FREE_MEM (dbinfo);
-      dbmt_user_free (&dbmt_user);
+    if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        FREE_MEM (dbinfo);
+        dbmt_user_free (&dbmt_user);
 
-      return build_server_header (response, retval, dbmt_error);
-    }
+        return build_server_header (response, retval, dbmt_error);
+      }
   }
 
 
