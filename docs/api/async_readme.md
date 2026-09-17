@@ -16,6 +16,8 @@ If `async` is not specified in the request, it defaults to `"async":"no"` and th
 
 Each of these tasks accepts the `async` key alongside its own task-specific parameters; see the individual task pages linked above for their full request/response syntax.
 
+Sending `"async":"yes"` on any task not listed above is not an error: CMS silently ignores it and runs the task synchronously, the same as if `async` had been omitted.
+
 ## Requesting Async Execution
 
 Add `"async":"yes"` to the request of any task listed above:
