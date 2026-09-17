@@ -53,7 +53,7 @@
 #define MIN_THREAD_NUM           1
 /* Reject multi connection with "ALL USER" */
 
-#define NUM_DBMT_FILE            23
+#define NUM_DBMT_FILE            24
 
 #define DEFAULT_CWM_PATH_SHORT            "/share/webmanager"
 #define DEFAULT_SSL_CERTIFICATE           "cm_ssl_cert.crt"
@@ -120,6 +120,7 @@ static T_DBMT_FILE_INFO dbmt_file[NUM_DBMT_FILE] =
   {FID_LOCK_PSVR_DBINFO, DBMT_TMP_DIR, "cmdbinfo.lock"},
   {FID_LOCK_SVR_LOG, DBMT_TMP_DIR, "cmlog.lock"},
   {FID_LOCK_DBMT_PASS, DBMT_TMP_DIR, "cmpass.lock"},
+  {FID_LOCK_AUTO_CONF, DBMT_TMP_DIR, "autoconf.lock"},
   {FID_DIAG_ACTIVITY_LOG, DBMT_CONF_DIR, "diagactivitylog.conf"},
   {FID_DIAG_STATUS_TEMPLATE, DBMT_CONF_DIR, "diagstatustemplate.conf"},
   {FID_DIAG_ACTIVITY_TEMPLATE, DBMT_CONF_DIR, "diagactivitytemplate.conf"},
@@ -628,6 +629,22 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
   char strbuf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   FILE *infp, *outfp;
 
+  /*
+   * the read (infp) - modify (in the fgets/fputs loop below) - write
+   * (move_file ()) sequence has to be atomic with respect to other
+   * threads/processes touching the same auto*.conf file, or a concurrent
+   * writer's change can be silently lost when this function's tmpfile
+   * overwrites it. auto_conf_mutex is shared by all of the auto*.conf
+   * files (addvoldb/backupdb/history/execquery) rather than one mutex per
+   * file: these are low-frequency admin-driven config edits, so a single
+   * coarse lock is simpler and cheap enough.
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
+
   conf_get_dbmt_file (fid, conf_file);
   if ((infp = fopen (conf_file, "r")) == NULL)
     {
@@ -668,6 +685,13 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
   char conf_dbname[128];
   char strbuf[1024], *p;
   FILE *infp, *outfp;
+
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
 
   conf_get_dbmt_file (fid, conf_file);
   if ((infp = fopen (conf_file, "r")) == NULL)
@@ -718,6 +742,13 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   char *strbuf, *p;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
+
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
 
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, conf_file_path);
   if ((conf_file = fopen (conf_file_path, "r")) == NULL)
@@ -783,6 +814,13 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   char *strbuf;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
+
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
 
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, conf_file_path);
   if ((conf_file = fopen (conf_file_path, "r")) == NULL)

@@ -152,6 +152,26 @@ cm_conn_list_mutex (void)
   return &h.m;
 }
 
+mutex_t *
+cm_auto_conf_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
