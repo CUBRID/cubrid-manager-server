@@ -687,14 +687,14 @@ cmd_chguser_auth (int argc, const char *in_argv[])
     if (!guard.ok ())
       {
         strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
       {
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
@@ -871,14 +871,14 @@ cmd_adddbinfo (int argc, const char *in_argv[])
     if (!guard.ok ())
       {
         strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
       {
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
@@ -1093,14 +1093,14 @@ cmd_chgdbinfo (int argc, const char *in_argv[])
     if (!guard.ok ())
       {
         strcpy_limit (error_msg, "cmdb.pass lock error", DBMT_ERROR_MSG_SIZE);
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user = _dbmt_user_get_locked (error_msg)) == NULL)
       {
-        _errmsg_output (cmd_id, error_msg);
-        return E_FAILURE;
+        retval = E_FAILURE;
+        goto error_clean_return;
       }
 
     if ((dbmt_user_index = _get_dbmt_user_index (dbmt_user, username)) < 0)
