@@ -1380,7 +1380,8 @@ parse_uuid (const Json::Value &v, INT64 &out)
 #else
       unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
 #endif
-      if (endptr == s.c_str () || *endptr != '\0' || errno == ERANGE)
+      if (endptr == s.c_str () || *endptr != '\0' || errno == ERANGE
+         || parsed > (unsigned long long) INT64_MAX)
         {
           return false;
         }
