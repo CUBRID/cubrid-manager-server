@@ -641,6 +641,7 @@ db_running_async_start (const vector <string> &dbnames, const string &task_name,
     {
       /*
        * roll back names 0..i erase () on a key that was never
+       * inserted is a harmless no-op.
        */
       for (size_t j = 0; j <= i && j < dbnames.size (); j++)
         {
