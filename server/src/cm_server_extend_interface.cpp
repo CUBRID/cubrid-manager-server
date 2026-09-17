@@ -1680,7 +1680,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
         return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
       }
 
-    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
+    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
         return build_server_header (response, retval, dbmt_error);
       }
