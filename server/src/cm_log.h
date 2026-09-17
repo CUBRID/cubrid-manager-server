@@ -315,7 +315,6 @@ class CLog
       static CLog *instance_log = NULL;
       static CLog *instance_err = NULL;
 
-      /* xFATAL is 0 and logLevel is unsigned, so the lower bound is implicit. */
       if (logLevel <= CLog::xWARN)
 	{
 	  // write log into error log file

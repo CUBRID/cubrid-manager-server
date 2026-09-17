@@ -1416,8 +1416,6 @@ void cm_mon_stat::gather_daily_dbs_mon (time_t gather_time)
 		  req["dbname"] = dbname;
 		  req["remotehostname"] = ha_rmt_hostname;
 		  string copylog = ha_res["ha_info"][i]["copylogdb"].asString();
-		  /* string::npos does not fit in an unsigned int: the cast made the
-		     'not found' test below always false and substr() then threw. */
 		  size_t colon_idx = copylog.find (':');
 		  if (string::npos == colon_idx)
 		    {

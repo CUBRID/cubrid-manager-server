@@ -535,8 +535,6 @@ uRemoveCRLF (char *str)
       return;
     }
 
-  /* i >= 0 is always true for a size_t, so the old loop ran off the front of an
-     empty or all-CRLF string and indexed str[(size_t) -1]. */
   len = strlen (str);
   while (len > 0 && (str[len - 1] == 10 || str[len - 1] == 13))
     {

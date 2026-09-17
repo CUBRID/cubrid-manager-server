@@ -2195,8 +2195,6 @@ namespace jwsmtp
 	    return newaddress;  // its empty, oops (this should fail at the server.)
 	  }
 
-	// was '!addresstoparse.find ("@") == std::string::npos', which compares a bool
-	// against npos and is therefore never true
 	if (addresstoparse.find ("@") == std::string::npos)
 	  {
 	    // no '@' symbol (could be a local address, e.g. root)

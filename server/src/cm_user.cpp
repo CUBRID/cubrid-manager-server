@@ -567,8 +567,6 @@ dbmt_user_new_token_info (const char *user_id,
       user_token_info->prev = new_node;
     }
 
-  /* the bound has to leave room for the terminator, otherwise a value that
-     exactly fills the field leaves it unterminated */
   strncpy (new_node->user_id, user_id, sizeof (new_node->user_id) - 1);
   new_node->user_id[sizeof (new_node->user_id) - 1] = '\0';
   strncpy (new_node->user_ip, user_ip, sizeof (new_node->user_ip) - 1);

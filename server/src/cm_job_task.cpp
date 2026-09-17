@@ -7528,7 +7528,6 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
   int len_tmp = 0;
   char buf[1024];
 
-  /* both callers pass NULL for one of the two files */
   if (stderr_file != NULL && access (stderr_file, F_OK) == 0)
     {
       fp = fopen (stderr_file, "r");
@@ -16604,8 +16603,6 @@ _hash_cert (char *hash_value, char *file_path)
   EVP_MD_CTX_free (mdContext);
   fclose (inFile);
 
-  /* two hex digits per byte, appended in place; the caller sizes hash_value for
-     the whole digest and starts it as an empty string */
   hash_p = hash_value + strlen (hash_value);
   for (i = 0; i < md5_len; i++)
     {
