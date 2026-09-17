@@ -170,15 +170,19 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version)
 	{
 	  LOG_ERROR ("Spacedb is skipped due to temporarily insufficient resources");
 	  major_version = minor_version = -1;
+	  fclose (infile);
+	  unlink (tmpfile);
 	  return;
 	}
       char version[10];
-      sscanf (strbuf, "%*s %s", version);
+
+      version[0] = '\0';
+      sscanf (strbuf, "%*s %9s", version);
 
       char *p = strtok (version, ".");
-      major_version = atoi (p);
-      p = strtok (NULL, ".");
-      minor_version = atoi (p);
+      major_version = (p != NULL) ? atoi (p) : -1;
+      p = (p != NULL) ? strtok (NULL, ".") : NULL;
+      minor_version = (p != NULL) ? atoi (p) : -1;
 
       fclose (infile);
       unlink (tmpfile);
@@ -210,7 +214,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
       cubrid_version_minor = minor_version;
     }
 
-  if (cubrid_version_major < 10 || (cubrid_version_minor == 10 && cubrid_version_minor == 0))
+  if (cubrid_version_major < 10 || (cubrid_version_major == 10 && cubrid_version_minor == 0))
     {
       res = new SpaceDbResultOldFormat();
     }
@@ -809,21 +813,28 @@ _size_to_byte_by_unit (double orgin_num, char unit)
 
 void SpaceDbResultNewFormat::add_volume (char *str_buf)
 {
-  char purpose[128], volume_name[PATH_MAX], type[32];
+  char purpose[COLUMN_VALUE_MAX_SIZE], volume_name[4096], type[COLUMN_VALUE_MAX_SIZE];
   struct stat statbuf;
 
   SpaceDbVolumeInfoNewFormat volume;
-  sscanf (str_buf, "%d %s %s DATA %d %d %d %s", &volume.volid, type, purpose,
+
+  memset (&volume, 0, sizeof (volume));
+  purpose[0] = volume_name[0] = type[0] = '\0';
+
+  sscanf (str_buf, "%d %31s %31s DATA %d %d %d %4095s", &volume.volid, type, purpose,
 	  &volume.used_size,
 	  &volume.free_size,
 	  &volume.total_size,
 	  volume_name);
-  strcpy (volume.purpose, purpose);
-  strcpy (volume.type, type);
-  strcpy (volume.volume_name, volume_name);
 
-  stat (volume_name, &statbuf);
-  volume.date = statbuf.st_mtime;
+  strcpy_limit (volume.purpose, purpose, sizeof (volume.purpose));
+  strcpy_limit (volume.type, type, sizeof (volume.type));
+  strcpy_limit (volume.volume_name, volume_name, sizeof (volume.volume_name));
+
+  if (stat (volume_name, &statbuf) == 0)
+    {
+      volume.date = statbuf.st_mtime;
+    }
 
   volumes.push_back (volume);
 }
@@ -1332,12 +1343,15 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
 	{
 	  break;
 	}
-      sscanf (str_buf, "%s %s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
-	      databaseSpaceDescriptions[index].purpose, &databaseSpaceDescriptions[index].volume_count,
-	      &databaseSpaceDescriptions[index].used_size,
-	      &databaseSpaceDescriptions[index].free_size,
-	      &databaseSpaceDescriptions[index].total_size);
-      index++;
+      if (index < DATABASE_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %31s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
+		  databaseSpaceDescriptions[index].purpose, &databaseSpaceDescriptions[index].volume_count,
+		  &databaseSpaceDescriptions[index].used_size,
+		  &databaseSpaceDescriptions[index].free_size,
+		  &databaseSpaceDescriptions[index].total_size);
+	  index++;
+	}
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
@@ -1377,14 +1391,16 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
 	{
 	  continue;
 	}
-
-      sscanf (str_buf, "%s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
-	      &fileSpaceDescriptions[index].file_count,
-	      &fileSpaceDescriptions[index].used_size,
-	      &fileSpaceDescriptions[index].file_table_size,
-	      &fileSpaceDescriptions[index].reserved_size,
-	      &fileSpaceDescriptions[index].total_size);
-      index++;
+      if (index < FILES_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
+		  &fileSpaceDescriptions[index].file_count,
+		  &fileSpaceDescriptions[index].used_size,
+		  &fileSpaceDescriptions[index].file_table_size,
+		  &fileSpaceDescriptions[index].reserved_size,
+		  &fileSpaceDescriptions[index].total_size);
+	  index++;
+	}
     }
 
   fclose (fp);

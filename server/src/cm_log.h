@@ -98,6 +98,9 @@ class CLog
       mutex_init (m_cs);
     }
 
+    CLog (const CLog &) = delete;
+    CLog &operator= (const CLog &) = delete;
+
   public:
     ~CLog ()
     {

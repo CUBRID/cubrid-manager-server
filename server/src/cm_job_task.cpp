@@ -2802,16 +2802,12 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "--" CREATE_LOG_VOLUMN_SIZE_L;
   argv[argc++] = logvolsize;
 
-  if (dbpagesize)
-    {
-      argv[argc++] = "--" CREATE_DB_PAGE_SIZE_L;
-      argv[argc++] = dbpagesize;
-    }
-  if (logpagesize)
-    {
-      argv[argc++] = "--" CREATE_LOG_PAGE_SIZE_L;
-      argv[argc++] = logpagesize;
-    }
+  argv[argc++] = "--" CREATE_DB_PAGE_SIZE_L;
+  argv[argc++] = dbpagesize;
+
+  argv[argc++] = "--" CREATE_LOG_PAGE_SIZE_L;
+  argv[argc++] = logpagesize;
+
   if (logvolpath)
     {
 #if defined(WINDOWS)
@@ -3406,8 +3402,6 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
       cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
-  err_message = cmd_res->get_err_msg();
-
   if (cmd_res == NULL)
     {
       sprintf (_dbmt_error, "spacedb %s", dbname);
@@ -3415,6 +3409,7 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else if (cmd_res->has_error())
     {
+      err_message = cmd_res->get_err_msg();
       strcpy (_dbmt_error, err_message);
       retval = ERR_WITH_MSG;
     }
@@ -3571,7 +3566,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   free_space_mb = ut_disk_free_space (volpath);
-  if (dbvolsize && (free_space_mb < atoi (dbvolsize)))
+  if (free_space_mb < atoi (dbvolsize))
     {
       sprintf (_dbmt_error, "Not enough free space in disk.");
       return ERR_WITH_MSG;
@@ -5474,6 +5469,7 @@ unlink_schema_files (const char *schema_list_file)
       }
     else
       {
+	fclose (fp);
 	return;
       }
   }
@@ -5481,6 +5477,7 @@ unlink_schema_files (const char *schema_list_file)
   snprintf (path, PATH_MAX, "%s", schema_list_file);
   if (dirname (path) == NULL)
     {
+      fclose (fp);
       return;
     }
 #endif
@@ -7494,7 +7491,7 @@ get_next_sqltext (FILE *qfp, char *qry_buf, int offset_v, int query_file_size)
 
 	      if (!feof (qfp))
 		{
-		  fseek (qfp, -1 * strlen (sbuf), SEEK_CUR); /* push back to iostream */
+		  fseek (qfp, - (long) strlen (sbuf), SEEK_CUR); /* push back to iostream */
 		}
 	      break;
 	    }
@@ -8666,7 +8663,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (obsolete_version_autoexecquery_conf (line_buf))
 	{
-	  if (sscanf (line_buf, "%64s %*s %64s", db_name, dbmt_uid) < 2)
+	  if (sscanf (line_buf, "%63s %*s %63s", db_name, dbmt_uid) < 2)
 	    {
 	      continue;
 	    }
@@ -8682,7 +8679,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
       else
 	{
 	  if (sscanf
-	      (line_buf, "%64s %*s %64s %80s %64s", db_name, db_uid,
+	      (line_buf, "%63s %*s %63s %64s %63s", db_name, db_uid,
 	       enc_dbpasswd, dbmt_uid) < 4)
 	    {
 	      continue;
@@ -12294,7 +12291,7 @@ parse_ha_proc_msg_to_all_info_array (char *buf, char *_dbmt_error,
   char elem_name[64] = { 0 };
   char state[64] = { 0 };
   char dbname[DB_NAME_LEN] = { 0 };
-  char logpath[PATH_MAX] = { 0 };
+  char logpath[1024] = { 0 };
   char hostname[MAXHOSTNAMELEN] = { 0 };
   int dbinfo_index = 0;
   int retval = ERR_NO_ERROR;
@@ -12407,7 +12404,7 @@ parse_ha_proc_msg_to_all_info_array (char *buf, char *_dbmt_error,
 	  T_HA_DBSERVER_INFO *db_info_t = NULL;
 	  T_HA_LOG_PROC_INFO p_proc_info;
 	  memset (&p_proc_info, 0, sizeof (T_HA_LOG_PROC_INFO));
-	  if (sscanf (tmpbuf, "%63[^@] @ %128[^:] : %1023s", dbname,
+	  if (sscanf (tmpbuf, "%63[^@] @ %63[^:] : %1023s", dbname,
 		      hostname, logpath) != 3)
 	    {
 	      retval = ERR_NO_ERROR;
@@ -13202,7 +13199,7 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      int num_holders, num_b_holders, num_waiters, scan_matched;
 
 	      scan_matched =
-		      sscanf (buf, "%*s %*s  %[^|] %*[|] %[^|] %*[|] %255s", s1, s2, s3);
+		      sscanf (buf, "%*s %*s  %255[^|] %*[|] %255[^|] %*[|] %255s", s1, s2, s3);
 	      if (scan_matched != 3)
 		{
 		  return -1;
@@ -13915,7 +13912,8 @@ obsolete_version_autoexecquery_conf (const char *conf_line)
       return -1;
     }
 
-  sscanf (conf_line, "%*s %*s %*s %80s", conf_item_buf);
+  conf_item_buf[0] = '\0';
+  sscanf (conf_line, "%*s %*s %*s %79s", conf_item_buf);
   if (strcmp (conf_item_buf, "ONE") == 0
       || strcmp (conf_item_buf, "DAY") == 0
       || strcmp (conf_item_buf, "WEEK") == 0
@@ -14833,8 +14831,8 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
 
 	      ret_val = ERR_SYSTEM_CALL;
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 
   if (access (stdout_file, F_OK) == 0 && ret_val == ERR_NO_ERROR)
@@ -14860,8 +14858,8 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
 				"...", 4);
 		}
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 
   return ret_val;

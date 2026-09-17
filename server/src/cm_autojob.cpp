@@ -454,7 +454,7 @@ aj_autohistory_handler (void *ajp, time_t prev_check_time, time_t cur_time)
 				   mondata->dbbuf[i].db_name);
 			  fprintf (hsp->hfile, "pid:%d ",
 				   mondata->dbbuf[i].db_pid);
-			  fprintf (hsp->hfile, "size:%ld ",
+			  fprintf (hsp->hfile, "size:%lu ",	/* db_size is unsigned long */
 				   mondata->dbbuf[i].db_size);
 			  fprintf (hsp->hfile, "status:%c ",
 				   mondata->dbbuf[i].proc_stat[0]);

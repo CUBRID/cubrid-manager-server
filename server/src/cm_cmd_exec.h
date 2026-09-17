@@ -190,7 +190,7 @@ class GeneralSpacedbResult
 class SpaceDbResultNewFormat : public GeneralSpacedbResult
 {
   public:
-    SpaceDbResultNewFormat() {}
+    SpaceDbResultNewFormat() : databaseSpaceDescriptions(), fileSpaceDescriptions() {}
     void add_volume (char *);
     int get_cnt_tpage();
     void get_total_and_free_page (const char *type, double &free_page, double &total_page)

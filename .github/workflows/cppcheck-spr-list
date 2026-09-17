@@ -3,3 +3,14 @@ objectIndex
 unknownMacro
 internalAstError
 preprocessorErrorDirective
+
+# Vendored third-party single-header libraries. They are taken from upstream as
+# they are and are not maintained here, so their findings are not actionable:
+#   cm_compress.h  miniz v1.12 (public domain)
+#   cm_mailer.h    jwSMTP (GPLv2)
+# miniz's decompressor is a switch-based coroutine that restores its state on
+# re-entry; cppcheck cannot follow that control flow and reports every variable
+# it restores as used-before-set, plus the NULL+0 pointer arithmetic its API
+# uses to mean "no output buffer".
+*:server/src/cm_compress.h
+*:server/src/cm_mailer.h
