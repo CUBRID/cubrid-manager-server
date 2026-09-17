@@ -89,11 +89,11 @@ To see the async subsystem's overall state instead of one specific job - how man
 
 The following parameters, configurable in `cm.conf`, control async job behavior:
 
-| **Key** | **Description** | **Default** | **Maximum** |
-| --- | --- | --- | --- |
-| max_num_async_task | Maximum number of async jobs that can run simultaneously on the server. | 8 | 12 |
-| async_job_ttl_sec | Number of seconds a completed job's `uuid` remains valid for [gettaskstatus](gettaskstatus.md) lookups, before it is dropped. | 3600 (1 hour) | 604800 (1 week) |
-| async_long_job_sec | Execution time, in seconds, after which CMS considers an async job to have been running for an excessive amount of time. CMS does not terminate the job when this threshold is exceeded; it only records that the job has run long. | 86400 (1 day) | 604800 (1 week) |
+| **Key** | **Description** | **Minimum** | **Default** | **Maximum** |
+| --- | --- | --- | --- | --- |
+| max_num_async_task | Maximum number of async jobs that can run simultaneously on the server. | 1 | 8 | 12 |
+| async_job_ttl_sec | Number of seconds a completed job's `uuid` remains valid for [gettaskstatus](gettaskstatus.md) lookups, before it is dropped. | 60 (1 minute) | 3600 (1 hour) | 604800 (1 week) |
+| async_long_job_sec | Execution time, in seconds, after which CMS considers an async job to have been running for an excessive amount of time. CMS does not terminate the job when this threshold is exceeded; it only records that the job has run long. | 60 (1 minute) | 86400 (1 day) | 604800 (1 week) |
 
 ### Example
 
