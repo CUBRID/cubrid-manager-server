@@ -948,6 +948,7 @@ main (int argc, char **argv)
   start_auto_thread ();
 
   find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build, sizeof (cubrid_version_build));
+  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
 
   if (start_service () < 0)
     {
@@ -956,8 +957,6 @@ main (int argc, char **argv)
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       exit (1);
     }
-
-  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
 
   return 0;
 }
