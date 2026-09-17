@@ -168,6 +168,9 @@ mutex_t *cm_conn_list_mutex (void);
  * file_resource_guard - RAII guard combining one of the in-process
  *   mutexes above with the existing uCreateLockFile ()/uRemoveLockFile ()
  *   cross-process file lock (see the comment above).
+ *
+ *   lock order: cm_mutex -> {cmdb_pass_mutex, cmdbinfo_temp_mutex, conn_list_mutex}.
+ *               never acquire cm_mutex while holding one of these.
  */
 class file_resource_guard
 {
