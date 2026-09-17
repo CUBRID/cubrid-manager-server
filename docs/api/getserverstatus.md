@@ -50,8 +50,6 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | max_async_job | same value as `cm-conf.max_num_async_task` |
 | num_timeout_fallback_jobs | number of jobs that ran past `http_timeout` on a *synchronous* (`"async":"no"`) request and fell back to being tracked like an async job; tracked separately from `num_async_job_running` so this kind of traffic can never block genuine `"async":"yes"` admission |
 
-* `num_timeout_fallback_jobs` is absent from the response when built against an older CMS version that predates the fallback-job counter.
-
 ### request-map
 
 The in-memory table that backs [gettaskstatus](gettaskstatus.md) lookups.
