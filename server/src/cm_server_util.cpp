@@ -3155,7 +3155,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
 	{
 	  return -1;
 	}
-      snprintf (ret_filename, PATH_MAX, short_filename);
+      snprintf (ret_filename, PATH_MAX, "%s", short_filename);
     }
   return 0;
 }
@@ -3701,7 +3701,7 @@ ut_record_cubrid_utility_log_stderr (const char *msg)
 #if !defined(WINDOWS)
   fprintf (stderr, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }
@@ -3714,9 +3714,9 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
       return -1;
     }
 #if !defined(WINDOWS)
-  fprintf (stdout, msg);
+  fprintf (stdout, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }
