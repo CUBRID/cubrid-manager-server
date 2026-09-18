@@ -1232,6 +1232,16 @@ uCreateLockFile (char *lockfile)
 #if !defined(WINDOWS)
   struct flock lock;
 #endif
+  /*
+   * How long to keep retrying a contended lock before giving up.
+   * The retry budgets below both target the same ~5 second ceiling
+   */
+#if defined(WINDOWS)
+  const int max_lock_retry = 50;      /* 50 * 100ms  = ~5 sec */
+#else
+  const int max_lock_retry = 500;     /* 500 * 10ms  = ~5 sec */
+#endif
+  int lock_retry;
 
   outfd = open (lockfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
@@ -1241,8 +1251,17 @@ uCreateLockFile (char *lockfile)
     }
 
 #if defined(WINDOWS)
-  while (_locking (outfd, _LK_NBLCK, 1) < 0)
+  for (lock_retry = 0; _locking (outfd, _LK_NBLCK, 1) < 0; lock_retry++)
     {
+      if (lock_retry >= max_lock_retry)
+        {
+          /*
+           * give up: close the fd we opened above before reporting
+           * failure.
+           */
+          close (outfd);
+          return -1;
+        }
       Sleep (100);
     }
 #else
@@ -1251,8 +1270,13 @@ uCreateLockFile (char *lockfile)
   lock.l_whence = SEEK_SET;
   lock.l_len = 0;
 
-  while (fcntl (outfd, F_SETLK, &lock) < 0)
+  for (lock_retry = 0; fcntl (outfd, F_SETLK, &lock) < 0; lock_retry++)
     {
+      if (lock_retry >= max_lock_retry)
+        {
+          close (outfd);
+          return -1;
+        }
       SLEEP_MILISEC (0, 10);
     }
 #endif
