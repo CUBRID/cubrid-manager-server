@@ -66,9 +66,6 @@ if "!exitcode!" == "0" (
 	exit /b !exitcode!
 )
 
-set platform_token=%platform%
-if "%platform%" == "Win32" set platform_token=x86
-
 if "%mode%" == "debug" set is_debug=true
 
 set target_server=pack_server
