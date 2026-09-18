@@ -148,6 +148,28 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
   return res;
 }
 
+static void
+_parse_version_field (const char *s, int *out)
+{
+  char *endptr = NULL;
+  long v;
+
+  if (s == NULL || *s == '\0')
+    {
+      return;
+    }
+
+  errno = 0;
+  v = strtol (s, &endptr, 10);
+  if (errno == ERANGE || endptr == s || *endptr != '\0' || v < 0 || v > INT_MAX)
+    {
+      return;
+    }
+
+  *out = (int) v;
+  return;
+}
+
 void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size)
 {
   const char *argv[3];
@@ -208,24 +230,24 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
     }
 
   char *p = STRTOK (version, ".", &saveptr);
-  if (p != NULL && is_positive_number (p))
+  if (p != NULL)
     {
-      local_major = atoi (p);
+      _parse_version_field (p, &local_major);
     }
 
   p = STRTOK (NULL, ".", &saveptr);
-  if (p != NULL && is_positive_number (p))
+
+  if (p != NULL)
     {
-      local_minor = atoi (p);
+      _parse_version_field (p, &local_minor);
     }
 
-  if (local_major < 0 || local_minor < 0)
+  if (local_major < 10 || local_minor < 0)  /* This CMS supports version 10.0 or higher */
     {
       LOG_ERROR ("Unable to parse cubrid minor version from '%s'. Set version to %d.%d defined by default.",
                  version, cubrid_version_major, cubrid_version_minor);
     }
-
-  if (local_major > 0 && local_minor >= 0)
+  else
     {
       major_version = local_major;
       minor_version = local_minor;
