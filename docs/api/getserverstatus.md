@@ -29,8 +29,9 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | async-slot | current async job slot usage; see below |
 | request-map | in-memory async job tracking table status; see below |
 | db-running-async | list of databases currently busy with an exclusive async task |
-| | a copydb/renamedb job appears as two entries (source and target) |
 | statdump-daemon | list of running statdump daemons |
+
+* a copydb/renamedb job appears in `db-running-async` as two entries (source and target)
 
 ### cm-conf
 
