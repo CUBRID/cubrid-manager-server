@@ -16074,6 +16074,7 @@ static void
 _write_auto_update_log (char *line_buf, int is_success)
 {
   char *log_time;
+  const char *log_time_str;
 
   char log_path[PATH_MAX];
 
@@ -16082,16 +16083,22 @@ _write_auto_update_log (char *line_buf, int is_success)
   sprintf (log_path, "%s/log/manager/cms.update.log", sco.szCubrid);
 
   fin = fopen (log_path, "a");
+  if (fin == NULL)
+    {
+      return;
+    }
 
   log_time = _get_format_time ();
+  log_time_str = (log_time != NULL) ? log_time : "unknown";
+
   if (is_success)
     {
-      fprintf (fin, "[%s] %s, update to %s.\n", log_time, line_buf,
+      fprintf (fin, "[%s] %s, update to %s.\n", log_time_str, line_buf,
 	       sco.szCMSVersion);
     }
   else
     {
-      fprintf (fin, "[%s] CMS update error: %s\n", log_time, line_buf);
+      fprintf (fin, "[%s] CMS update error: %s\n", log_time_str, line_buf);
     }
 
   free (log_time);
