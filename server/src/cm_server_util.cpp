@@ -1226,7 +1226,7 @@ ut_get_dblist (nvplist *res, char dbdir_flag)
 }
 
 int
-uCreateLockFile (char *lockfile)
+uCreateLockFile (char *lockfile, int timeout_ms)
 {
   int outfd;
 #if !defined(WINDOWS)
@@ -1234,14 +1234,20 @@ uCreateLockFile (char *lockfile)
 #endif
   /*
    * How long to keep retrying a contended lock before giving up.
-   * The retry budgets below both target the same ~5 second ceiling
    */
 #if defined(WINDOWS)
-  const int max_lock_retry = 50;      /* 50 * 100ms  = ~5 sec */
+  const int retry_interval_ms = 100;    /* poll cadence: ~100ms on Windows */
 #else
-  const int max_lock_retry = 500;     /* 500 * 10ms  = ~5 sec */
+  const int retry_interval_ms = 10;     /* poll cadence: ~10ms on POSIX */
 #endif
+  int max_lock_retry;
   int lock_retry;
+
+  if (timeout_ms < 0)
+    {
+      timeout_ms = 0;
+    }
+  max_lock_retry = timeout_ms / retry_interval_ms;
 
   outfd = open (lockfile, O_WRONLY | O_CREAT | O_TRUNC, 0666);
 
@@ -1262,7 +1268,7 @@ uCreateLockFile (char *lockfile)
           close (outfd);
           return -1;
         }
-      Sleep (100);
+      Sleep (retry_interval_ms);
     }
 #else
   lock.l_type = F_WRLCK;
@@ -1277,7 +1283,7 @@ uCreateLockFile (char *lockfile)
           close (outfd);
           return -1;
         }
-      SLEEP_MILISEC (0, 10);
+      SLEEP_MILISEC (0, retry_interval_ms);
     }
 #endif
 
@@ -2679,6 +2685,16 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
   sec = end->tv_sec - start->tv_sec;
   msec = (end->tv_usec / 1000) - (start->tv_usec / 1000);
   *res_msec = sec * 1000 + msec;
+}
+
+long
+ut_get_msec_marker (void)
+{
+  struct timeval tv;
+
+  gettimeofday (&tv, NULL);
+
+  return (long) tv.tv_sec * 1000 + (long) (tv.tv_usec / 1000);
 }
 
 /*

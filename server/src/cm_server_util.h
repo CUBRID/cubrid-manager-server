@@ -157,8 +157,16 @@ int _isRegisteredDB (char *);
 void uWriteDBnfo (void);
 void uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res);
 int ut_get_dblist (nvplist *res, char dbdir_flag);
-int uCreateLockFile (char *filename);
+#define LOCK_FILE_DEFAULT_TIMEOUT_MS 5000
+
+/*
+ * uCreateLockFile () - timeout_ms is the total time budget (in
+ *   milliseconds) to keep retrying before giving up.
+ */
+int uCreateLockFile (char *filename, int timeout_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS);
 void uRemoveLockFile (int fd);
+
+long ut_get_msec_marker (void);
 
 mutex_t *cm_cmdb_pass_mutex (void);
 mutex_t *cm_cmdbinfo_temp_mutex (void);
@@ -182,10 +190,56 @@ class file_resource_guard
       : m_proc_mutex (proc_mutex), m_fd (-1)
     {
       char path[PATH_MAX];
+      long start_ms, elapsed_ms, remaining_ms;
+      bool mutex_acquired = false;
 
-      mutex_lock (m_proc_mutex);
+#if defined (WINDOWS)
+      const int retry_interval_ms = 100;
+#else
+      const int retry_interval_ms = 10;
+#endif
+      start_ms = ut_get_msec_marker ();
 
-      m_fd = uCreateLockFile (conf_get_dbmt_file (lock_fid, path));
+      for (;;)
+        {
+          if (mutex_trylock (m_proc_mutex))
+            {
+              mutex_acquired = true;
+              break;
+            }
+
+          elapsed_ms = ut_get_msec_marker () - start_ms;
+          if (elapsed_ms >= LOCK_FILE_DEFAULT_TIMEOUT_MS)
+            {
+              /* out of budget: give up. m_fd stays -1, so ok ()
+                 correctly reports failure and there is nothing to
+                 release (the mutex was never acquired here). */
+              break;
+            }
+
+          SLEEP_MILISEC (0, retry_interval_ms);
+        }
+
+      if (!mutex_acquired)
+        {
+          return;
+        }
+
+      /*
+       * Whatever time the mutex wait above consumed comes out of the
+       * budget uCreateLockFile () gets next, so the combined
+       * mutex-wait + file-lock-wait is bounded by
+       * LOCK_FILE_DEFAULT_TIMEOUT_MS overall, not by that amount
+       * PER STAGE.
+       */
+      elapsed_ms = ut_get_msec_marker () - start_ms;
+      remaining_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS - elapsed_ms;
+      if (remaining_ms < 0)
+        {
+          remaining_ms = 0;
+        }
+
+      m_fd = uCreateLockFile (conf_get_dbmt_file (lock_fid, path), (int) remaining_ms);
       if (m_fd < 0)
         {
           mutex_unlock (m_proc_mutex);

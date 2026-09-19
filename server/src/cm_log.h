@@ -52,14 +52,22 @@ using namespace std;
 #define mutex_t                           CRITICAL_SECTION
 #define mutex_init(mutex)                 InitializeCriticalSection(&mutex)
 #define mutex_lock(mutex)                 EnterCriticalSection(&mutex)
+/*
+ * mutex_trylock (mutex) - non-blocking lock attempt, added alongside the
+ *   unconditional mutex_lock () above so a caller can build a BOUNDED
+ *   wait (trylock + sleep-and-retry in a loop, giving up after some
+ *   total budget) instead of blocking forever.
+ */
+#define mutex_trylock(mutex)              TryEnterCriticalSection(&mutex)
 #define mutex_unlock(mutex)               LeaveCriticalSection(&mutex)
 #define mutex_destory(mutex)              DeleteCriticalSection(&mutex)
 #else
 #define mutex_t                           pthread_mutex_t
 #define mutex_init(mutex)                 pthread_mutex_init(&mutex, NULL)
 #define mutex_lock(mutex)                 pthread_mutex_lock(&mutex)
-#define mutex_unlock(mutex)               pthread_mutex_unlock(&mutex)
-#define mutex_destory(mutex)              pthread_mutex_destroy(&mutex)
+#define mutex_trylock(mutex)               (pthread_mutex_trylock(&mutex) == 0)
+#define mutex_unlock(mutex)                pthread_mutex_unlock(&mutex)
+#define mutex_destory(mutex)               pthread_mutex_destroy(&mutex)
 #endif
 
 #define MAX_DATE_TIME_LENGTH   128
