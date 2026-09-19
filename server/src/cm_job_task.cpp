@@ -3567,7 +3567,7 @@ tsStartDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (db_mode == DB_SERVICE_MODE_CS)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "database is aleady running: %s", dbname);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "database is already running: %s", dbname);
       return ERR_WITH_MSG;
     }
 
