@@ -590,12 +590,12 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
 		       SSL_OP_NO_SSLv3 |
                        SSL_OP_NO_SSLv2);
 
-#ifdef SSL_CTX_set_min_proto_version
-  /*
-   * we don't want support TLSv1.0, TLSv1.1
-   */
-  SSL_CTX_set_min_proto_version (ctx, TLS1_2_VERSION);
-#endif
+  if (SSL_CTX_set_min_proto_version (ctx, TLS1_2_VERSION) != 1)    /* we don't want support TLSv1.0, TLSv1.1 */
+    {
+      LOG_ERROR ("-- CUBRID Manager Server: OpenSSL error: cannot set minimum TLS version to 1.2.");
+      SSL_CTX_free (ctx);
+      return NULL;
+    }
 
   /* Find and set up our server certificate. */
   server_setup_certs (ctx, certificate_chain, private_key);
