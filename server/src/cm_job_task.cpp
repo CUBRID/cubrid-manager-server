@@ -16160,16 +16160,9 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
   char shell_name[PATH_MAX];
   char err_log[PATH_MAX];
   char output_log[PATH_MAX];
-#ifndef WINDOWS
-  char cmd[PATH_MAX];
-#endif
-  char *argv[2];
+  char *argv[3];
 
   int ret_val = 0;
-
-#ifndef WINDOWS
-  pid_t pid = 0;
-#endif
 
   patch_name = nv_get_val (req, "patch_name");
   if (patch_name == NULL)
@@ -16191,35 +16184,25 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   sprintf (shell_name, "%s" SHELL_NAME, path);
-
-  argv[0] = shell_name;
-  argv[1] = NULL;
-
   sprintf (err_log, "%scms.autoupdate.err", path);
   sprintf (output_log, "%scms.autoupdate.log", path);
 
 #ifdef WINDOWS
+  argv[0] = shell_name;
+  argv[1] = NULL;
   ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, output_log, err_log, NULL);
 
 #else
-  sprintf (cmd, "%s >%s 2>%s", shell_name, output_log, err_log);
+  argv[0] = "/bin/sh";
+  argv[1] = shell_name;
+  argv[2] = NULL;
 
-  // As "system" fucntion will wait for the command return in parent process, fork a new procee to execute it in order to avoid blocking.
-  if ((pid = fork ()) > 0)
+  ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, output_log, err_log, NULL);
+  if (ret_val < 0)
     {
-      return ERR_NO_ERROR;
-    }
-  else if (pid == 0)
-    {
-      system (cmd);
-      exit (0);
-    }
-  else
-    {
-      sprintf (_dbmt_error, "fork()");
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "run_child_env(): %s", shell_name);
       return ERR_SYSTEM_CALL;
     }
-
 #endif
 
   return ERR_NO_ERROR;
