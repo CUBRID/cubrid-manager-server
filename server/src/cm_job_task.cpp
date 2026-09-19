@@ -1158,7 +1158,10 @@ ts2_start_unicas (nvplist *in, nvplist *out, char *_dbmt_error)
   argv[argc++] = NULL;
 
   gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
-  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
+  /*
+   * ut_child_exited_ok () replaces the previous raw "rc != 0" comparison.
+   */
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || !ut_child_exited_ok (rc))
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
         {
@@ -1655,7 +1658,7 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
 
   gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
 
-  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || !ut_child_exited_ok (rc))
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
         {
@@ -10254,12 +10257,12 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-#if defined (WINDOWS)
-  ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL);
-#else
   ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, &status);
-#endif
-  if (ret < 0 || status != EXIT_SUCCESS)
+  /*
+   * ut_child_exited_ok () replaces the previous raw "status !=
+   * EXIT_SUCCESS" comparison
+   */
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       /* broker_log_converter */
       strcpy (diag_error, argv[0]);
@@ -10305,15 +10308,10 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
     extra_envp[0] = out_msg_file_env;
     extra_envp[1] = NULL;
 
-#if defined (WINDOWS)
-    status = EXIT_SUCCESS;
-    ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL, extra_envp);
-#else
     ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, &status, extra_envp);
-#endif
   }
 
-  if (ret < 0 || status != EXIT_SUCCESS)
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       /* broker_log_runner */
       return ERR_SYSTEM_CALL;
@@ -11964,13 +11962,8 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = script_path;
   argv[argc++] = NULL;
 
-  /* run *.bat or *.sh. */
-#if defined (WINDOWS)
-  ret = run_child_env (argv, RUN_FOREGROUND, NULL, outfile, errfile, NULL, extra_envp);
-#else
   ret = run_child_env (argv, RUN_FOREGROUND, NULL, outfile, errfile, &status, extra_envp);
-#endif
-  if (ret < 0 || status != EXIT_SUCCESS)
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       retval = ERR_SYSTEM_CALL;
