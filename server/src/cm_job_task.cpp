@@ -7058,6 +7058,12 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
   if ((outfile = fopen (autofilepath, "a")) == NULL)
     {
