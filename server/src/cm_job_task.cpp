@@ -934,9 +934,7 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
 	            "the password for database user '%s' was changed, but "
 	            "updating the cached credentials in cmdb.pass and/or "
-	            "autoexecquery.conf timed out or failed; CMS-mediated "
-	            "access to database '%s' as this user may still use "
-	            "the OLD password until the next successful sync",
+	            "autoexecquery.conf timed out or failed",
 	            new_db_user_name, db_name);
 	  return ERR_WARNING;
 	}
@@ -3270,11 +3268,8 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
        * clear note about what may still need manual cleanup. */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "database '%s' was deleted, but one or more bookkeeping "
-                "files (cmdb.pass and/or the auto-job addvoldb/backupdb/"
-                "history/execquery config files) could not be updated "
-                "because a lock could not be acquired in time; stale "
-                "entries referencing '%s' may remain and should be "
-                "checked and cleaned up manually",
+                "files (cmdb.pass, ...) could not be updated "
+                "because a lock could not be acquired",
                 dbname, dbname);
       return ERR_WARNING;
     }
