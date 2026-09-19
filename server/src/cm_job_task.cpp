@@ -854,7 +854,7 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
   const char *new_db_user_name;
   const char *new_db_user_pass;
   char *db_name;
-  int i, ret;
+  int ret;
 
   new_db_user_name = nv_get_val (req, "username");
   new_db_user_pass = nv_get_val (req, "userpass");
@@ -893,22 +893,6 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 
 	if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
 	  {
-	    int src_dbinfo;
-
-	    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	      {
-		src_dbinfo =
-			dbmt_user_search (& (dbmt_user.user_info[i]), db_name);
-		if (src_dbinfo < 0)
-		  {
-		    continue;
-		  }
-		if (strcmp
-		    (dbmt_user.user_info[i].dbinfo[src_dbinfo].uid, new_db_user_name) != 0)
-		  {
-		    continue;
-		  }
-	      }
 	    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
 	    dbmt_user_free (&dbmt_user);
 	  }
