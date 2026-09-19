@@ -592,7 +592,7 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
 
 #ifdef SSL_CTX_set_min_proto_version
   /*
-   * accoring to RFC8996, we don't want support TLSv1.0, TLSv1.1
+   * we don't want support TLSv1.0, TLSv1.1
    */
   SSL_CTX_set_min_proto_version (ctx, TLS1_2_VERSION);
 #endif
