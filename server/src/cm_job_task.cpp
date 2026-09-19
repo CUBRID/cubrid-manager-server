@@ -880,6 +880,13 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
   if (new_db_user_pass)
     {
       char hexacoded[PASSWD_ENC_LENGTH];
+      /*
+       * sync_failed tracks whether cmdb.pass and/or autoexecquery.conf
+       * actually picked up the new password below.
+       */
+
+      int sync_failed = 0;
+
       /* update cmdb.pass dbinfo */
       {
 	file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
@@ -905,11 +912,34 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 	    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
 	    dbmt_user_free (&dbmt_user);
 	  }
+	else
+	  {
+	    /*
+             * Lock timeout, or the cmdb.pass file could not be read:
+	     * the new password was NOT written into cmdb.pass.
+	     */
+	    sync_failed = 1;
+	  }
       }
 
       /* update db_user's passwd in autoexecquery.conf */
       uEncrypt (PASSWD_LENGTH, new_db_user_pass, hexacoded);
-      auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded);
+      if (auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded) < 0)
+	{
+	  sync_failed = 1;
+	}
+
+      if (sync_failed)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+	            "the password for database user '%s' was changed, but "
+	            "updating the cached credentials in cmdb.pass and/or "
+	            "autoexecquery.conf timed out or failed; CMS-mediated "
+	            "access to database '%s' as this user may still use "
+	            "the OLD password until the next successful sync",
+	            new_db_user_name, db_name);
+	  return ERR_WARNING;
+	}
     }
 #endif
   return ERR_NO_ERROR;
@@ -2525,6 +2555,7 @@ int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   int retval = ERR_NO_ERROR;
+  int cmdb_pass_registration_failed = 0;
   char *dbname = NULL;
   char *dbmt_user_name = NULL;
   char *charset = NULL;
@@ -2996,7 +3027,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_SYSTEM_CALL;
     }
 
-  /* add dbinfo to cmdb.pass */
+  /*
+   * add dbinfo to cmdb.pass
+   *
+   * NOTE: file_resource_guard::ok () can now return false when the
+   * cross-process lock on cmdb.pass could not be acquired within the
+   * bounded retry window
+   */
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
@@ -3022,6 +3059,10 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      }
 	  }
 	dbmt_user_free (&dbmt_user);
+      }
+    else
+      {
+	cmdb_pass_registration_failed = 1;    /* lock timeout, or the cmdb.pass file could not be read */
       }
   }
 
@@ -3093,6 +3134,18 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       unlink (extvolfile);
     }
+
+  if (cmdb_pass_registration_failed)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "database '%s' was created on disk, but it could not be "
+                "registered in cmdb.pass because the lock on cmdb.pass "
+                "could not be acquired in time (or the file could not be "
+                "read); the database is NOT currently manageable through "
+                "CMS for user '%s' until cmdb.pass is corrected manually",
+                dbname, dbmt_user_name);
+      return ERR_WITH_MSG;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3101,6 +3154,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int retval = ERR_NO_ERROR;
+  int cmdb_pass_sync_failed = 0;
   char *dbname = NULL, *delbackup;
   char cubrid_err_file[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -3163,10 +3217,27 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_SYSTEM_CALL;
     }
 
-  auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname);
-  auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname);
-  auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname);
-  auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname);
+  /*
+   * NOTE: each of these four auto_conf_*_delete () calls is a thin macro
+   * around auto_conf_delete () (see cm_config.h), and auto_conf_delete ()
+   * takes its own bounded-retry file_resource_guard lock internally.
+   */
+  if (auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
 
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
@@ -3176,6 +3247,10 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	dbmt_user_db_delete (&dbmt_user, dbname);
 	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
 	dbmt_user_free (&dbmt_user);
+      }
+    else
+      {
+	cmdb_pass_sync_failed = 1;
       }
   }
 
@@ -3187,6 +3262,22 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   rmdir (dblogpath);
   rmdir (dbvolpath);
 
+  if (cmdb_pass_sync_failed)
+    {
+      /* Soft failure: the delete already happened, so we report
+       * "warning" (see the ERR_WARNING case in uGenerateStatus (),
+       * cm_server_util.cpp) rather than "failure", together with a
+       * clear note about what may still need manual cleanup. */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "database '%s' was deleted, but one or more bookkeeping "
+                "files (cmdb.pass and/or the auto-job addvoldb/backupdb/"
+                "history/execquery config files) could not be updated "
+                "because a lock could not be acquired in time; stale "
+                "entries referencing '%s' may remain and should be "
+                "checked and cleaned up manually",
+                dbname, dbname);
+      return ERR_WARNING;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3204,6 +3295,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   int argc = 0;
   int retval = 0;
+  int cmdb_pass_sync_failed = 0;
   T_DB_SERVICE_MODE db_mode;
   T_DBMT_USER dbmt_user;
 
@@ -3397,10 +3489,22 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
-  auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname);
-  auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname);
-  auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname);
-  auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname);
+  if (auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
+  if (auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname) < 0)
+    {
+      cmdb_pass_sync_failed = 1;
+    }
 
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
@@ -3421,8 +3525,28 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
 	dbmt_user_free (&dbmt_user);
       }
+    else
+      {
+	cmdb_pass_sync_failed = 1;
+      }
   }
 
+  if (cmdb_pass_sync_failed)
+    {
+      /* Soft failure: the rename already happened, so we report
+       * "warning" (see the ERR_WARNING case in uGenerateStatus (),
+       * cm_server_util.cpp) rather than "failure". */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "database '%s' was renamed to '%s', but one or more "
+                "bookkeeping files (cmdb.pass and/or the auto-job "
+                "addvoldb/backupdb/history/execquery config files) could "
+                "not be updated because a lock could not be acquired in "
+                "time; stale entries still referencing the old name "
+                "'%s' may remain and should be checked and cleaned up "
+                "manually",
+                dbname, newdbname, dbname);
+      return ERR_WARNING;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3798,6 +3922,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
   char src_conf_file[PATH_MAX], dest_conf_file[PATH_MAX], conf_dir[PATH_MAX];
   int i = -1;
   int retval = -1;
+  int cmdb_pass_sync_failed = 0;
   char cubrid_err_file[PATH_MAX];
   T_DBMT_USER dbmt_user;
   T_DB_SERVICE_MODE db_mode;
@@ -4038,6 +4163,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 
     if (!guard.ok () || dbmt_user_read_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
       {
+	cmdb_pass_sync_failed = 1;
 	goto copydb_finale;
       }
 
@@ -4057,6 +4183,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 	if (dbmt_user_add_dbinfo (& (dbmt_user.user_info[i]), &tmp_info) != ERR_NO_ERROR)
 	  {
 	    dbmt_user_free (&dbmt_user);
+	    cmdb_pass_sync_failed = 1;
 	    goto copydb_finale;
 	  }
       }
@@ -4069,6 +4196,25 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
   }
 
 copydb_finale:
+  if (cmdb_pass_sync_failed)
+    {
+      /*
+       * Soft failure: the copy already happened, so we report
+       * "warning" rather than "failure".
+       */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "database '%s' was copied to '%s', but cmdb.pass could "
+                "not be updated with the new database's dbinfo (lock "
+                "timeout, read failure, or an internal update error); "
+                "the copy itself succeeded, but '%s' may not be "
+                "manageable through CMS until cmdb.pass is corrected "
+                "manually%s",
+                srcdbname, destdbname, destdbname,
+                move_flag ? " (note: 'move' was requested, so the source "
+                             "database's cmdb.pass entry may also still "
+                             "be present and need manual cleanup)" : "");
+      return ERR_WARNING;
+    }
   return ERR_NO_ERROR;
 }
 
