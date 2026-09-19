@@ -2107,6 +2107,27 @@ file_copy (char *src_file, char *dest_file)
 int
 move_file (char *src_file, char *dest_file)
 {
+  /*
+   * make the replace itself atomic wherever the filesystem allows it,
+   */
+#if defined (WINDOWS)
+  if (MoveFileEx (src_file, dest_file, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
+    {
+      return 0;
+    }
+#else
+  if (rename (src_file, dest_file) == 0)
+    {
+      /* Atomic same-filesystem replace succeeded; nothing left to do. */
+      return 0;
+    }
+  /*
+   * rename () failed. The expected reason here is errno == EXDEV
+   * (src_file and dest_file are on different filesystems, so the
+   * kernel cannot just relink the inode and refuses outright)
+   */
+#endif
+
   if (file_copy (src_file, dest_file) < 0)
     {
       return -1;
