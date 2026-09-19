@@ -156,9 +156,14 @@ class CLog
     {
       time_t cur_time;
       struct tm cur_tm;
+      tm *t;
 
       time (&cur_time);
-      strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", LOCALTIME_R (&cur_time, &cur_tm));
+      t = LOCALTIME_R (&cur_time, &cur_tm);
+      if (t)
+        {
+          strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", t);
+        }
     }
 
 #if defined(WINDOWS)
