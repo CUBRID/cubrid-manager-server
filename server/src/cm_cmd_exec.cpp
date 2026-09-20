@@ -242,10 +242,16 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
       _parse_version_field (p, &local_minor);
     }
 
-  if (local_major < 10 || local_minor < 0)  /* This CMS supports version 10.0 or higher */
+  if (local_major < 0 || local_minor < 0)
     {
       LOG_ERROR ("Unable to parse cubrid minor version from '%s'. Set version to %d.%d defined by default.",
                  version, cubrid_version_major, cubrid_version_minor);
+    }
+  else if (local_major < 10) /* this CMS supports version 10.0 or higher */
+    {
+      LOG_ERROR ("cubrid version %d.%d is not supported (10.0 or higher required). "
+                 "Set version to %d.%d defined by default.",
+                 local_major, local_minor, cubrid_version_major, cubrid_version_minor);
     }
   else
     {
