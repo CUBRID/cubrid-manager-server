@@ -887,6 +887,79 @@ class async_request
 #endif
 };
 
+/*
+ * async_request_guard - RAII guard owning a heap-allocated async_request
+ *   from the moment cm_execute_request_async () allocates it until
+ *   ownership is handed off to the caller's own bookkeeping.
+ */
+class async_request_guard
+{
+  public:
+    async_request_guard (void)
+      : m_pstmt (new async_request), m_owns (true)
+    {
+#ifndef WINDOWS
+      m_pstmt->mutex = new pthread_mutex_t;
+      m_pstmt->cond = new pthread_cond_t;
+      m_mutex_inited = false;
+      m_cond_inited = false;
+#endif
+    }
+
+    ~async_request_guard (void)
+    {
+      if (m_owns)
+        {
+#ifndef WINDOWS
+          if (m_cond_inited)
+            {
+              pthread_cond_destroy (m_pstmt->cond);
+            }
+          if (m_mutex_inited)
+            {
+              pthread_mutex_destroy (m_pstmt->mutex);
+            }
+          delete m_pstmt->mutex;
+          delete m_pstmt->cond;
+#endif
+          delete m_pstmt;
+        }
+    }
+
+    async_request *get (void) const
+    {
+      return m_pstmt;
+    }
+
+#ifndef WINDOWS
+    void set_mutex_inited (void)
+    {
+      m_mutex_inited = true;
+    }
+
+    void set_cond_inited (void)
+    {
+      m_cond_inited = true;
+    }
+#endif
+
+    void disarm (void)
+    {
+      m_owns = false;
+    }
+
+  private:
+    async_request *m_pstmt;
+    bool m_owns;
+#ifndef WINDOWS
+    bool m_mutex_inited;
+    bool m_cond_inited;
+#endif
+
+    async_request_guard (const async_request_guard &);
+    async_request_guard &operator= (const async_request_guard &);
+};
+
 std::map < INT64, async_request * > request_map;
 
 /*
@@ -1079,7 +1152,8 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       state_guard.set_slot ();
     }
 
-  async_request *pstmt = new async_request;
+  async_request_guard pstmt_guard;
+  async_request *pstmt = pstmt_guard.get ();
 
   pstmt->request = request;
   pstmt->status = 0;
@@ -1099,7 +1173,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
-      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to execute task");
     }
@@ -1107,8 +1180,9 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   /*
    * the worker thread now owns pstmt and is solely responsible for
    * releasing the marker/slot exactly once (see
-   * cm_async_request_handler ()); this guard's job here is done.
+   * cm_async_request_handler ()); both guards' jobs here are done.
    */
+  pstmt_guard.disarm ();
   state_guard.disarm ();
 
   if (no_wait)
@@ -1198,33 +1272,27 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       state_guard.set_slot ();
     }
 
-  async_request *pstmt = new async_request;
-
-  pstmt->mutex = new pthread_mutex_t;
-  pstmt->cond = new pthread_cond_t;
+  async_request_guard pstmt_guard;
+  async_request *pstmt = pstmt_guard.get ();
 
   err = pthread_mutex_init (pstmt->mutex, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
-      delete pstmt->mutex;
-      delete pstmt->cond;
-      delete (pstmt);
+         pthread_*_init ()-ed yet) and pstmt itself */
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
+  pstmt_guard.set_mutex_inited ();
 
   err = pthread_cond_init (pstmt->cond, NULL);
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
-      pthread_mutex_destroy (pstmt->mutex);
-      delete pstmt->mutex;
-      delete pstmt->cond;
-      delete (pstmt);
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
+  pstmt_guard.set_cond_inited ();
 
   pstmt->request = request;
   pstmt->status = 0;
@@ -1245,11 +1313,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   if (err != 0)
     {
-      pthread_mutex_destroy (pstmt->mutex);
-      pthread_cond_destroy (pstmt->cond);
-      delete pstmt->mutex;
-      delete pstmt->cond;
-      delete (pstmt);
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
@@ -1265,8 +1328,10 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   /*
    * the worker thread now owns pstmt (including pstmt->mutex/cond) and
-   * is solely responsible for releasing the marker/slot exactly once
+   * is solely responsible for releasing the marker/slot exactly once;
+   * both guards' jobs here are done.
    */
+  pstmt_guard.disarm ();
   state_guard.disarm ();
 
   if (no_wait)
