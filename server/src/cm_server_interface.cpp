@@ -1279,7 +1279,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (err != 0)
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
-         pthread_*_init ()-ed yet) and pstmt itself */
       return build_server_header (response, ERR_WITH_MSG,
                                   "failed to run task.");
     }
