@@ -99,6 +99,12 @@ The following parameters, configurable in `cm.conf`, control async job behavior:
 
 ### Example
 
+`async_job_ttl_sec` and `async_long_job_sec` below are deliberately set above
+their defaults (3600 and 86400) - for a deployment where `gettaskstatus` is
+polled less often, or where individual jobs are expected to legitimately run
+for a day or more, and the "long job" warning threshold should reflect that.
+`max_num_async_task` is left at its default of 8 here.
+
 ```
 ...
 max_num_async_task=8
