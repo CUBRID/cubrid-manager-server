@@ -2701,14 +2701,17 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
   *res_msec = sec * 1000 + msec;
 }
 
-long
+/*
+ * ut_get_msec_marker () - returns INT64, not the "long"
+ */
+INT64
 ut_get_msec_marker (void)
 {
   struct timeval tv;
 
   gettimeofday (&tv, NULL);
 
-  return (long) tv.tv_sec * 1000 + (long) (tv.tv_usec / 1000);
+  return (INT64) tv.tv_sec * 1000 + (INT64) (tv.tv_usec / 1000);
 }
 
 /*

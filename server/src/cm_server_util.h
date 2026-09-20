@@ -166,7 +166,13 @@ int ut_get_dblist (nvplist *res, char dbdir_flag);
 int uCreateLockFile (char *filename, int timeout_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS);
 void uRemoveLockFile (int fd);
 
-long ut_get_msec_marker (void);
+/*
+ * ut_get_msec_marker () - returns INT64. Do not store the result in a
+ *   plain "long": on Windows, long is 32-bit regardless of build, and
+ *   truncating this back into one just reintroduces the overflow the
+ *   INT64 return type exists to avoid.
+ */
+INT64 ut_get_msec_marker (void);
 
 mutex_t *cm_cmdb_pass_mutex (void);
 mutex_t *cm_cmdbinfo_temp_mutex (void);
@@ -190,7 +196,7 @@ class file_resource_guard
       : m_proc_mutex (proc_mutex), m_fd (-1)
     {
       char path[PATH_MAX];
-      long start_ms, elapsed_ms, remaining_ms;
+      INT64 start_ms, elapsed_ms, remaining_ms;
       bool mutex_acquired = false;
 
 #if defined (WINDOWS)
