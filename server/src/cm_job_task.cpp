@@ -3118,7 +3118,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int retval = ERR_NO_ERROR;
-  int cmdb_pass_sync_failed = 0;
+  int bookkeeping_sync_failed = 0;
   char *dbname = NULL, *delbackup;
   char cubrid_err_file[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -3188,19 +3188,19 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
    */
   if (auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
 
   {
@@ -3214,7 +3214,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
     else
       {
-	cmdb_pass_sync_failed = 1;
+	bookkeeping_sync_failed = 1;
       }
   }
 
@@ -3226,7 +3226,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   rmdir (dblogpath);
   rmdir (dbvolpath);
 
-  if (cmdb_pass_sync_failed)
+  if (bookkeeping_sync_failed)
     {
       /*
        * Warning: the deletedb already happened, but may still need manual cleanup
@@ -3234,7 +3234,8 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
                 "database '%s' was deleted, but one or more bookkeeping "
-                "files (cmdb.pass, ...) could not be updated "
+                "files (cmdb.pass and/or the auto-job addvoldb/backupdb/"
+                "history/execquery config files) could not be updated "
                 "because a lock could not be acquired; manual check "
                 "recommended",
                 dbname);
@@ -3258,7 +3259,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   int argc = 0;
   int retval = 0;
-  int cmdb_pass_sync_failed = 0;
+  int bookkeeping_sync_failed = 0;
   T_DB_SERVICE_MODE db_mode;
   T_DBMT_USER dbmt_user;
 
@@ -3454,19 +3455,19 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
   if (auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname) < 0)
     {
-      cmdb_pass_sync_failed = 1;
+      bookkeeping_sync_failed = 1;
     }
 
   {
@@ -3490,11 +3491,11 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
     else
       {
-	cmdb_pass_sync_failed = 1;
+	bookkeeping_sync_failed = 1;
       }
   }
 
-  if (cmdb_pass_sync_failed)
+  if (bookkeeping_sync_failed)
     {
       /*
        * Warning: the renamedb already happened, but may still need manual cleanup
