@@ -16135,7 +16135,7 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
   char shell_name[PATH_MAX];
   char err_log[PATH_MAX];
   char output_log[PATH_MAX];
-  char *argv[3];
+  const char *argv[3];
 
   int ret_val = 0;
 
