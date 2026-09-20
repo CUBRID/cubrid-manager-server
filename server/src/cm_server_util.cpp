@@ -2136,6 +2136,18 @@ move_file (char *src_file, char *dest_file)
     {
       return 0;
     }
+
+  /*
+   * MoveFileEx () failed. Only ERROR_NOT_SAME_DEVICE (cross-volume).
+   */
+  if (GetLastError () != ERROR_NOT_SAME_DEVICE)
+    {
+      return -1;
+    }
+
+  LOG_ERROR ("move_file (): MoveFileEx () of '%s' to '%s' failed with "
+	     "ERROR_NOT_SAME_DEVICE; falling back to a non-atomic copy",
+	     src_file, dest_file);
 #else
   if (rename (src_file, dest_file) == 0)
     {
@@ -2144,17 +2156,19 @@ move_file (char *src_file, char *dest_file)
        */
       return 0;
     }
-  /*
-   * rename () failed. The expected reason here is errno == EXDEV
-   * (src_file and dest_file are on different filesystems, so the
-   * kernel cannot just relink the inode and refuses outright)
-   */
+
+  if (errno != EXDEV)
+    {
+      return -1;
+    }
+
+  LOG_ERROR ("move_file (): rename () of '%s' to '%s' failed with "
+	     "EXDEV; falling back to a non-atomic copy", src_file,
+	     dest_file);
 #endif
 
   /*
-   * Fallback for cross-filesystem moves (or Windows if MoveFileEx ()
-   * above failed). Unlike the rename () path, this does NOT reliably
-   * give dest_file the same permissions as src_file.
+   * Fallback for genuine cross-filesystem/cross-volume moves only.
    */
   if (file_copy (src_file, dest_file) < 0)
     {
