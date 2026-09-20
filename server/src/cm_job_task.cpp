@@ -850,7 +850,6 @@ ts_delete_user (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  T_DBMT_USER dbmt_user;
   const char *new_db_user_name;
   const char *new_db_user_pass;
   char *db_name;
@@ -880,44 +879,17 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
   if (new_db_user_pass)
     {
       char hexacoded[PASSWD_ENC_LENGTH];
+
       /*
-       * sync_failed tracks whether cmdb.pass and/or autoexecquery.conf
-       * actually picked up the new password below.
+       * update db_user's passwd in autoexecquery.conf
+       *
        */
-
-      int sync_failed = 0;
-
-      /* update cmdb.pass dbinfo */
-      {
-	file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
-
-	if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-	  {
-	    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
-	    dbmt_user_free (&dbmt_user);
-	  }
-	else
-	  {
-	    /*
-             * Lock timeout, or the cmdb.pass file could not be read:
-	     * the new password was NOT written into cmdb.pass.
-	     */
-	    sync_failed = 1;
-	  }
-      }
-
-      /* update db_user's passwd in autoexecquery.conf */
       uEncrypt (PASSWD_LENGTH, new_db_user_pass, hexacoded);
       if (auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded) < 0)
 	{
-	  sync_failed = 1;
-	}
-
-      if (sync_failed)
-	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-	            "the password for database user '%s' was changed, but "
-	            "updating the cached credentials in cmdb.pass and/or "
+	            "the password for database user '%s' on database '%s' was "
+	            "changed, but updating the cached password in "
 	            "autoexecquery.conf timed out or failed",
 	            new_db_user_name, db_name);
 	  return ERR_WARNING;
