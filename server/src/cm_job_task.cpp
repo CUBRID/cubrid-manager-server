@@ -3113,12 +3113,58 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * BOOKKEEPING_FAILED_* - bits identifying which of the bookkeeping
+ *   files tsDeleteDB ()/tsRenameDB () keep in sync with the database
+ *   itself failed to update, for reporting via
+ *   bookkeeping_failed_files_list () below. Both functions touch the
+ *   same five files (cmdb.pass plus the four auto-job configs), so one
+ *   shared set of bits/names covers both.
+ */
+#define BOOKKEEPING_FAILED_CMDB_PASS       (1 << 0)
+#define BOOKKEEPING_FAILED_ADDVOLDB_CONF   (1 << 1)
+#define BOOKKEEPING_FAILED_BACKUPDB_CONF   (1 << 2)
+#define BOOKKEEPING_FAILED_HISTORY_CONF    (1 << 3)
+#define BOOKKEEPING_FAILED_EXECQUERY_CONF  (1 << 4)
+
+#define BOOKKEEPING_FAILED_LIST_BUF_SIZE 160
+
+static void
+bookkeeping_failed_files_list (int failed_mask, char *buf)
+{
+  static const struct
+  {
+    int bit;
+    const char *name;
+  } entries[] = {
+    { BOOKKEEPING_FAILED_CMDB_PASS,      "cmdb.pass" },
+    { BOOKKEEPING_FAILED_ADDVOLDB_CONF,  "the auto-job addvoldb config file" },
+    { BOOKKEEPING_FAILED_BACKUPDB_CONF,  "the auto-job backupdb config file" },
+    { BOOKKEEPING_FAILED_HISTORY_CONF,   "the auto-job history config file" },
+    { BOOKKEEPING_FAILED_EXECQUERY_CONF, "the auto-job execquery config file" }
+  };
+  size_t i;
+  int wrote_any = 0;
+
+  buf[0] = '\0';
+  for (i = 0; i < sizeof (entries) / sizeof (entries[0]); i++)
+    {
+      if (!(failed_mask & entries[i].bit))
+        {
+          continue;
+        }
+      snprintf (buf + strlen (buf), BOOKKEEPING_FAILED_LIST_BUF_SIZE - strlen (buf),
+                "%s%s", wrote_any ? ", " : "", entries[i].name);
+      wrote_any = 1;
+    }
+}
+
 int
 tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int retval = ERR_NO_ERROR;
-  int bookkeeping_sync_failed = 0;
+  int bookkeeping_failed_mask = 0;
   char *dbname = NULL, *delbackup;
   char cubrid_err_file[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -3188,19 +3234,19 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
    */
   if (auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_ADDVOLDB_CONF;
     }
   if (auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_BACKUPDB_CONF;
     }
   if (auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_HISTORY_CONF;
     }
   if (auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_EXECQUERY_CONF;
     }
 
   {
@@ -3214,7 +3260,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
     else
       {
-	bookkeeping_sync_failed = 1;
+	bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
       }
   }
 
@@ -3226,19 +3272,20 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   rmdir (dblogpath);
   rmdir (dbvolpath);
 
-  if (bookkeeping_sync_failed)
+  if (bookkeeping_failed_mask)
     {
+      char failed_files[BOOKKEEPING_FAILED_LIST_BUF_SIZE];
+
       /*
        * Warning: the deletedb already happened, but may still need manual cleanup
        */
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files);
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
-                "database '%s' was deleted, but one or more bookkeeping "
-                "files (cmdb.pass and/or the auto-job addvoldb/backupdb/"
-                "history/execquery config files) could not be updated "
-                "because a lock could not be acquired; manual check "
-                "recommended",
-                dbname);
+                "database '%s' was deleted, but the following bookkeeping "
+                "file(s) could not be updated because a lock could not be "
+                "acquired: %s; manual check recommended",
+                dbname, failed_files);
       nv_update_val (res, "note", _dbmt_error);
       return ERR_NO_ERROR;
     }
@@ -3259,7 +3306,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   int argc = 0;
   int retval = 0;
-  int bookkeeping_sync_failed = 0;
+  int bookkeeping_failed_mask = 0;
   T_DB_SERVICE_MODE db_mode;
   T_DBMT_USER dbmt_user;
 
@@ -3455,19 +3502,19 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_ADDVOLDB_CONF;
     }
   if (auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_BACKUPDB_CONF;
     }
   if (auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_HISTORY_CONF;
     }
   if (auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname) < 0)
     {
-      bookkeeping_sync_failed = 1;
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_EXECQUERY_CONF;
     }
 
   {
@@ -3491,26 +3538,27 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
     else
       {
-	bookkeeping_sync_failed = 1;
+	bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
       }
   }
 
-  if (bookkeeping_sync_failed)
+  if (bookkeeping_failed_mask)
     {
+      char failed_files[BOOKKEEPING_FAILED_LIST_BUF_SIZE];
+
       /*
        * Warning: the renamedb already happened, but may still need manual cleanup
        * see the API-level decision recorded in docs/api/renamedb.md.
        */
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files);
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING:"
-                "database '%s' was renamed to '%s', but one or more "
-                "bookkeeping files (cmdb.pass and/or the auto-job "
-                "addvoldb/backupdb/history/execquery config files) could "
-                "not be updated because a lock could not be acquired in "
-                "time; stale entries still referencing the old name "
-                "'%s' may remain and should be checked and cleaned up "
-                "manually",
-                dbname, newdbname, dbname);
+                "database '%s' was renamed to '%s', but the following "
+                "bookkeeping file(s) could not be updated because a lock "
+                "could not be acquired in time: %s; stale entries still "
+                "referencing the old name '%s' may remain and should be "
+                "checked and cleaned up manually",
+                dbname, newdbname, failed_files, dbname);
       nv_update_val (res, "note", _dbmt_error);
       return ERR_NO_ERROR;
     }
