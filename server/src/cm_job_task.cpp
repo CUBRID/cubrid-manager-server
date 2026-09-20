@@ -887,12 +887,19 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
       uEncrypt (PASSWD_LENGTH, new_db_user_pass, hexacoded);
       if (auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded) < 0)
 	{
+	  /*
+	   * The password change itself already succeeded.
+	   * this is a best-effort cache sync failing, not the requested operation.
+	   */
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+	            "WARNING: "
 	            "the password for database user '%s' on database '%s' was "
 	            "changed, but updating the cached password in "
-	            "autoexecquery.conf timed out or failed",
+	            "autoexecquery.conf timed out or failed; manual check "
+	            "recommended",
 	            new_db_user_name, db_name);
-	  return ERR_WARNING;
+	  nv_update_val (res, "note", _dbmt_error);
+	  return ERR_NO_ERROR;
 	}
     }
 #endif
@@ -3221,16 +3228,18 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (cmdb_pass_sync_failed)
     {
-      /* Soft failure: the delete already happened, so we report
-       * "warning" (see the ERR_WARNING case in uGenerateStatus (),
-       * cm_server_util.cpp) rather than "failure", together with a
-       * clear note about what may still need manual cleanup. */
+      /*
+       * Warning: the deletedb already happened, but may still need manual cleanup
+       */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "WARNING: "
                 "database '%s' was deleted, but one or more bookkeeping "
                 "files (cmdb.pass, ...) could not be updated "
-                "because a lock could not be acquired",
-                dbname, dbname);
-      return ERR_WARNING;
+                "because a lock could not be acquired; manual check "
+                "recommended",
+                dbname);
+      nv_update_val (res, "note", _dbmt_error);
+      return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
 }
@@ -3487,10 +3496,12 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (cmdb_pass_sync_failed)
     {
-      /* Soft failure: the rename already happened, so we report
-       * "warning" (see the ERR_WARNING case in uGenerateStatus (),
-       * cm_server_util.cpp) rather than "failure". */
+      /*
+       * Warning: the renamedb already happened, but may still need manual cleanup
+       * see the API-level decision recorded in docs/api/renamedb.md.
+       */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "WARNING:"
                 "database '%s' was renamed to '%s', but one or more "
                 "bookkeeping files (cmdb.pass and/or the auto-job "
                 "addvoldb/backupdb/history/execquery config files) could "
@@ -3499,7 +3510,8 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
                 "'%s' may remain and should be checked and cleaned up "
                 "manually",
                 dbname, newdbname, dbname);
-      return ERR_WARNING;
+      nv_update_val (res, "note", _dbmt_error);
+      return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
 }
@@ -4153,10 +4165,10 @@ copydb_finale:
   if (cmdb_pass_sync_failed)
     {
       /*
-       * Soft failure: the copy already happened, so we report
-       * "warning" rather than "failure".
+       * Warning: the copy already happened, but may still need manual cleanup
        */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "WARNING: "
                 "database '%s' was copied to '%s', but cmdb.pass could "
                 "not be updated with the new database's dbinfo (lock "
                 "timeout, read failure, or an internal update error); "
@@ -4167,7 +4179,8 @@ copydb_finale:
                 move_flag ? " (note: 'move' was requested, so the source "
                              "database's cmdb.pass entry may also still "
                              "be present and need manual cleanup)" : "");
-      return ERR_WARNING;
+      nv_update_val (res, "note", _dbmt_error);
+      return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
 }

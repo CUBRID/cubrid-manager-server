@@ -29,11 +29,12 @@ Check the status of a task asynchronously running
 | --- | --- |
 | job-status | one of running, success, error, rejected |
 | status | execution result, success or failed. |
-| note | if failed, a brief description will be given here |
+| note | if failed, a brief description will be given here; for a handful of tasks (see below), may instead be non-"none" on a *successful* job to flag that a manual check is recommended |
 | uuid | uuid given in the request |
 | task | name of the original async task (e.g. createdb); absent while the job is still running |
 
 * `rejected` is returned directly in the response to the original task request, when CMS could not start the async job at all - for example because the concurrent async job limit (`max_num_async_task`) was reached, or another async job was already running against the same database. See [Request Rejected](async_readme.md#request-rejected) for details. A rejected request never receives a `uuid`, so `job-status` is never `rejected` in an actual `gettaskstatus` response - it is listed here only for a complete reference of the possible `job-status` values.
+* `job-status` is derived entirely from `status`: it is `"success"` whenever `status` is `"success"`, regardless of what `note` says. For [deletedb](deletedb.md), [renamedb](renamedb.md), [copydb](copydb.md) and [updateuser](updateuser.md), a non-"none" `note` on an otherwise successful job means the requested database operation completed, but some secondary bookkeeping (an internal cache/config file) could not be updated and should be checked manually - see each task's own page for what that means for it. It is not a partial success at the database-operation level, and `job-status`/`status` do not distinguish it from an unremarkable success; only `note` does.
 
 
 ## Response Sample if task is running
@@ -58,6 +59,22 @@ Check the status of a task asynchronously running
    "uuid" : "14"
 }
 ```
+
+## Response Sample if task is completed successfully but a manual check is recommended
+
+See the note above the samples: this is still `job-status:"success"`/`status:"success"` - the database operation completed - but `note` is non-"none" because a secondary bookkeeping file could not be updated. Currently only [deletedb](deletedb.md), [renamedb](renamedb.md) and [copydb](copydb.md) can produce this in async mode.
+
+```
+{
+   "__EXEC_TIME" : "401 ms",
+   "job-status" : "success",
+   "note" : "WARNING: database 'alatestdb' was deleted, but one or more bookkeeping files (cmdb.pass, ...) could not be updated because a lock could not be acquired; manual check recommended",
+   "status" : "success",
+   "task" : "deletedb",
+   "uuid" : "14"
+}
+```
+
 ## Response Sample if task is completed with error
 ```
 {

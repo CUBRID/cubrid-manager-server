@@ -33,7 +33,9 @@ Delete a database.
 | --- | --- |
 | task | task name |
 | status | execution result, success or failed. |
-| note | if failed, a brief description will be given here |
+| note | if failed, a brief description will be given here; on a successful delete, may instead carry a warning that a manual check is recommended (see below) |
+
+* Deleting the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: removing the database's entries from its own user-authorization file (`cmdb.pass`) and from the auto-job config files (addvoldb/backupdb/history/execquery). If any of that bookkeeping fails - normally because a short internal lock could not be acquired in time - the database is **not** restored; `status` still reports `"success"`, and `note` instead explains that one or more of those files may still reference the deleted database and should be checked and cleaned up manually. This applies whether the task is run synchronously or with `async:"yes"` (see the async response samples below).
 
 ## Response Sample
 
@@ -41,6 +43,16 @@ Delete a database.
 {
    "__EXEC_TIME" : "393 ms",
    "note" : "none",
+   "status" : "success",
+   "task" : "deletedb"
+}
+```
+
+## Response Sample (success, manual check recommended)
+```
+{
+   "__EXEC_TIME" : "401 ms",
+   "note" : "WARNING: database 'alatestdb' was deleted, but one or more bookkeeping files (cmdb.pass, ...) could not be updated because a lock could not be acquired; manual check recommended",
    "status" : "success",
    "task" : "deletedb"
 }
