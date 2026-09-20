@@ -204,6 +204,11 @@ class file_resource_guard
 #else
       const int retry_interval_ms = 10;
 #endif
+      /*
+       * Resolved up front, purely so both failure paths - the mutex-wait timeout
+       */
+      conf_get_dbmt_file (lock_fid, path);
+
       start_ms = ut_get_msec_marker ();
 
       for (;;)
@@ -220,6 +225,11 @@ class file_resource_guard
               /* out of budget: give up. m_fd stays -1, so ok ()
                  correctly reports failure and there is nothing to
                  release (the mutex was never acquired here). */
+              LOG_ERROR ("file_resource_guard: gave up waiting for the "
+                         "in-process mutex guarding '%s' (lock_fid=%d) "
+                         "after %lldms (limit %dms) without acquiring it",
+                         path, (int) lock_fid, (long long) elapsed_ms,
+                         LOCK_FILE_DEFAULT_TIMEOUT_MS);
               break;
             }
 
@@ -245,9 +255,14 @@ class file_resource_guard
           remaining_ms = 0;
         }
 
-      m_fd = uCreateLockFile (conf_get_dbmt_file (lock_fid, path), (int) remaining_ms);
+      m_fd = uCreateLockFile (path, (int) remaining_ms);
       if (m_fd < 0)
         {
+          LOG_ERROR ("file_resource_guard: uCreateLockFile () for '%s' "
+                     "(lock_fid=%d) failed within its remaining %lldms "
+                     "budget (%lldms already spent acquiring the "
+                     "in-process mutex)", path, (int) lock_fid,
+                     (long long) remaining_ms, (long long) elapsed_ms);
           mutex_unlock (m_proc_mutex);
         }
     }
