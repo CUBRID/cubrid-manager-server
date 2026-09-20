@@ -2124,7 +2124,16 @@ move_file (char *src_file, char *dest_file)
 #else
   if (rename (src_file, dest_file) == 0)
     {
-      /* Atomic same-filesystem replace succeeded; nothing left to do. */
+      /*
+       * Atomic same-filesystem replace succeeded; nothing left to do.
+       * Note this is not "permissions were preserved" in the sense of
+       * some step having copied them - rename () never touches the
+       * file's metadata at all. dest_file's name now simply refers to
+       * the same inode src_file did, so its mode/owner/timestamps are
+       * whatever they already were. As a side effect, any pre-existing
+       * dest_file's own permissions are gone; the destination now has
+       * exactly src_file's permissions, not its own prior ones.
+       */
       return 0;
     }
   /*
@@ -2134,6 +2143,11 @@ move_file (char *src_file, char *dest_file)
    */
 #endif
 
+  /*
+   * Fallback for cross-filesystem moves (or Windows if MoveFileEx ()
+   * above failed). Unlike the rename () path, this does NOT reliably
+   * give dest_file the same permissions as src_file.
+   */
   if (file_copy (src_file, dest_file) < 0)
     {
       return -1;
