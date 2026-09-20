@@ -2113,6 +2113,21 @@ file_copy (char *src_file, char *dest_file)
 int
 move_file (char *src_file, char *dest_file)
 {
+#if !defined (WINDOWS)
+  /*
+   * Preserve dest_file's existing permissions/ownership
+   */
+  struct stat dest_statbuf;
+
+  if (stat (dest_file, &dest_statbuf) == 0)
+    {
+      chmod (src_file, dest_statbuf.st_mode & 07777);
+#if defined (HAVE_CHOWN)
+      chown (src_file, dest_statbuf.st_uid, dest_statbuf.st_gid);
+#endif
+    }
+#endif
+
   /*
    * make the replace itself atomic wherever the filesystem allows it,
    */
@@ -2125,14 +2140,7 @@ move_file (char *src_file, char *dest_file)
   if (rename (src_file, dest_file) == 0)
     {
       /*
-       * Atomic same-filesystem replace succeeded; nothing left to do.
-       * Note this is not "permissions were preserved" in the sense of
-       * some step having copied them - rename () never touches the
-       * file's metadata at all. dest_file's name now simply refers to
-       * the same inode src_file did, so its mode/owner/timestamps are
-       * whatever they already were. As a side effect, any pre-existing
-       * dest_file's own permissions are gone; the destination now has
-       * exactly src_file's permissions, not its own prior ones.
+       * Atomic same-filesystem replace succeeded
        */
       return 0;
     }
