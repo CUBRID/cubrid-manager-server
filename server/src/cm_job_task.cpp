@@ -3552,7 +3552,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
        */
       bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files);
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "WARNING:"
+                "WARNING: "
                 "database '%s' was renamed to '%s', but the following "
                 "bookkeeping file(s) could not be updated because a lock "
                 "could not be acquired in time: %s; stale entries still "
