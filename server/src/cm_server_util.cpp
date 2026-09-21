@@ -2121,10 +2121,12 @@ move_file (char *src_file, char *dest_file)
 
   if (stat (dest_file, &dest_statbuf) == 0)
     {
-#if defined (HAVE_CHOWN)
       chown (src_file, dest_statbuf.st_uid, dest_statbuf.st_gid);
-#endif
-      chmod (src_file, dest_statbuf.st_mode & 07777);
+      errno = 0;
+      if (chmod (src_file, dest_statbuf.st_mode & 07777) < 0)
+        {
+          LOG_ERROR ("chmod failed: %s, errno = %d", src_file, errno);
+        }
     }
 #endif
 
