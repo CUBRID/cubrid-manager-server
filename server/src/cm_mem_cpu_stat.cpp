@@ -66,7 +66,6 @@ typedef void *(*EXTRACT_FUNC) (FILE *fp, const char *arg1, T_CM_ERROR *arg2);
 static void *extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf);
 static void assign_db_stat (T_CM_DB_PROC_STAT *db_stat, char *db_name, T_CM_PROC_STAT *stat);
 static void cm_db_proc_stat_free (T_CM_DB_PROC_STAT *stat);
-static void *extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf);
 static void *extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf);
 static uint64_t *get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name);
 static void *cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_arg1,
@@ -75,6 +74,10 @@ static void cms_err_buf_reset (T_CM_ERROR *err_buf);
 static void cms_set_error_null_pointer (T_CM_ERROR *err_buf);
 static void cms_set_error_oom (T_CM_ERROR *err_buf);
 static char *cms_trim (char *str);
+
+#if defined (ENABLE_UNUSED_FUNCTION)
+static void *extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf);
+#endif
 
 /*
  * cms_err_buf_reset () - CMS-native replacement for the engine's
