@@ -98,6 +98,9 @@ class CLog
       mutex_init (m_cs);
     }
 
+    CLog (const CLog &) = delete;
+    CLog &operator= (const CLog &) = delete;
+
   public:
     ~CLog ()
     {
@@ -249,8 +252,8 @@ class CLog
     {
       list < string >::iterator itor;
       list < string > files_mtime_list;
-      char log_full_path[PATH_MAX];
-      char oldest_file[PATH_MAX];
+      char log_full_path[COMPOSED_PATH_MAX];
+      char oldest_file[COMPOSED_PATH_MAX];
       struct stat st;
       long oldest_time = LONG_MAX;
 
@@ -264,12 +267,12 @@ class CLog
 
       for (itor = files_list.begin(); itor != files_list.end(); itor++)
 	{
-	  snprintf (log_full_path, PATH_MAX, "%s/%s", log_path, (*itor).c_str());
+	  snprintf (log_full_path, sizeof (log_full_path), "%s/%s", log_path, (*itor).c_str());
 	  stat (log_full_path, &st);
 	  if ((long) st.st_mtime < oldest_time)
 	    {
 	      oldest_time = (long) st.st_mtime;
-	      snprintf (oldest_file, PATH_MAX, "%s", log_full_path);
+	      snprintf (oldest_file, sizeof (oldest_file), "%s", log_full_path);
 	    }
 	}
 
@@ -281,8 +284,8 @@ class CLog
     {
       int ret_backup_log = -1;
       int ret_backup_err = -1;
-      char backup_log_name[PATH_MAX];
-      char backup_err_name[PATH_MAX];
+      char backup_log_name[COMPOSED_PATH_MAX];
+      char backup_err_name[COMPOSED_PATH_MAX];
       char cur_time[MAX_DATE_TIME_LENGTH];
 
       backup_log_name[0] = '\0';
@@ -290,8 +293,9 @@ class CLog
       cur_time[0] = '\0';
 
       _get_current_time_year_mon_day_hour_minute_second (cur_time);
-      snprintf (backup_err_name, PATH_MAX, "%s/%s.%s", base_log_path, error_log_name.c_str(), cur_time);
-      snprintf (backup_log_name, PATH_MAX, "%s/%s.%s", base_log_path, log_name.c_str(), cur_time);
+      snprintf (backup_err_name, sizeof (backup_err_name), "%s/%s.%s", base_log_path, error_log_name.c_str(),
+		cur_time);
+      snprintf (backup_log_name, sizeof (backup_log_name), "%s/%s.%s", base_log_path, log_name.c_str(), cur_time);
 
       ret_backup_log = rename (sco.szAccessLog, backup_log_name);
       ret_backup_err = rename (sco.szErrorLog, backup_err_name);
@@ -311,7 +315,7 @@ class CLog
       static CLog *instance_log = NULL;
       static CLog *instance_err = NULL;
 
-      if ((logLevel <= CLog::xWARN) && (logLevel >= CLog::xFATAL))
+      if (logLevel <= CLog::xWARN)
 	{
 	  // write log into error log file
 

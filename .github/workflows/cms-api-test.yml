@@ -88,7 +88,7 @@ jobs:
             elfutils-libelf-devel libstdc++-static \
             glibc-gconv-extra glibc-langpack-ko glibc-langpack-en \
             java-1.8.0-openjdk-devel ant \
-            python3 procps-ng diffutils
+            python3 procps-ng diffutils perl-core
 
           # build.sh runs "ninja install" by name, and the EL package installs
           # the binary as ninja-build.
