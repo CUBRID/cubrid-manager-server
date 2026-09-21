@@ -895,10 +895,11 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 	            "WARNING: "
 	            "the password for database user '%s' on database '%s' was "
 	            "changed, but updating the cached password in "
-	            "autoexecquery.conf timed out or failed; manual check "
-	            "recommended",
+	            "autoexecquery.conf failed (lock timeout, file I/O error, "
+	            "or an internal update error); manual check recommended",
 	            new_db_user_name, db_name);
 	  nv_update_val (res, "note", _dbmt_error);
+	  ut_error_log (req, _dbmt_error);
 	  return ERR_NO_ERROR;
 	}
     }
@@ -3293,10 +3294,12 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
                 "database '%s' was deleted, but the following bookkeeping "
-                "file(s) could not be updated because a lock could not be "
-                "acquired: %s; manual check recommended",
+                "file(s) could not be updated (lock timeout, file I/O "
+                "error, or an internal update error): %s; manual check "
+                "recommended",
                 dbname, failed_files);
       nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
@@ -3564,12 +3567,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
                 "database '%s' was renamed to '%s', but the following "
-                "bookkeeping file(s) could not be updated because a lock "
-                "could not be acquired in time: %s; stale entries still "
-                "referencing the old name '%s' may remain and should be "
-                "checked and cleaned up manually",
+                "bookkeeping file(s) could not be updated (lock timeout, "
+                "file I/O error, or an internal update error): %s; stale "
+                "entries still referencing the old name '%s' may remain "
+                "and should be checked and cleaned up manually",
                 dbname, newdbname, failed_files, dbname);
       nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
@@ -4239,6 +4243,7 @@ copydb_finale:
                              "database's cmdb.pass entry may also still "
                              "be present and need manual cleanup)" : "");
       nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
