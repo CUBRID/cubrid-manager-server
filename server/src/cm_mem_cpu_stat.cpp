@@ -473,6 +473,8 @@ extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf)
               if (db_stats_newptr == NULL)
                 {
                   cms_set_error_oom (err_buf);
+                  CMS_FREE_MEM (all_stat->db_stats);
+                  CMS_FREE_MEM (all_stat);
                   return NULL;
                 }
               all_stat->db_stats = db_stats_newptr;
