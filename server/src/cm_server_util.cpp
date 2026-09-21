@@ -2143,17 +2143,20 @@ move_file (char *src_file, char *dest_file)
       return 0;
     }
 
-  /*
-   * MoveFileEx () failed. Only ERROR_NOT_SAME_DEVICE (cross-volume).
-   */
-  if (GetLastError () != ERROR_NOT_SAME_DEVICE)
-    {
-      return -1;
-    }
+  {
+    DWORD move_file_ex_error = GetLastError ();
 
-  LOG_ERROR ("move_file (): MoveFileEx () of '%s' to '%s' failed with "
-	     "ERROR_NOT_SAME_DEVICE; falling back to a non-atomic copy",
-	     src_file, dest_file);
+    if (move_file_ex_error != ERROR_NOT_SAME_DEVICE
+	&& move_file_ex_error != ERROR_SHARING_VIOLATION
+	&& move_file_ex_error != ERROR_ACCESS_DENIED)
+      {
+	return -1;
+      }
+
+    LOG_ERROR ("move_file (): MoveFileEx () of '%s' to '%s' failed with "
+	       "error %lu; falling back to a non-atomic copy", src_file,
+	       dest_file, (unsigned long) move_file_ex_error);
+  }
 #else
   if (rename (src_file, dest_file) == 0)
     {
