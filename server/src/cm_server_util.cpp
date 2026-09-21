@@ -2725,9 +2725,6 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
   *res_msec = sec * 1000 + msec;
 }
 
-/*
- * ut_get_msec_marker () - returns INT64, not the "long"
- */
 INT64
 ut_get_msec_marker (void)
 {

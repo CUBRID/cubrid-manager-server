@@ -205,7 +205,7 @@ class file_resource_guard
       const int retry_interval_ms = 10;
 #endif
       /*
-       * Resolved up front, purely so both failure paths - the mutex-wait timeout
+       * Resolved up front, purely so both failure paths
        */
       conf_get_dbmt_file (lock_fid, path);
 
