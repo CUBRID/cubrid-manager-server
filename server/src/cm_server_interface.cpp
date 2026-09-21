@@ -1636,6 +1636,8 @@ int
 cub_cm_request_handler (Json::Value &request, Json::Value &response)
 {
   bool want_async = false;
+  bool dispatched = false;
+  string task_name;
 
   {
     /*
@@ -1663,16 +1665,32 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
       {
         return 1;
       }
-    if (cub_cm_extend_request (request, response))
-      {
-        return 1;
-      }
 
-    const Json::Value &async_val = request.get ("async", "no");
-    want_async = async_val.isString ()
-                 && uStringEqual (async_val.asString ().c_str (), "yes")
-                 && is_async_capable_task (request["task"].asString ());
+    task_name = request["task"].asString ();
+
+    /*
+     * ext_get_server_status () reads request_map/db_running_async/the
+     * async-slot counters directly, with no locking of its own
+     */
+    if (task_name == "getserverstatus")
+      {
+        dispatched = true;
+        if (cub_cm_extend_request (request, response))
+          {
+            return 1;
+          }
+      }
   }
+
+  if (!dispatched && cub_cm_extend_request (request, response))
+    {
+      return 1;
+    }
+
+  const Json::Value &async_val = request.get ("async", "no");
+  want_async = async_val.isString ()
+               && uStringEqual (async_val.asString ().c_str (), "yes")
+               && is_async_capable_task (task_name);
 
   cm_execute_request_async (request, response, sco.iHttpTimeout, want_async);
 
