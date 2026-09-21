@@ -1144,7 +1144,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
   T_CM_BROKER_CONF uc_conf;
   char logdir[PATH_MAX], err_logdir[PATH_MAX], access_logdir[PATH_MAX];
   const char *v;
-  char *bname, *from, buf[1024];
+  char *bname, *from, buf[COMPOSED_PATH_MAX];
   char *cur_file;
   T_CM_ERROR error;
 
@@ -2443,7 +2443,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
   char *overwrite_config_file = NULL;
   char targetdir[PATH_MAX];
-  char extvolfile[PATH_MAX];
+  char extvolfile[COMPOSED_PATH_MAX];
   char createdb_err_file[PATH_MAX];
   char *ip, *port;
   T_DBMT_USER dbmt_user;
@@ -2608,13 +2608,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       char strbuf[1024];
       FILE *infile = NULL;
       FILE *outfile = NULL;
-      char dstrbuf[PATH_MAX];
+      char dstrbuf[COMPOSED_PATH_MAX];
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-      snprintf (dstrbuf, PATH_MAX - 1, "%s/conf/%s", sco.szCubrid,
+      snprintf (dstrbuf, sizeof (dstrbuf), "%s/conf/%s", sco.szCubrid,
 		CUBRID_CUBRID_CONF);
 #else
-      snprintf (dstrbuf, PATH_MAX - 1, "%s/%s", CUBRID_CONFDIR,
+      snprintf (dstrbuf, sizeof (dstrbuf), "%s/%s", CUBRID_CONFDIR,
 		CUBRID_CUBRID_CONF);
 #endif
       infile = fopen (dstrbuf, "r");
@@ -2624,7 +2624,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_FILE_OPEN_FAIL;
 	}
 
-      snprintf (dstrbuf, PATH_MAX - 1, "%s/%s", targetdir, CUBRID_CUBRID_CONF);
+      snprintf (dstrbuf, sizeof (dstrbuf), "%s/%s", targetdir, CUBRID_CUBRID_CONF);
       outfile = fopen (dstrbuf, "w");
       if (outfile == NULL)
 	{
@@ -2717,7 +2717,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
       char extvol_path[PATH_MAX];
 
-      snprintf (extvolfile, PATH_MAX - 1, "%s/extvol.spec", targetdir);
+      snprintf (extvolfile, sizeof (extvolfile), "%s/extvol.spec", targetdir);
       outfile = fopen (extvolfile, "w");
       if (outfile == NULL)
 	{
@@ -2802,16 +2802,12 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "--" CREATE_LOG_VOLUMN_SIZE_L;
   argv[argc++] = logvolsize;
 
-  if (dbpagesize)
-    {
-      argv[argc++] = "--" CREATE_DB_PAGE_SIZE_L;
-      argv[argc++] = dbpagesize;
-    }
-  if (logpagesize)
-    {
-      argv[argc++] = "--" CREATE_LOG_PAGE_SIZE_L;
-      argv[argc++] = logpagesize;
-    }
+  argv[argc++] = "--" CREATE_DB_PAGE_SIZE_L;
+  argv[argc++] = dbpagesize;
+
+  argv[argc++] = "--" CREATE_LOG_PAGE_SIZE_L;
+  argv[argc++] = logpagesize;
+
   if (logvolpath)
     {
 #if defined(WINDOWS)
@@ -2997,9 +2993,9 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   if ((overwrite_config_file == NULL)    /* for backward compatibility */
       || (strcasecmp (overwrite_config_file, "NO") != 0))
     {
-      char strbuf[PATH_MAX];
+      char strbuf[COMPOSED_PATH_MAX];
 
-      snprintf (strbuf, PATH_MAX - 1, "%s/%s", targetdir, CUBRID_CUBRID_CONF);
+      snprintf (strbuf, sizeof (strbuf), "%s/%s", targetdir, CUBRID_CUBRID_CONF);
       unlink (strbuf);
     }
 
@@ -3406,8 +3402,6 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
       cmd_res = cmd_spacedb (dbname, cubrid_mode);
     }
 
-  err_message = cmd_res->get_err_msg();
-
   if (cmd_res == NULL)
     {
       sprintf (_dbmt_error, "spacedb %s", dbname);
@@ -3415,6 +3409,7 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else if (cmd_res->has_error())
     {
+      err_message = cmd_res->get_err_msg();
       strcpy (_dbmt_error, err_message);
       retval = ERR_WITH_MSG;
     }
@@ -3571,7 +3566,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   free_space_mb = ut_disk_free_space (volpath);
-  if (dbvolsize && (free_space_mb < atoi (dbvolsize)))
+  if (free_space_mb < atoi (dbvolsize))
     {
       sprintf (_dbmt_error, "Not enough free space in disk.");
       return ERR_WITH_MSG;
@@ -3664,7 +3659,8 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
   int adv_flag = 0;
   char tmpfile[PATH_MAX], cmd_name[CUBRID_CMD_NAME_LEN],
        lob_base_path[PATH_MAX];
-  char src_conf_file[PATH_MAX], dest_conf_file[PATH_MAX], conf_dir[PATH_MAX];
+  char src_conf_file[COMPOSED_PATH_MAX], dest_conf_file[COMPOSED_PATH_MAX];
+  char conf_dir[PATH_MAX];
   int i = -1;
   int retval = -1;
   char cubrid_err_file[PATH_MAX];
@@ -3874,14 +3870,14 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       strcpy (_dbmt_error, srcdbname);
       return ERR_DBDIRNAME_NULL;
     }
-  snprintf (src_conf_file, sizeof (src_conf_file) - 1, "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
+  snprintf (src_conf_file, sizeof (src_conf_file), "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
 
   if (uRetrieveDBDirectory (destdbname, conf_dir) != ERR_NO_ERROR)
     {
       strcpy (_dbmt_error, destdbname);
       return ERR_DBDIRNAME_NULL;
     }
-  snprintf (dest_conf_file, sizeof (dest_conf_file) - 1, "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
+  snprintf (dest_conf_file, sizeof (dest_conf_file), "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
 
   /* Doesn't copy if src and desc is same */
   if (strcmp (src_conf_file, dest_conf_file) != 0)
@@ -4144,7 +4140,7 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
   if (file_to_nvp_by_separator (infile, res, '=') < 0)
     {
       const char *tmperr = "Can't parse tmpfile of paramdump.";
-      strncpy (_dbmt_error, tmperr, strlen (tmperr));
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", tmperr);
       retval = ERR_WITH_MSG;
       fclose (infile);
       goto rm_tmpfile;
@@ -4698,7 +4694,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *dbname, *targetdir, *usehash, *hashdir, *target, *s1, *s2,
        *ref, *classonly, *delimit, *estimate, *prefix, *cach, *lofile,
-       buf[PATH_MAX], infofile[PATH_MAX], tmpfile[PATH_MAX], temp[PATH_MAX],
+       buf[COMPOSED_PATH_MAX], infofile[PATH_MAX], tmpfile[PATH_MAX], temp[PATH_MAX],
        n[256], v[256], cname[256], p1[64], p2[8], p3[8];
 
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
@@ -4711,7 +4707,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   const char *argv[30];
   int argc = 0;
   T_DB_SERVICE_MODE db_mode;
-  char fullpath[PATH_MAX];
+  char fullpath[PATH_MAX + 16];	/* holds "<path>/files/" */
   char dba_user[32] = "dba";
   char *dbuser = NULL;
   char *dbpasswd = NULL;
@@ -4766,11 +4762,11 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (strcmp (targetdir, "+D") == 0)
     {
-      snprintf (fullpath, sizeof (fullpath) - 1, "%s/files/", sco.szCWMPath);
+      snprintf (fullpath, sizeof (fullpath), "%s/files/", sco.szCWMPath);
     }
   else
     {
-      snprintf (fullpath, sizeof (fullpath) - 1, "%s", targetdir);
+      snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
     }
 
   if (is_invalid_filename_with_msg (fullpath, _dbmt_error))
@@ -4971,7 +4967,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   unlink (tmpfile);
 
   /* makeup upload result information in unload.log file */
-  snprintf (buf, sizeof (buf) - 1, "%s/%s_unloaddb.log", fullpath, dbname);
+  snprintf (buf, sizeof (buf), "%s/%s_unloaddb.log", fullpath, dbname);
   nv_add_nvp (res, "open", "result");
   if ((infile = fopen (buf, "rt")) != NULL)
     {
@@ -5473,6 +5469,7 @@ unlink_schema_files (const char *schema_list_file)
       }
     else
       {
+	fclose (fp);
 	return;
       }
   }
@@ -5480,6 +5477,7 @@ unlink_schema_files (const char *schema_list_file)
   snprintf (path, PATH_MAX, "%s", schema_list_file);
   if (dirname (path) == NULL)
     {
+      fclose (fp);
       return;
     }
 #endif
@@ -5706,7 +5704,7 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   char *dbname;
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
-  char strbuf[PATH_MAX], dbdir[PATH_MAX];
+  char strbuf[COMPOSED_PATH_MAX], dbdir[PATH_MAX];
   int no_tpage = 0, log_size = 0, baselen;
   struct stat statbuf;
   GeneralSpacedbResult *cmd_res;
@@ -6256,8 +6254,8 @@ int
 ts_backupdb_info (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char db_dir[PATH_MAX], log_dir[PATH_MAX];
-  char *tok[3], vinf[PATH_MAX], buf[LINE_MAX];
-  char db_backup_dir[PATH_MAX];
+  char *tok[3], vinf[COMPOSED_PATH_MAX], buf[LINE_MAX];
+  char db_backup_dir[COMPOSED_PATH_MAX];
   FILE *infile;
   struct stat statbuf;
 
@@ -6729,7 +6727,7 @@ ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  char *dbname, log_dir[PATH_MAX], buf[PATH_MAX];
+  char *dbname, log_dir[PATH_MAX], buf[COMPOSED_PATH_MAX];
   char *error_log_param;
   struct stat statbuf;
   int fname_len = 0;
@@ -7426,7 +7424,7 @@ get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *sql_info, int query_fil
 	}
 
       num_queries++;
-      strncpy (sql_info[sql_index].sql_id, sqlid_p, strlen (sqlid_p));
+      snprintf (sql_info[sql_index].sql_id, sizeof (sql_info[sql_index].sql_id), "%s", sqlid_p);
 
       ret = get_next_sqltext (qry_fp, query_p, offset, query_file_size);
       if (ret > 0)
@@ -7493,7 +7491,7 @@ get_next_sqltext (FILE *qfp, char *qry_buf, int offset_v, int query_file_size)
 
 	      if (!feof (qfp))
 		{
-		  fseek (qfp, -1 * strlen (sbuf), SEEK_CUR); /* push back to iostream */
+		  fseek (qfp, - (long) strlen (sbuf), SEEK_CUR); /* push back to iostream */
 		}
 	      break;
 	    }
@@ -7504,7 +7502,7 @@ get_next_sqltext (FILE *qfp, char *qry_buf, int offset_v, int query_file_size)
 	  return -1;
 	}
 
-      strncpy (qry_buf + offset, buf, line_length);     /* copy a SQL text into qry_buf */
+      memcpy (qry_buf + offset, buf, line_length);      /* copy a SQL text into qry_buf */
 
       offset += line_length;
       if (end_of_query)
@@ -7530,7 +7528,7 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
   int len_tmp = 0;
   char buf[1024];
 
-  if (access (stderr_file, F_OK) == 0)
+  if (stderr_file != NULL && access (stderr_file, F_OK) == 0)
     {
       fp = fopen (stderr_file, "r");
       if (fp != NULL)
@@ -7554,11 +7552,11 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
 		  break;
 		}
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 
-  if (access (stdout_file, F_OK) == 0)
+  if (stdout_file != NULL && access (stdout_file, F_OK) == 0)
     {
       fp = fopen (stdout_file, "r");
       if (fp != NULL)
@@ -7582,8 +7580,8 @@ read_stdout_stderr_as_err (char *stdout_file, char *stderr_file,
 		  break;
 		}
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 }
 
@@ -8664,7 +8662,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (obsolete_version_autoexecquery_conf (line_buf))
 	{
-	  if (sscanf (line_buf, "%64s %*s %64s", db_name, dbmt_uid) < 2)
+	  if (sscanf (line_buf, "%63s %*s %63s", db_name, dbmt_uid) < 2)
 	    {
 	      continue;
 	    }
@@ -8680,7 +8678,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
       else
 	{
 	  if (sscanf
-	      (line_buf, "%64s %*s %64s %80s %64s", db_name, db_uid,
+	      (line_buf, "%63s %*s %63s %64s %63s", db_name, db_uid,
 	       enc_dbpasswd, dbmt_uid) < 4)
 	    {
 	      continue;
@@ -9710,7 +9708,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[25];
   T_CM_BROKER_CONF uc_conf;
-  char out_msg_file_env[1024];
+  char out_msg_file_env[COMPOSED_PATH_MAX];
   T_CM_ERROR error;
 #if defined(WINDOWS)
   DWORD th_id;
@@ -9868,7 +9866,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1, "%s", resfile2);
+  snprintf (out_msg_file_env, sizeof (out_msg_file_env), "%s", resfile2);
   PUT_ENV ("CUBRID_MANAGER_OUT_MSG_FILE", out_msg_file_env);
 
   if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
@@ -9939,7 +9937,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
     {
       /* remove query result file - resfile */
       int i, n = 0;
-      char filename[PATH_MAX];
+      char filename[COMPOSED_PATH_MAX];
       if (num_thread != NULL)
 	{
 	  n = atoi (num_thread);
@@ -9947,7 +9945,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
 
       for (i = 0; i < n && i < MAX_SERVER_THREAD_COUNT; i++)
 	{
-	  snprintf (filename, PATH_MAX - 1, "%s.%d", resfile, i);
+	  snprintf (filename, sizeof (filename), "%s.%d", resfile, i);
 	  unlink (filename);
 	}
     }
@@ -11687,7 +11685,7 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  if (*path == '+' && * (path + 1) == 'T')   // for CUBRID/tmp
 	    {
-	      snprintf (fullpath, sizeof (fullpath) - 1, "%s/tmp/%s",
+	      snprintf (fullpath, sizeof (fullpath), "%s/tmp/%s",
 			sco.szCubrid, (path + 2));
 
 	      if (!is_authorized_filename (fullpath, _dbmt_error))
@@ -12292,7 +12290,7 @@ parse_ha_proc_msg_to_all_info_array (char *buf, char *_dbmt_error,
   char elem_name[64] = { 0 };
   char state[64] = { 0 };
   char dbname[DB_NAME_LEN] = { 0 };
-  char logpath[PATH_MAX] = { 0 };
+  char logpath[1024] = { 0 };
   char hostname[MAXHOSTNAMELEN] = { 0 };
   int dbinfo_index = 0;
   int retval = ERR_NO_ERROR;
@@ -12405,7 +12403,7 @@ parse_ha_proc_msg_to_all_info_array (char *buf, char *_dbmt_error,
 	  T_HA_DBSERVER_INFO *db_info_t = NULL;
 	  T_HA_LOG_PROC_INFO p_proc_info;
 	  memset (&p_proc_info, 0, sizeof (T_HA_LOG_PROC_INFO));
-	  if (sscanf (tmpbuf, "%63[^@] @ %128[^:] : %1023s", dbname,
+	  if (sscanf (tmpbuf, "%63[^@] @ %63[^:] : %1023s", dbname,
 		      hostname, logpath) != 3)
 	    {
 	      retval = ERR_NO_ERROR;
@@ -13200,7 +13198,7 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 	      int num_holders, num_b_holders, num_waiters, scan_matched;
 
 	      scan_matched =
-		      sscanf (buf, "%*s %*s  %[^|] %*[|] %[^|] %*[|] %255s", s1, s2, s3);
+		      sscanf (buf, "%*s %*s  %255[^|] %*[|] %255[^|] %*[|] %255s", s1, s2, s3);
 	      if (scan_matched != 3)
 		{
 		  return -1;
@@ -13913,7 +13911,8 @@ obsolete_version_autoexecquery_conf (const char *conf_line)
       return -1;
     }
 
-  sscanf (conf_line, "%*s %*s %*s %80s", conf_item_buf);
+  conf_item_buf[0] = '\0';
+  sscanf (conf_line, "%*s %*s %*s %79s", conf_item_buf);
   if (strcmp (conf_item_buf, "ONE") == 0
       || strcmp (conf_item_buf, "DAY") == 0
       || strcmp (conf_item_buf, "WEEK") == 0
@@ -14831,8 +14830,8 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
 
 	      ret_val = ERR_SYSTEM_CALL;
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 
   if (access (stdout_file, F_OK) == 0 && ret_val == ERR_NO_ERROR)
@@ -14858,8 +14857,8 @@ read_ha_cmd_output (char *stdout_file, char *stderr_file, char *_dbmt_error)
 				"...", 4);
 		}
 	    }
+	  fclose (fp);
 	}
-      fclose (fp);
     }
 
   return ret_val;
@@ -15694,7 +15693,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *nvp_path = NULL;
   char path[PATH_MAX];
-  char full_path[PATH_MAX];
+  char full_path[2 * PATH_MAX];
 
   path[0] = 0;
   full_path[0] = 0;
@@ -15731,7 +15730,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "path", path);
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  snprintf (full_path, PATH_MAX, "%s/%s/", sco.szCubrid, path);
+  snprintf (full_path, sizeof (full_path), "%s/%s/", sco.szCubrid, path);
 #else
   sprintf (full_path, "%s/%s/", CUBRID, path);
 #endif
@@ -15804,7 +15803,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 
 #else
   {
-    char name_temp[1024];
+    char name_temp[sizeof (full_path) + NAME_MAX + 1];
     DIR *dirptr = NULL;
     struct dirent *entry;
 
@@ -15823,8 +15822,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 	      {
 		continue;
 	      }
-	    strcpy (name_temp, full_path);
-	    strcat (name_temp, entry->d_name);
+	    snprintf (name_temp, sizeof (name_temp), "%s%s", full_path, entry->d_name);
 
 	    stat (name_temp, &stat_file);
 	    if (S_ISDIR (stat_file.st_mode))
@@ -15851,8 +15849,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 	      {
 		continue;
 	      }
-	    strcpy (name_temp, full_path);
-	    strcat (name_temp, entry->d_name);
+	    snprintf (name_temp, sizeof (name_temp), "%s%s", full_path, entry->d_name);
 
 	    stat (name_temp, &stat_file);
 	    if (! (S_ISDIR (stat_file.st_mode)))
@@ -16225,13 +16222,13 @@ _add_extensions (X509 *cert, int nid, char *value)
 static int
 _backup_cert (char *_dbmt_error)
 {
-  char default_backup_cert_path[PATH_MAX];
+  char default_backup_cert_path[COMPOSED_PATH_MAX];
   char default_cert_path[PATH_MAX];
 
   default_backup_cert_path[0] = '\0';
   default_cert_path[0] = '\0';
 
-  snprintf (default_backup_cert_path, PATH_MAX, "%s.bak",
+  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
 	    sco.szSSLCertificate);
   if (access (default_backup_cert_path, F_OK) == 0)
     {
@@ -16269,7 +16266,7 @@ static int
 _recover_cert (char *_dbmt_error)
 {
   char default_cert_path[PATH_MAX];
-  char default_backup_cert_path[PATH_MAX];
+  char default_backup_cert_path[COMPOSED_PATH_MAX];
 
   default_cert_path[0] = '\0';
   default_backup_cert_path[0] = '\0';
@@ -16292,7 +16289,7 @@ _recover_cert (char *_dbmt_error)
 	}
     }
 
-  snprintf (default_backup_cert_path, PATH_MAX, "%s.bak",
+  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
 	    sco.szSSLCertificate);
   if (file_copy (default_backup_cert_path, default_cert_path) != 0)
     {
@@ -16392,7 +16389,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val = ERR_NO_ERROR;
   char *db_name, *interval_str;
   int interval = 0;
-  char *argv [10];
+  const char *argv[10];
   char path [512];
   int argc = 0;
   char note [20];
@@ -16562,7 +16559,7 @@ _hash_cert (char *hash_value, char *file_path)
   EVP_MD_CTX *mdContext = NULL;
   unsigned char data[1024];	/* file read buffer */
   unsigned char md5_final[EVP_MAX_MD_SIZE];
-  char md5_final_hex[MD5_DIGEST_LENGTH];
+  char *hash_p = NULL;
   unsigned int md5_len = 0;
   int bytes = 0;
   unsigned int i = 0;
@@ -16606,10 +16603,11 @@ _hash_cert (char *hash_value, char *file_path)
   EVP_MD_CTX_free (mdContext);
   fclose (inFile);
 
+  hash_p = hash_value + strlen (hash_value);
   for (i = 0; i < md5_len; i++)
     {
-      snprintf (md5_final_hex, 3, "%02x", md5_final[i]);
-      strncat (hash_value, md5_final_hex, 3);
+      snprintf (hash_p, 3, "%02x", md5_final[i]);
+      hash_p += 2;
     }
   return 0;
 }
@@ -16651,13 +16649,13 @@ static int
 _is_exist_default_backup_cert (char *_dbmt_error)
 {
   char new_hash_value[33];
-  char default_backup_cert_path[PATH_MAX];
+  char default_backup_cert_path[COMPOSED_PATH_MAX];
   int compare_ret = 0;
 
   new_hash_value[0] = '\0';
   default_backup_cert_path[0] = '\0';
 
-  snprintf (default_backup_cert_path, PATH_MAX, "%s.bak",
+  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
 	    sco.szSSLCertificate);
 
   if (access (default_backup_cert_path, F_OK) != 0)

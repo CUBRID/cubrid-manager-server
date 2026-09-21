@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>            /* isalpha()        */
+#include <inttypes.h>         /* SCNu64           */
 
 #include <iostream>
 #include <cctype>
@@ -527,14 +528,17 @@ ut_getline (char **lineptr, int *n, FILE *fp)
 void
 uRemoveCRLF (char *str)
 {
-  size_t i;
+  size_t len;
+
   if (str == NULL)
     {
       return;
     }
-  for (i = strlen (str) - 1; (i >= 0) && (str[i] == 10 || str[i] == 13); i--)
+
+  len = strlen (str);
+  while (len > 0 && (str[len - 1] == 10 || str[len - 1] == 13))
     {
-      str[i] = '\0';
+      str[--len] = '\0';
     }
 }
 
@@ -1013,7 +1017,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   int i;
   int dbcnt;
   char strbuf[1024];
-  int dbvect[MAX_INSTALLED_DB];
+  int dbvect[MAX_INSTALLED_DB] = { 0 };
   int lock_fd;
   FILE *outfp;
   T_SERVER_STATUS_INFO *info;
@@ -1036,7 +1040,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
       else
 	{
 	  info = (T_SERVER_STATUS_INFO *) cmd_res->result;
-	  for (i = 0; i < cmd_res->num_result; i++)
+	  for (i = 0; i < cmd_res->num_result && dbcnt < MAX_INSTALLED_DB; i++)
 	    {
 	      if (_isRegisteredDB (info[i].db_name))
 		{
@@ -1336,12 +1340,12 @@ folder_copy (const char *src_folder, const char *dest_folder)
 
   while ((dirp = readdir (dp)) != NULL)
     {
-      char src_path[PATH_MAX];
-      char dest_path[PATH_MAX];
+      char src_path[COMPOSED_PATH_MAX];
+      char dest_path[COMPOSED_PATH_MAX];
 
-      snprintf (src_path, sizeof (src_path) - 1, "%s/%s", src_dir,
+      snprintf (src_path, sizeof (src_path), "%s/%s", src_dir,
 		dirp->d_name);
-      snprintf (dest_path, sizeof (dest_path) - 1, "%s/%s", dest_dir,
+      snprintf (dest_path, sizeof (dest_path), "%s/%s", dest_dir,
 		dirp->d_name);
 
       stat (src_path, &statbuf);
@@ -2105,6 +2109,8 @@ is_cmserver_process (int pid, const char *module_name)
 
   unlink (result_file);
   return return_value;
+#else
+  return -1;
 #endif
 }
 
@@ -3079,6 +3085,11 @@ get_short_filename (char *ret_name, int ret_name_len,
   char *path_p = NULL;
   unsigned int filename_len = 0;
 
+  if (short_filename == NULL)
+    {
+      return -1;
+    }
+
 #if defined(WINDOWS)
   path_p = strrchr (short_filename, '\\');
 #else
@@ -3086,11 +3097,6 @@ get_short_filename (char *ret_name, int ret_name_len,
 #endif
 
   if (path_p != NULL)
-    {
-      return -1;
-    }
-
-  if (short_filename == NULL)
     {
       return -1;
     }
@@ -3103,13 +3109,13 @@ get_short_filename (char *ret_name, int ret_name_len,
   ptr = strrchr (short_filename, '.');
   if (ptr == NULL)
     {
-      snprintf (ret_name, strlen (short_filename) + 1, short_filename);
+      snprintf (ret_name, strlen (short_filename) + 1, "%s", short_filename);
       return -1;
     }
 
   filename_len = (unsigned int) (ptr - short_filename);
 
-  snprintf (ret_name, filename_len + 1, short_filename);
+  snprintf (ret_name, filename_len + 1, "%s", short_filename);
 
   return 0;
 }
@@ -3133,14 +3139,14 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
   filename = strrchr (fullpath, '/');
 #endif
 
-  if ((filename == NULL) || ((filename + 1) == NULL))
+  if (filename == NULL)
     {
       return -1;
     }
 
   if (with_ext == 1)
     {
-      snprintf (ret_filename, PATH_MAX, filename + 1);
+      snprintf (ret_filename, PATH_MAX, "%s", filename + 1);
       return 0;
     }
   else
@@ -3149,7 +3155,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
 	{
 	  return -1;
 	}
-      snprintf (ret_filename, PATH_MAX, short_filename);
+      snprintf (ret_filename, PATH_MAX, "%s", short_filename);
     }
   return 0;
 }
@@ -3528,8 +3534,8 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
 int
 ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
 {
-  long vmem_pages;
-  long rmem_pages;
+  unsigned long vmem_pages;
+  unsigned long rmem_pages;
   char fname[PATH_MAX];
   FILE *cpufp = NULL;
   FILE *memfp = NULL;
@@ -3559,15 +3565,9 @@ ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
       fclose (cpufp);
       return -1;
     }
-#if __WORDSIZE == 64
-  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%lu%lu",
+  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%" SCNu64 "%" SCNu64,
 	  &stat->cpu_user, &stat->cpu_kernel);
   fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
-#else
-  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%llu%llu",
-	  &stat->cpu_user, &stat->cpu_kernel);
-  fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
-#endif
 
   stat->mem_virtual = vmem_pages * sysconf (_SC_PAGESIZE);
   stat->mem_physical = rmem_pages * sysconf (_SC_PAGESIZE);
@@ -3583,9 +3583,9 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
 {
   char linebuf[LINE_MAX];
   char prefix[50];
-  uint64_t nice;
-  uint64_t buffers;
-  uint64_t cached;
+  uint64_t nice = 0;
+  uint64_t buffers = 0;
+  uint64_t cached = 0;
   FILE *cpufp = NULL;
   FILE *memfp = NULL;
   int n_cpuitem = 0;
@@ -3611,6 +3611,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   if (memfp == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "meminfo_file");
+      fclose (cpufp);
       return ERR_FILE_OPEN_FAIL;
     }
 
@@ -3619,13 +3620,9 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "cpu"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu%lu%lu%lu%lu", &stat->cpu_user, &nice,
+	  sscanf (linebuf, "%*s%" SCNu64 "%" SCNu64 "%" SCNu64 "%" SCNu64 "%" SCNu64,
+		  &stat->cpu_user, &nice,
 		  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
-#else
-	  sscanf (linebuf, "%*s%llu%llu%llu%llu%llu", &stat->cpu_user, &nice,
-		  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
-#endif
 
 	  stat->cpu_user += nice;
 	  n_cpuitem++;
@@ -3642,54 +3639,30 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "MemTotal:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &stat->mem_physical_total);
-#else
-	  sscanf (linebuf, "%*s%llu", &stat->mem_physical_total);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_physical_total);
 	  n_memitem++;
 	}
       if (!strcmp (prefix, "MemFree:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &stat->mem_physical_free);
-#else
-	  sscanf (linebuf, "%*s%llu", &stat->mem_physical_free);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_physical_free);
 	  n_memitem++;
 	}
       if (!strcmp (prefix, "Buffers:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &buffers);
-#else
-	  sscanf (linebuf, "%*s%llu", &buffers);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &buffers);
 	}
       if (!strcmp (prefix, "Cached:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &cached);
-#else
-	  sscanf (linebuf, "%*s%llu", &cached);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &cached);
 	}
       if (!strcmp (prefix, "SwapTotal:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &stat->mem_swap_total);
-#else
-	  sscanf (linebuf, "%*s%llu", &stat->mem_swap_total);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_swap_total);
 	  n_memitem++;
 	}
       if (!strcmp (prefix, "SwapFree:"))
 	{
-#if __WORDSIZE == 64
-	  sscanf (linebuf, "%*s%lu", &stat->mem_swap_free);
-#else
-	  sscanf (linebuf, "%*s%llu", &stat->mem_swap_free);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_swap_free);
 	  n_memitem++;
 	}
     }
@@ -3726,9 +3699,9 @@ ut_record_cubrid_utility_log_stderr (const char *msg)
       return -1;
     }
 #if !defined(WINDOWS)
-  fprintf (stderr, msg);
+  fprintf (stderr, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }
@@ -3741,9 +3714,9 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
       return -1;
     }
 #if !defined(WINDOWS)
-  fprintf (stdout, msg);
+  fprintf (stdout, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }

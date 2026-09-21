@@ -2195,7 +2195,9 @@ namespace jwsmtp
 	    return newaddress;  // its empty, oops (this should fail at the server.)
 	  }
 
-	if (!addresstoparse.find ("@") == std::string::npos)
+	if (addresstoparse.find ("@") == std::string::npos
+	    && addresstoparse.find ('<') == std::string::npos
+	    && addresstoparse.find ('>') == std::string::npos)
 	  {
 	    // no '@' symbol (could be a local address, e.g. root)
 	    // so just assume this. The SMTP server should just deny delivery if its messed up!

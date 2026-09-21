@@ -277,7 +277,8 @@ aj_add_volume (char *dbname, const char *type, int increase,
     }
   else
     {
-      strncpy (tmp_dbname, dbname, strlen (dbname) + 1);
+      strncpy (tmp_dbname, dbname, sizeof (tmp_dbname) - 1);
+      tmp_dbname[sizeof (tmp_dbname) - 1] = '\0';
     }
 
   if (uRetrieveDBDirectory (tmp_dbname, dbloca) != ERR_NO_ERROR)
@@ -453,7 +454,7 @@ aj_autohistory_handler (void *ajp, time_t prev_check_time, time_t cur_time)
 				   mondata->dbbuf[i].db_name);
 			  fprintf (hsp->hfile, "pid:%d ",
 				   mondata->dbbuf[i].db_pid);
-			  fprintf (hsp->hfile, "size:%ld ",
+			  fprintf (hsp->hfile, "size:%lu ",	/* db_size is unsigned long */
 				   mondata->dbbuf[i].db_size);
 			  fprintf (hsp->hfile, "status:%c ",
 				   mondata->dbbuf[i].proc_stat[0]);
@@ -736,7 +737,8 @@ set_query_period_details (query_period_details **details, char *conf_item)
   while (token != NULL)
     {
       *details = (query_period_details *) malloc (sizeof (query_period_details));
-      strncpy ((*details)->detail, token, DETAIL_LEN);
+      strncpy ((*details)->detail, token, DETAIL_LEN - 1);
+      (*details)->detail[DETAIL_LEN - 1] = '\0';
       (*details)->next = head;
       head = *details;
       token = strtok (NULL, delim);

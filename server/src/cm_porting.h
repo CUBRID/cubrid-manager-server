@@ -60,6 +60,8 @@
 #define NAME_MAX 256
 #endif
 
+#define COMPOSED_PATH_MAX (PATH_MAX + NAME_MAX + 2)
+
 #define MOVE_FILE(SRC_FILE, DEST_FILE)    \
     (unlink(DEST_FILE) || 1 ? rename(SRC_FILE, DEST_FILE) : -1)
 
@@ -134,10 +136,7 @@
       pthread_attr_init(&thread_attr);                                    \
       pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED); \
       pthread_attr_setstacksize(&thread_attr, 100 * 1024);                \
-      if (pthread_create(&(THR_ID), &thread_attr, FUNC, ARG) < 0){        \
-        free ((void *) ARG);                                              \
-        ARG = NULL;                                                       \
-      }                                                                   \
+      (void) pthread_create(&(THR_ID), &thread_attr, FUNC, ARG);          \
       pthread_attr_destroy(&thread_attr);                                 \
     } while (0)
 #else
@@ -146,10 +145,7 @@
       pthread_attr_t    thread_attr;                                      \
       pthread_attr_init(&thread_attr);                                    \
       pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED); \
-      if (pthread_create(&(THR_ID), &thread_attr, FUNC, ARG) < 0){        \
-        free ((void *) ARG);                                              \
-        ARG = NULL;                                                       \
-      }                                                                   \
+      (void) pthread_create(&(THR_ID), &thread_attr, FUNC, ARG);          \
       pthread_attr_destroy(&thread_attr);                                 \
     } while (0)
 #endif
