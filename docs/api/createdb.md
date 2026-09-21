@@ -47,7 +47,9 @@ Create database.
 | --- | --- |
 | task | task name |
 | status | execution result, success or failed. |
-| note | if failed, a brief description will be given here |
+| note | if failed, a brief description will be given here; on a successful create, may instead carry a warning that a manual check is recommended (see below) |
+
+* Creating the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: registering the new database's entry in its own user-authorization file (`cmdb.pass`). If that bookkeeping fails - a lock timeout, a file I/O error, or an internal update error - the database is **not** removed; `status` still reports `"success"`, and `note` instead explains that `cmdb.pass` may need to be corrected manually before the database is manageable through CMS. This applies whether the task is run synchronously or with `async:"yes"`.
 
 ## Response Sample
 
@@ -55,6 +57,16 @@ Create database.
 {
    "__EXEC_TIME" : "3593 ms",
    "note" : "none",
+   "status" : "success",
+   "task" : "createdb"
+}
+```
+
+## Response Sample (success, manual check recommended)
+```
+{
+   "__EXEC_TIME" : "3601 ms",
+   "note" : "WARNING: database 'alatestdb' was created on disk, but it could not be registered in cmdb.pass (lock timeout, file I/O error, or an internal update error); the database is NOT currently manageable through CMS for user 'dba' until cmdb.pass is corrected manually",
    "status" : "success",
    "task" : "createdb"
 }
