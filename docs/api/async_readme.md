@@ -69,6 +69,12 @@ A rejected request never gets a `uuid`, since the job never started:
 
 Check `note` for the reason and retry the request later. (This exclusivity check only serializes async job bookkeeping; access to shared credential/connection files such as `cmdb.pass` is separately protected by an in-process mutex, `file_resource_guard`.)
 
+### A Note on Request Latency
+
+The bookkeeping updates that the tasks above perform on `cmdb.pass` and the auto-job config files run off CMS's global request-serialization lock, so they do not delay unrelated requests while waiting on `file_resource_guard` (bounded to ~5 seconds; see above).
+
+[setautoexecquery](setautoexecquery.md) is the one exception: it is a synchronous, non-async task, and it takes the same `file_resource_guard` lock on `autoexecquery.conf` *while still holding* that global lock. If the lock is contended - for example, by another `setautoexecquery` call, or by a `deletedb`/`renamedb`/`copydb`/`updateuser` bookkeeping update racing on `autoexecquery.conf` - `setautoexecquery` can block for up to ~5 seconds waiting for it, and CMS cannot start processing *any other request* (including an unrelated `gettaskstatus` poll) until it either acquires the lock or gives up. This is a known limitation, not a hang: it resolves on its own once `file_resource_guard`'s wait times out or the lock is released.
+
 ## Checking Job Status
 
 Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
