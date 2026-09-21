@@ -3127,10 +3127,15 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 #define BOOKKEEPING_FAILED_HISTORY_CONF    (1 << 3)
 #define BOOKKEEPING_FAILED_EXECQUERY_CONF  (1 << 4)
 
-#define BOOKKEEPING_FAILED_LIST_BUF_SIZE 160
+#define BOOKKEEPING_FAILED_LIST_BUF_SIZE 256
 
+/*
+ * bookkeeping_failed_files_list () - writes a comma-separated,
+ *   human-readable list of the bookkeeping files corresponding to the
+ *   BOOKKEEPING_FAILED_* bits set in failed_mask into buf.
+ */
 static void
-bookkeeping_failed_files_list (int failed_mask, char *buf)
+bookkeeping_failed_files_list (int failed_mask, char *buf, size_t buf_size)
 {
   static const struct
   {
@@ -3146,6 +3151,11 @@ bookkeeping_failed_files_list (int failed_mask, char *buf)
   size_t i;
   int wrote_any = 0;
 
+  if (buf_size == 0)
+    {
+      return;
+    }
+
   buf[0] = '\0';
   for (i = 0; i < sizeof (entries) / sizeof (entries[0]); i++)
     {
@@ -3153,7 +3163,7 @@ bookkeeping_failed_files_list (int failed_mask, char *buf)
         {
           continue;
         }
-      snprintf (buf + strlen (buf), BOOKKEEPING_FAILED_LIST_BUF_SIZE - strlen (buf),
+      snprintf (buf + strlen (buf), buf_size - strlen (buf),
                 "%s%s", wrote_any ? ", " : "", entries[i].name);
       wrote_any = 1;
     }
@@ -3279,7 +3289,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       /*
        * Warning: the deletedb already happened, but may still need manual cleanup
        */
-      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files);
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
                 "database '%s' was deleted, but the following bookkeeping "
@@ -3550,7 +3560,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
        * Warning: the renamedb already happened, but may still need manual cleanup
        * see the API-level decision recorded in docs/api/renamedb.md.
        */
-      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files);
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
                 "WARNING: "
                 "database '%s' was renamed to '%s', but the following "
