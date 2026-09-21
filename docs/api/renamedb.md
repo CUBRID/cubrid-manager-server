@@ -42,7 +42,7 @@ Rename database.
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here; on a successful rename, may instead carry a warning that a manual check is recommended (see below) |
 
-* Renaming the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: updating the database's entries in its own user-authorization file (`cmdb.pass`) and in the auto-job config files (addvoldb/backupdb/history/execquery) to the new name. If any of that bookkeeping fails - normally because a short internal lock could not be acquired in time - the rename is **not** rolled back; `status` still reports `"success"`, and `note` instead explains that one or more of those files may still reference the old database name and should be checked and cleaned up manually. This applies whether the task is run synchronously or with `async:"yes"`.
+* Renaming the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: updating the database's entries in its own user-authorization file (`cmdb.pass`) and in the auto-job config files (addvoldb/backupdb/history/execquery) to the new name. If any of that bookkeeping fails - a lock timeout, a file I/O error, or an internal update error - the rename is **not** rolled back; `status` still reports `"success"`, and `note` instead names exactly which of those file(s) could not be updated and should be checked and cleaned up manually. This applies whether the task is run synchronously or with `async:"yes"`.
 
 ## Response Sample
 
@@ -59,7 +59,7 @@ Rename database.
 ```
 {
   "__EXEC_TIME": "360 ms",
-  "note": "WARNING: database 'destinationdb' was renamed to 'anotherdb', but one or more bookkeeping files (cmdb.pass and/or the auto-job addvoldb/backupdb/history/execquery config files) could not be updated because a lock could not be acquired in time; stale entries still referencing the old name 'destinationdb' may remain and should be checked and cleaned up manually",
+  "note": "WARNING: database 'destinationdb' was renamed to 'anotherdb', but the following bookkeeping file(s) could not be updated (lock timeout, file I/O error, or an internal update error): the auto-job addvoldb config file, the auto-job execquery config file; stale entries still referencing the old name 'destinationdb' may remain and should be checked and cleaned up manually",
   "status": "success",
   "task": "renamedb"
 }

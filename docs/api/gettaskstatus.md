@@ -68,7 +68,7 @@ See the note above the samples: this is still `job-status:"success"`/`status:"su
 {
    "__EXEC_TIME" : "401 ms",
    "job-status" : "success",
-   "note" : "WARNING: database 'alatestdb' was deleted, but one or more bookkeeping files (cmdb.pass and/or the auto-job addvoldb/backupdb/history/execquery config files) could not be updated because a lock could not be acquired; manual check recommended",
+   "note" : "WARNING: database 'alatestdb' was deleted, but the following bookkeeping file(s) could not be updated (lock timeout, file I/O error, or an internal update error): cmdb.pass, the auto-job backupdb config file; manual check recommended",
    "status" : "success",
    "task" : "deletedb",
    "uuid" : "14"

@@ -35,7 +35,7 @@ Delete a database.
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here; on a successful delete, may instead carry a warning that a manual check is recommended (see below) |
 
-* Deleting the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: removing the database's entries from its own user-authorization file (`cmdb.pass`) and from the auto-job config files (addvoldb/backupdb/history/execquery). If any of that bookkeeping fails - normally because a short internal lock could not be acquired in time - the database is **not** restored; `status` still reports `"success"`, and `note` instead explains that one or more of those files may still reference the deleted database and should be checked and cleaned up manually. This applies whether the task is run synchronously or with `async:"yes"` (see the async response samples below).
+* Deleting the database itself is what `status` reflects. Afterward, CMS also does best-effort bookkeeping: removing the database's entries from its own user-authorization file (`cmdb.pass`) and from the auto-job config files (addvoldb/backupdb/history/execquery). If any of that bookkeeping fails - a lock timeout, a file I/O error, or an internal update error - the database is **not** restored; `status` still reports `"success"`, and `note` instead names exactly which of those file(s) could not be updated and should be checked and cleaned up manually. This applies whether the task is run synchronously or with `async:"yes"` (see the async response samples below).
 
 ## Response Sample
 
@@ -52,7 +52,7 @@ Delete a database.
 ```
 {
    "__EXEC_TIME" : "401 ms",
-   "note" : "WARNING: database 'alatestdb' was deleted, but one or more bookkeeping files (cmdb.pass and/or the auto-job addvoldb/backupdb/history/execquery config files) could not be updated because a lock could not be acquired; manual check recommended",
+   "note" : "WARNING: database 'alatestdb' was deleted, but the following bookkeeping file(s) could not be updated (lock timeout, file I/O error, or an internal update error): cmdb.pass, the auto-job backupdb config file; manual check recommended",
    "status" : "success",
    "task" : "deletedb"
 }
