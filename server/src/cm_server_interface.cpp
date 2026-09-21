@@ -899,10 +899,21 @@ class async_request_guard
       : m_pstmt (new async_request), m_owns (true)
     {
 #ifndef WINDOWS
-      m_pstmt->mutex = new pthread_mutex_t;
-      m_pstmt->cond = new pthread_cond_t;
       m_mutex_inited = false;
       m_cond_inited = false;
+      m_pstmt->mutex = NULL;
+      m_pstmt->cond = NULL;
+      try
+        {
+          m_pstmt->mutex = new pthread_mutex_t;
+          m_pstmt->cond = new pthread_cond_t;
+        }
+      catch (...)
+        {
+          delete m_pstmt->mutex;
+          delete m_pstmt;
+          throw;
+        }
 #endif
     }
 
