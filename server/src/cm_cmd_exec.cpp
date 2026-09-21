@@ -178,7 +178,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char *saveptr;
   int local_major = -1, local_minor = -1;
-  char version[BUFFER_MAX_LEN];
+  char version[BUFFER_MAX_LEN], vers_buf[BUFFER_MAX_LEN];
 
   if (build_version != NULL && build_version_size > 0)
     {
@@ -229,6 +229,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
       return;
     }
 
+  snprintf (vers_buf, BUFFER_MAX_LEN, "%s", version);
   char *p = STRTOK (version, ".", &saveptr);
   if (p != NULL)
     {
@@ -244,8 +245,8 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
 
   if (local_major < 0 || local_minor < 0)
     {
-      LOG_ERROR ("Unable to parse cubrid minor version from '%s'. Set version to %d.%d defined by default.",
-                 version, cubrid_version_major, cubrid_version_minor);
+      LOG_ERROR ("Unable to parse cubrid version from '%s'. Set version to %d.%d defined by default.",
+                 vers_buf, cubrid_version_major, cubrid_version_minor);
     }
   else if (local_major < 10) /* this CMS supports version 10.0 or higher */
     {
