@@ -453,7 +453,11 @@ _op_check_is_localhost (char *token, char *hname)
         }
     }
 
-  freeaddrinfo (res);
+  if (res != NULL)
+    {
+      freeaddrinfo (res);
+    }
+
   return ret;
 }
 
