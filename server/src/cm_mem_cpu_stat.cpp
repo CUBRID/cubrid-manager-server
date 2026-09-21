@@ -806,8 +806,14 @@ extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf)
     {
       uint64_t *member_ptr;
       uint64_t prop_val;
+      int nmatched;
+
       memset (prop_name, 0, sizeof (prop_name));
-      sscanf (linebuf, "%99s%*s%" SCNu64, prop_name, &prop_val);
+      nmatched = sscanf (linebuf, "%99s%*s%" SCNu64, prop_name, &prop_val);
+      if (nmatched != 2)
+        {
+          continue;
+        }
       member_ptr = get_statdump_member_ptr (stat, prop_name);
       if (!member_ptr)
         continue;
