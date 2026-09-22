@@ -362,6 +362,18 @@ ext_get_auto_start (Json::Value &request, Json::Value &response)
 {
   Json::Value   root_jobs;
 
+  /*
+   * ext_get_auto_jobs ()/ext_set_auto_jobs () have no locking of their
+   * own - they rely on the caller holding this guard for the entire
+   * read (here) or read-modify-write (ext_set_auto_start () etc. below)
+   * span against autojobs.conf.
+   */
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
   if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
     {
       response[EXT_JOBS_AUTO_START] = Json::Value::null;
@@ -381,6 +393,12 @@ ext_set_auto_start (Json::Value &request, Json::Value &response)
 
   JSON_FIND_V (request, "service",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
+
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
 
   if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
     {
@@ -405,6 +423,12 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
   char decrypted[PASSWD_LENGTH + 1];
   string userpasswd;
   string key = request.get ("service", "").asString();
+
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
 
   if (ext_get_auto_jobs (key, root_jobs) == FALSE)
     {
@@ -448,6 +472,19 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
           return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
         }
     }
+
+  /*
+   * ext_set_auto_jobs () does its own internal read-modify-write of
+   * autojobs.conf (load, set this one key, write the whole file back);
+   * see the comment in ext_get_auto_start () above for why that needs
+   * to be guarded here rather than inside ext_set_auto_jobs () itself.
+   */
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
   if (ext_set_auto_jobs ( keyvalue, request["jobconf"]) == FALSE)
     {
       LOG_WARN ("set %s fail!", keyvalue.c_str());
@@ -876,6 +913,20 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
+
+  /*
+   * held for the whole call, including ext_exec_mail_report ()'s own
+   * read of "mail_config" and its conditional write-back of
+   * "mail_report" below - both touch autojobs.conf and have to stay
+   * atomic with this function's initial read. See the comment in
+   * ext_get_auto_start () above.
+   */
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
   if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
     {
       LOG_WARN ("get mail report config failed!");
@@ -889,11 +940,26 @@ int ext_exec_auto_start (Json::Value &request, Json::Value &response)
   Json::Value autojobs;
   string dbname;
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, autojobs) == FALSE)
-    {
-      LOG_DEBUG ("get auto start jobs failed.");
-      return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
-    }
+  {
+    /*
+     * only the read itself needs to be atomic with respect to a
+     * concurrent writer (see ext_get_auto_start () above); the
+     * ext_exec_*_auto_start () calls below don't touch autojobs.conf,
+     * so the guard is released before them rather than held across
+     * however long starting brokers/databases takes.
+     */
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
+
+    if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, autojobs) == FALSE)
+      {
+        LOG_DEBUG ("get auto start jobs failed.");
+        return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
+      }
+  }
 
   if (autojobs == Json::Value::null)
     {

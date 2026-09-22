@@ -178,6 +178,7 @@ mutex_t *cm_cmdb_pass_mutex (void);
 mutex_t *cm_cmdbinfo_temp_mutex (void);
 mutex_t *cm_conn_list_mutex (void);
 mutex_t *cm_auto_conf_mutex (void);
+mutex_t *cm_auto_jobs_mutex (void);
 
 /*
  * file_resource_guard - RAII guard combining one of the in-process

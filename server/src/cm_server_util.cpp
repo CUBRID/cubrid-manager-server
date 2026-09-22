@@ -172,6 +172,31 @@ cm_auto_conf_mutex (void)
   return &h.m;
 }
 
+/*
+ * cm_auto_jobs_mutex () - guards autojobs.conf (FID_AUTO_JOBS_CONF), a
+ * separate file from the four auto*.conf files cm_auto_conf_mutex ()
+ * above already covers.
+ */
+mutex_t *
+cm_auto_jobs_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096

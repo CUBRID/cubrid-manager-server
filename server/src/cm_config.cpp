@@ -121,6 +121,7 @@ static T_DBMT_FILE_INFO dbmt_file[NUM_DBMT_FILE] =
   {FID_LOCK_SVR_LOG, DBMT_TMP_DIR, "cmlog.lock"},
   {FID_LOCK_DBMT_PASS, DBMT_TMP_DIR, "cmpass.lock"},
   {FID_LOCK_AUTO_CONF, DBMT_TMP_DIR, "autoconf.lock"},
+  {FID_LOCK_AUTO_JOBS, DBMT_TMP_DIR, "autojobs.lock"},
   {FID_DIAG_ACTIVITY_LOG, DBMT_CONF_DIR, "diagactivitylog.conf"},
   {FID_DIAG_STATUS_TEMPLATE, DBMT_CONF_DIR, "diagstatustemplate.conf"},
   {FID_DIAG_ACTIVITY_TEMPLATE, DBMT_CONF_DIR, "diagactivitytemplate.conf"},
