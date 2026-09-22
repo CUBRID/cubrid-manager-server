@@ -2597,7 +2597,7 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
 int
 ut_validate_token (nvplist *req)
 {
-  T_USER_TOKEN_INFO *token_info;
+  T_USER_TOKEN_INFO token_info;
 
   time_t active_time = 0;
   time_t now_time = time (NULL);
@@ -2633,14 +2633,13 @@ ut_validate_token (nvplist *req)
 
   ut_access_log (req, id);
 
-  token_info = dbmt_user_search_token_info (id);
-  if (token_info == NULL)
+  if (!dbmt_user_search_token_info (id, &token_info))
     {
       ut_access_log (req, "can't find registered token.");
       return 0;
     }
 
-  if (strcmp (token_info->token, token))
+  if (strcmp (token_info.token, token))
     {
       ut_access_log (req, "tokens aren't equal!");
       return 0;
@@ -2648,12 +2647,15 @@ ut_validate_token (nvplist *req)
 
   ut_get_token_active_time (&active_time);
 
-  if (now_time - token_info->login_time > active_time)
+  if (now_time - token_info.login_time > active_time)
     {
       return 0;
     }
 
-  token_info->login_time = now_time;
+  if (!dbmt_user_touch_token_login_time (id, token, now_time))
+    {
+      return 0;
+    }
 
   nv_add_nvp (req, "_IP", ip);
   nv_add_nvp (req, "_PORT", port);

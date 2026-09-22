@@ -546,6 +546,138 @@ dbmt_user_add_dbinfo (T_DBMT_USER_INFO *usrinfo, T_DBMT_USER_DBINFO *dbinfo)
   return ERR_NO_ERROR;
 }
 
+/*
+ * token_list_mutex ()/token_list_guard - guard user_token_info (the
+ * in-memory circular linked list of active login tokens) against
+ * concurrent access. It has two very different callers:
+ *   - HTTP request threads read it (dbmt_user_search_token_info () and
+ *     friends, via ext_ut_validate_token ()/ut_validate_token ()) while
+ *     holding cm_mutex (cm_lock_guard in cm_server_interface.cpp).
+ *   - "login"/"logout" run in their OWN per-request worker thread
+ *     (registered in task_info [], not ext_task_info [] - see
+ *     cm_execute_request_async () in cm_server_interface.cpp),
+ *     completely outside cm_mutex, and insert/delete nodes.
+ */
+static mutex_t *
+token_list_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      mutex_destory (m);
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
+/*
+ * token_list_guard - minimal RAII wrapper around token_list_mutex ().
+ */
+class token_list_guard
+{
+  public:
+    token_list_guard (void)
+    {
+      mutex_lock (*token_list_mutex ());
+    }
+
+    ~token_list_guard (void)
+    {
+      mutex_unlock (*token_list_mutex ());
+    }
+
+  private:
+    token_list_guard (const token_list_guard &);
+    token_list_guard &operator= (const token_list_guard &);
+};
+
+/*
+ * find_token_node_unlocked ()/find_token_node_by_token_unlocked () -
+ * the actual list traversal, verbatim from before.
+ */
+static T_USER_TOKEN_INFO *
+find_token_node_unlocked (const char *user_id)
+{
+  T_USER_TOKEN_INFO *head = user_token_info;
+
+  if (user_id == NULL || head == NULL)
+    {
+      return NULL;
+    }
+
+  do
+    {
+      if (!strcmp (head->user_id, user_id))
+	{
+	  return head;
+	}
+
+      head = head->next;
+
+    }
+  while (head != user_token_info);
+
+  return NULL;
+}
+
+static T_USER_TOKEN_INFO *
+find_token_node_by_token_unlocked (const char *token)
+{
+  T_USER_TOKEN_INFO *head = user_token_info;
+
+  if (token == NULL || head == NULL)
+    {
+      return NULL;
+    }
+
+  do
+    {
+      if (!strcmp (head->token, token))
+	{
+	  return head;
+	}
+
+      head = head->next;
+
+    }
+  while (head != user_token_info);
+
+  return NULL;
+}
+
+/*
+ * unlink_and_free_token_node_unlocked () - detach `node` from the
+ * circular list.
+ */
+static void
+unlink_and_free_token_node_unlocked (T_USER_TOKEN_INFO *node)
+{
+  if (node == user_token_info)
+    {
+      if (user_token_info->next != user_token_info)
+	{
+	  user_token_info = user_token_info->next;
+	}
+      else
+	{
+	  user_token_info = NULL;
+	}
+    }
+
+  node->prev->next = node->next;
+  node->next->prev = node->prev;
+
+  free (node);
+}
+
 int
 dbmt_user_new_token_info (const char *user_id,
 			  const char *user_ip,
@@ -560,7 +692,9 @@ dbmt_user_new_token_info (const char *user_id,
   T_USER_TOKEN_INFO *end_node;
   T_USER_TOKEN_INFO *new_node;
 
-  if (! (new_node = dbmt_user_search_token_info (user_id)))
+  token_list_guard guard;
+
+  if (! (new_node = find_token_node_unlocked (user_id)))
     {
       new_node = (T_USER_TOKEN_INFO *) malloc (sizeof (T_USER_TOKEN_INFO));
       if (new_node == NULL)
@@ -592,135 +726,122 @@ dbmt_user_new_token_info (const char *user_id,
   return ERR_NO_ERROR;
 }
 
-T_USER_TOKEN_INFO *
-dbmt_user_search_token_info (const char *user_id)
+bool
+dbmt_user_search_token_info (const char *user_id, T_USER_TOKEN_INFO *out)
 {
-  T_USER_TOKEN_INFO *head = user_token_info;
+  T_USER_TOKEN_INFO *node;
 
-  if (user_id == NULL)
+  if (user_id == NULL || out == NULL)
     {
-      return NULL;
+      return false;
     }
 
-  if (head == NULL)
-    {
-      ut_access_log (NULL, "user_token_info is null.");
-      return NULL;
-    }
+  token_list_guard guard;
 
-  do
+  node = find_token_node_unlocked (user_id);
+  if (node == NULL)
     {
-      if (!strcmp (head->user_id, user_id))
+      if (user_token_info == NULL)
 	{
-	  return head;
+	  ut_access_log (NULL, "user_token_info is null.");
 	}
-
-      head = head->next;
-
+      return false;
     }
-  while (head != user_token_info);
 
-  return NULL;
+  *out = *node;
+  return true;
 }
 
-T_USER_TOKEN_INFO *
-dbmt_user_search_token_info_by_token (const char *token)
+bool
+dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out)
 {
-  T_USER_TOKEN_INFO *head = user_token_info;
+  T_USER_TOKEN_INFO *node;
 
-  if (token == NULL)
+  if (token == NULL || out == NULL)
     {
-      return NULL;
+      return false;
     }
 
-  if (head == NULL)
-    {
-      ut_access_log (NULL, "user_token_info is null.");
-      return NULL;
-    }
+  token_list_guard guard;
 
-  do
+  node = find_token_node_by_token_unlocked (token);
+  if (node == NULL)
     {
-      if (!strcmp (head->token, token))
+      if (user_token_info == NULL)
 	{
-	  return head;
+	  ut_access_log (NULL, "user_token_info is null.");
 	}
-
-      head = head->next;
-
+      return false;
     }
-  while (head != user_token_info);
 
-  return NULL;
-
+  *out = *node;
+  return true;
 }
 
-T_USER_TOKEN_INFO *
+bool
+dbmt_user_touch_token_login_time (const char *user_id, const char *token, time_t now_time)
+{
+  T_USER_TOKEN_INFO *node;
+
+  if (user_id == NULL || token == NULL)
+    {
+      return false;
+    }
+
+  token_list_guard guard;
+
+  node = find_token_node_unlocked (user_id);
+  if (node == NULL || strcmp (node->token, token) != 0)
+    {
+      return false;
+    }
+
+  node->login_time = now_time;
+  return true;
+}
+
+bool
 dbmt_user_delete_token_info (const char *user_id)
 {
   T_USER_TOKEN_INFO *removed_node = NULL;
 
   if (user_id == NULL)
     {
-      return NULL;
+      return false;
     }
 
+  token_list_guard guard;
 
-  if ((removed_node = dbmt_user_search_token_info (user_id)) == NULL)
+  removed_node = find_token_node_unlocked (user_id);
+  if (removed_node == NULL)
     {
-      return NULL;
+      return false;
     }
 
-  if (removed_node == user_token_info)
-    {
-      if (user_token_info->next != user_token_info)
-	{
-	  user_token_info = user_token_info->next;
-	}
-      else
-	{
-	  user_token_info = NULL;
-	}
-    }
+  unlink_and_free_token_node_unlocked (removed_node);
 
-  removed_node->prev->next = removed_node->next;
-  removed_node->next->prev = removed_node->prev;
-
-  return removed_node;
-
+  return true;
 }
 
-T_USER_TOKEN_INFO *
+bool
 dbmt_user_delete_token_info_by_token (const char *token)
 {
   T_USER_TOKEN_INFO *removed_node = NULL;
 
   if (token == NULL)
     {
-      return NULL;
+      return false;
     }
 
-  if ((removed_node = dbmt_user_search_token_info_by_token (token)) == NULL)
+  token_list_guard guard;
+
+  removed_node = find_token_node_by_token_unlocked (token);
+  if (removed_node == NULL)
     {
-      return NULL;
+      return false;
     }
 
-  if (removed_node == user_token_info)
-    {
-      if (user_token_info->next != user_token_info)
-	{
-	  user_token_info = user_token_info->next;
-	}
-      else
-	{
-	  user_token_info = NULL;
-	}
+  unlink_and_free_token_node_unlocked (removed_node);
 
-    }
-
-  removed_node->prev->next = removed_node->next;
-  removed_node->next->prev = removed_node->prev;
-
-  return removed_node;
-
+  return true;
 }

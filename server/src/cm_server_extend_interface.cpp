@@ -2549,7 +2549,7 @@ static bool _validate_token_active_time (time_t &active_time)
 
 bool ext_ut_validate_token (const char *token)
 {
-  T_USER_TOKEN_INFO *token_info;
+  T_USER_TOKEN_INFO token_info;
   string token_enc;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   istringstream tmp_iss;
@@ -2568,13 +2568,12 @@ bool ext_ut_validate_token (const char *token)
   int i = 0;
   while (getline (tmp_iss, token_content[i++], ':'));
 
-  token_info = dbmt_user_search_token_info (token_content[2].c_str());
-  if (token_info == NULL)
+  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
       return false;
     }
 
-  if (strcmp (token_info->token, token) != 0)
+  if (strcmp (token_info.token, token) != 0)
     {
       return false;
     }
@@ -2584,12 +2583,19 @@ bool ext_ut_validate_token (const char *token)
       active_time = 7200;
     }
 
-  if (now_time - token_info->login_time > active_time)
+  if (now_time - token_info.login_time > active_time)
     {
       return false;
     }
 
-  token_info->login_time = now_time;
+  /*
+   * re-finds the live node and bumps login_time only if it's still
+   * the same session validated above
+   */
+  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token, now_time))
+    {
+      return false;
+    }
 
   return true;
 }
@@ -2597,7 +2603,7 @@ bool ext_ut_validate_token (const char *token)
 int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 {
 
-  T_USER_TOKEN_INFO *token_info;
+  T_USER_TOKEN_INFO token_info;
   string task;
   string token;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
@@ -2645,14 +2651,13 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   int i = 0;
   while (getline (tmp_iss, token_content[i++], ':'));
 
-  token_info = dbmt_user_search_token_info (token_content[2].c_str());
-  if (token_info == NULL)
+  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
 
-  if (strcmp (token_info->token, token.c_str()))
+  if (strcmp (token_info.token, token.c_str()))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
@@ -2663,12 +2668,16 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       active_time = 7200;
     }
 
-  if (now_time-token_info->login_time > active_time)
+  if (now_time-token_info.login_time > active_time)
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  token_info->login_time = now_time;
+  /* see the comment in the (const char *token) overload above */
+  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token.c_str(), now_time))
+    {
+      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
+    }
 
   request["_IP"] = token_content[0];
   request["_PORT"] = token_content[1];

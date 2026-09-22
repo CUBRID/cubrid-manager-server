@@ -12235,8 +12235,6 @@ ts_login (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  T_USER_TOKEN_INFO *removed_node = NULL;
-
   char *token = NULL;
 
   ut_access_log (req, "disconnected");
@@ -12245,14 +12243,14 @@ ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_update_val (res, "note", "");
 
   token = nv_get_val (req, "token");
-  removed_node = dbmt_user_delete_token_info_by_token (token);
 
-  if (removed_node == NULL)
+  /*
+   * unlinks AND frees the node as one step under its own lock now.
+   */
+  if (!dbmt_user_delete_token_info_by_token (token))
     {
       return ERR_INVALID_TOKEN;
     }
-
-  FREE_MEM (removed_node);
 
   return ERR_NO_ERROR;
 }

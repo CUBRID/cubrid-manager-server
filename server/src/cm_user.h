@@ -122,9 +122,10 @@ int dbmt_user_new_token_info (const char *user_id,
 #endif
                               time_t login_time);
 
-T_USER_TOKEN_INFO *dbmt_user_search_token_info (const char *user_id);
-T_USER_TOKEN_INFO *dbmt_user_search_token_info_by_token (const char *token);
-T_USER_TOKEN_INFO *dbmt_user_delete_token_info (const char *user_id);
-T_USER_TOKEN_INFO *dbmt_user_delete_token_info_by_token (const char *token);
+bool dbmt_user_search_token_info (const char *user_id, T_USER_TOKEN_INFO *out);
+bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
+bool dbmt_user_touch_token_login_time (const char *user_id, const char *token, time_t now_time);
+bool dbmt_user_delete_token_info (const char *user_id);
+bool dbmt_user_delete_token_info_by_token (const char *token);
 
 #endif                /* _CM_USER_H_ */
