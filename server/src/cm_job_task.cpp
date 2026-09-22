@@ -3102,14 +3102,20 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (cmdb_pass_registration_failed)
     {
+      /*
+       * Warning: the createdb already happened, but may still need manual cleanup.
+       */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+                "WARNING: "
                 "database '%s' was created on disk, but it could not be "
-                "registered in cmdb.pass because the lock on cmdb.pass "
-                "could not be acquired in time (or the file could not be "
-                "read); the database is NOT currently manageable through "
-                "CMS for user '%s' until cmdb.pass is corrected manually",
+                "registered in cmdb.pass (lock timeout, file I/O error, or "
+                "an internal update error); the database is NOT currently "
+                "manageable through CMS for user '%s' until cmdb.pass is "
+                "corrected manually",
                 dbname, dbmt_user_name);
-      return ERR_WITH_MSG;
+      nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
+      return ERR_NO_ERROR;
     }
   return ERR_NO_ERROR;
 }
