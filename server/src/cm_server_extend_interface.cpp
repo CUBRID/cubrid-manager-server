@@ -813,11 +813,19 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
 
-  if (ext_get_auto_jobs (EXT_JOBS_MAIL_CONF, mail_conf) == FALSE)
-    {
-      LOG_ERROR ("get mail config failed!");
-      return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
-    }
+  {
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
+
+    if (ext_get_auto_jobs (EXT_JOBS_MAIL_CONF, mail_conf) == FALSE)
+      {
+        LOG_ERROR ("get mail config failed!");
+        return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
+      }
+  }
 
   if (mail_conf == Json::Value::null || mail_conf["onoff"].asInt() == 0)
     {
@@ -904,7 +912,19 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 
   if (save_flag)
     {
-      ext_set_auto_jobs ("mail_report", mailreport);
+      /*
+       * Guarded only for this write, reacquired fresh here rather than
+       * held since the read above
+       */
+      file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+      if (guard.ok ())
+        {
+          ext_set_auto_jobs ("mail_report", mailreport);
+        }
+      else
+        {
+          LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
+        }
     }
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -915,23 +935,24 @@ int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
   Json::Value mail_report;
 
   /*
-   * held for the whole call, including ext_exec_mail_report ()'s own
-   * read of "mail_config" and its conditional write-back of
-   * "mail_report" below - both touch autojobs.conf and have to stay
-   * atomic with this function's initial read. See the comment in
-   * ext_get_auto_start () above.
+   * Only this one read is guarded here. It used to hold the guard for
+   * the whole call, including ext_exec_mail_report ()'s log-scanning
+   * and ext_send_mail () -> mail.send () SMTP send below
    */
-  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
-  if (!guard.ok ())
-    {
-      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
-    }
+  {
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
 
-  if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
-    {
-      LOG_WARN ("get mail report config failed!");
-      return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
-    }
+    if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
+      {
+        LOG_WARN ("get mail report config failed!");
+        return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
+      }
+  }
+
   return ext_exec_mail_report (mail_report, response);
 }
 
