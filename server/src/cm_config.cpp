@@ -53,7 +53,7 @@
 #define MIN_THREAD_NUM           1
 /* Reject multi connection with "ALL USER" */
 
-#define NUM_DBMT_FILE            24
+#define NUM_DBMT_FILE            25
 
 #define DEFAULT_CWM_PATH_SHORT            "/share/webmanager"
 #define DEFAULT_SSL_CERTIFICATE           "cm_ssl_cert.crt"
