@@ -271,16 +271,53 @@ bool load_json_from_file (string filepath, Json::Value &root)
 
 bool write_json_to_file (string filepath, Json::Value &root)
 {
-  Json::StyledWriter writer;
-  ofstream ofs (filepath.c_str());
-  if (!ofs.bad())
+  char tmp_path[PATH_MAX];
+
+  /*
+   * Write to a fresh temp file first, then move_file () it over filepath,
+   * rather than truncating filepath in place.
+   */
+  if (gen_tempfile_path (tmp_path, sco.dbmt_tmp_dir, "DBMT_json", TS_EXT_SET_AUTO_JOBS, PATH_MAX) < 0)
     {
-      ofs << writer.write (root) << endl;
-      ofs.close();
-      return TRUE;
+      LOG_ERROR ("write_json_to_file (): failed to generate a temp file path for '%s'", filepath.c_str());
+      return FALSE;
     }
 
-  return FALSE;
+  {
+    Json::StyledWriter writer;
+    ofstream ofs (tmp_path);
+
+    if (!ofs.is_open ())
+      {
+        LOG_ERROR ("write_json_to_file (): failed to open temp file '%s' for '%s'",
+		   tmp_path, filepath.c_str());
+        return FALSE;
+      }
+
+    ofs << writer.write (root) << endl;
+    ofs.close ();
+
+    /*
+     * Check for a write/close-time failure
+     */
+    if (ofs.fail ())
+      {
+        LOG_ERROR ("write_json_to_file (): failed to write '%s' (temp file '%s')",
+		   filepath.c_str(), tmp_path);
+        unlink (tmp_path);
+        return FALSE;
+      }
+  }
+
+  if (move_file (tmp_path, const_cast<char *> (filepath.c_str())) < 0)
+    {
+      LOG_ERROR ("write_json_to_file (): move_file () of temp file '%s' to '%s' failed",
+		 tmp_path, filepath.c_str());
+      unlink (tmp_path);
+      return FALSE;
+    }
+
+  return TRUE;
 }
 
 int ext_cub_broker_start (Json::Value &request, Json::Value &response)
