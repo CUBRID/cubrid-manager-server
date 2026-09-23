@@ -326,23 +326,47 @@ class CLog
       static CLog *instance_log = NULL;
       static CLog *instance_err = NULL;
 
+      /*
+       * Serializes the lazy-create/recreate check below for each of
+       * instance_log/instance_err, mirroring the function-local static
+       * holder pattern cm_auto_jobs_mutex () uses (cm_server_util.cpp).
+       */
+      struct mutex_holder
+      {
+        mutex_t m;
+        mutex_holder (void)
+        {
+          mutex_init (m);
+        }
+        ~mutex_holder (void)
+        {
+          mutex_destory (m);
+        }
+      };
+      static mutex_holder log_holder;
+      static mutex_holder err_holder;
+
       if ((logLevel <= CLog::xWARN) && (logLevel >= CLog::xFATAL))
         {
           // write log into error log file
 
+          mutex_lock (err_holder.m);
           if ((instance_err == NULL) || (access (sco.szErrorLog, F_OK) < 0))
             {
               instance_err = new CLog (TRUE);
             }
+          mutex_unlock (err_holder.m);
           return instance_err;
         }
       else
         {
           // write log into normal log file
+          mutex_lock (log_holder.m);
           if ((instance_log == NULL) || (access (sco.szAccessLog, F_OK) < 0))
             {
               instance_log = new CLog (TRUE);
             }
+          mutex_unlock (log_holder.m);
           return instance_log;
         }
     }
