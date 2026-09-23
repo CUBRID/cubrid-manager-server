@@ -71,9 +71,9 @@ Check `note` for the reason and retry the request later. (This exclusivity check
 
 ### A Note on Request Latency
 
-The bookkeeping updates that the tasks above perform on `cmdb.pass` and the auto-job config files run off CMS's global request-serialization lock, so they do not delay unrelated requests while waiting on `file_resource_guard` (bounded to ~5 seconds; see above).
+The bookkeeping updates that the tasks above perform on `cmdb.pass` and the auto-job config files run off CMS's global request-serialization lock, so they do not delay unrelated requests while waiting on `file_resource_guard` (bounded to ~5 seconds; see above). The same is true of [setautoexecquery](setautoexecquery.md) itself: like every task except [getserverstatus](getserverstatus.md), it is dispatched entirely off that global lock, so a slow `file_resource_guard` wait on `autoexecquery.conf` - for example, contention from another `setautoexecquery` call, or from a `deletedb`/`renamedb`/`copydb`/`updateuser` bookkeeping update racing on the same file - only delays requests waiting on that same lock. It no longer blocks unrelated requests such as a `gettaskstatus` poll.
 
-[setautoexecquery](setautoexecquery.md) is the one exception: it is a synchronous, non-async task, and it takes the same `file_resource_guard` lock on `autoexecquery.conf` *while still holding* that global lock. If the lock is contended - for example, by another `setautoexecquery` call, or by a `deletedb`/`renamedb`/`copydb`/`updateuser` bookkeeping update racing on `autoexecquery.conf` - `setautoexecquery` can block for up to ~5 seconds waiting for it, and CMS cannot start processing *any other request* (including an unrelated `gettaskstatus` poll) until it either acquires the lock or gives up. This is a known limitation, not a hang: it resolves on its own once `file_resource_guard`'s wait times out or the lock is released.
+Only three things run under CMS's global request-serialization lock: token and authority validation, `gettaskstatus` handling, and `getserverstatus` (which reads its counters directly with no locking of its own and relies on the lock being held for that). All three are short, in-memory operations with no file or network I/O, so this lock is never held for long.
 
 ## Checking Job Status
 
