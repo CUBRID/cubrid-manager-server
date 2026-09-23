@@ -75,6 +75,8 @@ The bookkeeping updates that the tasks above perform on `cmdb.pass` and the auto
 
 Only three things run under CMS's global request-serialization lock: token and authority validation, `gettaskstatus` handling, and `getserverstatus` (which reads its counters directly with no locking of its own and relies on the lock being held for that). All three are short, in-memory operations with no file or network I/O, so this lock is never held for long.
 
+The auto-job configuration tasks (`getautostart`, `setautostart`, `getautojobconf`, `setautojobconf`, `execautostart`, `automail`) are not yet documented individually, but the same pattern applies to them: they wait on `file_resource_guard` for `autojobs.conf` (bounded to ~5 seconds; see above) and can return a failure response such as `"failed to lock autojobs.conf"` if that wait times out.
+
 ## Checking Job Status
 
 Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
