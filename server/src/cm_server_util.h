@@ -186,7 +186,7 @@ mutex_t *cm_auto_jobs_mutex (void);
  *   cross-process file lock (see the comment above).
  *
  *   lock order: cm_mutex -> {cmdb_pass_mutex, cmdbinfo_temp_mutex,
- *               conn_list_mutex, auto_conf_mutex}.
+ *               conn_list_mutex, auto_conf_mutex, auto_jobs_mutex}.
  *               never acquire cm_mutex while holding one of these, and
  *               never hold more than one of these at the same time.
  */
