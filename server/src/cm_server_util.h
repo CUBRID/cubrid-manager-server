@@ -205,9 +205,6 @@ class file_resource_guard
 #else
       const int retry_interval_ms = 10;
 #endif
-      /*
-       * Resolved up front, purely so both failure paths
-       */
       conf_get_dbmt_file (lock_fid, path);
 
       start_ms = ut_get_msec_marker ();

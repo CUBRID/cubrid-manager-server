@@ -3376,9 +3376,12 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
        ;
       if (wait_rc < 0)
        {
+         if (errno == ECHILD)
+           {
+             return -1;
+           }
+
          /*
-          * waitpid () failed for a reason other than EINTR (the loop
-          * above already retries those).
           * fork () still succeeded, so pid is a real child
           * that has not been reaped here - hand it off to _reap_child_async (),
           * the same way the wait_flag == false branch below already does, so it does
