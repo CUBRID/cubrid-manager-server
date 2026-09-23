@@ -85,7 +85,7 @@ int ext_get_server_status (Json::Value &request, Json::Value &response); /* defi
 
 /* utility */
 bool ext_set_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
-bool ext_get_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
+bool ext_get_auto_jobs (const std::string jobkey, Json::Value &jobvalue, bool *file_existed = NULL);
 bool ext_ut_validate_userid (const std::string userid);
 int ext_ut_add_dblist_to_response (Json::Value &res, bool is_add_dbpath =
                                      false);

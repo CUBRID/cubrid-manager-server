@@ -256,10 +256,21 @@ ext_set_log_level (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
-bool load_json_from_file (string filepath, Json::Value &root)
+/*
+ * load_json_from_file () - file_existed, when given, is set to whether
+ *   filepath exists on disk
+ */
+bool load_json_from_file (string filepath, Json::Value &root, bool *file_existed = NULL)
 {
   bool rtn = FALSE;
   Json::Reader reader;
+
+  if (file_existed != NULL)
+    {
+      struct stat st;
+      *file_existed = (stat (filepath.c_str(), &st) == 0);
+    }
+
   ifstream ifs (filepath.c_str());
   if (!ifs.bad())
     {
@@ -359,12 +370,12 @@ int ext_cub_broker_start (Json::Value &request, Json::Value &response)
   return 0;
 }
 
-bool ext_get_auto_jobs (const string jobkey, Json::Value &jobvalue)
+bool ext_get_auto_jobs (const string jobkey, Json::Value &jobvalue, bool *file_existed)
 {
   char conf_path[MAX_PATH];
   Json::Value   root_jobs;
 
-  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs) == FALSE)
+  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs, file_existed) == FALSE)
     {
       LOG_DEBUG ("load json from %s error.", conf_path);
       return FALSE;
@@ -384,9 +395,16 @@ bool ext_set_auto_jobs (const string jobkey, Json::Value &jobvalue)
 {
   char conf_path[MAX_PATH];
   Json::Value   root_jobs;
+  bool file_existed = false;
 
-  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs) == FALSE)
+  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs, &file_existed) == FALSE)
     {
+      if (file_existed)
+        {
+          LOG_ERROR ("%s exists but could not be parsed as JSON; refusing to overwrite it", conf_path);
+          return FALSE;
+        }
+
       LOG_WARN ("%s is not exist!", conf_path);
     }
   root_jobs[jobkey] = jobvalue;
@@ -400,10 +418,7 @@ ext_get_auto_start (Json::Value &request, Json::Value &response)
   Json::Value   root_jobs;
 
   /*
-   * ext_get_auto_jobs ()/ext_set_auto_jobs () have no locking of their
-   * own - they rely on the caller holding this guard for the entire
-   * read (here) or read-modify-write (ext_set_auto_start () etc. below)
-   * span against autojobs.conf.
+   * ext_get_auto_jobs ()/ext_set_auto_jobs () have no locking of their own.
    */
   file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
   if (!guard.ok ())
@@ -437,10 +452,20 @@ ext_set_auto_start (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
     }
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
-    {
-      LOG_WARN ("autojob configure file is not exist or error format!");
-    }
+  {
+    bool file_existed = false;
+
+    if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs, &file_existed) == FALSE)
+      {
+        if (file_existed)
+          {
+            LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update auto_start");
+            return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+          }
+
+        LOG_WARN ("autojob configure file is not exist or error format!");
+      }
+  }
 
   root_jobs[request["service"].asString()] = request[EXT_JOBS_AUTO_START];
 
