@@ -39,6 +39,7 @@
 #include <Tlhelp32.h>
 #include <sys/timeb.h>
 #include <winternl.h>
+#include <aclapi.h>           /* Get/SetNamedSecurityInfo () - move_file () ACL preservation */
 #else
 #include <sys/types.h>        /* umask()          */
 #include <sys/stat.h>         /* umask(), stat()  */
@@ -2139,6 +2140,39 @@ file_copy (char *src_file, char *dest_file)
   return 0;
 }
 
+#if defined (WINDOWS)
+/*
+ * restore_dest_acl_and_free () - apply a previously-captured owner/DACL back
+ *   onto dest_file, then free the security descriptor that was holding it.
+ *
+ *   The DACL (the actual permission/ACE list - what this fix is for) and
+ *   the owner are restored via two separate SetNamedSecurityInfo () calls,
+ *   deliberately not combined into one. Reassigning ownership requires
+ *   either SeRestorePrivilege or that the target owner be the caller's own
+ *   SID
+ */
+static void
+restore_dest_acl_and_free (char *dest_file, PSID dest_owner, PACL dest_dacl, PSECURITY_DESCRIPTOR dest_sd)
+{
+  if (SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
+			    NULL, NULL, dest_dacl, NULL) != ERROR_SUCCESS)
+    {
+      LOG_ERROR ("move_file (): SetNamedSecurityInfo () failed to restore '%s''s "
+		 "original DACL, error %lu", dest_file, (unsigned long) GetLastError ());
+    }
+
+  if (SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+			    dest_owner, NULL, NULL, NULL) != ERROR_SUCCESS)
+    {
+      LOG_ERROR ("move_file (): SetNamedSecurityInfo () failed to restore '%s''s "
+		 "original owner, error %lu (non-fatal: the file's permissions "
+		 "ACL was still restored above)", dest_file, (unsigned long) GetLastError ());
+    }
+
+  LocalFree (dest_sd);
+}
+#endif
+
 int
 move_file (char *src_file, char *dest_file)
 {
@@ -2157,6 +2191,29 @@ move_file (char *src_file, char *dest_file)
           LOG_ERROR ("chmod failed: %s, errno = %d", src_file, errno);
         }
     }
+#else
+  /*
+   * Preserve dest_file's existing owner/DACL: both MoveFileEx () and the
+   * file_copy () fallback below replace dest_file's ACL along with its
+   * content
+   */
+  PSID dest_owner = NULL;
+  PACL dest_dacl = NULL;
+  PSECURITY_DESCRIPTOR dest_sd = NULL;
+  bool have_dest_acl = false;
+
+  if (GetNamedSecurityInfo (dest_file, SE_FILE_OBJECT,
+			    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+			    &dest_owner, NULL, &dest_dacl, NULL, &dest_sd) == ERROR_SUCCESS)
+    {
+      have_dest_acl = true;
+    }
+  else
+    {
+      LOG_ERROR ("move_file (): GetNamedSecurityInfo () failed to read '%s''s "
+		 "current ACL, error %lu; the destination's original ACL will "
+		 "not be preserved", dest_file, (unsigned long) GetLastError ());
+    }
 #endif
 
   /*
@@ -2165,6 +2222,10 @@ move_file (char *src_file, char *dest_file)
 #if defined (WINDOWS)
   if (MoveFileEx (src_file, dest_file, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED))
     {
+      if (have_dest_acl)
+	{
+	  restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_sd);
+	}
       return 0;
     }
 
@@ -2175,6 +2236,10 @@ move_file (char *src_file, char *dest_file)
 	&& move_file_ex_error != ERROR_SHARING_VIOLATION
 	&& move_file_ex_error != ERROR_ACCESS_DENIED)
       {
+	if (have_dest_acl)
+	  {
+	    LocalFree (dest_sd);
+	  }
 	return -1;
       }
 
@@ -2206,12 +2271,25 @@ move_file (char *src_file, char *dest_file)
    */
   if (file_copy (src_file, dest_file) < 0)
     {
+#if defined (WINDOWS)
+      if (have_dest_acl)
+	{
+	  LocalFree (dest_sd);
+	}
+#endif
       return -1;
     }
   else
     {
       unlink (src_file);
     }
+
+#if defined (WINDOWS)
+  if (have_dest_acl)
+    {
+      restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_sd);
+    }
+#endif
 
   return 0;
 }
