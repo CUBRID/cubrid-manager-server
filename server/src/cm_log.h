@@ -346,31 +346,50 @@ class CLog
       static mutex_holder log_holder;
       static mutex_holder err_holder;
 
+      /*
+       * scoped_lock - locks a mutex_t on construction, unlocks it on
+       *   destruction. Unlike the bare mutex_lock ()/mutex_unlock () pair
+       *   this replaces, the unlock still happens if new CLog (TRUE)
+       *   below throws
+       */
+      struct scoped_lock
+      {
+        mutex_t &m;
+        scoped_lock (mutex_t &m) : m (m)
+        {
+          mutex_lock (m);
+        }
+        ~scoped_lock (void)
+        {
+          mutex_unlock (m);
+        }
+
+      private:
+        scoped_lock (const scoped_lock &);
+        scoped_lock &operator= (const scoped_lock &);
+      };
+
       if ((logLevel <= CLog::xWARN) && (logLevel >= CLog::xFATAL))
         {
           // write log into error log file
 
-          mutex_lock (err_holder.m);
+          scoped_lock lock (err_holder.m);
           if ((instance_err == NULL) || (access (sco.szErrorLog, F_OK) < 0))
             {
               instance_err = new CLog (TRUE);
             }
 
-          CLog *rtn_err = instance_err;
-          mutex_unlock (err_holder.m);
-          return rtn_err;
+          return instance_err;
         }
       else
         {
           // write log into normal log file
-          mutex_lock (log_holder.m);
+          scoped_lock lock (log_holder.m);
           if ((instance_log == NULL) || (access (sco.szAccessLog, F_OK) < 0))
             {
               instance_log = new CLog (TRUE);
             }
-          CLog *rtn_log = instance_log;
-          mutex_unlock (log_holder.m);
-          return rtn_log;
+          return instance_log;
         }
     }
 
