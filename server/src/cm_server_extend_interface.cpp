@@ -280,6 +280,22 @@ bool load_json_from_file (string filepath, Json::Value &root, bool *file_existed
   return rtn;
 }
 
+/*
+ * write_json_to_file () - atomically replace filepath with root's JSON
+ *   serialization.
+ *
+ *   This is process-crash safe (no fsync ()): if this process dies while
+ *   writing or before move_file ()'s rename () runs, filepath is left
+ *   untouched, since we only ever replace it after the temp file write
+ *   fully succeeds. It is NOT safe against a power loss or OS crash -
+ *   without an fsync (), the filesystem can reorder or delay flushing the
+ *   temp file's data blocks and the rename ()'s directory-entry update to
+ *   disk (e.g. ext4 data=writeback), so an unclean shutdown around this
+ *   call could leave filepath renamed into place but empty or truncated
+ *   on the next boot. Should that happen to autojobs.conf, ext_set_auto_jobs ()'s
+ *   corrupt-file-refusal would then keep refusing to overwrite it until an admin
+ *   intervenes manually.
+ */
 bool write_json_to_file (string filepath, Json::Value &root)
 {
   char tmp_path[PATH_MAX];
