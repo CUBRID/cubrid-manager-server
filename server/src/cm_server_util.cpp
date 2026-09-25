@@ -2149,24 +2149,35 @@ file_copy (char *src_file, char *dest_file)
  *   the owner are restored via two separate SetNamedSecurityInfo () calls,
  *   deliberately not combined into one. Reassigning ownership requires
  *   either SeRestorePrivilege or that the target owner be the caller's own
- *   SID
+ *   SID.
  */
 static void
-restore_dest_acl_and_free (char *dest_file, PSID dest_owner, PACL dest_dacl, PSECURITY_DESCRIPTOR dest_sd)
+restore_dest_acl_and_free (char *dest_file, PSID dest_owner, PACL dest_dacl,
+			   bool dest_dacl_protected, PSECURITY_DESCRIPTOR dest_sd)
 {
-  if (SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION,
-			    NULL, NULL, dest_dacl, NULL) != ERROR_SUCCESS)
+  DWORD rc;
+  SECURITY_INFORMATION dacl_flags = DACL_SECURITY_INFORMATION;
+
+  if (dest_dacl_protected)
     {
-      LOG_ERROR ("move_file (): SetNamedSecurityInfo () failed to restore '%s''s "
-		 "original DACL, error %lu", dest_file, (unsigned long) GetLastError ());
+      dacl_flags |= PROTECTED_DACL_SECURITY_INFORMATION;
     }
 
-  if (SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
-			    dest_owner, NULL, NULL, NULL) != ERROR_SUCCESS)
+  rc = SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, dacl_flags,
+			     NULL, NULL, dest_dacl, NULL);
+  if (rc != ERROR_SUCCESS)
+    {
+      LOG_ERROR ("move_file (): SetNamedSecurityInfo () failed to restore '%s''s "
+		 "original DACL, error %lu", dest_file, (unsigned long) rc);
+    }
+
+  rc = SetNamedSecurityInfo (dest_file, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+			     dest_owner, NULL, NULL, NULL);
+  if (rc != ERROR_SUCCESS)
     {
       LOG_ERROR ("move_file (): SetNamedSecurityInfo () failed to restore '%s''s "
 		 "original owner, error %lu (non-fatal: the file's permissions "
-		 "ACL was still restored above)", dest_file, (unsigned long) GetLastError ());
+		 "ACL was still restored above)", dest_file, (unsigned long) rc);
     }
 
   LocalFree (dest_sd);
@@ -2201,18 +2212,30 @@ move_file (char *src_file, char *dest_file)
   PACL dest_dacl = NULL;
   PSECURITY_DESCRIPTOR dest_sd = NULL;
   bool have_dest_acl = false;
+  bool dest_dacl_protected = false;
 
-  if (GetNamedSecurityInfo (dest_file, SE_FILE_OBJECT,
-			    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
-			    &dest_owner, NULL, &dest_dacl, NULL, &dest_sd) == ERROR_SUCCESS)
+  if (GetFileAttributes (dest_file) != INVALID_FILE_ATTRIBUTES)
     {
-      have_dest_acl = true;
-    }
-  else
-    {
-      LOG_ERROR ("move_file (): GetNamedSecurityInfo () failed to read '%s''s "
-		 "current ACL, error %lu; the destination's original ACL will "
-		 "not be preserved", dest_file, (unsigned long) GetLastError ());
+      DWORD gnsi_rc = GetNamedSecurityInfo (dest_file, SE_FILE_OBJECT,
+					    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+					    &dest_owner, NULL, &dest_dacl, NULL, &dest_sd);
+      if (gnsi_rc == ERROR_SUCCESS)
+	{
+	  have_dest_acl = true;
+
+	  SECURITY_DESCRIPTOR_CONTROL control = 0;
+	  DWORD revision;
+	  if (GetSecurityDescriptorControl (dest_sd, &control, &revision))
+	    {
+	      dest_dacl_protected = (control & SE_DACL_PROTECTED) != 0;
+	    }
+	}
+      else
+	{
+	  LOG_ERROR ("move_file (): GetNamedSecurityInfo () failed to read '%s''s "
+		     "current ACL, error %lu; the destination's original ACL will "
+		     "not be preserved", dest_file, (unsigned long) gnsi_rc);
+	}
     }
 #endif
 
@@ -2224,7 +2247,7 @@ move_file (char *src_file, char *dest_file)
     {
       if (have_dest_acl)
 	{
-	  restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_sd);
+	  restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_dacl_protected, dest_sd);
 	}
       return 0;
     }
@@ -2287,7 +2310,7 @@ move_file (char *src_file, char *dest_file)
 #if defined (WINDOWS)
   if (have_dest_acl)
     {
-      restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_sd);
+      restore_dest_acl_and_free (dest_file, dest_owner, dest_dacl, dest_dacl_protected, dest_sd);
     }
 #endif
 
