@@ -189,6 +189,9 @@ mutex_t *cm_auto_jobs_mutex (void);
  *               conn_list_mutex, auto_conf_mutex, auto_jobs_mutex}.
  *               never acquire cm_mutex while holding one of these, and
  *               never hold more than one of these at the same time.
+ *               token_list_mutex (cm_user.cpp) is outside this guard but
+ *               follows the same order, after cm_mutex: never acquire a
+ *               file guard above or cm_mutex while holding it.
  */
 class file_resource_guard
 {
