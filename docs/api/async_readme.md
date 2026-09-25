@@ -77,6 +77,8 @@ Only three things run under CMS's global request-serialization lock: token and a
 
 The auto-job configuration tasks (`getautostart`, `setautostart`, `getautojobconf`, `setautojobconf`, `execautostart`, `automail`) are not yet documented individually, but the same pattern applies to them: they wait on `file_resource_guard` for `autojobs.conf` (bounded to ~5 seconds; see above) and can return a failure response such as `"failed to lock autojobs.conf"` if that wait times out.
 
+These tasks share a second failure mode unrelated to locking: if `autojobs.conf` exists but can't be parsed as JSON, `getautostart`, `setautostart`, `getautojobconf`, and `setautojobconf` all fail with `"autojobs.conf is corrupt"` rather than silently proceeding as if it were empty. A missing `autojobs.conf` is not an error - it's the normal state before any of these tasks have saved anything yet, so `getautostart`/`getautojobconf` return an empty result for it instead of failing. To recover from a corrupt `autojobs.conf`, delete the file; CMS treats its absence as normal and starts a fresh, empty configuration on the next successful save.
+
 ## Checking Job Status
 
 Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):

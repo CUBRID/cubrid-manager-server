@@ -432,6 +432,7 @@ int
 ext_get_auto_start (Json::Value &request, Json::Value &response)
 {
   Json::Value   root_jobs;
+  bool file_existed = false;
 
   /*
    * ext_get_auto_jobs ()/ext_set_auto_jobs () have no locking of their own.
@@ -442,8 +443,18 @@ ext_get_auto_start (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
     }
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
+  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs, &file_existed) == FALSE)
     {
+      /*
+       * A missing autojobs.conf is the normal state before anything has
+       * been saved yet - report an empty auto_start.
+       */
+      if (file_existed)
+        {
+          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return auto_start");
+          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+        }
+
       response[EXT_JOBS_AUTO_START] = Json::Value::null;
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
@@ -501,6 +512,7 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
   char decrypted[PASSWD_LENGTH + 1];
   string userpasswd;
   string key = request.get ("service", "").asString();
+  bool file_existed = false;
 
   file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
   if (!guard.ok ())
@@ -508,9 +520,16 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
     }
 
-  if (ext_get_auto_jobs (key, root_jobs) == FALSE)
+  if (ext_get_auto_jobs (key, root_jobs, &file_existed) == FALSE)
     {
-      return build_server_header (response, ERR_WITH_MSG, "failed to get autojob conf");
+      if (file_existed)
+        {
+          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return '%s'", key.c_str());
+          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+        }
+
+      response["jobconf"] = Json::Value::null;
+      return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
   if (key == "mail_config")
     {
@@ -562,6 +581,22 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
     {
       return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
     }
+
+  {
+    /*
+     * ext_set_auto_jobs () below does its own internal file_existed check
+     * and silently folds a corrupt-file refusal into the same FALSE it
+     * returns for every other failure, so its caller can't tell "autojobs.conf
+     * is corrupt" apart from a generic write failure.
+     */
+    bool file_existed = false;
+
+    if (ext_get_auto_jobs (keyvalue, root_jobs, &file_existed) == FALSE && file_existed)
+      {
+        LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update '%s'", keyvalue.c_str());
+        return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+      }
+  }
 
   if (ext_set_auto_jobs ( keyvalue, request["jobconf"]) == FALSE)
     {
