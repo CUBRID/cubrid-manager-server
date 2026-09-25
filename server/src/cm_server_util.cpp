@@ -2195,7 +2195,12 @@ move_file (char *src_file, char *dest_file)
 
   if (stat (dest_file, &dest_statbuf) == 0)
     {
-      chown (src_file, dest_statbuf.st_uid, dest_statbuf.st_gid);
+      errno = 0;
+      if (chown (src_file, dest_statbuf.st_uid, dest_statbuf.st_gid) < 0)
+        {
+          LOG_ERROR ("chown failed: %s, errno = %d", src_file, errno);
+        }
+
       errno = 0;
       if (chmod (src_file, dest_statbuf.st_mode & 07777) < 0)
         {
