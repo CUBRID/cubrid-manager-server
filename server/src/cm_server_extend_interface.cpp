@@ -981,7 +981,13 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
       if (guard.ok ())
         {
-          ext_set_auto_jobs ("mail_report", mailreport);
+          if (ext_set_auto_jobs ("mail_report", mailreport) == FALSE)
+            {
+              LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
+              return build_server_header (response, ERR_NO_ERROR,
+                                          "mail sent but schedule not saved; "
+                                          "the same report may be resent next time");
+            }
         }
       else
         {
