@@ -355,8 +355,10 @@ class CLog
             {
               instance_err = new CLog (TRUE);
             }
+
+          CLog *rtn_err = instance_err;
           mutex_unlock (err_holder.m);
-          return instance_err;
+          return rtn_err;
         }
       else
         {
@@ -366,8 +368,9 @@ class CLog
             {
               instance_log = new CLog (TRUE);
             }
+          CLog *rtn_log = instance_log;
           mutex_unlock (log_holder.m);
-          return instance_log;
+          return rtn_log;
         }
     }
 
@@ -463,6 +466,26 @@ class CLog
       bool shouldBackupFiles = false;
 
       mutex_lock (m_cs);
+
+      if (isErrorLog == true)
+        {
+          if (m_pErrFile == NULL)
+            {
+              mutex_unlock (m_cs);
+              delete[]buffer;
+              return;
+            }
+        }
+      else
+        {
+          if (m_pLogFile == NULL)
+            {
+              mutex_unlock (m_cs);
+              delete[]buffer;
+              return;
+            }
+        }
+
       if (isErrorLog == true)
         {
           fprintf (m_pErrFile, "[%s] [%s] [%6d] %s\n",
