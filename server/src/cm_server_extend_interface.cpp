@@ -1043,6 +1043,9 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       else
         {
           LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
+          return build_server_header (response, ERR_NO_ERROR,
+                                      "mail sent but schedule not saved; "
+                                      "the same report may be resent next time");
         }
     }
 
