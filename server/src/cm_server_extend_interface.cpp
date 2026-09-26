@@ -916,6 +916,11 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 {
   unsigned int i, period_type, save_flag = 0;
   Json::Value log_request, log_response, mail_conf;
+  /*
+   * Content (not index) of every entry actually sent this round, plus
+   * its new next_exec/prev_exec
+   */
+  Json::Value sent_updates (Json::arrayValue);
   time_t cur_time, next_time;
   char format_time[PATH_MAX], next_exec_time[PATH_MAX];
   string next_exec, prev_exec, mailhead, mailbody, userpasswd;
@@ -1021,6 +1026,16 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       mailreport[i]["next_exec"] = next_exec_time;
       mailreport[i]["prev_exec"] = format_time;
       save_flag = 1;
+
+      {
+        Json::Value upd;
+        upd["dbname"] = mailreport[i]["dbname"];
+        upd["receiver"] = mailreport[i]["receiver"];
+        upd["url_prefix"] = mailreport[i]["url_prefix"];
+        upd["next_exec"] = next_exec_time;
+        upd["prev_exec"] = format_time;
+        sent_updates.append (upd);
+      }
     }
 
   if (save_flag)
@@ -1032,7 +1047,49 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
       if (guard.ok ())
         {
-          if (ext_set_auto_jobs ("mail_report", mailreport) == FALSE)
+          /*
+           * a concurrent setautojobconf may have changed mail_report on disk
+           * in the meantime. Re-read it fresh here
+           */
+          Json::Value current;
+          bool report_existed = false;
+
+          if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, current, &report_existed) == FALSE)
+            {
+              if (report_existed)
+                {
+                  LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail: "
+                             "autojobs.conf is corrupt");
+                  return build_server_header (response, ERR_NO_ERROR,
+                                              "mail sent but schedule not saved; "
+                                              "the same report may be resent next time");
+                }
+
+              /* autojobs.conf missing is normal; fall back to our own copy. */
+              current = mailreport;
+            }
+          else if (current == Json::Value::null)
+            {
+              /* file exists but has no mail_report key yet */
+              current = mailreport;
+            }
+
+          for (unsigned int u = 0; u < sent_updates.size (); u++)
+            {
+              for (unsigned int j = 0; j < current.size (); j++)
+                {
+                  if (current[j]["dbname"] == sent_updates[u]["dbname"] &&
+                      current[j]["receiver"] == sent_updates[u]["receiver"] &&
+                      current[j]["url_prefix"] == sent_updates[u]["url_prefix"])
+                    {
+                      current[j]["next_exec"] = sent_updates[u]["next_exec"];
+                      current[j]["prev_exec"] = sent_updates[u]["prev_exec"];
+                      break;
+                    }
+                }
+            }
+
+          if (ext_set_auto_jobs ("mail_report", current) == FALSE)
             {
               LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
               return build_server_header (response, ERR_NO_ERROR,
