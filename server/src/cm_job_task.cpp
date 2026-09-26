@@ -2668,14 +2668,14 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (access (genvolpath, W_OK) < 0)
     {
-      char errbuf[ERR_MSG_LEN];
+      char errbuf[CM_STRERROR_BUF_LEN];
       sprintf (_dbmt_error, "%s: %s\n", genvolpath, STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
     }
 
   if (logvolpath != NULL && access (logvolpath, W_OK) < 0)
     {
-      char errbuf[ERR_MSG_LEN];
+      char errbuf[CM_STRERROR_BUF_LEN];
       sprintf (_dbmt_error, "%s: %s\n", genvolpath, STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
     }
@@ -6435,7 +6435,7 @@ ts_kill_process (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (kill (pid, SIGTERM) < 0)
 	{
-	  char errbuf[ERR_MSG_LEN];
+	  char errbuf[CM_STRERROR_BUF_LEN];
 	  DBMT_ERR_MSG_SET (_dbmt_error, STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
 	}
@@ -6535,7 +6535,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	}
       else
 	{
-	  char errbuf[ERR_MSG_LEN];
+	  char errbuf[CM_STRERROR_BUF_LEN];
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Error : %s : %s",
 		    conf_item[2], STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
@@ -6543,7 +6543,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
     }
   else if (access (path_item, R_OK | W_OK) < 0)
     {
-      char errbuf[ERR_MSG_LEN];
+      char errbuf[CM_STRERROR_BUF_LEN];
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Error : %s : %s",
 		conf_item[2], STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
@@ -12182,7 +12182,7 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  if ((unlink (fullpath) != 0) && (errno != ENOENT))
 	    {
-	      char errbuf[ERR_MSG_LEN];
+	      char errbuf[CM_STRERROR_BUF_LEN];
 	      sprintf (_dbmt_error, "Cannot remove file '%s' (%s)", path,
 		       STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	      return ERR_WITH_MSG;
@@ -17633,7 +17633,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
         }
       else if (check_errno == EPERM)
         {
-          char errbuf[ERR_MSG_LEN];
+          char errbuf[CM_STRERROR_BUF_LEN];
           nv_add_nvp (res, "Linux_error", STRERROR_R (check_errno, errbuf, sizeof (errbuf)));
         }
       else

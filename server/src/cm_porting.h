@@ -356,7 +356,6 @@ typedef volatile int atomic_counter_t;
  *            argument order versus localtime_r () - returns errno_t (0 on
  *            success).
  */
-#define ERR_MSG_LEN 256
 #if defined(WINDOWS)
 #define LOCALTIME_R(time_p, tm_p) \
     (localtime_s ((tm_p), (time_p)) == 0 ? (tm_p) : NULL)
@@ -381,6 +380,8 @@ typedef volatile int atomic_counter_t;
  *   Windows: strerror_s (char *, size_t, int)
  *                       returns errno_t (0 on success)
  */
+#define CM_STRERROR_BUF_LEN 256
+
 #ifdef __cplusplus
 #if defined(WINDOWS)
 #define STRERROR_R(errnum, buf, buflen) \

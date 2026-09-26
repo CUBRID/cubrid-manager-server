@@ -876,7 +876,7 @@ static int
 check_file (char *fname, char *pname)
 {
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
-  char errbuf[ERR_MSG_LEN];
+  char errbuf[CM_STRERROR_BUF_LEN];
 
   tmpstrbuf[0] = '\0';
 
@@ -896,7 +896,7 @@ check_path (char *dirname, char *pname)
 {
   /* check if directory exists */
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
-  char errbuf[ERR_MSG_LEN];
+  char errbuf[CM_STRERROR_BUF_LEN];
 
   tmpstrbuf[0] = '\0';
 

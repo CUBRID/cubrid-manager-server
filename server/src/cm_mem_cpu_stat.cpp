@@ -197,7 +197,7 @@ cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_
   fp = fopen (outputfile, "r");
   if (fp == NULL)
     {
-      char errbuf[ERR_MSG_LEN];
+      char errbuf[CM_STRERROR_BUF_LEN];
 
       err_buf->err_code = CM_FILE_OPEN_FAILED;
       snprintf (err_buf->err_msg, sizeof (err_buf->err_msg) - 1, "file (%s) open failed: %s", outputfile,
