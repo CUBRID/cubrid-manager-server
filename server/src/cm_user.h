@@ -82,6 +82,23 @@ int dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 void dbmt_user_free (T_DBMT_USER *dbmt_user);
 int dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error);
+
+/*
+ * dbmt_user_read_locked ()/dbmt_user_write_auth_locked ()/
+ * dbmt_user_write_pass_locked () - the caller must already hold
+ *   a file_resource_guard on cm_cmdb_pass_mutex () (FID_LOCK_DBMT_PASS) for
+ *   the whole read-modify-write sequence, not just for each individual call.
+ *   usage:
+ *     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+ *     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+ *       {
+ *         ... modify dbmt_user in memory ...
+ *         dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+ *       }
+ */
+int dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
+int dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
+int dbmt_user_write_pass_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 void dbmt_user_set_dbinfo (T_DBMT_USER_DBINFO *dbinfo, const char *dbname,
                            const char *auth, const char *uid, const char *broker_address);
 void dbmt_user_set_authinfo (T_DBMT_USER_AUTHINFO *authinfo,
@@ -105,9 +122,10 @@ int dbmt_user_new_token_info (const char *user_id,
 #endif
                               time_t login_time);
 
-T_USER_TOKEN_INFO *dbmt_user_search_token_info (const char *user_id);
-T_USER_TOKEN_INFO *dbmt_user_search_token_info_by_token (const char *token);
-T_USER_TOKEN_INFO *dbmt_user_delete_token_info (const char *user_id);
-T_USER_TOKEN_INFO *dbmt_user_delete_token_info_by_token (const char *token);
+bool dbmt_user_search_token_info (const char *user_id, T_USER_TOKEN_INFO *out);
+bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
+bool dbmt_user_touch_token_login_time (const char *user_id, const char *token, time_t now_time);
+bool dbmt_user_delete_token_info (const char *user_id);
+bool dbmt_user_delete_token_info_by_token (const char *token);
 
 #endif                /* _CM_USER_H_ */

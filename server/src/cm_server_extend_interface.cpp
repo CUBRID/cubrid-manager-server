@@ -83,6 +83,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"get_mon_interval", 0, ext_get_mon_interval, AU_MON},
   {"set_mon_interval", 0, ext_set_mon_interval, AU_ADMIN},
   {"get_mon_statistic", 0, ext_get_mon_statistic, AU_MON},
+  {"getserverstatus", 0, ext_get_server_status, AU_ADMIN},
   {NULL, 0, NULL, 0}
 };
 
@@ -255,10 +256,21 @@ ext_set_log_level (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
-bool load_json_from_file (string filepath, Json::Value &root)
+/*
+ * load_json_from_file () - file_existed, when given, is set to whether
+ *   filepath exists on disk
+ */
+bool load_json_from_file (string filepath, Json::Value &root, bool *file_existed = NULL)
 {
   bool rtn = FALSE;
   Json::Reader reader;
+
+  if (file_existed != NULL)
+    {
+      struct stat st;
+      *file_existed = (stat (filepath.c_str(), &st) == 0);
+    }
+
   ifstream ifs (filepath.c_str());
   if (!ifs.bad())
     {
@@ -268,18 +280,71 @@ bool load_json_from_file (string filepath, Json::Value &root)
   return rtn;
 }
 
+/*
+ * write_json_to_file () - atomically replace filepath with root's JSON
+ *   serialization.
+ *
+ *   This is process-crash safe (no fsync ()): if this process dies while
+ *   writing or before move_file ()'s rename () runs, filepath is left
+ *   untouched, since we only ever replace it after the temp file write
+ *   fully succeeds. It is NOT safe against a power loss or OS crash -
+ *   without an fsync (), the filesystem can reorder or delay flushing the
+ *   temp file's data blocks and the rename ()'s directory-entry update to
+ *   disk (e.g. ext4 data=writeback), so an unclean shutdown around this
+ *   call could leave filepath renamed into place but empty or truncated
+ *   on the next boot. Should that happen to autojobs.conf, ext_set_auto_jobs ()'s
+ *   corrupt-file-refusal would then keep refusing to overwrite it until an admin
+ *   intervenes manually.
+ */
 bool write_json_to_file (string filepath, Json::Value &root)
 {
-  Json::StyledWriter writer;
-  ofstream ofs (filepath.c_str());
-  if (!ofs.bad())
+  char tmp_path[PATH_MAX];
+
+  /*
+   * Write to a fresh temp file first, then move_file () it over filepath,
+   * rather than truncating filepath in place.
+   */
+  if (gen_tempfile_path (tmp_path, sco.dbmt_tmp_dir, "DBMT_json", TS_EXT_SET_AUTO_JOBS, PATH_MAX) < 0)
     {
-      ofs << writer.write (root) << endl;
-      ofs.close();
-      return TRUE;
+      LOG_ERROR ("write_json_to_file (): failed to generate a temp file path for '%s'", filepath.c_str());
+      return FALSE;
     }
 
-  return FALSE;
+  {
+    Json::StyledWriter writer;
+    ofstream ofs (tmp_path);
+
+    if (!ofs.is_open ())
+      {
+        LOG_ERROR ("write_json_to_file (): failed to open temp file '%s' for '%s'",
+		   tmp_path, filepath.c_str());
+        return FALSE;
+      }
+
+    ofs << writer.write (root) << endl;
+    ofs.close ();
+
+    /*
+     * Check for a write/close-time failure
+     */
+    if (ofs.fail ())
+      {
+        LOG_ERROR ("write_json_to_file (): failed to write '%s' (temp file '%s')",
+		   filepath.c_str(), tmp_path);
+        unlink (tmp_path);
+        return FALSE;
+      }
+  }
+
+  if (move_file (tmp_path, const_cast<char *> (filepath.c_str())) < 0)
+    {
+      LOG_ERROR ("write_json_to_file (): move_file () of temp file '%s' to '%s' failed",
+		 tmp_path, filepath.c_str());
+      unlink (tmp_path);
+      return FALSE;
+    }
+
+  return TRUE;
 }
 
 int ext_cub_broker_start (Json::Value &request, Json::Value &response)
@@ -321,12 +386,12 @@ int ext_cub_broker_start (Json::Value &request, Json::Value &response)
   return 0;
 }
 
-bool ext_get_auto_jobs (const string jobkey, Json::Value &jobvalue)
+bool ext_get_auto_jobs (const string jobkey, Json::Value &jobvalue, bool *file_existed)
 {
   char conf_path[MAX_PATH];
   Json::Value   root_jobs;
 
-  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs) == FALSE)
+  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs, file_existed) == FALSE)
     {
       LOG_DEBUG ("load json from %s error.", conf_path);
       return FALSE;
@@ -346,9 +411,16 @@ bool ext_set_auto_jobs (const string jobkey, Json::Value &jobvalue)
 {
   char conf_path[MAX_PATH];
   Json::Value   root_jobs;
+  bool file_existed = false;
 
-  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs) == FALSE)
+  if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs, &file_existed) == FALSE)
     {
+      if (file_existed)
+        {
+          LOG_ERROR ("%s exists but could not be parsed as JSON; refusing to overwrite it", conf_path);
+          return FALSE;
+        }
+
       LOG_WARN ("%s is not exist!", conf_path);
     }
   root_jobs[jobkey] = jobvalue;
@@ -360,9 +432,29 @@ int
 ext_get_auto_start (Json::Value &request, Json::Value &response)
 {
   Json::Value   root_jobs;
+  bool file_existed = false;
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
+  /*
+   * ext_get_auto_jobs ()/ext_set_auto_jobs () have no locking of their own.
+   */
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
     {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
+  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs, &file_existed) == FALSE)
+    {
+      /*
+       * A missing autojobs.conf is the normal state before anything has
+       * been saved yet - report an empty auto_start.
+       */
+      if (file_existed)
+        {
+          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return auto_start");
+          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+        }
+
       response[EXT_JOBS_AUTO_START] = Json::Value::null;
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
@@ -381,10 +473,26 @@ ext_set_auto_start (Json::Value &request, Json::Value &response)
   JSON_FIND_V (request, "service",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs) == FALSE)
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
     {
-      LOG_WARN ("autojob configure file is not exist or error format!");
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
     }
+
+  {
+    bool file_existed = false;
+
+    if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs, &file_existed) == FALSE)
+      {
+        if (file_existed)
+          {
+            LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update auto_start");
+            return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+          }
+
+        LOG_WARN ("autojob configure file is not exist or error format!");
+      }
+  }
 
   root_jobs[request["service"].asString()] = request[EXT_JOBS_AUTO_START];
 
@@ -404,10 +512,24 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
   char decrypted[PASSWD_LENGTH + 1];
   string userpasswd;
   string key = request.get ("service", "").asString();
+  bool file_existed = false;
 
-  if (ext_get_auto_jobs (key, root_jobs) == FALSE)
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
     {
-      return build_server_header (response, ERR_WITH_MSG, "failed to get autojob conf");
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
+  if (ext_get_auto_jobs (key, root_jobs, &file_existed) == FALSE)
+    {
+      if (file_existed)
+        {
+          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return '%s'", key.c_str());
+          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+        }
+
+      response["jobconf"] = Json::Value::null;
+      return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
   if (key == "mail_config")
     {
@@ -447,6 +569,35 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
           return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
         }
     }
+
+  /*
+   * ext_set_auto_jobs () does its own internal read-modify-write of
+   * autojobs.conf (load, set this one key, write the whole file back);
+   * see the comment in ext_get_auto_start () above for why that needs
+   * to be guarded here rather than inside ext_set_auto_jobs () itself.
+   */
+  file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+    }
+
+  {
+    /*
+     * ext_set_auto_jobs () below does its own internal file_existed check
+     * and silently folds a corrupt-file refusal into the same FALSE it
+     * returns for every other failure, so its caller can't tell "autojobs.conf
+     * is corrupt" apart from a generic write failure.
+     */
+    bool file_existed = false;
+
+    if (ext_get_auto_jobs (keyvalue, root_jobs, &file_existed) == FALSE && file_existed)
+      {
+        LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update '%s'", keyvalue.c_str());
+        return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+      }
+  }
+
   if (ext_set_auto_jobs ( keyvalue, request["jobconf"]) == FALSE)
     {
       LOG_WARN ("set %s fail!", keyvalue.c_str());
@@ -460,7 +611,7 @@ int ext_get_active_dbs (Json::Value &activedbs)
 {
   T_SERVER_STATUS_RESULT *cmd_res;
   int i;
-  cmd_res = cmd_server_status ();
+  cmd_res = cmd_cms_server_status ();
   if (cmd_res == NULL)
     {
       return 1;
@@ -470,7 +621,7 @@ int ext_get_active_dbs (Json::Value &activedbs)
     {
       activedbs .append (info[i].db_name);
     }
-  cmd_servstat_result_free (cmd_res);
+  cmd_cms_result_free (cmd_res);
   return 0;
 }
 
@@ -511,6 +662,7 @@ static void
 ext_autojobs_log (const char *service, const char *serv_name, const char *errmsg)
 {
   time_t tt;
+  struct tm tm_buf;
   tm *t;
   FILE *outfile;
   char logfile[MAX_PATH];
@@ -525,7 +677,7 @@ ext_autojobs_log (const char *service, const char *serv_name, const char *errmsg
     {
       return;
     }
-  t = localtime (&tt);
+  t = LOCALTIME_R (&tt, &tm_buf);
   if (t)
     {
       strftime ( strbuf, MAX_PATH, "%Y%m%d_%H:%M:%S", t);
@@ -760,11 +912,40 @@ int update_next_report_time (Json::Value &mailreport)
   return 0;
 }
 
+/*
+ * mail_report_compute_next_exec () - shared by the per-entry send loop and
+ *   the save-time merge below, so a period_type that changed concurrently
+ */
+static void
+mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *next_exec_time)
+{
+  time_t next_time;
+
+  switch (period_type)
+    {
+    case 0: /* daily */
+      next_time = cur_time + 24 * 60 * 60;
+      break;
+    case 1: /* weekly */
+      next_time = cur_time + 7 * 24 * 60 * 60;
+      break;
+    default: /* monthly */
+      next_time = cur_time + 30 * 24 * 60 * 60;
+      break;
+    }
+  time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
+}
+
 int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 {
   unsigned int i, period_type, save_flag = 0;
   Json::Value log_request, log_response, mail_conf;
-  time_t cur_time, next_time;
+  /*
+   * Content (not index) of every entry actually sent this round, plus
+   * its new next_exec/prev_exec
+   */
+  Json::Value sent_updates (Json::arrayValue);
+  time_t cur_time;
   char format_time[PATH_MAX], next_exec_time[PATH_MAX];
   string next_exec, prev_exec, mailhead, mailbody, userpasswd;
   char decrypted[PASSWD_LENGTH + 1];
@@ -774,11 +955,19 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
 
-  if (ext_get_auto_jobs (EXT_JOBS_MAIL_CONF, mail_conf) == FALSE)
-    {
-      LOG_ERROR ("get mail config failed!");
-      return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
-    }
+  {
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
+
+    if (ext_get_auto_jobs (EXT_JOBS_MAIL_CONF, mail_conf) == FALSE)
+      {
+        LOG_ERROR ("get mail config failed!");
+        return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
+      }
+  }
 
   if (mail_conf == Json::Value::null || mail_conf["onoff"].asInt() == 0)
     {
@@ -845,27 +1034,118 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       ext_send_mail (mail_conf, response);
 
       period_type = mailreport[i].get ("period_type", 2).asInt();
-      switch (period_type)
-        {
-        case 0: /* daily */
-          next_time = cur_time + 24 * 60 * 60;
-          break;
-        case 1: /* weekly */
-          next_time = cur_time + 7 * 24 * 60 * 60;
-          break;
-        default: /* monthly */
-          next_time = cur_time + 30 * 24 * 60 * 60;
-          break;
-        }
-      time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
+      mail_report_compute_next_exec (period_type, cur_time, next_exec_time);
       mailreport[i]["next_exec"] = next_exec_time;
       mailreport[i]["prev_exec"] = format_time;
       save_flag = 1;
+
+      {
+        Json::Value upd;
+        upd["dbname"] = mailreport[i]["dbname"];
+        upd["receiver"] = mailreport[i]["receiver"];
+        upd["url_prefix"] = mailreport[i]["url_prefix"];
+        upd["period_type"] = (int) period_type;
+        upd["next_exec"] = next_exec_time;
+        upd["prev_exec"] = format_time;
+        sent_updates.append (upd);
+      }
     }
 
   if (save_flag)
     {
-      ext_set_auto_jobs ("mail_report", mailreport);
+      /*
+       * Guarded only for this write, reacquired fresh here rather than
+       * held since the read above
+       */
+      file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+      if (guard.ok ())
+        {
+          /*
+           * a concurrent setautojobconf may have changed mail_report on disk
+           * in the meantime. Re-read it fresh here
+           */
+          Json::Value current;
+          bool report_existed = false;
+
+          if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, current, &report_existed) == FALSE)
+            {
+              if (report_existed)
+                {
+                  LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail: "
+                             "autojobs.conf is corrupt");
+                  return build_server_header (response, ERR_NO_ERROR,
+                                              "mail send attempted but schedule not saved; "
+                                              "the same report may be resent next time");
+                }
+
+              /* autojobs.conf missing is normal; fall back to our own copy. */
+              current = mailreport;
+            }
+          else if (current == Json::Value::null)
+            {
+              /* file exists but has no mail_report key yet */
+              current = mailreport;
+            }
+
+          /*
+           * dbname/receiver/url_prefix is not guaranteed unique (nothing
+           * validates that on setautojobconf), so a current[] entry that
+           * has already been claimed by an earlier sent_updates[] match
+           * must not be matched again, or a duplicate entry's update is
+           * silently dropped while the first duplicate absorbs both.
+           */
+          Json::Value consumed (Json::arrayValue);
+          for (unsigned int j = 0; j < current.size (); j++)
+            {
+              consumed[j] = false;
+            }
+
+          for (unsigned int u = 0; u < sent_updates.size (); u++)
+            {
+              for (unsigned int j = 0; j < current.size (); j++)
+                {
+                  if (!consumed[j].asBool () &&
+                      current[j]["dbname"] == sent_updates[u]["dbname"] &&
+                      current[j]["receiver"] == sent_updates[u]["receiver"] &&
+                      current[j]["url_prefix"] == sent_updates[u]["url_prefix"])
+                    {
+                      int sent_period_type = sent_updates[u].get ("period_type", 2).asInt ();
+                      int cur_period_type = current[j].get ("period_type", 2).asInt ();
+
+                      if (cur_period_type != sent_period_type)
+                        {
+                          char recomputed_next_exec[PATH_MAX];
+
+                          mail_report_compute_next_exec ((unsigned int) cur_period_type, cur_time,
+                                                          recomputed_next_exec);
+                          current[j]["next_exec"] = recomputed_next_exec;
+                        }
+                      else
+                        {
+                          current[j]["next_exec"] = sent_updates[u]["next_exec"];
+                        }
+                      current[j]["prev_exec"] = sent_updates[u]["prev_exec"];
+                      consumed[j] = true;
+                      break;
+                    }
+                }
+            }
+
+          if (ext_set_auto_jobs ("mail_report", current) == FALSE)
+            {
+              LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
+              return build_server_header (response, ERR_NO_ERROR,
+                                          "mail send attempted but schedule not saved; "
+                                          "the same report may be resent next time");
+            }
+        }
+      else
+        {
+          LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
+          return build_server_header (response, ERR_NO_ERROR,
+                                      "mail send attempted but schedule not saved; "
+                                      "the same report may be resent next time");
+        }
     }
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -874,11 +1154,26 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
-  if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
-    {
-      LOG_WARN ("get mail report config failed!");
-      return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
-    }
+
+  /*
+   * Only this one read is guarded here. It used to hold the guard for
+   * the whole call, including ext_exec_mail_report ()'s log-scanning
+   * and ext_send_mail () -> mail.send () SMTP send below
+   */
+  {
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
+
+    if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
+      {
+        LOG_WARN ("get mail report config failed!");
+        return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
+      }
+  }
+
   return ext_exec_mail_report (mail_report, response);
 }
 
@@ -887,11 +1182,26 @@ int ext_exec_auto_start (Json::Value &request, Json::Value &response)
   Json::Value autojobs;
   string dbname;
 
-  if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, autojobs) == FALSE)
-    {
-      LOG_DEBUG ("get auto start jobs failed.");
-      return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
-    }
+  {
+    /*
+     * only the read itself needs to be atomic with respect to a
+     * concurrent writer (see ext_get_auto_start () above); the
+     * ext_exec_*_auto_start () calls below don't touch autojobs.conf,
+     * so the guard is released before them rather than held across
+     * however long starting brokers/databases takes.
+     */
+    file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+      }
+
+    if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, autojobs) == FALSE)
+      {
+        LOG_DEBUG ("get auto start jobs failed.");
+        return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
+      }
+  }
 
   if (autojobs == Json::Value::null)
     {
@@ -1282,6 +1592,17 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   line_buf[0] = '\0';
   _dbmt_error[0] = '\0';
 
+  /*
+   * autoexecquery.conf is also rewritten by auto_conf_execquery_delete ()/
+   * auto_conf_execquery_rename ()/auto_conf_execquery_update_dbuser (),
+   * which take cm_auto_conf_mutex ().
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "internal lock error");
+    }
+
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);
   if (access (autoexecquery_conf_file, F_OK) == 0)
     {
@@ -1299,7 +1620,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
     }
 
   // open a temp file for new auto query config.
-  make_temp_filepath (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", TS_EXT_SET_AUTO_EXEC_QRY, PATH_MAX);
+  gen_tempfile_path (tmp_conf_file, sco.dbmt_tmp_dir, "DBMT_task", TS_EXT_SET_AUTO_EXEC_QRY, PATH_MAX);
   tmp_file.open (tmp_conf_file, ios::out);
   if (!tmp_file.good())
     {
@@ -1568,8 +1889,8 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   JSON_FIND_V (request, "dbname",
                build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   copy_log_path = request["copylogpath"].asString();
   remote_host_name = request["remotehostname"].asString();
@@ -1587,7 +1908,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   argv[7] = dbname.c_str();
   argv[8] = NULL;
 
-  run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if ((retval=_read_apply_info_cmd_output (stdout_log_file, stderr_log_file, str_result)) != ERR_NO_ERROR)
     {
@@ -1659,220 +1980,229 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, "Invalid password! The length should be between 4 and 32.");
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error) != ERR_NO_ERROR))
-    {
-      return build_server_header (response, retval, dbmt_error);
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  uEncrypt (PASSWD_LENGTH, password.c_str(), dbmt_password);
+    if (!guard.ok ())
+      {
+        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
+      }
 
-  num_dbmt_user = dbmt_user.num_dbmt_user;
-  for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
-        {
-          dbmt_user_free (&dbmt_user);
-          sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
-          return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
-        }
-    }
+    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        return build_server_header (response, retval, dbmt_error);
+      }
 
-  // set user authority info
-  JSON_FIND_V (request, "authoritylist", build_server_header (response, ERR_PARAM_MISSING,
-               "Parameter(authoritylist) missing in the request"));
-  authoritylist = request["authoritylist"];
-  Json::Value json_value = authoritylist;
+    uEncrypt (PASSWD_LENGTH, password.c_str(), dbmt_password);
 
-  if (json_value["admin"] != Json::Value::null)
-    {
-      if (json_value["admin"].asString() != "yes")
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
-        }
-      auth |= AU_ADMIN;
+    num_dbmt_user = dbmt_user.num_dbmt_user;
+    for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
+      {
+        if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
+          {
+            dbmt_user_free (&dbmt_user);
+            sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
+            return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
+          }
+      }
 
-      authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                 num_authinfo + 2);
-      if (authinfo == NULL)
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
+    // set user authority info
+    JSON_FIND_V (request, "authoritylist", build_server_header (response, ERR_PARAM_MISSING,
+                 "Parameter(authoritylist) missing in the request"));
+    authoritylist = request["authoritylist"];
+    Json::Value json_value = authoritylist;
 
-      dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
-      num_authinfo += 2;
-    }
-  else
-    {
-      JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbc or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbo or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(brk or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(mon or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(job or admin) missing in the authoritylist"));
-      JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(var or admin) missing in the authoritylist"));
+    if (json_value["admin"] != Json::Value::null)
+      {
+        if (json_value["admin"].asString() != "yes")
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
+          }
+        auth |= AU_ADMIN;
 
-      if (json_value["dbc"].asString() == "yes")
-        {
-          auth |= AU_DBC;
-        }
-      else if (json_value["dbc"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
-        }
+        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+                   num_authinfo + 2);
+        if (authinfo == NULL)
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
 
-      if (json_value["dbo"].asString() == "yes")
-        {
-          auth |= AU_DBO;
-        }
-      else if (json_value["dbo"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
-        }
+        dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
+        num_authinfo += 2;
+      }
+    else
+      {
+        JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbc or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbo or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(brk or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(mon or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(job or admin) missing in the authoritylist"));
+        JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(var or admin) missing in the authoritylist"));
 
-      if (json_value["brk"].asString() == "yes")
-        {
-          auth |= AU_BRK;
-        }
-      else if (json_value["brk"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["dbc"].asString() == "yes")
+          {
+            auth |= AU_DBC;
+          }
+        else if (json_value["dbc"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["mon"].asString() == "yes")
-        {
-          auth |= AU_MON;
-        }
-      else if (json_value["mon"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["dbo"].asString() == "yes")
+          {
+            auth |= AU_DBO;
+          }
+        else if (json_value["dbo"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["job"].asString() == "yes")
-        {
-          auth |= AU_JOB;
-        }
-      else if (json_value["job"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["brk"].asString() == "yes")
+          {
+            auth |= AU_BRK;
+          }
+        else if (json_value["brk"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
+          }
 
-      if (json_value["var"].asString() == "yes")
-        {
-          auth |= AU_VAR;
-        }
-      else if (json_value["var"].asString() != "no")
-        {
-          return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
-        }
+        if (json_value["mon"].asString() == "yes")
+          {
+            auth |= AU_MON;
+          }
+        else if (json_value["mon"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
+          }
 
-      // all authorites are set as 'no'
-      if (auth == 0)
-        {
-          return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
-        }
+        if (json_value["job"].asString() == "yes")
+          {
+            auth |= AU_JOB;
+          }
+        else if (json_value["job"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
+          }
 
-      authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                 num_authinfo + 7);
-      if (authinfo == NULL)
-        {
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
-      num_authinfo += 7;
+        if (json_value["var"].asString() == "yes")
+          {
+            auth |= AU_VAR;
+          }
+        else if (json_value["var"].asString() != "no")
+          {
+            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
+          }
 
-      // maybe only for debug
-      dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
-      dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
-    }
+        // all authorites are set as 'no'
+        if (auth == 0)
+          {
+            return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
+          }
 
-  sprintf (str_auth, "%u", auth);
-  dbmt_user_set_authinfo (& (authinfo[0]), "user_auth", str_auth);
+        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+                   num_authinfo + 7);
+        if (authinfo == NULL)
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
+        num_authinfo += 7;
 
-  LOG_DEBUG ("set user authority info successfully.");
+        // maybe only for debug
+        dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
+        dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
+      }
 
-  // set db authority info
-  JSON_FIND_V (request, "dbauth", build_server_header (response, ERR_PARAM_MISSING,
-               "Parameter(dbauth) missing in the request"));
+    sprintf (str_auth, "%u", auth);
+    dbmt_user_set_authinfo (& (authinfo[0]), "user_auth", str_auth);
 
-  dbauthlist = request["dbauth"];
+    LOG_DEBUG ("set user authority info successfully.");
 
-  for (unsigned int i = 0; i < dbauthlist.size(); ++i)
-    {
-      string dbname, dbid, dbpassword, broker_address;
+    // set db authority info
+    JSON_FIND_V (request, "dbauth", build_server_header (response, ERR_PARAM_MISSING,
+                 "Parameter(dbauth) missing in the request"));
 
-      JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbname) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbid) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbpassword) missing in the authoritylist"));
-      JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
-                   "Parameter(dbbrokeraddress) missing in the authoritylist"));
+    dbauthlist = request["dbauth"];
 
-      dbname = dbauthlist[i]["dbname"].asString();
-      dbid = dbauthlist[i]["dbid"].asString();
-      dbpassword = dbauthlist[i]["dbpassword"].asString();
-      broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
+    for (unsigned int i = 0; i < dbauthlist.size(); ++i)
+      {
+        string dbname, dbid, dbpassword, broker_address;
 
-      dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
-               num_dbinfo, num_dbinfo + 1);
-      if (dbinfo == NULL)
-        {
-          FREE_MEM (authinfo);
-          dbmt_user_free (&dbmt_user);
+        JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbname) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbid) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbpassword) missing in the authoritylist"));
+        JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
+                     "Parameter(dbbrokeraddress) missing in the authoritylist"));
 
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-        }
-      num_dbinfo++;
+        dbname = dbauthlist[i]["dbname"].asString();
+        dbid = dbauthlist[i]["dbid"].asString();
+        dbpassword = dbauthlist[i]["dbpassword"].asString();
+        broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
 
-      dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
-    }
+        dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
+                 num_dbinfo, num_dbinfo + 1);
+        if (dbinfo == NULL)
+          {
+            FREE_MEM (authinfo);
+            dbmt_user_free (&dbmt_user);
 
-  LOG_DEBUG ("set db authority info successfully.");
+            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+          }
+        num_dbinfo++;
 
-  // store user authority info & db authority info into dbmt_user
-  dbmt_user.user_info = (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info, sizeof (T_DBMT_USER_INFO),
-                        num_dbmt_user, num_dbmt_user + 1);
+        dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
+      }
 
+    LOG_DEBUG ("set db authority info successfully.");
 
-  if (dbmt_user.user_info == NULL)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
-    }
-
-  num_dbmt_user++;
-  dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
-                          authinfo, num_dbinfo, dbinfo);
-  dbmt_user.num_dbmt_user = num_dbmt_user;
+    // store user authority info & db authority info into dbmt_user
+    dbmt_user.user_info = (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info, sizeof (T_DBMT_USER_INFO),
+                          num_dbmt_user, num_dbmt_user + 1);
 
 
-  LOG_DEBUG ("store to dbmt_user successfully.");
+    if (dbmt_user.user_info == NULL)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
+      }
 
-  if ((retval = dbmt_user_write_auth (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
+    num_dbmt_user++;
+    dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
+                            authinfo, num_dbinfo, dbinfo);
+    dbmt_user.num_dbmt_user = num_dbmt_user;
 
-      return build_server_header (response, retval, dbmt_error);
-    }
-  if ((retval = dbmt_user_write_pass (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
 
-      return build_server_header (response, retval, dbmt_error);
-    }
+    LOG_DEBUG ("store to dbmt_user successfully.");
+
+    if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        dbmt_user_free (&dbmt_user);
+
+        return build_server_header (response, retval, dbmt_error);
+      }
+    if ((retval = dbmt_user_write_pass_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        dbmt_user_free (&dbmt_user);
+
+        return build_server_header (response, retval, dbmt_error);
+      }
+  }
 
   if ((retval = ext_ut_add_dblist_to_response (response)) != ERR_NO_ERROR)
     {
@@ -2083,95 +2413,106 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
         }
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      return build_server_header (response, retval, dbmt_error);
-    }
+  {
+    file_resource_guard user_write_guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  pos = -1;
-  for (int i = 0;  i < dbmt_user.num_dbmt_user; ++i)
-    {
-      if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
-        {
-          pos = i;
-          break;
-        }
-    }
+    if (!user_write_guard.ok ())
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
+      }
 
-  if (pos < 0)
-    {
-      FREE_MEM (authinfo);
-      FREE_MEM (dbinfo);
-      dbmt_user_free (&dbmt_user);
+    if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        return build_server_header (response, retval, dbmt_error);
+      }
 
-      return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
-    }
+    pos = -1;
+    for (int i = 0;  i < dbmt_user.num_dbmt_user; ++i)
+      {
+        if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
+          {
+            pos = i;
+            break;
+          }
+      }
 
-  if (authinfo != NULL)
-    {
-      free (dbmt_user.user_info[pos].authinfo);
-      dbmt_user.user_info[pos].authinfo = authinfo;
-      dbmt_user.user_info[pos].num_authinfo = num_authinfo;
+    if (pos < 0)
+      {
+        FREE_MEM (authinfo);
+        FREE_MEM (dbinfo);
+        dbmt_user_free (&dbmt_user);
 
-    }
+        return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
+      }
 
-  if (dbinfo != NULL)
-    {
-      if (dbmt_user.user_info[pos].dbinfo == NULL)
-        {
-          dbmt_user.user_info[pos].dbinfo = dbinfo;
-          dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
-        }
-      else
-        {
-          T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
-          for (int i = 0; i < num_dbinfo; ++i )
-            {
-              int tmp_pos = -1;
-              for (int j = 0; j < current_user->num_dbinfo; ++j)
-                {
-                  if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
-                    {
-                      tmp_pos = j;
-                    }
-                }
+    if (authinfo != NULL)
+      {
+        free (dbmt_user.user_info[pos].authinfo);
+        dbmt_user.user_info[pos].authinfo = authinfo;
+        dbmt_user.user_info[pos].num_authinfo = num_authinfo;
 
-              if (tmp_pos < 0)
-                {
-                  current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
-                                         sizeof (T_DBMT_USER_DBINFO),
-                                         current_user->num_dbinfo,
-                                         current_user->num_dbinfo+1);
+      }
 
-                  if (current_user->dbinfo == NULL)
-                    {
-                      FREE_MEM (dbinfo);
-                      dbmt_user_free (&dbmt_user);
+    if (dbinfo != NULL)
+      {
+        if (dbmt_user.user_info[pos].dbinfo == NULL)
+          {
+            dbmt_user.user_info[pos].dbinfo = dbinfo;
+            dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
+          }
+        else
+          {
+            T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
+            for (int i = 0; i < num_dbinfo; ++i )
+              {
+                int tmp_pos = -1;
+                for (int j = 0; j < current_user->num_dbinfo; ++j)
+                  {
+                    if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
+                      {
+                        tmp_pos = j;
+                      }
+                  }
 
-                      return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
-                    }
-                  tmp_pos = current_user->num_dbinfo;
-                  current_user->num_dbinfo++;
-                }
+                if (tmp_pos < 0)
+                  {
+                    current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
+                                           sizeof (T_DBMT_USER_DBINFO),
+                                           current_user->num_dbinfo,
+                                           current_user->num_dbinfo+1);
 
-              dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
-                                    dbinfo[i].dbname,
-                                    dbinfo[i].auth,
-                                    dbinfo[i].uid,
-                                    dbinfo[i].broker_address);
-            }
-        }
-    }
+                    if (current_user->dbinfo == NULL)
+                      {
+                        FREE_MEM (dbinfo);
+                        dbmt_user_free (&dbmt_user);
 
-  if ((retval = dbmt_user_write_auth (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
-    {
-      FREE_MEM (dbinfo);
-      dbmt_user_free (&dbmt_user);
+                        return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
+                      }
+                    tmp_pos = current_user->num_dbinfo;
+                    current_user->num_dbinfo++;
+                  }
 
-      return build_server_header (response, retval, dbmt_error);
-    }
+                dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
+                                      dbinfo[i].dbname,
+                                      dbinfo[i].auth,
+                                      dbinfo[i].uid,
+                                      dbinfo[i].broker_address);
+              }
+          }
+      }
+
+    if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+      {
+        FREE_MEM (dbinfo);
+        dbmt_user_free (&dbmt_user);
+
+        return build_server_header (response, retval, dbmt_error);
+      }
+  }
 
 
   if ((retval = ext_ut_add_dblist_to_response (response)) != ERR_NO_ERROR)
@@ -2450,7 +2791,7 @@ static bool _validate_token_active_time (time_t &active_time)
 
 bool ext_ut_validate_token (const char *token)
 {
-  T_USER_TOKEN_INFO *token_info;
+  T_USER_TOKEN_INFO token_info;
   string token_enc;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   istringstream tmp_iss;
@@ -2469,13 +2810,12 @@ bool ext_ut_validate_token (const char *token)
   int i = 0;
   while (getline (tmp_iss, token_content[i++], ':'));
 
-  token_info = dbmt_user_search_token_info (token_content[2].c_str());
-  if (token_info == NULL)
+  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
       return false;
     }
 
-  if (strcmp (token_info->token, token) != 0)
+  if (strcmp (token_info.token, token) != 0)
     {
       return false;
     }
@@ -2485,12 +2825,19 @@ bool ext_ut_validate_token (const char *token)
       active_time = 7200;
     }
 
-  if (now_time - token_info->login_time > active_time)
+  if (now_time - token_info.login_time > active_time)
     {
       return false;
     }
 
-  token_info->login_time = now_time;
+  /*
+   * re-finds the live node and bumps login_time only if it's still
+   * the same session validated above
+   */
+  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token, now_time))
+    {
+      return false;
+    }
 
   return true;
 }
@@ -2498,7 +2845,7 @@ bool ext_ut_validate_token (const char *token)
 int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 {
 
-  T_USER_TOKEN_INFO *token_info;
+  T_USER_TOKEN_INFO token_info;
   string task;
   string token;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
@@ -2546,14 +2893,13 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   int i = 0;
   while (getline (tmp_iss, token_content[i++], ':'));
 
-  token_info = dbmt_user_search_token_info (token_content[2].c_str());
-  if (token_info == NULL)
+  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
 
-  if (strcmp (token_info->token, token.c_str()))
+  if (strcmp (token_info.token, token.c_str()))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
@@ -2564,12 +2910,16 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       active_time = 7200;
     }
 
-  if (now_time-token_info->login_time > active_time)
+  if (now_time-token_info.login_time > active_time)
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  token_info->login_time = now_time;
+  /* see the comment in the (const char *token) overload above */
+  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token.c_str(), now_time))
+    {
+      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
+    }
 
   request["_IP"] = token_content[0];
   request["_PORT"] = token_content[1];

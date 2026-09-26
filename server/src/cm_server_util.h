@@ -29,6 +29,7 @@
 #include "cm_dep.h"
 #include "cm_cmd_exec.h"
 #include "cm_job_task.h"
+#include "cm_log.h"    /* mutex_t / mutex_init () / mutex_lock () / mutex_unlock () */
 
 #ifndef WINDOWS
 #include <sys/select.h>
@@ -95,6 +96,15 @@ typedef unsigned __int64 uint64_t;
 #define AIX_STACKSIZE_PER_THREAD           (10*1024*1024)
 #endif
 
+#if defined (WINDOWS)
+#define STRTOK(buf,delim,saveptr)  strtok_s (buf, delim, saveptr)
+#else
+#define STRTOK(buf,delim,saveptr)  strtok_r (buf, delim, saveptr)
+#endif
+
+#define RUN_FOREGROUND 1
+#define RUN_BACKGROUND 0
+
 typedef enum
 {
   TIME_STR_FMT_DATE = NV_ADD_DATE,
@@ -147,8 +157,139 @@ int _isRegisteredDB (char *);
 void uWriteDBnfo (void);
 void uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res);
 int ut_get_dblist (nvplist *res, char dbdir_flag);
-int uCreateLockFile (char *filename);
+#define LOCK_FILE_DEFAULT_TIMEOUT_MS 5000
+
+/*
+ * uCreateLockFile () - timeout_ms is the total time budget (in
+ *   milliseconds) to keep retrying before giving up.
+ */
+int uCreateLockFile (char *filename, int timeout_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS);
 void uRemoveLockFile (int fd);
+
+/*
+ * ut_get_msec_marker () - returns INT64. Do not store the result in a
+ *   plain "long": on Windows, long is 32-bit regardless of build, and
+ *   truncating this back into one just reintroduces the overflow the
+ *   INT64 return type exists to avoid.
+ */
+INT64 ut_get_msec_marker (void);
+
+mutex_t *cm_cmdb_pass_mutex (void);
+mutex_t *cm_cmdbinfo_temp_mutex (void);
+mutex_t *cm_conn_list_mutex (void);
+mutex_t *cm_auto_conf_mutex (void);
+mutex_t *cm_auto_jobs_mutex (void);
+
+/*
+ * file_resource_guard - RAII guard combining one of the in-process
+ *   mutexes above with the existing uCreateLockFile ()/uRemoveLockFile ()
+ *   cross-process file lock (see the comment above).
+ *
+ *   lock order: cm_mutex -> {cmdb_pass_mutex, cmdbinfo_temp_mutex,
+ *               conn_list_mutex, auto_conf_mutex, auto_jobs_mutex}.
+ *               never acquire cm_mutex while holding one of these, and
+ *               never hold more than one of these at the same time.
+ *               token_list_mutex (cm_user.cpp) is outside this guard but
+ *               follows the same order, after cm_mutex: never acquire a
+ *               file guard above or cm_mutex while holding it.
+ */
+class file_resource_guard
+{
+  public:
+    file_resource_guard (mutex_t &proc_mutex, T_DBMT_FILE_ID lock_fid)
+      : m_proc_mutex (proc_mutex), m_fd (-1)
+    {
+      char path[PATH_MAX];
+      INT64 start_ms, elapsed_ms, remaining_ms;
+      bool mutex_acquired = false;
+
+#if defined (WINDOWS)
+      const int retry_interval_ms = 100;
+#else
+      const int retry_interval_ms = 10;
+#endif
+      conf_get_dbmt_file (lock_fid, path);
+
+      start_ms = ut_get_msec_marker ();
+
+      for (;;)
+        {
+          if (mutex_trylock (m_proc_mutex))
+            {
+              mutex_acquired = true;
+              break;
+            }
+
+          elapsed_ms = ut_get_msec_marker () - start_ms;
+          if (elapsed_ms >= LOCK_FILE_DEFAULT_TIMEOUT_MS)
+            {
+              /* out of budget: give up. m_fd stays -1, so ok ()
+                 correctly reports failure and there is nothing to
+                 release (the mutex was never acquired here). */
+              LOG_ERROR ("file_resource_guard: gave up waiting for the "
+                         "in-process mutex guarding '%s' (lock_fid=%d) "
+                         "after %lldms (limit %dms) without acquiring it",
+                         path, (int) lock_fid, (long long) elapsed_ms,
+                         LOCK_FILE_DEFAULT_TIMEOUT_MS);
+              break;
+            }
+
+          SLEEP_MILISEC (0, retry_interval_ms);
+        }
+
+      if (!mutex_acquired)
+        {
+          return;
+        }
+
+      /*
+       * Whatever time the mutex wait above consumed comes out of the
+       * budget uCreateLockFile () gets next, so the combined
+       * mutex-wait + file-lock-wait is bounded by
+       * LOCK_FILE_DEFAULT_TIMEOUT_MS overall, not by that amount
+       * PER STAGE.
+       */
+      elapsed_ms = ut_get_msec_marker () - start_ms;
+      remaining_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS - elapsed_ms;
+      if (remaining_ms < 0)
+        {
+          remaining_ms = 0;
+        }
+
+      m_fd = uCreateLockFile (path, (int) remaining_ms);
+      if (m_fd < 0)
+        {
+          LOG_ERROR ("file_resource_guard: uCreateLockFile () for '%s' "
+                     "(lock_fid=%d) failed within its remaining %lldms "
+                     "budget (%lldms already spent acquiring the "
+                     "in-process mutex)", path, (int) lock_fid,
+                     (long long) remaining_ms, (long long) elapsed_ms);
+          mutex_unlock (m_proc_mutex);
+        }
+    }
+
+    ~file_resource_guard (void)
+    {
+      if (m_fd >= 0)
+        {
+          uRemoveLockFile (m_fd);
+          mutex_unlock (m_proc_mutex);
+        }
+    }
+
+    bool ok (void) const
+    {
+      return m_fd >= 0;
+    }
+
+  private:
+    mutex_t &m_proc_mutex;
+    int m_fd;
+
+    /* non-copyable: releasing the same lock/mutex twice would be wrong */
+    file_resource_guard (const file_resource_guard &);
+    file_resource_guard &operator= (const file_resource_guard &);
+};
 int uCreateDir (char *path);
 int folder_copy (const char *src_dir, const char *dest_dir);
 int uRemoveDir (char *dir, int remove_file_in_dir);
@@ -174,6 +315,7 @@ int write_to_socket (SOCKET fd, const char *buf, int size);
 int is_cmserver_process (int pid, const char *module_name);
 int make_default_env (void);
 int is_positive_number (const char *str);
+int gen_tempfile_path (char *tempfile, const char *tempdir, const char *prefix, int task_code, size_t size);
 
 #if defined(WINDOWS)
 void remove_end_of_dir_ch (char *path);
@@ -199,9 +341,12 @@ void _accept_connection (nvplist *cli_request, nvplist *cli_response);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
-int ut_run_child (const char *bin_path, const char *const argv[],
-                  int wait_flag, const char *stdin_file,
-                  const char *stdout_file, const char *stderr_file, int *exit_status);
+int run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
+                   char *stderr_file, int *exit_status, const char *envp[] = NULL,
+                   long long *out_start_time = NULL);
+
+void env_mutex_lock (void);
+void env_mutex_unlock (void);
 
 int IsValidUserName (const char *pUserName);
 int ut_validate_auth (nvplist *req);
@@ -215,5 +360,7 @@ int ut_record_cubrid_utility_log_stderr (const char *msg);
 int ut_record_cubrid_utility_log_stdout (const char *msg);
 void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
+
+bool ut_child_exited_ok (int exit_code);
 
 #endif                /* _CM_SERVER_UTIL_H_ */

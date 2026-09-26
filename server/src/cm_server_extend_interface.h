@@ -77,6 +77,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response);
 int ext_get_dbmt_user_info_new (Json::Value &request,
                                 Json::Value &response);
+int ext_get_server_status (Json::Value &request, Json::Value &response); /* defined in cm_server_interface.cpp */
 
 #define EXT_JOBS_AUTO_START      "auto_start"
 #define EXT_JOBS_MAIL_CONF       "mail_config"
@@ -84,7 +85,7 @@ int ext_get_dbmt_user_info_new (Json::Value &request,
 
 /* utility */
 bool ext_set_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
-bool ext_get_auto_jobs (const std::string jobkey, Json::Value &jobvalue);
+bool ext_get_auto_jobs (const std::string jobkey, Json::Value &jobvalue, bool *file_existed = NULL);
 bool ext_ut_validate_userid (const std::string userid);
 int ext_ut_add_dblist_to_response (Json::Value &res, bool is_add_dbpath =
                                      false);

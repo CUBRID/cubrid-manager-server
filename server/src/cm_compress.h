@@ -4259,7 +4259,12 @@ extern "C"
   static void mz_zip_time_to_dos_time (time_t time, mz_uint16 * pDOS_time,
 				       mz_uint16 * pDOS_date)
   {
-    struct tm *tm = localtime (&time);
+    struct tm tm_buf;
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
+    struct tm *tm = (localtime_s (&tm_buf, &time) == 0) ? &tm_buf : NULL;
+#else
+    struct tm *tm = localtime_r (&time, &tm_buf);
+#endif
     if (tm)
       {
 	*pDOS_time =

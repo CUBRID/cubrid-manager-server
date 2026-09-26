@@ -53,7 +53,7 @@
 #define MIN_THREAD_NUM           1
 /* Reject multi connection with "ALL USER" */
 
-#define NUM_DBMT_FILE            23
+#define NUM_DBMT_FILE            25
 
 #define DEFAULT_CWM_PATH_SHORT            "/share/webmanager"
 #define DEFAULT_SSL_CERTIFICATE           "cm_ssl_cert.crt"
@@ -120,6 +120,8 @@ static T_DBMT_FILE_INFO dbmt_file[NUM_DBMT_FILE] =
   {FID_LOCK_PSVR_DBINFO, DBMT_TMP_DIR, "cmdbinfo.lock"},
   {FID_LOCK_SVR_LOG, DBMT_TMP_DIR, "cmlog.lock"},
   {FID_LOCK_DBMT_PASS, DBMT_TMP_DIR, "cmpass.lock"},
+  {FID_LOCK_AUTO_CONF, DBMT_TMP_DIR, "autoconf.lock"},
+  {FID_LOCK_AUTO_JOBS, DBMT_TMP_DIR, "autojobs.lock"},
   {FID_DIAG_ACTIVITY_LOG, DBMT_CONF_DIR, "diagactivitylog.conf"},
   {FID_DIAG_STATUS_TEMPLATE, DBMT_CONF_DIR, "diagstatustemplate.conf"},
   {FID_DIAG_ACTIVITY_TEMPLATE, DBMT_CONF_DIR, "diagactivitytemplate.conf"},
@@ -223,6 +225,7 @@ uReadSystemConfig (void)
   int str_len = 0;
   char access_log_buf[PATH_MAX];
   char error_log_buf[PATH_MAX];
+  char *saveptr;
 
   conf_file = fopen (conf_get_dbmt_file (FID_DBMT_CONF, cbuf), "rt");
   if (conf_file == NULL)
@@ -236,6 +239,9 @@ uReadSystemConfig (void)
   sco.iSupportWebManager = FALSE;
   sco.iSupportMonStat = FALSE;
   sco.iHttpTimeout = 30;
+  sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
+  sco.iMaxNumAsyncTask = DEFAULT_MAX_NUM_ASYNC_TASK;
+  sco.iAsyncLongJobSec = DEFAULT_ASYNC_LONG_JOB_SEC;
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
@@ -263,7 +269,7 @@ uReadSystemConfig (void)
       * put the first token into var ent_name,
       * the separator is ' ', '\t', '='
       */
-      if ((token = strtok (cbuf, separator)) == NULL)
+      if ((token = STRTOK (cbuf, separator, &saveptr)) == NULL)
         {
           continue;
         }
@@ -273,7 +279,7 @@ uReadSystemConfig (void)
       /*
       * put the rest of the string into var ent_val.
       */
-      if ((token = strtok (NULL, "\0")) == NULL)
+      if ((token = STRTOK (NULL, "\0", &saveptr)) == NULL)
         {
           continue;
         }
@@ -389,6 +395,62 @@ uReadSystemConfig (void)
                strcasecmp (ent_name, "HttpTimeout") == 0)
         {
           sco.iHttpTimeout = atoi (ent_val);
+        }
+      else if (strcasecmp (ent_name, "async_job_ttl_sec") == 0)
+        {
+          int ttl = atoi (ent_val);
+          if (MIN_ASYNC_JOB_TTL_SEC <= ttl && ttl <= MAX_ASYNC_JOB_TTL_SEC)
+            {
+              sco.iAsyncJobTtlSec = ttl;
+            }
+          else
+            {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid async_job_ttl_sec in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_ASYNC_JOB_TTL_SEC);
+              ut_record_cubrid_utility_log_stderr (err_buf);
+              sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
+            }
+        }
+      else if (strcasecmp (ent_name, "max_num_async_task") == 0)
+        {
+          int max_task = atoi (ent_val);
+          if (max_task < 1 || max_task > MAX_NUM_ASYNC_TASK_LIMIT)
+            {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid max_num_async_task in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_MAX_NUM_ASYNC_TASK);
+              ut_record_cubrid_utility_log_stderr (err_buf);
+
+              sco.iMaxNumAsyncTask = DEFAULT_MAX_NUM_ASYNC_TASK;
+            }
+          else
+            {
+              sco.iMaxNumAsyncTask = max_task;
+            }
+        }
+      else if (strcasecmp (ent_name, "async_long_job_sec") == 0)
+        {
+          int long_job_sec = atoi (ent_val);
+
+          if (MIN_ASYNC_LONG_JOB_SEC <= long_job_sec && long_job_sec <= MAX_ASYNC_LONG_JOB_SEC)
+            {
+              sco.iAsyncLongJobSec = long_job_sec;
+            }
+          else
+            {
+              char err_buf[DBMT_ERROR_MSG_SIZE];
+
+              snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+                    "CUBRID Manager Server: invalid async_long_job_sec in cm.conf (%s). use default (%d)\n",
+                    ent_val, DEFAULT_ASYNC_LONG_JOB_SEC);
+              ut_record_cubrid_utility_log_stderr (err_buf);
+              sco.iAsyncLongJobSec = DEFAULT_ASYNC_LONG_JOB_SEC;
+            }
         }
       else if (strcasecmp (ent_name, "auto_update_url") == 0 ||
                strcasecmp (ent_name, "AutoUpdateURL") == 0)
@@ -568,12 +630,28 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
   char strbuf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   FILE *infp, *outfp;
 
+  /*
+   * the read (infp) - modify (in the fgets/fputs loop below) - write
+   * (move_file ()) sequence has to be atomic with respect to other
+   * threads/processes touching the same auto*.conf file, or a concurrent
+   * writer's change can be silently lost when this function's tmpfile
+   * overwrites it. auto_conf_mutex is shared by all of the auto*.conf
+   * files (addvoldb/backupdb/history/execquery) rather than one mutex per
+   * file: these are low-frequency admin-driven config edits, so a single
+   * coarse lock is simpler and cheap enough.
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
+
   conf_get_dbmt_file (fid, conf_file);
   if ((infp = fopen (conf_file, "r")) == NULL)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_del", TS_AUTOCONF_DELETE, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_del", TS_AUTOCONF_DELETE, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -609,12 +687,19 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
   char strbuf[1024], *p;
   FILE *infp, *outfp;
 
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
+
   conf_get_dbmt_file (fid, conf_file);
   if ((infp = fopen (conf_file, "r")) == NULL)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_ren", TS_AUTOCONF_RENAME, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_ac_ren", TS_AUTOCONF_RENAME, PATH_MAX);
   if ((outfp = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infp);
@@ -659,12 +744,19 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
 
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
+
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, conf_file_path);
   if ((conf_file = fopen (conf_file_path, "r")) == NULL)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_swit", TS_AUTOCONF_SWIT, PATH_MAX);
+  gen_tempfile_path (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_swit", TS_AUTOCONF_SWIT, PATH_MAX);
   if ((tmpfile = fopen (tmpfile_path, "w")) == NULL)
     {
       fclose (conf_file);
@@ -724,12 +816,19 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
 
+  /* see the comment in auto_conf_delete () above */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      return -1;
+    }
+
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, conf_file_path);
   if ((conf_file = fopen (conf_file_path, "r")) == NULL)
     {
       return -1;
     }
-  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_del_user", TS_DELETEDBMTUSER, PATH_MAX);
+  gen_tempfile_path (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_task_ac_del_user", TS_DELETEDBMTUSER, PATH_MAX);
   if ((tmpfile = fopen (tmpfile_path, "w")) == NULL)
     {
       fclose (conf_file);
@@ -777,13 +876,15 @@ static int
 check_file (char *fname, char *pname)
 {
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
+  char errbuf[CM_STRERROR_BUF_LEN];
 
   tmpstrbuf[0] = '\0';
 
   if (access (fname, F_OK | R_OK | W_OK) < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : %s - %s. - %s\n", fname, strerror (errno), pname);
+                "CUBRID Manager Server : %s - %s. - %s\n", fname,
+                STRERROR_R (errno, errbuf, sizeof (errbuf)), pname);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
@@ -795,13 +896,15 @@ check_path (char *dirname, char *pname)
 {
   /* check if directory exists */
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
+  char errbuf[CM_STRERROR_BUF_LEN];
 
   tmpstrbuf[0] = '\0';
 
   if (access (dirname, F_OK | W_OK | R_OK | X_OK) < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server :  %s - %s. - %s\n", dirname, strerror (errno), pname);
+                "CUBRID Manager Server :  %s - %s. - %s\n", dirname,
+                STRERROR_R (errno, errbuf, sizeof (errbuf)), pname);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
