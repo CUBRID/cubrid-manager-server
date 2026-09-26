@@ -342,7 +342,8 @@ void _accept_connection (nvplist *cli_request, nvplist *cli_response);
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
 int run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-                   char *stderr_file, int *exit_status, const char *envp[] = NULL);
+                   char *stderr_file, int *exit_status, const char *envp[] = NULL,
+                   long long *out_start_time = NULL);
 
 void env_mutex_lock (void);
 void env_mutex_unlock (void);

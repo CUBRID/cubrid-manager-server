@@ -17473,8 +17473,14 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = db_name;
   argv[argc++] = NULL;
 
+  long long dispatcher_start_time = -1;
+
 #if defined (WINDOWS)
   ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, NULL, NULL, NULL);
+  if (ret_val >= 0)
+    {
+      dispatcher_start_time = _get_proc_start_time (ret_val);
+    }
 #else
   {
     /*
@@ -17484,11 +17490,16 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     char devnull_out[] = "/dev/null";
     char devnull_err[] = "/dev/null";
 
-    ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, devnull_out, devnull_err, NULL);
+    /*
+     * Pass dispatcher_start_time through run_child_env ()'s
+     * out_start_time so it is read in the parent before the pid can be
+     * reaped by run_child_env ()'s own background reaper thread, rather
+     * than reading it here after the call returns
+     */
+    ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, devnull_out, devnull_err, NULL, NULL,
+                             &dispatcher_start_time);
   }
 #endif
-
-  long long dispatcher_start_time = (ret_val >= 0) ? _get_proc_start_time (ret_val) : -1;
 
   mutex_lock (*_statdumpd_mutex ());
 

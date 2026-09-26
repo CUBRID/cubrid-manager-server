@@ -3055,10 +3055,12 @@ _build_env_block (const char *const envp[])
  * envp (in) : NULL-terminated array of "KEY=VALUE" strings to add to (or
  *             override in) the child's environment. An entry of the form
  *             "KEY=" (no value) removes KEY from the child's environment
+ * out_start_time (out, optional) : when non-NULL, filled in with the
+ *            spawned child's process start time.
  */
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-              char *stderr_file, int *exit_status, const char *envp[])
+              char *stderr_file, int *exit_status, const char *envp[], long long *out_start_time)
 {
   int new_pid;
   STARTUPINFO start_info;
@@ -3074,6 +3076,15 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
 
   if (exit_status != NULL)
     *exit_status = 0;
+  if (out_start_time != NULL)
+    {
+      /*
+       * Unlike the POSIX build below, this Windows run_child_env () never
+       * hands the child off to any background reaper, so the pid-reuse
+       * race out_start_time exists for cannot happen here; left unfilled.
+       */
+      *out_start_time = -1;
+    }
 
   for (i = 0, cmd_arg_len = 0; argv[i]; i++)
     {
@@ -3312,15 +3323,61 @@ _reap_child_async (void *arg)
   return NULL;
 }
 
+/*
+ * _get_child_start_time () - pid's /proc/<pid>/stat starttime field.
+ */
+static long long
+_get_child_start_time (pid_t pid)
+{
+  char path[64];
+  char buf[1024];
+  FILE *fp;
+  char *p, *tok, *saveptr;
+  long long start_time;
+  int field;
+
+  snprintf (path, sizeof (path), "/proc/%d/stat", (int) pid);
+  fp = fopen (path, "r");
+  if (fp == NULL)
+    {
+      return -1;
+    }
+  if (fgets (buf, sizeof (buf), fp) == NULL)
+    {
+      fclose (fp);
+      return -1;
+    }
+  fclose (fp);
+
+  p = strrchr (buf, ')');
+  if (p == NULL)
+    {
+      return -1;
+    }
+
+  tok = STRTOK (p + 1, " ", &saveptr);
+  for (field = 3; tok != NULL && field < 22; field++)
+    {
+      tok = STRTOK (NULL, " ", &saveptr);
+    }
+  if (tok == NULL || sscanf (tok, "%lld", &start_time) != 1)
+    {
+      return -1;
+    }
+  return start_time;
+}
+
 int
 run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-              char *stderr_file, int *exit_status, const char *envp[])
+              char *stderr_file, int *exit_status, const char *envp[], long long *out_start_time)
 {
   int pid;
   char **merged_envp = NULL;
 
   if (exit_status != NULL)
     *exit_status = 0;
+  if (out_start_time != NULL)
+    *out_start_time = -1;
 
   if (envp != NULL)
     {
@@ -3393,6 +3450,14 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
   if (pid < 0)
     {
       return -1;
+    }
+
+  if (out_start_time != NULL)
+    {
+      /*
+       * Read now, in the parent, before pid can be handed to any waiter below
+       */
+      *out_start_time = _get_child_start_time ((pid_t) pid);
     }
 
   if (wait_flag)
