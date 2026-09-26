@@ -2198,7 +2198,7 @@ move_file (char *src_file, char *dest_file)
       errno = 0;
       if (chown (src_file, dest_statbuf.st_uid, dest_statbuf.st_gid) < 0)
         {
-          LOG_ERROR ("chown failed: %s, errno = %d", src_file, errno);
+          LOG_WARN ("chown failed: %s, errno = %d", src_file, errno);
         }
 
       errno = 0;
