@@ -912,6 +912,30 @@ int update_next_report_time (Json::Value &mailreport)
   return 0;
 }
 
+/*
+ * mail_report_compute_next_exec () - shared by the per-entry send loop and
+ *   the save-time merge below, so a period_type that changed concurrently
+ */
+static void
+mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *next_exec_time)
+{
+  time_t next_time;
+
+  switch (period_type)
+    {
+    case 0: /* daily */
+      next_time = cur_time + 24 * 60 * 60;
+      break;
+    case 1: /* weekly */
+      next_time = cur_time + 7 * 24 * 60 * 60;
+      break;
+    default: /* monthly */
+      next_time = cur_time + 30 * 24 * 60 * 60;
+      break;
+    }
+  time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
+}
+
 int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 {
   unsigned int i, period_type, save_flag = 0;
@@ -921,7 +945,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
    * its new next_exec/prev_exec
    */
   Json::Value sent_updates (Json::arrayValue);
-  time_t cur_time, next_time;
+  time_t cur_time;
   char format_time[PATH_MAX], next_exec_time[PATH_MAX];
   string next_exec, prev_exec, mailhead, mailbody, userpasswd;
   char decrypted[PASSWD_LENGTH + 1];
@@ -1010,19 +1034,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       ext_send_mail (mail_conf, response);
 
       period_type = mailreport[i].get ("period_type", 2).asInt();
-      switch (period_type)
-        {
-        case 0: /* daily */
-          next_time = cur_time + 24 * 60 * 60;
-          break;
-        case 1: /* weekly */
-          next_time = cur_time + 7 * 24 * 60 * 60;
-          break;
-        default: /* monthly */
-          next_time = cur_time + 30 * 24 * 60 * 60;
-          break;
-        }
-      time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
+      mail_report_compute_next_exec (period_type, cur_time, next_exec_time);
       mailreport[i]["next_exec"] = next_exec_time;
       mailreport[i]["prev_exec"] = format_time;
       save_flag = 1;
@@ -1032,6 +1044,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
         upd["dbname"] = mailreport[i]["dbname"];
         upd["receiver"] = mailreport[i]["receiver"];
         upd["url_prefix"] = mailreport[i]["url_prefix"];
+        upd["period_type"] = (int) period_type;
         upd["next_exec"] = next_exec_time;
         upd["prev_exec"] = format_time;
         sent_updates.append (upd);
@@ -1074,16 +1087,45 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
               current = mailreport;
             }
 
+          /*
+           * dbname/receiver/url_prefix is not guaranteed unique (nothing
+           * validates that on setautojobconf), so a current[] entry that
+           * has already been claimed by an earlier sent_updates[] match
+           * must not be matched again, or a duplicate entry's update is
+           * silently dropped while the first duplicate absorbs both.
+           */
+          Json::Value consumed (Json::arrayValue);
+          for (unsigned int j = 0; j < current.size (); j++)
+            {
+              consumed[j] = false;
+            }
+
           for (unsigned int u = 0; u < sent_updates.size (); u++)
             {
               for (unsigned int j = 0; j < current.size (); j++)
                 {
-                  if (current[j]["dbname"] == sent_updates[u]["dbname"] &&
+                  if (!consumed[j].asBool () &&
+                      current[j]["dbname"] == sent_updates[u]["dbname"] &&
                       current[j]["receiver"] == sent_updates[u]["receiver"] &&
                       current[j]["url_prefix"] == sent_updates[u]["url_prefix"])
                     {
-                      current[j]["next_exec"] = sent_updates[u]["next_exec"];
+                      int sent_period_type = sent_updates[u].get ("period_type", 2).asInt ();
+                      int cur_period_type = current[j].get ("period_type", 2).asInt ();
+
+                      if (cur_period_type != sent_period_type)
+                        {
+                          char recomputed_next_exec[PATH_MAX];
+
+                          mail_report_compute_next_exec ((unsigned int) cur_period_type, cur_time,
+                                                          recomputed_next_exec);
+                          current[j]["next_exec"] = recomputed_next_exec;
+                        }
+                      else
+                        {
+                          current[j]["next_exec"] = sent_updates[u]["next_exec"];
+                        }
                       current[j]["prev_exec"] = sent_updates[u]["prev_exec"];
+                      consumed[j] = true;
                       break;
                     }
                 }
