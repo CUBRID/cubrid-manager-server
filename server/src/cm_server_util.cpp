@@ -92,6 +92,8 @@
  * this process (C++11 guarantees the init itself is thread-safe), so
  * there is no separate init/destroy call for cub_cm_init_env () (or any
  * other binary's startup) to remember to make.
+ *
+ * Each holder's destructor is deliberately empty
  */
 mutex_t *
 cm_cmdb_pass_mutex (void)
@@ -105,7 +107,7 @@ cm_cmdb_pass_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static holder h;
@@ -125,7 +127,7 @@ cm_cmdbinfo_temp_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static holder h;
@@ -145,7 +147,7 @@ cm_conn_list_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static holder h;
@@ -165,7 +167,7 @@ cm_auto_conf_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static holder h;
@@ -190,7 +192,7 @@ cm_auto_jobs_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static holder h;
@@ -2892,7 +2894,7 @@ _env_mutex (void)
     }
     ~env_mutex_holder (void)
     {
-      mutex_destory (m);
+      /* deliberately empty */
     }
   };
   static env_mutex_holder holder;

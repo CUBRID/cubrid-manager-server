@@ -573,7 +573,9 @@ token_list_mutex (void)
     }
     ~holder (void)
     {
-      mutex_destory (m);
+      /*
+       * deliberately empty
+       */
     }
   };
   static holder h;

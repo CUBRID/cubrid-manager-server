@@ -340,7 +340,9 @@ class CLog
         }
         ~mutex_holder (void)
         {
-          mutex_destory (m);
+          /*
+           * deliberately empty
+           */
         }
       };
       static mutex_holder log_holder;

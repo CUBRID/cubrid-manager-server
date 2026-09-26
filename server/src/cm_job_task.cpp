@@ -16944,7 +16944,9 @@ _statdumpd_mutex (void)
     }
     ~statdumpd_mutex_holder (void)
     {
-      mutex_destory (m);
+      /*
+       * deliberately empty
+       */
     }
   };
   static statdumpd_mutex_holder holder;
