@@ -344,14 +344,6 @@ bool resolve_ipv4_into(const std::string& name, char* out_addr4) {
    return ok;
 }
 
-static
-bool verify_via_reverse_dns(char* in_addr4, char* out_addr4) {
-   if(in_addr4 != out_addr4) {
-      std::copy(in_addr4, in_addr4 + 4, out_addr4);
-   }
-   return true;
-}
-
 bool Connect(SOCKET sockfd, const SOCKADDR_IN& addr) {
 #ifdef WIN32
    return bool(connect(sockfd, (sockaddr*)&addr, (int) addr.get_size()) != SOCKET_ERROR);
@@ -536,13 +528,7 @@ public:
    }
    else { // connect directly to an SMTP server.
       SOCKADDR_IN addr(nameserver, port, AF_INET);
-      if(addr) {
-         if(!verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr())) {
-            returnstring = "451 Requested action aborted: local error in processing";
-            return; // error!!!
-         }
-      }
-      else {
+      if(!addr) {
          if(!resolve_ipv4_into(nameserver, addr.get_sin_addr())) {
             returnstring = "451 Requested action aborted: local error in processing";
             return;
@@ -1440,13 +1426,7 @@ private:
 
    SOCKADDR_IN addr(nameserver, htons(DNS_PORT), AF_INET);
 
-   bool resolved;
-   if(addr) {
-      resolved = verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr());
-   }
-   else {
-      resolved = resolve_ipv4_into(nameserver, addr.get_sin_addr());
-   }
+   bool resolved = addr ? true : resolve_ipv4_into(nameserver, addr.get_sin_addr());
 
    if(!resolved) { // couldn't get to dns, try to connect directly to 'server' instead.
       ////////////////////////////////////////////////////////////////////////////////
@@ -1455,12 +1435,7 @@ private:
       // addr.sin_family = AF_INET;
       addr = SOCKADDR_IN(server, port);
       addr.ADDR.sin_port = port; // smtp port!! 25
-      if(addr) {
-         resolved = verify_via_reverse_dns(addr.get_sin_addr(), addr.get_sin_addr());
-      }
-      else {
-         resolved = resolve_ipv4_into(server, addr.get_sin_addr());
-      }
+      resolved = addr ? true : resolve_ipv4_into(server, addr.get_sin_addr());
 
       if(!resolved) {
          returnstring = "550 Requested action not taken: mailbox unavailable";
