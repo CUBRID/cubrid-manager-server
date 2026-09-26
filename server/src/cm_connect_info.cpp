@@ -53,7 +53,13 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
   file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      /*
+       * This function has no way to report a message and its normal
+       * return domain is {0, 1} (not found/found), not an ERR_* code, so
+       * a lock failure is reported the same way an unreadable conlist
+       * already is below
+       */
+      return retval;
     }
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");

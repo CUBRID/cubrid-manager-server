@@ -51,7 +51,8 @@ dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      strcpy (_dbmt_error, "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   return dbmt_user_read_locked (dbmt_user, _dbmt_error);
@@ -336,7 +337,8 @@ dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      strcpy (_dbmt_error, "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   return dbmt_user_write_auth_locked (dbmt_user, _dbmt_error);
@@ -464,7 +466,8 @@ dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      strcpy (_dbmt_error, "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   return dbmt_user_write_pass_locked (dbmt_user, _dbmt_error);

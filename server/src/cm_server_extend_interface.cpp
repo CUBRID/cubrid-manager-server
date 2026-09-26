@@ -1558,7 +1558,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+      return build_server_header (response, ERR_WITH_MSG, "internal lock error");
     }
 
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);
@@ -1943,7 +1943,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
 
     if (!guard.ok ())
       {
-        return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
@@ -2378,7 +2378,7 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
       {
         FREE_MEM (authinfo);
         FREE_MEM (dbinfo);
-        return build_server_header (response, ERR_TMPFILE_OPEN_FAIL, "internal lock error");
+        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
