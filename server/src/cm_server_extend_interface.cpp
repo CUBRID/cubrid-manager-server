@@ -1061,7 +1061,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
                   LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail: "
                              "autojobs.conf is corrupt");
                   return build_server_header (response, ERR_NO_ERROR,
-                                              "mail sent but schedule not saved; "
+                                              "mail send attempted but schedule not saved; "
                                               "the same report may be resent next time");
                 }
 
@@ -1093,7 +1093,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
             {
               LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
               return build_server_header (response, ERR_NO_ERROR,
-                                          "mail sent but schedule not saved; "
+                                          "mail send attempted but schedule not saved; "
                                           "the same report may be resent next time");
             }
         }
@@ -1101,7 +1101,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
         {
           LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
           return build_server_header (response, ERR_NO_ERROR,
-                                      "mail sent but schedule not saved; "
+                                      "mail send attempted but schedule not saved; "
                                       "the same report may be resent next time");
         }
     }
