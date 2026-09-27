@@ -1910,7 +1910,8 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
     if (!guard.ok ())
       {
-	return ERR_TMPFILE_OPEN_FAIL;
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
@@ -2039,7 +2040,8 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
     if (!guard.ok ())
       {
-	return ERR_TMPFILE_OPEN_FAIL;
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
@@ -2438,7 +2440,8 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
 
     if (!guard.ok ())
       {
-	return ERR_TMPFILE_OPEN_FAIL;
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
@@ -6975,7 +6978,8 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
@@ -7103,7 +7107,8 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
@@ -7160,7 +7165,8 @@ ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
@@ -7497,7 +7503,8 @@ ts_set_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   conf_get_dbmt_file (FID_AUTO_ADDVOLDB_CONF, auto_addvol_conf_file);
@@ -9123,7 +9130,8 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
     }
 
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);
