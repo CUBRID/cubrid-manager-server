@@ -3326,10 +3326,11 @@ _reap_child_async (void *arg)
 }
 
 /*
- * _get_child_start_time () - pid's /proc/<pid>/stat starttime field.
+ * ut_get_proc_start_time () - pid's /proc/<pid>/stat starttime field
+ *   (field 22).
  */
-static long long
-_get_child_start_time (pid_t pid)
+long long
+ut_get_proc_start_time (pid_t pid)
 {
   char path[64];
   char buf[1024];
@@ -3459,7 +3460,7 @@ run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, 
       /*
        * Read now, in the parent, before pid can be handed to any waiter below
        */
-      *out_start_time = _get_child_start_time ((pid_t) pid);
+      *out_start_time = ut_get_proc_start_time ((pid_t) pid);
     }
 
   if (wait_flag)

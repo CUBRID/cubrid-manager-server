@@ -345,6 +345,16 @@ int run_child_env (const char *const argv[], int wait_flag, const char *stdin_fi
                    char *stderr_file, int *exit_status, const char *envp[] = NULL,
                    long long *out_start_time = NULL);
 
+#if !defined (WINDOWS)
+/*
+ * the single implementation of the /proc/<pid>/stat starttime (field
+ * 22) parse
+ * POSIX only - Windows has no /proc, and cm_job_task.cpp's Windows
+ * branch gets a process's start time from GetProcessTimes () instead.
+ */
+long long ut_get_proc_start_time (pid_t pid);
+#endif
+
 void env_mutex_lock (void);
 void env_mutex_unlock (void);
 

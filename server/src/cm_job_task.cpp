@@ -17279,7 +17279,6 @@ _read_proc_stat_fields (int pid, char *state_out, long long *start_time_out)
   FILE *fp;
   char *p;
   char *tok;
-  int field;
   char *saveptr;
 
   if (pid <= 0)
@@ -17316,18 +17315,13 @@ _read_proc_stat_fields (int pid, char *state_out, long long *start_time_out)
       *state_out = tok[0];
     }
 
-  for (field = 3; tok != NULL && field < 22; field++)
+  if (start_time_out != NULL)
     {
-      tok = STRTOK (NULL, " ", &saveptr);
-    }
-
-  if (tok == NULL)
-    {
-      return -1;
-    }
-  if (start_time_out != NULL && sscanf (tok, "%lld", start_time_out) != 1)
-    {
-      return -1;
+      *start_time_out = ut_get_proc_start_time ((pid_t) pid);
+      if (*start_time_out < 0)
+        {
+          return -1;
+        }
     }
 
   return 0;
