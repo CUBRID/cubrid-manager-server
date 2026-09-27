@@ -1219,7 +1219,7 @@ _dbmt_user_get (char *error_msg)
       return NULL;
     }
 
-  if (dbmt_user_read (dbmt_user, error_msg) < 0)
+  if (dbmt_user_read (dbmt_user, error_msg) != ERR_NO_ERROR)
     {
       free (dbmt_user);
       return NULL;
@@ -1238,7 +1238,7 @@ _dbmt_user_get_locked (char *error_msg)
       return NULL;
     }
 
-  if (dbmt_user_read_locked (dbmt_user, error_msg) < 0)
+  if (dbmt_user_read_locked (dbmt_user, error_msg) != ERR_NO_ERROR)
     {
       free (dbmt_user);
       return NULL;

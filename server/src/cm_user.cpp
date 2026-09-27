@@ -48,6 +48,11 @@ T_USER_TOKEN_INFO *user_token_info = NULL;
 int
 dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 {
+  /*
+   * zero dbmt_user up front, before even trying the lock
+   */
+  memset (dbmt_user, 0, sizeof (T_DBMT_USER));
+
   file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
   if (!guard.ok ())
     {
