@@ -1081,10 +1081,14 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
               /* autojobs.conf missing is normal; fall back to our own copy. */
               current = mailreport;
             }
-          else if (current == Json::Value::null)
+          else if (current == Json::Value::null || !current.isArray ())
             {
-              /* file exists but has no mail_report key yet */
-              current = mailreport;
+              LOG_WARN ("mail_report changed to a non-array value on disk while mail was "
+                        "being sent (likely a concurrent setautojobconf); not saving the "
+                        "updated next_exec/prev_exec to avoid overwriting that change");
+              return build_server_header (response, ERR_NO_ERROR,
+                                          "mail send attempted but schedule not saved; "
+                                          "the same report may be resent next time");
             }
 
           /*
@@ -1105,9 +1109,9 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
               for (unsigned int j = 0; j < current.size (); j++)
                 {
                   if (!consumed[j].asBool () &&
-                      current[j]["dbname"] == sent_updates[u]["dbname"] &&
-                      current[j]["receiver"] == sent_updates[u]["receiver"] &&
-                      current[j]["url_prefix"] == sent_updates[u]["url_prefix"])
+                      current[j].get ("dbname", Json::Value::null) == sent_updates[u]["dbname"] &&
+                      current[j].get ("receiver", Json::Value::null) == sent_updates[u]["receiver"] &&
+                      current[j].get ("url_prefix", Json::Value::null) == sent_updates[u]["url_prefix"])
                     {
                       int sent_period_type = sent_updates[u].get ("period_type", 2).asInt ();
                       int cur_period_type = current[j].get ("period_type", 2).asInt ();
