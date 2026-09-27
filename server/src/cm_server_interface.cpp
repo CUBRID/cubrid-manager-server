@@ -1128,6 +1128,47 @@ put_uuid (Json::Value &response, INT64 uuid)
   response["uuid"] = buf;
 }
 
+/*
+ * how many low bits of next_async_uuid ()'s result are this run's
+ * sequence number; the rest is the process-start millisecond marker.
+ * see next_async_uuid () below.
+ */
+#define ASYNC_UUID_SEQ_BITS 20
+
+/*
+ * next_async_uuid () - the next unique async-job uuid.
+ *
+ *   To make uuids unique across restarts, the high bits are this
+ *   process's start time in milliseconds (wall clock, via
+ *   ut_get_msec_marker ()) rather than just a sequence starting at 0:
+ *   two separate process lifetimes would have to begin within the same
+ *   millisecond to collide, which a process that has to re-open CMS's
+ *   listeners/mutexes/etc. cannot do. The low ASYNC_UUID_SEQ_BITS bits
+ *   are this run's sequence number, added rather than OR-ed/masked in,
+ *   so a run issuing more than ASYNC_UUID_SEQ_BITS worth of jobs just
+ *   carries up into the millisecond field instead of wrapping back to a
+ *   value this run already handed out.
+ *
+ *   The lazy one-time capture of the start-time marker below is safe
+ *   without its own lock because both call sites already hold cm_mutex
+ *   (via cm_lock_guard) for the duration of this call.
+ */
+static INT64
+next_async_uuid (void)
+{
+  static bool started = false;
+  static INT64 epoch_ms = 0;
+  static INT64 seq = 0;
+
+  if (!started)
+    {
+      epoch_ms = ut_get_msec_marker ();
+      started = true;
+    }
+
+  return (epoch_ms << ASYNC_UUID_SEQ_BITS) + seq++;
+}
+
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
@@ -1136,7 +1177,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   HANDLE hHandles;
   DWORD ThreadID;
   DWORD dwWaitResult;
-  static INT64 req_id = 0;
   string task_name = request.get ("task", "").asString ();
   vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
   bool is_exclusive_task = is_exclusive_db_task (task_name);
@@ -1185,7 +1225,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   pstmt->is_long_async_job = false;
   {
     cm_lock_guard lg;
-    pstmt->uuid = req_id++;
+    pstmt->uuid = next_async_uuid ();
   }
 
   hHandles =
@@ -1256,7 +1296,6 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   int err = 0;
   pthread_t async_thrd;
   timespec to;
-  static INT64 req_id = 0;
   string task_name = request.get ("task", "").asString ();
   vector <string> dbnames = exclusive_dbnames_for_request (request, task_name);
   bool is_exclusive_task = is_exclusive_db_task (task_name);
@@ -1324,7 +1363,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 
   {
     cm_lock_guard lg;
-    pstmt->uuid = req_id++;
+    pstmt->uuid = next_async_uuid ();
   }
 
   err = pthread_create (&async_thrd, NULL, cm_async_request_handler, pstmt);
