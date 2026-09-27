@@ -629,6 +629,7 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
   char conf_dbname[128];
   char strbuf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   FILE *infp, *outfp;
+  int write_failed = 0;
 
   /*
    * the read (infp) - modify (in the fgets/fputs loop below) - write
@@ -666,11 +667,31 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
         }
       if (strcmp (dbname, conf_dbname) != 0)
         {
-          fputs (strbuf, outfp);
+          if (fputs (strbuf, outfp) == EOF)
+            {
+              write_failed = 1;
+            }
         }
     }
   fclose (infp);
-  fclose (outfp);
+  if (fclose (outfp) != 0)
+    {
+      write_failed = 1;
+    }
+
+  if (write_failed)
+    {
+      /*
+       * outfp's contents are incomplete/unreliable (e.g. disk full, quota
+       * exceeded, other I/O error): never move a possibly-truncated
+       * tmpfile over conf_file, which would silently drop every entry
+       * after the failure point
+       */
+      LOG_ERROR ("auto_conf_delete (): failed writing '%s' while rewriting '%s'; "
+                 "leaving '%s' untouched", tmpfile, conf_file, conf_file);
+      unlink (tmpfile);
+      return -1;
+    }
 
   if (move_file (tmpfile, conf_file) < 0)
     {
@@ -686,8 +707,8 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
   char conf_dbname[128];
   char strbuf[1024], *p;
   FILE *infp, *outfp;
+  int write_failed = 0;
 
-  /* see the comment in auto_conf_delete () above */
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
@@ -716,15 +737,32 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
         {
           p = strstr (strbuf, src_dbname);
           p += strlen (src_dbname);
-          fprintf (outfp, "%s%s", dest_dbname, p);
+          if (fprintf (outfp, "%s%s", dest_dbname, p) < 0)
+            {
+              write_failed = 1;
+            }
         }
       else
         {
-          fputs (strbuf, outfp);
+          if (fputs (strbuf, outfp) == EOF)
+            {
+              write_failed = 1;
+            }
         }
     }
   fclose (infp);
-  fclose (outfp);
+  if (fclose (outfp) != 0)
+    {
+      write_failed = 1;
+    }
+
+  if (write_failed)
+    {
+      LOG_ERROR ("auto_conf_rename (): failed writing '%s' while rewriting '%s'; "
+                 "leaving '%s' untouched", tmpfile, conf_file, conf_file);
+      unlink (tmpfile);
+      return -1;
+    }
 
   if (move_file (tmpfile, conf_file) < 0)
     {
@@ -743,8 +781,8 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   char *strbuf, *p;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
+  int write_failed = 0;
 
-  /* see the comment in auto_conf_delete () above */
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
@@ -780,12 +818,18 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
             {
               p = strchr (p, ' ');
             }
-          fprintf (tmpfile, "%s %s %s %s %s%s", dbname, query_id, dest_db_uid,
-                   dest_db_passwd, dbmt_uid, p);
+          if (fprintf (tmpfile, "%s %s %s %s %s%s", dbname, query_id, dest_db_uid,
+                       dest_db_passwd, dbmt_uid, p) < 0)
+            {
+              write_failed = 1;
+            }
         }
       else
         {
-          fputs (strbuf, tmpfile);
+          if (fputs (strbuf, tmpfile) == EOF)
+            {
+              write_failed = 1;
+            }
         }
       FREE_MEM (strbuf);
       buf_len = 0;
@@ -797,7 +841,19 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
     }
 
   fclose (conf_file);
-  fclose (tmpfile);
+  if (fclose (tmpfile) != 0)
+    {
+      write_failed = 1;
+    }
+
+  if (write_failed)
+    {
+      LOG_ERROR ("auto_conf_execquery_update_dbuser (): failed writing '%s' while "
+                 "rewriting '%s'; leaving '%s' untouched",
+                 tmpfile_path, conf_file_path, conf_file_path);
+      unlink (tmpfile_path);
+      return -1;
+    }
 
   if (move_file (tmpfile_path, conf_file_path) < 0)
     {
@@ -815,8 +871,8 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   char *strbuf;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
+  int write_failed = 0;
 
-  /* see the comment in auto_conf_delete () above */
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
     {
@@ -850,7 +906,10 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
         }
       else
         {
-          fputs (strbuf, tmpfile);
+          if (fputs (strbuf, tmpfile) == EOF)
+            {
+              write_failed = 1;
+            }
         }
       FREE_MEM (strbuf);
       buf_len = 0;
@@ -862,7 +921,19 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
     }
 
   fclose (conf_file);
-  fclose (tmpfile);
+  if (fclose (tmpfile) != 0)
+    {
+      write_failed = 1;
+    }
+
+  if (write_failed)
+    {
+      LOG_ERROR ("auto_conf_execquery_delete_by_dbuser (): failed writing '%s' while "
+                 "rewriting '%s'; leaving '%s' untouched",
+                 tmpfile_path, conf_file_path, conf_file_path);
+      unlink (tmpfile_path);
+      return -1;
+    }
 
   if (move_file (tmpfile_path, conf_file_path) < 0)
     {
