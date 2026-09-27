@@ -915,6 +915,7 @@ int update_next_report_time (Json::Value &mailreport)
 /*
  * mail_report_compute_next_exec () - shared by the per-entry send loop and
  *   the save-time merge below, so a period_type that changed concurrently
+ *   (see the merge) is turned into a next_exec the same way either place.
  */
 static void
 mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *next_exec_time)
