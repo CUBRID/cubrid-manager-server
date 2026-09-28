@@ -49,6 +49,6 @@ Runs `cubrid heartbeat reload` command.
    "note" : "none",
    "status" : "success",
    "task" : "ha_reload",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

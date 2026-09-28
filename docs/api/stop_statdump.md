@@ -54,6 +54,6 @@ Related with [start_statdump](start_statdump.md), deactivate the previously star
    "note" : "none",
    "status" : "success",
    "task" : "stop_statdump",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

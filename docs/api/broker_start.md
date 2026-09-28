@@ -30,6 +30,6 @@ The broker_start interface will start a specified broker.
    "note" : "none",
    "status" : "success",
    "task" : "broker_start",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

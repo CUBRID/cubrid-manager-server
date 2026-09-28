@@ -50,6 +50,6 @@ Runs `cubrid heartbeat start` command.
    "note" : "none",
    "status" : "success",
    "task" : "ha_start",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

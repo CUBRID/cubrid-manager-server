@@ -12,6 +12,7 @@ Check the status of a task asynchronously running
 
 * an uuid is dropped 3,600 seconds after the job is finished by default,<br>
  it can be changed in cm.conf, for example "async_job_ttl_sec=7200"
+* `uuid` is an opaque decimal-digit string, up to 19 digits long, sent and expected as a JSON string (quoted), never as a JSON number - see the note in [Asynchronous Task Execution](async_readme.md). Send back exactly the string you received; do not parse it into a number first, since a `double` (e.g. a JS/TS `number`) cannot represent every value at this size without losing precision, which this task will then reject as `"invalid uuid"` or fail to find as `"uuid not found"`.
 
 ## Request Sample
 
@@ -44,7 +45,7 @@ Check the status of a task asynchronously running
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 
@@ -56,7 +57,7 @@ Check the status of a task asynchronously running
    "note" : "none",
    "status" : "success",
    "task" : "createdb",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 
@@ -71,7 +72,7 @@ See the note above the samples: this is still `job-status:"success"`/`status:"su
    "note" : "WARNING: database 'alatestdb' was deleted, but the following bookkeeping file(s) could not be updated (lock timeout, file I/O error, or an internal update error): cmdb.pass, the auto-job backupdb config file; manual check recommended",
    "status" : "success",
    "task" : "deletedb",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 
@@ -83,7 +84,7 @@ See the note above the samples: this is still `job-status:"success"`/`status:"su
    "note" : "Couldn't create database.<end>Database \"testdb\" already exists.<end>",
    "status" : "failure",
    "task" : "createdb",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 

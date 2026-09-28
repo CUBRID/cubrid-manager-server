@@ -50,6 +50,6 @@ Runs `cubrid heartbeat stop` command.
    "note" : "none",
    "status" : "success",
    "task" : "ha_stop",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

@@ -65,7 +65,7 @@ Delete a database.
    "note" : "none",
    "status" : "success",
    "task" : "deletedb",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 

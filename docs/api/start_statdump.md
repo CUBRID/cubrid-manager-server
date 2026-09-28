@@ -58,6 +58,6 @@ Activate *background* statdump process to accumulate values per seconds, to stop
    "note" : "none",
    "status" : "success",
    "task" : "start_statdump",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```

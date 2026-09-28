@@ -8,6 +8,8 @@ Clients can ask CMS to execute certain long-running tasks asynchronously by send
 
 If `async` is not specified in the request, it defaults to `"async":"no"` and the task runs synchronously, as usual.
 
+`uuid` is an opaque decimal-digit string, up to 19 digits long, and CMS always sends it as a JSON string (quoted), never as a JSON number. Treat it as an opaque token: store it and send it back to [gettaskstatus](gettaskstatus.md) exactly as received, as a string, rather than converting it to a number. At this size a JS/TS `number` (or any other IEEE-754 `double`) cannot represent every value exactly, so a `uuid` that has been round-tripped through one will typically no longer match anything, and CMS will report `"uuid not found"` or reject it outright as `"invalid uuid"`.
+
 ## Async-Capable Tasks
 
 25 tasks currently support `async`:
@@ -37,7 +39,7 @@ If CMS can start the job, it returns a response right away, without waiting for 
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 
@@ -89,7 +91,7 @@ Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
 {
   "task": "gettaskstatus",
   "token": "$TOKEN",
-  "uuid": "14"
+  "uuid": "1876951040000000000"
 }
 ```
 

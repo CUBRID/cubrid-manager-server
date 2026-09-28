@@ -57,7 +57,7 @@ The loaddb interface will load a database from files.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 

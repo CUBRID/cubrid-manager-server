@@ -45,7 +45,7 @@ The backupdb interface will create a database backup file.
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "uuid" : "14"
+   "uuid" : "1876951040000000000"
 }
 ```
 
