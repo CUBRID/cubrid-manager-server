@@ -1087,9 +1087,14 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
               LOG_WARN ("mail_report changed to a non-array value on disk while mail was "
                         "being sent (likely a concurrent setautojobconf); not saving the "
                         "updated next_exec/prev_exec to avoid overwriting that change");
+              /*
+               * unlike the autojobs.conf-corrupt case above, mail_report
+               * itself is gone/replaced here, so there is no on-disk
+               * array left for the next run to find this entry in and resend
+               */
               return build_server_header (response, ERR_NO_ERROR,
-                                          "mail send attempted but schedule not saved; "
-                                          "the same report may be resent next time");
+                                          "mail send attempted; schedule not saved because "
+                                          "mail_report was changed concurrently");
             }
 
           /*
