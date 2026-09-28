@@ -818,7 +818,7 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   while ((get_len = ut_getline (&strbuf, &buf_len, conf_file)) != -1)
     {
       if (sscanf
-          (strbuf, "%64s %64s %64s %*s %64s", dbname, query_id, db_uid, dbmt_uid) < 4)
+          (strbuf, "%63s %63s %63s %*s %63s", dbname, query_id, db_uid, dbmt_uid) < 4)
         {
           continue;
         }
@@ -911,7 +911,7 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   buf_len = get_len = 0;
   while ((get_len = ut_getline (&strbuf, &buf_len, conf_file)) != -1)
     {
-      if (sscanf (strbuf, "%*s %*s %64s", db_uid) < 1)
+      if (sscanf (strbuf, "%*s %*s %63s", db_uid) < 1)
         {
           continue;
         }
