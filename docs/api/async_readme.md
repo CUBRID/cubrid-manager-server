@@ -111,7 +111,9 @@ For example:
 2. Within those 10 minutes, CMS itself is stopped and restarted (a service restart, an upgrade, an operator running `cubrid manager stop`/`start`, etc.).
 3. The client polls [gettaskstatus](gettaskstatus.md) with the `uuid` from step 1.
 
-The response is `"uuid not found"` - even though the underlying `createdb` process may still be running to completion on the server (stopping CMS does not send it any signal of its own; it only stops CMS itself), or may have already finished successfully or failed, entirely unobserved. `gettaskstatus`'s `"uuid not found"` does not distinguish "this `uuid` was never valid" from "this job was in flight when CMS restarted" - both look identical. If you suspect a CMS restart happened while a job was in flight, check that task's actual result directly (for example, whether the database now exists, for `createdb`) rather than relying on `gettaskstatus` for it.
+The response is `"uuid not found"` - even though the underlying `createdb` process may still be running to completion on the server (stopping CMS does not send it any signal of its own; it only stops CMS itself), or may have already finished successfully or failed, entirely unobserved. `gettaskstatus`'s `"uuid not found"` does not distinguish "this `uuid` was never valid" from "this job was in flight when CMS restarted" - both look identical.
+
+If a `uuid` you actually received from CMS - not made up, not corrupted in transit - gets `"uuid not found"`, send [getserverstatus](getserverstatus.md) and check `server-information.start_time` (and `server-information.pid`, for a second, stronger signal). If `start_time` is later than when you received that `uuid` - or `pid` no longer matches a value you may have logged earlier - CMS restarted in between, and this is exactly that case. Check the task's actual result directly (for example, whether the database now exists, for `createdb`) rather than relying on `gettaskstatus` for it.
 
 ## Configuration
 
