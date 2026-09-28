@@ -3326,18 +3326,24 @@ _reap_child_async (void *arg)
 }
 
 /*
- * ut_get_proc_start_time () - pid's /proc/<pid>/stat starttime field
- *   (field 22).
+ * ut_get_proc_stat_fields () - the single implementation of the
+ *   /proc/<pid>/stat parse: one fopen ()/fgets () of the file hands
+ *   back field 3 (state) and/or field 22 (starttime), whichever of
+ *   state_out/start_time_out the caller passes non-NULL.
  */
-long long
-ut_get_proc_start_time (pid_t pid)
+int
+ut_get_proc_stat_fields (pid_t pid, char *state_out, long long *start_time_out)
 {
   char path[64];
   char buf[1024];
   FILE *fp;
   char *p, *tok, *saveptr;
-  long long start_time;
   int field;
+
+  if (pid <= 0)
+    {
+      return -1;
+    }
 
   snprintf (path, sizeof (path), "/proc/%d/stat", (int) pid);
   fp = fopen (path, "r");
@@ -3359,11 +3365,44 @@ ut_get_proc_start_time (pid_t pid)
     }
 
   tok = STRTOK (p + 1, " ", &saveptr);
-  for (field = 3; tok != NULL && field < 22; field++)
+  if (tok == NULL)
     {
-      tok = STRTOK (NULL, " ", &saveptr);
+      return -1;
     }
-  if (tok == NULL || sscanf (tok, "%lld", &start_time) != 1)
+  if (state_out != NULL)
+    {
+      *state_out = tok[0];
+    }
+
+  if (start_time_out != NULL)
+    {
+      /*
+       * tok is field 3 (just captured above); keep tokenizing the same
+       * saveptr forward to field 22, rather than re-reading the file.
+       */
+      for (field = 3; tok != NULL && field < 22; field++)
+        {
+          tok = STRTOK (NULL, " ", &saveptr);
+        }
+      if (tok == NULL || sscanf (tok, "%lld", start_time_out) != 1)
+        {
+          return -1;
+        }
+    }
+
+  return 0;
+}
+
+/*
+ * ut_get_proc_start_time () - pid's /proc/<pid>/stat starttime field
+ *   (field 22); a thin wrapper over ut_get_proc_stat_fields ().
+ */
+long long
+ut_get_proc_start_time (pid_t pid)
+{
+  long long start_time;
+
+  if (ut_get_proc_stat_fields (pid, NULL, &start_time) != 0)
     {
       return -1;
     }

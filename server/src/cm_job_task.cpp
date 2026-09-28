@@ -17268,63 +17268,21 @@ _find_statdumpd_worker_pid (int dispatcher_pid)
 }
 
 /*
- * _read_proc_stat_fields () - parse /proc/<pid>/stat and hand back its state character
- *   returns 0 on success, -1 if the file doesn't exist or couldn't be parsed.
+ * _read_proc_stat_fields () - parse /proc/<pid>/stat and hand back its
+ *   state character and/or starttime.
+ *   returns 0 on success, -1 if the file doesn't exist or couldn't be
+ *   parsed.
+ *
+ *   A thin wrapper over ut_get_proc_stat_fields () (cm_server_util.cpp):
+ *   both fields now come from a single read of the file, rather than
+ *   this function reading state itself and separately calling
+ *   ut_get_proc_start_time () (which used to re-open the file for
+ *   starttime).
  */
 static int
 _read_proc_stat_fields (int pid, char *state_out, long long *start_time_out)
 {
-  char path[64];
-  char buf[1024];
-  FILE *fp;
-  char *p;
-  char *tok;
-  char *saveptr;
-
-  if (pid <= 0)
-    {
-      return -1;
-    }
-
-  snprintf (path, sizeof (path), "/proc/%d/stat", pid);
-  fp = fopen (path, "r");
-  if (fp == NULL)
-    {
-      return -1;
-    }
-  if (fgets (buf, sizeof (buf), fp) == NULL)
-    {
-      fclose (fp);
-      return -1;
-    }
-  fclose (fp);
-
-  p = strrchr (buf, ')');
-  if (p == NULL)
-    {
-      return -1;
-    }
-
-  tok = STRTOK (p + 1, " ", &saveptr);
-  if (tok == NULL)
-    {
-      return -1;
-    }
-  if (state_out != NULL)
-    {
-      *state_out = tok[0];
-    }
-
-  if (start_time_out != NULL)
-    {
-      *start_time_out = ut_get_proc_start_time ((pid_t) pid);
-      if (*start_time_out < 0)
-        {
-          return -1;
-        }
-    }
-
-  return 0;
+  return ut_get_proc_stat_fields ((pid_t) pid, state_out, start_time_out);
 }
 
 /*
