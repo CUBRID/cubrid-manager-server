@@ -59,6 +59,13 @@ mutex_t cm_mutex;
 /*global cubrid env*/
 cubrid_env_t cub_httpd_env;
 
+/*
+ * g_cms_start_time - wall-clock time this CMS process instance called
+ *   cub_cm_init_env (). Exposed as server-information.start_time by
+ *   ext_get_server_status () ("getserverstatus").
+ */
+static time_t g_cms_start_time = 0;
+
 /**
  * @brief initial monitoring stat information
  *
@@ -147,6 +154,7 @@ cub_cm_init_env ()
   putenv (cub_httpd_env.cubrid_databases);
 
   mutex_init (cm_mutex);
+  g_cms_start_time = time (NULL);
   return;
 }
 
@@ -1577,19 +1585,35 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
 /*
  * ext_get_server_status () - handle a "getserverstatus" query: an
  *   admin-only, instant (no worker thread, no external process) health
- *   snapshot of the async-job subsystem.
+ *   snapshot of the async-job subsystem, plus this CMS process's own
+ *   identity (version/start_time/pid/uptime) and the engine version
+ *   it's running against.
  */
 int
 ext_get_server_status (Json::Value &request, Json::Value &response)
 {
   response["task"] = request["task"].asString ();
-
-  reap_stale_async_jobs ();
+  response["CUBRID_engine_version"] = cubrid_version_build;
 
   time_t now = time (NULL);
 
+  {
+    char start_time_buf[64];
+    Json::Value server_info;
+
+    time_to_str (g_cms_start_time, "%04d-%02d-%02d %02d:%02d:%02d",
+                start_time_buf, TIME_STR_FMT_DATE_TIME);
+    server_info["version"] = makestring (BUILD_NUMBER);
+    server_info["start_time"] = start_time_buf;
+    server_info["pid"] = (int) getpid ();
+    server_info["uptime_sec"] = (int) (now - g_cms_start_time);
+    response["server-information"] = server_info;
+  }
+
+  reap_stale_async_jobs ();
+
   Json::Value conf;
-  conf["CUBRID_Version"] = cubrid_version_build;
+  conf["cm_port"] = sco.iCMS_port;
   conf["async_job_ttl_sec"] = sco.iAsyncJobTtlSec;
   conf["async_long_job_sec"] = sco.iAsyncLongJobSec;
   conf["max_num_async_task"] = sco.iMaxNumAsyncTask;
