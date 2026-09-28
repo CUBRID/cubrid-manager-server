@@ -101,6 +101,18 @@ A `uuid` is only valid for a limited time after the job finishes; see `async_job
 
 To see the async subsystem's overall state instead of one specific job - how many slots are in use, which databases are currently busy, any long-running jobs - use [getserverstatus](getserverstatus.md).
 
+## Orphan Jobs After a CMS Restart
+
+Job tracking (the `uuid` -> job mapping [gettaskstatus](gettaskstatus.md) looks up) lives in CMS's memory only. It is not written to disk, and CMS does not reconcile or rediscover anything when it starts back up. If CMS is stopped and restarted while an async job is still running, that job becomes untracked - an *orphan job*.
+
+For example:
+
+1. A client sends `createdb` with `"async":"yes"`. Creating this particular database takes about 10 minutes, so CMS returns immediately with `"job-status":"running"` and a `uuid`.
+2. Within those 10 minutes, CMS itself is stopped and restarted (a service restart, an upgrade, an operator running `cubrid manager stop`/`start`, etc.).
+3. The client polls [gettaskstatus](gettaskstatus.md) with the `uuid` from step 1.
+
+The response is `"uuid not found"` - even though the underlying `createdb` process may still be running to completion on the server (stopping CMS does not send it any signal of its own; it only stops CMS itself), or may have already finished successfully or failed, entirely unobserved. `gettaskstatus`'s `"uuid not found"` does not distinguish "this `uuid` was never valid" from "this job was in flight when CMS restarted" - both look identical. If you suspect a CMS restart happened while a job was in flight, check that task's actual result directly (for example, whether the database now exists, for `createdb`) rather than relying on `gettaskstatus` for it.
+
 ## Configuration
 
 The following parameters, configurable in `cm.conf`, control async job behavior:
