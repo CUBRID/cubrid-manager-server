@@ -629,7 +629,7 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
   char conf_dbname[128];
   char strbuf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   FILE *infp, *outfp;
-  int write_failed = 0;
+  int fileio_failed = 0;
 
   /*
    * the read (infp) - modify (in the fgets/fputs loop below) - write
@@ -669,17 +669,25 @@ auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname)
         {
           if (fputs (strbuf, outfp) == EOF)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
+    }
+  if (ferror (infp))
+    {
+      /* fgets () can't tell EOF from a read error (NFS drop, bad sector,
+       * ...) - either way the loop just stops, so a read error partway
+       * through would otherwise leave outfp with only the lines read so
+       * far, and fileio_failed alone wouldn't catch it. */
+      fileio_failed = 1;
     }
   fclose (infp);
   if (fclose (outfp) != 0)
     {
-      write_failed = 1;
+      fileio_failed = 1;
     }
 
-  if (write_failed)
+  if (fileio_failed)
     {
       /*
        * outfp's contents are incomplete/unreliable (e.g. disk full, quota
@@ -707,7 +715,7 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
   char conf_dbname[128];
   char strbuf[1024], *p;
   FILE *infp, *outfp;
-  int write_failed = 0;
+  int fileio_failed = 0;
 
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
@@ -739,24 +747,28 @@ auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname, char *dest_dbname)
           p += strlen (src_dbname);
           if (fprintf (outfp, "%s%s", dest_dbname, p) < 0)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
       else
         {
           if (fputs (strbuf, outfp) == EOF)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
+    }
+  if (ferror (infp))
+    {
+      fileio_failed = 1;
     }
   fclose (infp);
   if (fclose (outfp) != 0)
     {
-      write_failed = 1;
+      fileio_failed = 1;
     }
 
-  if (write_failed)
+  if (fileio_failed)
     {
       LOG_ERROR ("auto_conf_rename (): failed writing '%s' while rewriting '%s'; "
                  "leaving '%s' untouched", tmpfile, conf_file, conf_file);
@@ -781,7 +793,7 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
   char *strbuf, *p;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
-  int write_failed = 0;
+  int fileio_failed = 0;
 
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
@@ -821,14 +833,14 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
           if (fprintf (tmpfile, "%s %s %s %s %s%s", dbname, query_id, dest_db_uid,
                        dest_db_passwd, dbmt_uid, p) < 0)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
       else
         {
           if (fputs (strbuf, tmpfile) == EOF)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
       FREE_MEM (strbuf);
@@ -840,13 +852,17 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
       FREE_MEM (strbuf);
     }
 
+  if (ferror (conf_file))
+    {
+      fileio_failed = 1;
+    }
   fclose (conf_file);
   if (fclose (tmpfile) != 0)
     {
-      write_failed = 1;
+      fileio_failed = 1;
     }
 
-  if (write_failed)
+  if (fileio_failed)
     {
       LOG_ERROR ("auto_conf_execquery_update_dbuser (): failed writing '%s' while "
                  "rewriting '%s'; leaving '%s' untouched",
@@ -871,7 +887,7 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
   char *strbuf;
   int buf_len, get_len;
   FILE *conf_file, *tmpfile;
-  int write_failed = 0;
+  int fileio_failed = 0;
 
   file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
   if (!guard.ok ())
@@ -908,7 +924,7 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
         {
           if (fputs (strbuf, tmpfile) == EOF)
             {
-              write_failed = 1;
+              fileio_failed = 1;
             }
         }
       FREE_MEM (strbuf);
@@ -920,13 +936,17 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
       FREE_MEM (strbuf);
     }
 
+  if (ferror (conf_file))
+    {
+      fileio_failed = 1;
+    }
   fclose (conf_file);
   if (fclose (tmpfile) != 0)
     {
-      write_failed = 1;
+      fileio_failed = 1;
     }
 
-  if (write_failed)
+  if (fileio_failed)
     {
       LOG_ERROR ("auto_conf_execquery_delete_by_dbuser (): failed writing '%s' while "
                  "rewriting '%s'; leaving '%s' untouched",
