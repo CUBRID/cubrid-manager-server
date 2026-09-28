@@ -41,7 +41,7 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | --- | --- |
 | version | CMS's own build/version string (distinct from `CUBRID_engine_version` above, which is the engine's) |
 | start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS` in the server's local time zone. If a `gettaskstatus` lookup for a `uuid` you actually received comes back `"uuid not found"`, compare it against this: if `start_time` is later than when you received that `uuid`, CMS restarted in between and lost track of the job - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) |
-| pid | process id of this CMS process; changes across every restart, so it's a second, stronger signal alongside `start_time` for telling two process instances apart |
+| pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid, and `start_time`'s one-second resolution means a restart that lands in the same second as a reused pid can leave both values identical to what a client saw before the restart. Treat a `pid`/`start_time` mismatch as confirmation CMS restarted; don't treat a match as proof it didn't |
 | uptime_sec | seconds since `start_time`, precomputed so a client doesn't need to parse/compare that string itself |
 
 ### cm-conf
