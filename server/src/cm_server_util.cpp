@@ -93,7 +93,13 @@
  * there is no separate init/destroy call for cub_cm_init_env () (or any
  * other binary's startup) to remember to make.
  *
- * Each holder's destructor is deliberately empty
+ * Each holder's destructor is deliberately empty: process exit runs
+ * these destructors on the main thread while other threads (a detached
+ * _reap_child_async () reaper, for instance) may still be running and
+ * could still call mutex_lock ()/mutex_unlock () on this same mutex, so
+ * destroying it here would race with them. Leaking it at exit is
+ * harmless; running its destructor while a live thread might still
+ * touch it is not.
  */
 mutex_t *
 cm_cmdb_pass_mutex (void)
