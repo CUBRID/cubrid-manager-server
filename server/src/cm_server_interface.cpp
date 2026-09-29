@@ -66,6 +66,14 @@ cubrid_env_t cub_httpd_env;
  */
 static time_t g_cms_start_time = 0;
 
+/*
+ * g_cms_start_ms - the same process-start instant as g_cms_start_time,
+ *   in milliseconds (via ut_get_msec_marker ()) rather than whole
+ *   seconds. next_async_uuid () below needs millisecond resolution so
+ *   two restarts within the same second still get different uuids.
+ */
+static INT64 g_cms_start_ms = 0;
+
 /**
  * @brief initial monitoring stat information
  *
@@ -155,6 +163,7 @@ cub_cm_init_env ()
 
   mutex_init (cm_mutex);
   g_cms_start_time = time (NULL);
+  g_cms_start_ms = ut_get_msec_marker ();
   return;
 }
 
@@ -1124,8 +1133,8 @@ cm_async_request_handler (void *lpArg)
  *   the vendored jsoncpp in this tree predates 64-bit JSON number
  *   support (Json::Value only has a 32-bit Int/UInt, no Int64/UInt64),
  *   so assigning an INT64 uuid straight into a Json::Value would
- *   silently truncate it once req_id grows past 2^32. encoding it as a
- *   string sidesteps that and round-trips losslessly through
+ *   silently truncate it once the uuid grows past 2^32. encoding it as
+ *   a string sidesteps that and round-trips losslessly through
  *   parse_uuid (), which already accepts numeric strings.
  */
 static void
@@ -1146,35 +1155,29 @@ put_uuid (Json::Value &response, INT64 uuid)
 /*
  * next_async_uuid () - the next unique async-job uuid.
  *
- *   To make uuids unique across restarts, the high bits are this
- *   process's start time in milliseconds (wall clock, via
- *   ut_get_msec_marker ()) rather than just a sequence starting at 0:
- *   two separate process lifetimes would have to begin within the same
- *   millisecond to collide, which a process that has to re-open CMS's
- *   listeners/mutexes/etc. cannot do. The low ASYNC_UUID_SEQ_BITS bits
- *   are this run's sequence number, added rather than OR-ed/masked in,
- *   so a run issuing more than ASYNC_UUID_SEQ_BITS worth of jobs just
- *   carries up into the millisecond field instead of wrapping back to a
- *   value this run already handed out.
+ *   To make uuids unique across restarts, the high bits are
+ *   g_cms_start_ms - this process's start time in milliseconds,
+ *   captured once in cub_cm_init_env () - rather than just a sequence
+ *   starting at 0: two separate process lifetimes would have to begin
+ *   within the same millisecond to collide, which a process that has
+ *   to re-open CMS's listeners/mutexes/etc. cannot do. The low
+ *   ASYNC_UUID_SEQ_BITS bits are this run's sequence number, added
+ *   rather than OR-ed/masked in, so a run issuing more than
+ *   ASYNC_UUID_SEQ_BITS worth of jobs just carries up into the
+ *   millisecond field instead of wrapping back to a value this run
+ *   already handed out.
  *
- *   The lazy one-time capture of the start-time marker below is safe
- *   without its own lock because both call sites already hold cm_mutex
- *   (via cm_lock_guard) for the duration of this call.
+ *   g_cms_start_ms is written once, during cub_cm_init_env ()'s
+ *   single-threaded startup, before any request - and so any call to
+ *   this function - can happen, so reading it here needs no lock of
+ *   its own.
  */
 static INT64
 next_async_uuid (void)
 {
-  static bool started = false;
-  static INT64 epoch_ms = 0;
   static INT64 seq = 0;
 
-  if (!started)
-    {
-      epoch_ms = ut_get_msec_marker ();
-      started = true;
-    }
-
-  return (epoch_ms << ASYNC_UUID_SEQ_BITS) + seq++;
+  return (g_cms_start_ms << ASYNC_UUID_SEQ_BITS) + seq++;
 }
 
 #ifdef WINDOWS
