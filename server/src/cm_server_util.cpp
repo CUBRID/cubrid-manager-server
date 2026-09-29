@@ -561,10 +561,13 @@ increase_capacity (void *ptr, int block_size, int old_count, int new_count)
     }
   else
     {
-      if ((ptr = realloc (ptr, block_size * new_count)) == NULL)
+      void *new_ptr = realloc (ptr, block_size * new_count);
+      if (new_ptr == NULL)
         {
+          free (ptr);
           return NULL;
         }
+      ptr = new_ptr;
       memset ((char *) ptr + old_count * block_size, 0,
               block_size * (new_count - old_count));
     }
