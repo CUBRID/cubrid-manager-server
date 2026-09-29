@@ -2868,12 +2868,40 @@ static bool _validate_token_active_time (time_t &active_time)
   return true;
 }
 
+/*
+ * Splits a decrypted token's plaintext ("client_ip:client_port:client_id:
+ * proc_id:login_time" followed by '*' padding, see ut_token_generate () in
+ * cm_server_util.cpp) into exactly 5 ':'-delimited fields.
+ */
+static bool
+split_token (const char *token_dec, string out[5])
+{
+  istringstream iss (token_dec);
+  int i = 0;
+
+  while (i < 5 && getline (iss, out[i], ':'))
+    {
+      i++;
+    }
+
+  if (i != 5)
+    {
+      return false;
+    }
+
+  if (iss.peek () != char_traits<char>::eof ())
+    {
+      return false;
+    }
+
+  return true;
+}
+
 bool ext_ut_validate_token (const char *token)
 {
   T_USER_TOKEN_INFO token_info;
   string token_enc;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
-  istringstream tmp_iss;
   time_t now_time = time (0);
   time_t active_time;
   char token_dec[TOKEN_LENGTH + 1];
@@ -2884,10 +2912,11 @@ bool ext_ut_validate_token (const char *token)
     }
 
   uDecrypt (TOKEN_LENGTH, token, token_dec);
-  tmp_iss.str (string (token_dec));
 
-  int i = 0;
-  while (getline (tmp_iss, token_content[i++], ':'));
+  if (!split_token (token_dec, token_content))
+    {
+      return false;
+    }
 
   if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
@@ -2928,7 +2957,6 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   string task;
   string token;
   string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
-  istringstream tmp_iss;
   time_t now_time = time (0);
   time_t active_time;
   char token_dec[TOKEN_LENGTH+1];
@@ -2968,10 +2996,11 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
     }
 
   uDecrypt (TOKEN_LENGTH, token.c_str(), token_dec);
-  tmp_iss.str (string (token_dec));
 
-  int i = 0;
-  while (getline (tmp_iss, token_content[i++], ':'));
+  if (!split_token (token_dec, token_content))
+    {
+      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
+    }
 
   if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
     {
