@@ -2017,8 +2017,11 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
       }
 
     // set user authority info
-    JSON_FIND_V (request, "authoritylist", build_server_header (response, ERR_PARAM_MISSING,
-                 "Parameter(authoritylist) missing in the request"));
+    if (Json::Value::null == request["authoritylist"])
+      {
+        dbmt_user_free (&dbmt_user);
+        return build_server_header (response, ERR_PARAM_MISSING, "Parameter(authoritylist) missing in the request");
+      }
     authoritylist = request["authoritylist"];
     Json::Value json_value = authoritylist;
 
@@ -2044,18 +2047,36 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
       }
     else
       {
-        JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbc or admin) missing in the authoritylist"));
-        JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbo or admin) missing in the authoritylist"));
-        JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(brk or admin) missing in the authoritylist"));
-        JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(mon or admin) missing in the authoritylist"));
-        JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(job or admin) missing in the authoritylist"));
-        JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(var or admin) missing in the authoritylist"));
+        if (Json::Value::null == json_value["dbc"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbc or admin) missing in the authoritylist");
+          }
+        if (Json::Value::null == json_value["dbo"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbo or admin) missing in the authoritylist");
+          }
+        if (Json::Value::null == json_value["brk"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(brk or admin) missing in the authoritylist");
+          }
+        if (Json::Value::null == json_value["mon"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(mon or admin) missing in the authoritylist");
+          }
+        if (Json::Value::null == json_value["job"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(job or admin) missing in the authoritylist");
+          }
+        if (Json::Value::null == json_value["var"])
+          {
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(var or admin) missing in the authoritylist");
+          }
 
         if (json_value["dbc"].asString() == "yes")
           {
@@ -2063,6 +2084,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["dbc"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
           }
 
@@ -2072,6 +2094,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["dbo"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
           }
 
@@ -2081,6 +2104,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["brk"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
           }
 
@@ -2090,6 +2114,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["mon"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
           }
 
@@ -2099,6 +2124,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["job"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
           }
 
@@ -2108,12 +2134,14 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
           }
         else if (json_value["var"].asString() != "no")
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
           }
 
         // all authorites are set as 'no'
         if (auth == 0)
           {
+            dbmt_user_free (&dbmt_user);
             return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
           }
 
@@ -2141,8 +2169,12 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
     LOG_DEBUG ("set user authority info successfully.");
 
     // set db authority info
-    JSON_FIND_V (request, "dbauth", build_server_header (response, ERR_PARAM_MISSING,
-                 "Parameter(dbauth) missing in the request"));
+    if (Json::Value::null == request["dbauth"])
+      {
+        FREE_MEM (authinfo);
+        dbmt_user_free (&dbmt_user);
+        return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbauth) missing in the request");
+      }
 
     dbauthlist = request["dbauth"];
 
@@ -2150,14 +2182,34 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
       {
         string dbname, dbid, dbpassword, broker_address;
 
-        JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbname) missing in the authoritylist"));
-        JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbid) missing in the authoritylist"));
-        JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbpassword) missing in the authoritylist"));
-        JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
-                     "Parameter(dbbrokeraddress) missing in the authoritylist"));
+        if (Json::Value::null == dbauthlist[i]["dbname"])
+          {
+            FREE_MEM (authinfo);
+            FREE_MEM (dbinfo);
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
+          }
+        if (Json::Value::null == dbauthlist[i]["dbid"])
+          {
+            FREE_MEM (authinfo);
+            FREE_MEM (dbinfo);
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
+          }
+        if (Json::Value::null == dbauthlist[i]["dbpassword"])
+          {
+            FREE_MEM (authinfo);
+            FREE_MEM (dbinfo);
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
+          }
+        if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
+          {
+            FREE_MEM (authinfo);
+            FREE_MEM (dbinfo);
+            dbmt_user_free (&dbmt_user);
+            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
+          }
 
         dbname = dbauthlist[i]["dbname"].asString();
         dbid = dbauthlist[i]["dbid"].asString();
@@ -2394,14 +2446,30 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
 
           string dbname, dbid, dbpassword, broker_address;
 
-          JSON_FIND_V (dbauthlist[i], "dbname", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbname) missing in the authoritylist"));
-          JSON_FIND_V (dbauthlist[i], "dbid", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbid) missing in the authoritylist"));
-          JSON_FIND_V (dbauthlist[i], "dbpassword", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbpassword) missing in the authoritylist"));
-          JSON_FIND_V (dbauthlist[i], "dbbrokeraddress", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbbrokeraddress) missing in the authoritylist"));
+          if (Json::Value::null == dbauthlist[i]["dbname"])
+            {
+              FREE_MEM (authinfo);
+              FREE_MEM (dbinfo);
+              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
+            }
+          if (Json::Value::null == dbauthlist[i]["dbid"])
+            {
+              FREE_MEM (authinfo);
+              FREE_MEM (dbinfo);
+              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
+            }
+          if (Json::Value::null == dbauthlist[i]["dbpassword"])
+            {
+              FREE_MEM (authinfo);
+              FREE_MEM (dbinfo);
+              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
+            }
+          if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
+            {
+              FREE_MEM (authinfo);
+              FREE_MEM (dbinfo);
+              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
+            }
 
           dbname = dbauthlist[i]["dbname"].asString();
           dbid = dbauthlist[i]["dbid"].asString();
