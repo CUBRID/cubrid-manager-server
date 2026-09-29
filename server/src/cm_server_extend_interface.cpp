@@ -2541,6 +2541,7 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
           {
             dbmt_user.user_info[pos].dbinfo = dbinfo;
             dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
+            dbinfo = NULL;
           }
         else
           {
