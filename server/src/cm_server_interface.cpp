@@ -1170,7 +1170,10 @@ put_uuid (Json::Value &response, INT64 uuid)
  *   g_cms_start_ms is written once, during cub_cm_init_env ()'s
  *   single-threaded startup, before any request - and so any call to
  *   this function - can happen, so reading it here needs no lock of
- *   its own.
+ *   its own. seq itself is still protected by the caller's cm_mutex
+ *   (both call sites hold cm_lock_guard): this function does not lock
+ *   internally, so calling it without the caller already holding
+ *   cm_mutex would race on seq++ and can hand out the same uuid twice.
  */
 static INT64
 next_async_uuid (void)
@@ -1508,7 +1511,7 @@ parse_uuid (const Json::Value &v, INT64 &out)
       errno = 0;
       /* strtoull (not strtoul): on Windows "unsigned long" is only 32
        * bits, which would silently truncate a uuid here even though
-       * req_id/out are a full 64-bit INT64. */
+       * uuid/out are a full 64-bit INT64. */
 #if defined (WINDOWS)
       unsigned long long parsed = _strtoui64 (s.c_str (), &endptr, 10);
 #else

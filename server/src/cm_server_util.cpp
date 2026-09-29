@@ -2878,8 +2878,7 @@ ut_get_msec_marker (void)
 {
 #if defined (WINDOWS)
   /*
-   * GetSystemTimeAsFileTime () gives a full 64-bit tick count directly,
-
+   * GetSystemTimeAsFileTime () gives a full 64-bit tick count directly.
    * FILETIME counts 100 ns intervals since 1601-01-01; 116444736000000000
    * is that count's value at the Unix epoch (1970-01-01).
    */
