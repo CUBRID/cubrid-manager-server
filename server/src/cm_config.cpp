@@ -852,8 +852,16 @@ auto_conf_execquery_update_dbuser (const char *src_db_uid,
       FREE_MEM (strbuf);
     }
 
-  if (ferror (conf_file))
+  if (ferror (conf_file) || !feof (conf_file))
     {
+      /*
+       * ut_getline ()/ut_getdelim () can return -1 without the loop
+       * having reached EOF: a line over MAX_LINE (cm_server_util.cpp)
+       * or a realloc () failure both give up mid-file, and neither
+       * ever fails a read on conf_file, so ferror () alone stays 0.
+       * !feof () catches those too - feof () is only set on the one
+       * path that really did read to the end of the file.
+       */
       fileio_failed = 1;
     }
   fclose (conf_file);
@@ -936,7 +944,7 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
       FREE_MEM (strbuf);
     }
 
-  if (ferror (conf_file))
+  if (ferror (conf_file) || !feof (conf_file))
     {
       fileio_failed = 1;
     }
