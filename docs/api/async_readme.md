@@ -115,6 +115,8 @@ The response is `"uuid not found"` - even though the underlying `createdb` proce
 
 If a `uuid` you actually received from CMS - not made up, not corrupted in transit - gets `"uuid not found"`, send [getserverstatus](getserverstatus.md) and check `server-information.start_time` (and `server-information.pid`, as a second signal). If `start_time` is later than when you received that `uuid`, or `pid` no longer matches a value you logged earlier, CMS restarted in between, and this is exactly that case. Neither check is airtight - the OS can reuse a pid, and `start_time` only has one-second resolution - so treat a mismatch as confirmation CMS restarted, not a match as proof it didn't. Check the task's actual result directly (for example, whether the database now exists, for `createdb`) rather than relying on `gettaskstatus` for it.
 
+Losing job tracking on restart also affects the per-database exclusivity check (see [Request Rejected](#request-rejected) above): it starts empty too, so a new exclusive task against a database an orphan job is still using will not be rejected by CMS. For example, if `backupdb` is running async against `xyz` when CMS restarts, sending `restoredb` against `xyz` afterward is accepted rather than rejected with `"database 'xyz' is busy with another task"` - the restarted CMS has no record that `backupdb` is still running. CUBRID's own volume locking blocks many such conflicts anyway, but when it does, what you get back is a utility-level error, not CMS's clearer busy-database rejection.
+
 ## Configuration
 
 The following parameters, configurable in `cm.conf`, control async job behavior:
