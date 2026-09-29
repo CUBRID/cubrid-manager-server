@@ -40,9 +40,9 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | **Key** | **Description** |
 | --- | --- |
 | version | CMS's own build/version string (distinct from `CUBRID_engine_version` above, which is the engine's) |
-| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS` in the server's local time zone. If a `gettaskstatus` lookup for a `uuid` you actually received comes back `"uuid not found"`, compare it against this: if `start_time` is later than when you received that `uuid`, CMS restarted in between and lost track of the job - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) |
-| pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid, and `start_time`'s one-second resolution means a restart that lands in the same second as a reused pid can leave both values identical to what a client saw before the restart. Treat a `pid`/`start_time` mismatch as confirmation CMS restarted; don't treat a match as proof it didn't |
-| uptime_sec | seconds since `start_time`, precomputed so a client doesn't need to parse/compare that string itself |
+| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS <zone>` (server-local time and zone abbreviation, e.g. `KST`/`UTC` - whatever this process's own time zone actually is). Do not compare it against your own clock - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) for the restart-detection procedure that avoids that |
+| pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid. See the same restart-detection procedure |
+| uptime_sec | seconds since `start_time`, as measured on this host by this process alone (not a cross-host comparison). Can be negative if the server's own clock was stepped backward (NTP correction, manual adjustment) since `start_time` |
 
 ### cm-conf
 
@@ -133,7 +133,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
    },
    "server-information" : {
       "pid" : 2346068,
-      "start_time" : "2026-09-28 09:00:00",
+      "start_time" : "2026-09-28 09:00:00 KST",
       "uptime_sec" : 3600,
       "version" : "11.4.0.0428"
    },
@@ -185,7 +185,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
    },
    "server-information" : {
       "pid" : 2346068,
-      "start_time" : "2026-09-28 09:00:00",
+      "start_time" : "2026-09-28 09:00:00 KST",
       "uptime_sec" : 96500,
       "version" : "11.4.0.0428"
    },

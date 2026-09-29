@@ -1599,10 +1599,21 @@ ext_get_server_status (Json::Value &request, Json::Value &response)
 
   {
     char start_time_buf[64];
+    struct tm start_tm;
     Json::Value server_info;
 
-    time_to_str (g_cms_start_time, "%04d-%02d-%02d %02d:%02d:%02d",
-                start_time_buf, TIME_STR_FMT_DATE_TIME);
+    /*
+     * time_to_str ()'s "YYYY-MM-DD HH:MM:SS" alone doesn't say which
+     * time zone it's in. Append the zone abbreviation, e.g. "KST"/"UTC".
+     */
+    if (LOCALTIME_R (&g_cms_start_time, &start_tm) != NULL)
+      {
+        strftime (start_time_buf, sizeof (start_time_buf), "%Y-%m-%d %H:%M:%S %Z", &start_tm);
+      }
+    else
+      {
+        start_time_buf[0] = '\0';
+      }
     server_info["version"] = makestring (BUILD_NUMBER);
     server_info["start_time"] = start_time_buf;
     server_info["pid"] = (int) getpid ();
