@@ -2878,7 +2878,7 @@ bool ext_ut_validate_token (const char *token)
   time_t active_time;
   char token_dec[TOKEN_LENGTH + 1];
 
-  if (strlen (token) > TOKEN_ENC_LENGTH)
+  if (strlen (token) >= TOKEN_ENC_LENGTH)
     {
       return false;
     }
@@ -2961,7 +2961,8 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 
   task = request["task"].asString();
   token = request["token"].asString();
-  if (token.length() > TOKEN_ENC_LENGTH)
+
+  if (token.length() >= TOKEN_ENC_LENGTH)
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }

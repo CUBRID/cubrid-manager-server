@@ -109,7 +109,7 @@ uEncrypt (int len, const char *src, char *trg)
  *    the string of hexadecimal string into its original values.
  *  NOTE
  *    - size of 'src' must be at least twice the 'trg'
- *    - size of 'trg' must be equal to 'len'
+ *    - size of 'trg' must be at least 'len + 1' (trg[len] is set to '\0')
  */
 void
 uDecrypt (int len, const char *src, char *trg)
@@ -117,6 +117,7 @@ uDecrypt (int len, const char *src, char *trg)
   int i;
   char v1, v2;
   char *hexacode = NULL;
+  size_t srclen;
 
   if (src == NULL || src[0] == '\0')
     {
@@ -129,8 +130,12 @@ uDecrypt (int len, const char *src, char *trg)
       return;
     }
 
-  memset (hexacode, 0, sizeof (hexacode));
-  strcpy (hexacode, src);
+  memset (hexacode, 0, len * 2 + 1);
+
+  srclen = strlen (src);
+  srclen = (srclen > (size_t) (len * 2)) ? (size_t) (len * 2) : srclen;
+  memcpy (hexacode, src, srclen);
+  hexacode[srclen] = '\0';
 
   for (i = 0; i < len; ++i)
     {
