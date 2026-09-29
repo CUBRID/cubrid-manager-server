@@ -18,7 +18,7 @@ If `async` is not specified in the request, it defaults to `"async":"no"` and th
 
 Each of these tasks accepts the `async` key alongside its own task-specific parameters; see the individual task pages linked above for their full request/response syntax.
 
-Sending `"async":"yes"` on any task not listed above is not an error: CMS silently ignores it and runs the task synchronously, the same as if `async` had been omitted. That does not exempt it from [Timeout Fallback](#timeout-fallback) below, though - that applies to every task CMS runs, not just the 25 above.
+Sending `"async":"yes"` on any task not listed above is not an error: CMS silently ignores it and runs the task synchronously, the same as if `async` had been omitted. Whether that synchronous run is also covered by [Timeout Fallback](#timeout-fallback) below depends on how the task is dispatched, not on whether `async` was set - see that section for which tasks are covered and which are not.
 
 ## Requesting Async Execution
 
@@ -85,7 +85,9 @@ These tasks share a second failure mode unrelated to locking: if `autojobs.conf`
 
 ## Timeout Fallback
 
-`http_timeout` (see [Configuration](#configuration) below) is not specific to the 25 async-capable tasks above - it applies to every task CMS runs. Internally, every request - including one that never mentioned `async` at all, one for a task not in the list above (see [Async-Capable Tasks](#async-capable-tasks)), or a listed task's request that just didn't set `"async":"yes"` - is run on its own worker thread while CMS waits for it, for up to `http_timeout` seconds, before responding. If the task hasn't finished by then, CMS does not keep waiting: it responds anyway, with a `uuid` and `job-status` just like a running async job, even though `status`/`note` read like a failure:
+`http_timeout` (see [Configuration](#configuration) below) is not specific to the 25 async-capable tasks above, but it is not universal either: it only covers tasks that CMS dispatches through the legacy, nvplist-based task table (looked up via `ut_get_task_info`). That includes every one of the 25 async-capable tasks above whenever their request just didn't set `"async":"yes"`, plus most other tasks not documented under [Async-Capable Tasks](#async-capable-tasks). It does **not** cover the smaller set of JSON-native "extended" tasks that CMS instead runs inline, synchronously, on the same thread that received the HTTP request - among them `getserverstatus`, `gettaskstatus`, `sendmail`, `automail`, `execautostart`, `setautoexecquery`, `adddbmtuser_new`, `getdberrorlog`, and a handful of other system/utility tasks.
+
+For a task covered by the fallback, every request - including one that never mentioned `async` at all - is run on its own worker thread while CMS waits for it, for up to `http_timeout` seconds, before responding. If the task hasn't finished by then, CMS does not keep waiting: it responds anyway, with a `uuid` and `job-status` just like a running async job, even though `status`/`note` read like a failure:
 
 ```
 {
@@ -97,6 +99,8 @@ These tasks share a second failure mode unrelated to locking: if `autojobs.conf`
 ```
 
 `status` is `"failure"` and `note` is `"timeout"` here, but the task itself has not failed - those two fields describe CMS giving up on waiting synchronously, not the task's outcome. The task keeps running in the background exactly like a job that was started with `"async":"yes"`, and `job-status`/`uuid` are what tell you that: poll [gettaskstatus](gettaskstatus.md) with the returned `uuid` the same way you would for one. A client that only checks `status` risks treating a still-running task as a failure.
+
+A task that is *not* covered by the fallback has no such safety net: if it hangs, the HTTP thread blocks until it returns, however long that takes, and the client gets no response - not even a timeout failure - until then. `sendmail`, for example, has no socket timeout of its own, so a request to it blocks indefinitely if the SMTP server it connects to never responds.
 
 Unlike a request that explicitly starts async - which is rejected once `max_num_async_task` are already running (see [Request Rejected](#request-rejected) above) - a timeout fallback is never rejected. CMS tracks how many are currently outstanding with a separate counter, `num_timeout_fallback_jobs` (see [getserverstatus](getserverstatus.md)), but that counter only triggers a one-time log warning once it reaches `max_num_async_task`; it does not cap or reject further fallbacks. A slow task that clients keep retrying past `http_timeout` can accumulate background jobs - and the threads running them - without bound.
 
