@@ -40,7 +40,7 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 | **Key** | **Description** |
 | --- | --- |
 | version | CMS's own build/version string (distinct from `CUBRID_engine_version` above, which is the engine's) |
-| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS <zone>` (server-local time and zone abbreviation, e.g. `KST`/`UTC` - whatever this process's own time zone actually is). Do not compare it against your own clock - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) for the restart-detection procedure that avoids that |
+| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS ±HHMM` (server-local time and its UTC offset, e.g. `+0900`/`+0000` - whatever this process's own time zone actually is). The offset is numeric, not a zone abbreviation like `KST`, so it's unambiguous and safe to embed regardless of platform or locale. Do not compare it against your own clock - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) for the restart-detection procedure that avoids that |
 | pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid. See the same restart-detection procedure |
 | uptime_sec | seconds since `start_time`, as measured on this host by this process alone (not a cross-host comparison). Can be negative if the server's own clock was stepped backward (NTP correction, manual adjustment) since `start_time` |
 
@@ -133,7 +133,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
    },
    "server-information" : {
       "pid" : 2346068,
-      "start_time" : "2026-09-28 09:00:00 KST",
+      "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 3600,
       "version" : "11.4.0.0428"
    },
@@ -185,7 +185,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
    },
    "server-information" : {
       "pid" : 2346068,
-      "start_time" : "2026-09-28 09:00:00 KST",
+      "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 96500,
       "version" : "11.4.0.0428"
    },

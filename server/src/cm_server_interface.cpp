@@ -1607,11 +1607,12 @@ ext_get_server_status (Json::Value &request, Json::Value &response)
 
     /*
      * time_to_str ()'s "YYYY-MM-DD HH:MM:SS" alone doesn't say which
-     * time zone it's in. Append the zone abbreviation, e.g. "KST"/"UTC".
+     * time zone it's in. Append the UTC offset (%z, e.g. "+0900"), not
+     * the zone abbreviation (%Z, e.g. "KST").
      */
     if (LOCALTIME_R (&g_cms_start_time, &start_tm) != NULL)
       {
-        strftime (start_time_buf, sizeof (start_time_buf), "%Y-%m-%d %H:%M:%S %Z", &start_tm);
+        strftime (start_time_buf, sizeof (start_time_buf), "%Y-%m-%d %H:%M:%S %z", &start_tm);
       }
     else
       {
