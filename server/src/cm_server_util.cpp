@@ -3858,6 +3858,7 @@ ut_get_token_active_time (time_t *active_time)
   return 0;
 }
 
+#if defined (ENABLE_UNUSED_FUNCTION)
 int
 ut_validate_auth (nvplist *req)
 {
@@ -3942,6 +3943,7 @@ ut_validate_auth (nvplist *req)
   return (auth_user & auth_task) ? 1 : 0;
 
 }
+#endif
 
 static int
 get_short_filename (char *ret_name, int ret_name_len,

@@ -354,7 +354,6 @@ void env_mutex_lock (void);
 void env_mutex_unlock (void);
 
 int IsValidUserName (const char *pUserName);
-int ut_validate_auth (nvplist *req);
 int ut_get_token_active_time (time_t *active_time);
 int remove_extra_subdir (const char *dirpath, const char *pattern,
                          unsigned int save_num);
@@ -367,5 +366,8 @@ void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 
 bool ut_child_exited_ok (int exit_code);
+#if defined (ENABLE_UNUSED_FUNCTION)
+int ut_validate_auth (nvplist *req);
+#endif
 
 #endif                /* _CM_SERVER_UTIL_H_ */
