@@ -2876,11 +2876,28 @@ _ut_timeval_diff (struct timeval *start, struct timeval *end, int *res_msec)
 INT64
 ut_get_msec_marker (void)
 {
+#if defined (WINDOWS)
+  /*
+   * GetSystemTimeAsFileTime () gives a full 64-bit tick count directly,
+
+   * FILETIME counts 100 ns intervals since 1601-01-01; 116444736000000000
+   * is that count's value at the Unix epoch (1970-01-01).
+   */
+  FILETIME ft;
+  ULARGE_INTEGER uli;
+
+  GetSystemTimeAsFileTime (&ft);
+  uli.LowPart = ft.dwLowDateTime;
+  uli.HighPart = ft.dwHighDateTime;
+
+  return (INT64) ((uli.QuadPart - 116444736000000000LL) / 10000);
+#else
   struct timeval tv;
 
   gettimeofday (&tv, NULL);
 
   return (INT64) tv.tv_sec * 1000 + (INT64) (tv.tv_usec / 1000);
+#endif
 }
 
 /*
