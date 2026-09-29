@@ -1586,6 +1586,41 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
 }
 
 /*
+ * fill_server_identity () - fill in this CMS process's own identity
+ */
+static void
+fill_server_identity (Json::Value &target)
+{
+  time_t now = time (NULL);
+  char start_time_buf[64];
+  struct tm start_tm;
+
+  if (LOCALTIME_R (&g_cms_start_time, &start_tm) != NULL)
+    {
+      strftime (start_time_buf, sizeof (start_time_buf), "%Y-%m-%d %H:%M:%S %z", &start_tm);
+    }
+  else
+    {
+      start_time_buf[0] = '\0';
+    }
+  target["version"] = makestring (BUILD_NUMBER);
+  target["start_time"] = start_time_buf;
+  target["pid"] = (int) getpid ();
+  target["uptime_sec"] = (int) (now - g_cms_start_time);
+}
+
+/*
+ * ext_get_server_info () - handle a "getserverinfo" query.
+ */
+int
+ext_get_server_info (Json::Value &request, Json::Value &response)
+{
+  response["task"] = request["task"].asString ();
+  fill_server_identity (response);
+  return build_server_header (response, ERR_NO_ERROR, "none");
+}
+
+/*
  * ext_get_server_status () - handle a "getserverstatus" query: an
  *   admin-only, instant (no worker thread, no external process) health
  *   snapshot of the async-job subsystem, plus this CMS process's own
@@ -1598,32 +1633,13 @@ ext_get_server_status (Json::Value &request, Json::Value &response)
   response["task"] = request["task"].asString ();
   response["CUBRID_engine_version"] = cubrid_version_build;
 
-  time_t now = time (NULL);
-
   {
-    char start_time_buf[64];
-    struct tm start_tm;
     Json::Value server_info;
-
-    /*
-     * time_to_str ()'s "YYYY-MM-DD HH:MM:SS" alone doesn't say which
-     * time zone it's in. Append the UTC offset (%z, e.g. "+0900"), not
-     * the zone abbreviation (%Z, e.g. "KST").
-     */
-    if (LOCALTIME_R (&g_cms_start_time, &start_tm) != NULL)
-      {
-        strftime (start_time_buf, sizeof (start_time_buf), "%Y-%m-%d %H:%M:%S %z", &start_tm);
-      }
-    else
-      {
-        start_time_buf[0] = '\0';
-      }
-    server_info["version"] = makestring (BUILD_NUMBER);
-    server_info["start_time"] = start_time_buf;
-    server_info["pid"] = (int) getpid ();
-    server_info["uptime_sec"] = (int) (now - g_cms_start_time);
+    fill_server_identity (server_info);
     response["server-information"] = server_info;
   }
+
+  time_t now = time (NULL);
 
   reap_stale_async_jobs ();
 
