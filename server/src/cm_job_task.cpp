@@ -16494,7 +16494,6 @@ ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error)
   int ch;
 
   gen_tempfile_path (pid_file, sco.dbmt_tmp_dir, "monitor_process_tmp", TS_MONITOR_PROCESS, PATH_MAX);
-  fin = fopen (pid_file, "w+");
 
   i = 0;
   while (process_name[i][0] != 0)
@@ -16503,20 +16502,25 @@ ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error)
 	       pid_file);
       system (cmd_name);
 
-      if ((ch = fgetc (fin)) == EOF)
+      fin = fopen (pid_file, "r");
+      if (fin == NULL)
 	{
-	  strcpy (exist, "don't exist");
+	  strcpy (_dbmt_error, "read process monitor tmp file failed!");
+	  return ERR_SYSTEM_CALL;
 	}
-      else if (ch > '1' && ch < '9')
+
+      strcpy (exist, "don't exist");
+      if ((ch = fgetc (fin)) != EOF && ch >= '0' && ch <= '9')
 	{
 	  strcpy (exist, "exist");
 	}
+
+      fclose (fin);
 
       nv_add_nvp (res, process_name[i], exist);
       i++;
     }
 
-  fclose (fin);
   unlink (pid_file);
 #endif
 
