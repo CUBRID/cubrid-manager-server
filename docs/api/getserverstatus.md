@@ -2,6 +2,8 @@
 
 Get an instant health snapshot of the async-job subsystem: how many async jobs are running, which databases are currently busy with an exclusive async task, jobs still waiting to be collected via [gettaskstatus](gettaskstatus.md), any long-running jobs, the relevant `cm.conf` settings, and the statdump daemon list. Also returns this CMS process's own identity (version, start time, pid, uptime) and the CUBRID engine version it's running against. Unlike most tasks, this does not start a worker thread or an external process - the response is built immediately from in-memory state.
 
+This task requires admin authority (`AU_ADMIN`). If you only need this process's identity (`server-information`) - for example, to run the restart-detection procedure in [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) - use [getserverinfo](getserverinfo.md) instead, which any authenticated user can call.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
@@ -197,5 +199,6 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
 
 ## See Also
 
+* [getserverinfo](getserverinfo.md) - just this process's identity, for callers without admin authority
 * [Asynchronous Task Execution](async_readme.md)
 * [gettaskstatus](gettaskstatus.md)
