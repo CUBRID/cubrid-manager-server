@@ -2234,16 +2234,21 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
     LOG_DEBUG ("set db authority info successfully.");
 
     // store user authority info & db authority info into dbmt_user
-    dbmt_user.user_info = (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info, sizeof (T_DBMT_USER_INFO),
-                          num_dbmt_user, num_dbmt_user + 1);
+    {
+      size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
+      T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
+              (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
 
-
-    if (dbmt_user.user_info == NULL)
-      {
-        FREE_MEM (authinfo);
-        FREE_MEM (dbinfo);
-        return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
-      }
+      if (tmp == NULL)
+        {
+          FREE_MEM (authinfo);
+          FREE_MEM (dbinfo);
+          dbmt_user_free (&dbmt_user);
+          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
+        }
+      memset (tmp + num_dbmt_user, 0, sizeof (T_DBMT_USER_INFO));
+      dbmt_user.user_info = tmp;
+    }
 
     num_dbmt_user++;
     dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
