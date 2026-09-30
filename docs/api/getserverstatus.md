@@ -1,6 +1,6 @@
 # getserverstatus
 
-Get an instant health snapshot of the async-job subsystem: how many async jobs are running, which databases are currently busy with an exclusive async task, jobs still waiting to be collected via [gettaskstatus](gettaskstatus.md), any long-running jobs, the relevant `cm.conf` settings, and the statdump daemon list. Also returns this CMS process's own identity (version, start time, pid, uptime) and the CUBRID engine version it's running against. Unlike most tasks, this does not start a worker thread or an external process - the response is built immediately from in-memory state.
+Get an instant health snapshot of the async-job subsystem: how many async jobs are running, which databases are currently busy with an exclusive async task, jobs still waiting to be collected via [gettaskstatus](gettaskstatus.md), any long-running jobs, the relevant `cm.conf` settings, and the statdump daemon list. Also returns this CMS process's own identity (version, start time, pid, uptime, and a restart-unique instance identifier) and the CUBRID engine version it's running against. Unlike most tasks, this does not start a worker thread or an external process - the response is built immediately from in-memory state.
 
 This task requires admin authority (`AU_ADMIN`). If you only need this process's identity (`server-information`) - for example, to run the restart-detection procedure in [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) - use [getserverinfo](getserverinfo.md) instead, which any authenticated user can call.
 
@@ -28,7 +28,7 @@ This task requires admin authority (`AU_ADMIN`). If you only need this process's
 | status | execution result, success or failed. |
 | task | task name |
 | CUBRID_engine_version | CUBRID engine version string the server is running against |
-| server-information | this CMS process's own version, start time, pid, and uptime; see below |
+| server-information | this CMS process's own version, start time, pid, uptime, and restart-unique instance identifier; see below |
 | cm-conf | `cm.conf` settings relevant to the async subsystem; see below |
 | async-slot | current async job slot usage; see below |
 | request-map | in-memory async job tracking table status; see below |
@@ -42,9 +42,10 @@ This task requires admin authority (`AU_ADMIN`). If you only need this process's
 | **Key** | **Description** |
 | --- | --- |
 | version | CMS's own build/version string (distinct from `CUBRID_engine_version` above, which is the engine's) |
-| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS ±HHMM` (server-local time and its UTC offset, e.g. `+0900`/`+0000` - whatever this process's own time zone actually is). The offset is numeric, not a zone abbreviation like `KST`, so it's unambiguous and safe to embed regardless of platform or locale. Do not compare it against your own clock - see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) for the restart-detection procedure that avoids that |
-| pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid. See the same restart-detection procedure |
+| start_time | wall-clock time this CMS process started, `YYYY-MM-DD HH:MM:SS ±HHMM` (server-local time and its UTC offset, e.g. `+0900`/`+0000` - whatever this process's own time zone actually is). The offset is numeric, not a zone abbreviation like `KST`, so it's unambiguous and safe to embed regardless of platform or locale. This is informational only - do not use it (or your own clock) to detect a restart, see `uuid` below |
+| pid | process id of this CMS process. Usually differs after a restart, but not guaranteed - the OS can reuse a pid. This is informational only - see `uuid` below for the reliable way to detect a restart |
 | uptime_sec | seconds since `start_time`, as measured on this host by this process alone (not a cross-host comparison). Can be negative if the server's own clock was stepped backward (NTP correction, manual adjustment) since `start_time` |
+| uuid | an opaque decimal-digit string, this CMS process instance's own identity, up to 19 digits long (same shape as a job [uuid](async_readme.md), and CMS always sends it as a JSON string for the same reason - see there). Unlike `pid`, this is guaranteed to differ every time CMS restarts, with no "OS can reuse it" caveat - it's the recommended way to detect a restart; see [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) |
 
 ### cm-conf
 
@@ -137,6 +138,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
       "pid" : 2346068,
       "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 3600,
+      "uuid" : "1876945760000000000",
       "version" : "11.4.0.0428"
    },
    "statdump-daemon" : null,
@@ -189,6 +191,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
       "pid" : 2346068,
       "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 96500,
+      "uuid" : "1876945760000000000",
       "version" : "11.4.0.0428"
    },
    "statdump-daemon" : null,

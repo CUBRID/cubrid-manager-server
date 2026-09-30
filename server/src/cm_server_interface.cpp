@@ -74,6 +74,27 @@ static time_t g_cms_start_time = 0;
  */
 static INT64 g_cms_start_ms = 0;
 
+/*
+ * g_cms_uuid - this CMS process instance's own identity, set once in
+ *   cub_cm_init_env () to next_async_uuid ()'s very first result (so it
+ *   never collides with a real job's uuid, since every job uuid handed
+ *   out afterward starts from that function's next sequence number).
+ *   Its uniqueness-across-restarts guarantee is exactly
+ *   next_async_uuid ()'s own (see below): two process lifetimes cannot
+ *   start within the same millisecond. Exposed as the "uuid" field by
+ *   both ext_get_server_info () ("getserverinfo") and
+ *   ext_get_server_status () ("getserverstatus"), so a client can tell
+ *   CMS restarted by noticing this single value changed - unlike
+ *   start_time/pid, it needs no "check both together" caveat, since it
+ *   does not depend on a reusable OS pid.
+ */
+static INT64 g_cms_uuid = 0;
+
+/* forward declaration: cub_cm_init_env () below sets g_cms_uuid from
+ * this; the function itself is defined much further down, next to the
+ * per-job callers it was originally written for. */
+static INT64 next_async_uuid (void);
+
 /**
  * @brief initial monitoring stat information
  *
@@ -164,6 +185,14 @@ cub_cm_init_env ()
   mutex_init (cm_mutex);
   g_cms_start_time = time (NULL);
   g_cms_start_ms = ut_get_msec_marker ();
+  /*
+   * no cm_lock_guard here, unlike next_async_uuid ()'s other two call
+   * sites: we are still in cub_cm_init_env ()'s single-threaded
+   * startup, before any request thread exists to race on it - the same
+   * reasoning that already lets g_cms_start_ms above be written without
+   * a lock.
+   */
+  g_cms_uuid = next_async_uuid ();
   return;
 }
 
@@ -1170,10 +1199,14 @@ put_uuid (Json::Value &response, INT64 uuid)
  *   g_cms_start_ms is written once, during cub_cm_init_env ()'s
  *   single-threaded startup, before any request - and so any call to
  *   this function - can happen, so reading it here needs no lock of
- *   its own. seq itself is still protected by the caller's cm_mutex
- *   (both call sites hold cm_lock_guard): this function does not lock
- *   internally, so calling it without the caller already holding
- *   cm_mutex would race on seq++ and can hand out the same uuid twice.
+ *   its own. seq itself is still protected by the caller's cm_mutex:
+ *   this function does not lock internally, so calling it without the
+ *   caller already holding cm_mutex would race on seq++ and can hand
+ *   out the same uuid twice. The two per-request callers (below) each
+ *   hold cm_lock_guard for exactly that reason; cub_cm_init_env ()'s
+ *   own call (which seeds g_cms_uuid) is the one exception, and needs
+ *   none - it happens during that same single-threaded startup window
+ *   described above, before a second thread exists to race it.
  */
 static INT64
 next_async_uuid (void)
@@ -1610,6 +1643,11 @@ fill_server_identity (Json::Value &target)
   target["start_time"] = start_time_buf;
   target["pid"] = (int) getpid ();
   target["uptime_sec"] = (int) (now - g_cms_start_time);
+  /* g_cms_uuid is this CMS process instance's own identity - see its
+   * declaration above. Encode it as a string for the same reason
+   * put_uuid () does for job uuids (the vendored jsoncpp has no 64-bit
+   * JSON number type). */
+  put_uuid (target, g_cms_uuid);
 }
 
 /*
