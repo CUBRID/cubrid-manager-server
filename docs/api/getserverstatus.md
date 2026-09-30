@@ -138,7 +138,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
       "pid" : 2346068,
       "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 3600,
-      "uuid" : "1876945760000000000",
+      "uuid" : "1877531532242829529",
       "version" : "11.4.0.0428"
    },
    "statdump-daemon" : null,
@@ -179,7 +179,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
             "elapsed_sec" : 96400,
             "requester_id" : "dba",
             "task" : "backupdb",
-            "uuid" : "1876951040000000000"
+            "uuid" : "1877531532242829532"
          }
       ],
       "long_jobs" : 1,
@@ -191,7 +191,7 @@ Databases currently marked busy by an exclusive async task (see [Request Rejecte
       "pid" : 2346068,
       "start_time" : "2026-09-28 09:00:00 +0900",
       "uptime_sec" : 96500,
-      "uuid" : "1876945760000000000",
+      "uuid" : "1877531532242829529",
       "version" : "11.4.0.0428"
    },
    "statdump-daemon" : null,

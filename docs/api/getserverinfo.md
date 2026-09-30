@@ -41,7 +41,7 @@ Get this CMS process's own identity: version, start time, pid, uptime, and a res
    "status" : "success",
    "task" : "getserverinfo",
    "uptime_sec" : 14,
-   "uuid" : "1876952383000000000",
+   "uuid" : "1877676857195167211",
    "version" : "11.4.0.0446"
 }
 ```
