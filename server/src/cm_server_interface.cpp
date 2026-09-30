@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <map>
+#include <random>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -75,25 +76,40 @@ static time_t g_cms_start_time = 0;
 static INT64 g_cms_start_ms = 0;
 
 /*
+ * how many low bits of g_cms_uuid (below) and of next_async_uuid ()'s
+ * result (further down, next to that function) are randomized/
+ * sequential; the rest, in both, is the process-start millisecond
+ * marker. Shared by both so they stay the same shape.
+ */
+#define ASYNC_UUID_SEQ_BITS 20
+
+/*
  * g_cms_uuid - this CMS process instance's own identity, set once in
- *   cub_cm_init_env () to next_async_uuid ()'s very first result (so it
- *   never collides with a real job's uuid, since every job uuid handed
- *   out afterward starts from that function's next sequence number).
- *   Its uniqueness-across-restarts guarantee is exactly
- *   next_async_uuid ()'s own (see below): two process lifetimes cannot
- *   start within the same millisecond. Exposed as the "uuid" field by
- *   both ext_get_server_info () ("getserverinfo") and
+ *   cub_cm_init_env (). Exposed as the "uuid" field by both
+ *   ext_get_server_info () ("getserverinfo") and
  *   ext_get_server_status () ("getserverstatus"), so a client can tell
  *   CMS restarted by noticing this single value changed - unlike
  *   start_time/pid, it needs no "check both together" caveat, since it
  *   does not depend on a reusable OS pid.
+ *
+ *   Deliberately NOT computed via next_async_uuid () (high bits =
+ *   g_cms_start_ms, low bits = a sequence starting at 0 every run):
+ *   that would make g_cms_uuid a pure function of the wall clock, so a
+ *   system clock set back to an exact earlier reading - a VM/container
+ *   snapshot restore, or a manual correction - could reproduce a
+ *   previous run's value exactly, and a client comparing only this
+ *   field would miss a real restart. Randomizing the low
+ *   ASYNC_UUID_SEQ_BITS bits instead of sequencing them means two runs
+ *   need the *same* g_cms_start_ms *and* the *same* draw from
+ *   std::random_device to collide - the clock alone can no longer do
+ *   it. (g_cms_start_ms still seeds the high bits, so an ordinary
+ *   restart - clock moving forward, as it normally does - keeps
+ *   g_cms_uuid trivially unique too, same as before.) This does mean
+ *   g_cms_uuid is no longer guaranteed distinct from some real job's
+ *   uuid, unlike before - harmless, since they're different JSON
+ *   fields and a coincidental match carries no meaning.
  */
 static INT64 g_cms_uuid = 0;
-
-/* forward declaration: cub_cm_init_env () below sets g_cms_uuid from
- * this; the function itself is defined much further down, next to the
- * per-job callers it was originally written for. */
-static INT64 next_async_uuid (void);
 
 /**
  * @brief initial monitoring stat information
@@ -186,13 +202,17 @@ cub_cm_init_env ()
   g_cms_start_time = time (NULL);
   g_cms_start_ms = ut_get_msec_marker ();
   /*
-   * no cm_lock_guard here, unlike next_async_uuid ()'s other two call
-   * sites: we are still in cub_cm_init_env ()'s single-threaded
-   * startup, before any request thread exists to race on it - the same
-   * reasoning that already lets g_cms_start_ms above be written without
-   * a lock.
+   * see g_cms_uuid's declaration above for why the low bits are
+   * randomized rather than a plain sequence starting at 0. A plain
+   * (non-thread_local) engine, seeded fresh here, is fine: this runs
+   * exactly once, during this same single-threaded startup window -
+   * same style as array_init_random_value () in cm_text_encryption.cpp.
    */
-  g_cms_uuid = next_async_uuid ();
+  {
+    std::mt19937 engine ((std::random_device ()) ());
+    std::uniform_int_distribution <INT64> dist (0, (INT64 (1) << ASYNC_UUID_SEQ_BITS) - 1);
+    g_cms_uuid = (g_cms_start_ms << ASYNC_UUID_SEQ_BITS) | dist (engine);
+  }
   return;
 }
 
@@ -1175,14 +1195,10 @@ put_uuid (Json::Value &response, INT64 uuid)
 }
 
 /*
- * how many low bits of next_async_uuid ()'s result are this run's
- * sequence number; the rest is the process-start millisecond marker.
- * see next_async_uuid () below.
- */
-#define ASYNC_UUID_SEQ_BITS 20
-
-/*
  * next_async_uuid () - the next unique async-job uuid.
+ *
+ *   ASYNC_UUID_SEQ_BITS is defined above, next to g_cms_uuid, which
+ *   needs it too.
  *
  *   To make uuids unique across restarts, the high bits are
  *   g_cms_start_ms - this process's start time in milliseconds,
@@ -1202,11 +1218,8 @@ put_uuid (Json::Value &response, INT64 uuid)
  *   its own. seq itself is still protected by the caller's cm_mutex:
  *   this function does not lock internally, so calling it without the
  *   caller already holding cm_mutex would race on seq++ and can hand
- *   out the same uuid twice. The two per-request callers (below) each
- *   hold cm_lock_guard for exactly that reason; cub_cm_init_env ()'s
- *   own call (which seeds g_cms_uuid) is the one exception, and needs
- *   none - it happens during that same single-threaded startup window
- *   described above, before a second thread exists to race it.
+ *   out the same uuid twice. Both call sites (below) hold
+ *   cm_lock_guard for exactly that reason.
  */
 static INT64
 next_async_uuid (void)
