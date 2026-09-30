@@ -108,6 +108,11 @@ static INT64 g_cms_start_ms = 0;
  *   g_cms_uuid is no longer guaranteed distinct from some real job's
  *   uuid, unlike before - harmless, since they're different JSON
  *   fields and a coincidental match carries no meaning.
+ *
+ *   cub_cm_init_env ()'s std::random_device use has a non-throwing
+ *   fallback (pid-based) for hosts with no usable entropy source; see
+ *   the comment there. Only in that rare fallback case does the
+ *   "doesn't depend on a reusable OS pid" property above not hold.
  */
 static INT64 g_cms_uuid = 0;
 
@@ -209,9 +214,22 @@ cub_cm_init_env ()
    * same style as array_init_random_value () in cm_text_encryption.cpp.
    */
   {
-    std::mt19937 engine ((std::random_device ()) ());
-    std::uniform_int_distribution <INT64> dist (0, (INT64 (1) << ASYNC_UUID_SEQ_BITS) - 1);
-    g_cms_uuid = (g_cms_start_ms << ASYNC_UUID_SEQ_BITS) | dist (engine);
+    INT64 low_bits;
+    try
+      {
+        std::mt19937 engine ((std::random_device ()) ());
+        std::uniform_int_distribution <INT64> dist (0, (INT64 (1) << ASYNC_UUID_SEQ_BITS) - 1);
+        low_bits = dist (engine);
+      }
+    catch (exception &e)
+      {
+        snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+                  "CUBRID Manager Server : no usable random source for g_cms_uuid (%s); falling back to pid.\n",
+                  e.what ());
+        ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+        low_bits = (INT64) getpid () & ((INT64 (1) << ASYNC_UUID_SEQ_BITS) - 1);
+      }
+    g_cms_uuid = (g_cms_start_ms << ASYNC_UUID_SEQ_BITS) | low_bits;
   }
   return;
 }
