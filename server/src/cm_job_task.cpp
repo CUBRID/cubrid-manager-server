@@ -1979,19 +1979,23 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
     dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "statusmonitorauth", status_monitor);
 
     /* set user info */
-    dbmt_user.user_info =
-	    (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info,
-		sizeof (T_DBMT_USER_INFO),
-		num_dbmt_user, num_dbmt_user + 1);
-    if (dbmt_user.user_info == NULL)
-      {
-	dbmt_user_free (&dbmt_user);
-	if (authinfo != NULL)
-	  {
-	    free (authinfo);
-	  }
-	return ERR_MEM_ALLOC;
-      }
+    {
+      size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
+      T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
+	      (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
+
+      if (tmp == NULL)
+	{
+	  dbmt_user_free (&dbmt_user);
+	  if (authinfo != NULL)
+	    {
+	      free (authinfo);
+	    }
+	  return ERR_MEM_ALLOC;
+	}
+      memset (tmp + num_dbmt_user, 0, sizeof (T_DBMT_USER_INFO));
+      dbmt_user.user_info = tmp;
+    }
     num_dbmt_user++;
     dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user - 1]), dbmt_id,
 			    dbmt_passwd, num_authinfo, authinfo, 0, NULL);

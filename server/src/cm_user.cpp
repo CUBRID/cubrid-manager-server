@@ -103,15 +103,19 @@ dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 	      continue;
 	    }
 
-	  user_info =
-		  (T_DBMT_USER_INFO *) increase_capacity (user_info,
-		      sizeof (T_DBMT_USER_INFO), num_dbmt_user,
-		      num_dbmt_user + 1);
-	  if (user_info == NULL)
-	    {
-	      retval = ERR_MEM_ALLOC;
-	      goto read_dbmt_user_error;
-	    }
+	  {
+	    size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
+	    T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
+		    (user_info == NULL ? malloc (new_size) : realloc (user_info, new_size));
+
+	    if (tmp == NULL)
+	      {
+		retval = ERR_MEM_ALLOC;
+		goto read_dbmt_user_error;
+	      }
+	    memset (tmp + num_dbmt_user, 0, sizeof (T_DBMT_USER_INFO));
+	    user_info = tmp;
+	  }
 	  num_dbmt_user++;
 
 	  /* user name set */
@@ -299,7 +303,10 @@ read_dbmt_user_error:
     }
   if (user_info != NULL)
     {
-      free (user_info);
+      T_DBMT_USER tmp_user;
+      tmp_user.num_dbmt_user = num_dbmt_user;
+      tmp_user.user_info = user_info;
+      dbmt_user_free (&tmp_user);
     }
   if (user_authinfo != NULL)
     {
