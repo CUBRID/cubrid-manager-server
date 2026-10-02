@@ -165,8 +165,11 @@ set(CMS_WARN_FLAGS -Wall -W -Wwrite-strings -Wno-cast-qual -Wno-unused -pthread)
 # build.sh exports for Clang never reach these targets. cm_compress.h is an
 # amalgamated copy of miniz and its initializer lists narrow char to mz_uint8, which
 # Clang rejects outright rather than warning about.
+#
+# -Wno-unused covers -Wunused-parameter under GCC but not under Clang, so the opt-out
+# is only needed, and only applied, for Clang.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  list(APPEND CMS_WARN_FLAGS -Wno-c++11-narrowing)
+  list(APPEND CMS_WARN_FLAGS -Wno-c++11-narrowing -Wno-unused-parameter)
 endif()
 
 # ---------------------------------------------------------------------------- targets
