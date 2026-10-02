@@ -496,7 +496,7 @@ aj_autoaddvoldb_handler (void *hd, time_t prev_check_time, time_t cur_time)
 
   for (curr = (autoaddvoldb_node *) hd; curr != NULL; curr = curr->next)
     {
-      if (curr->dbname == NULL)
+      if (curr->dbname[0] == '\0')
 	{
 	  continue;
 	}

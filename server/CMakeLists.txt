@@ -161,6 +161,14 @@ set(CMS_VERSION_DEFS
   )
 set(CMS_WARN_FLAGS -Wall -W -Wwrite-strings -Wno-cast-qual -Wno-unused -pthread)
 
+# This directory resets CMAKE_C_FLAGS/CMAKE_CXX_FLAGS above, so the -Wno flags that
+# build.sh exports for Clang never reach these targets. cm_compress.h is an
+# amalgamated copy of miniz and its initializer lists narrow char to mz_uint8, which
+# Clang rejects outright rather than warning about.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  list(APPEND CMS_WARN_FLAGS -Wno-c++11-narrowing)
+endif()
+
 # ---------------------------------------------------------------------------- targets
 set(CM_ADMIN_SOURCES
   ${CMS_SRC_DIR}/cm_text_encryption.c

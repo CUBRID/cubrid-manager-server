@@ -167,7 +167,7 @@ get_cmdname_by_id (int cmd_id, char *cmd_name, int buf_size)
     {
       if (cmd_id == (int) cmd_info[i].cmd_id)
 	{
-	  snprintf (cmd_name, buf_size - 1, cmd_info[i].cmd_name);
+	  snprintf (cmd_name, buf_size - 1, "%s", cmd_info[i].cmd_name);
 	  return 0;
 	}
     }
