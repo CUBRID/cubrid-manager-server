@@ -263,6 +263,8 @@ dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   dbmt_user->num_dbmt_user = num_dbmt_user;
   dbmt_user->user_info = user_info;
 
+  user_info = NULL;
+
   fp = fopen (conf_get_dbmt_file (FID_DBMT_PASS, strbuf), "r");
   if (fp == NULL)
     {
