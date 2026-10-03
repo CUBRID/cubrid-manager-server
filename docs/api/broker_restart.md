@@ -31,6 +31,6 @@ The broker_restart interface will restart a specified broker.
    "note" : "none",
    "status" : "success",
    "task" : "broker_restart",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```

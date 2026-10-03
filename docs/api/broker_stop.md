@@ -50,6 +50,6 @@ The broker_stop interface will stop a specified broker.
    "note" : "none",
    "status" : "success",
    "task" : "broker_stop",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```

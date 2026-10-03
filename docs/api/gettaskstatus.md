@@ -45,7 +45,7 @@ Check the status of a task asynchronously running
    "job-status" : "running",
    "note" : "none",
    "status" : "success",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```
 
@@ -57,7 +57,7 @@ Check the status of a task asynchronously running
    "note" : "none",
    "status" : "success",
    "task" : "createdb",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```
 
@@ -72,7 +72,7 @@ See the note above the samples: this is still `job-status:"success"`/`status:"su
    "note" : "WARNING: database 'alatestdb' was deleted, but the following bookkeeping file(s) could not be updated (lock timeout, file I/O error, or an internal update error): cmdb.pass, the auto-job backupdb config file; manual check recommended",
    "status" : "success",
    "task" : "deletedb",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```
 
@@ -84,7 +84,7 @@ See the note above the samples: this is still `job-status:"success"`/`status:"su
    "note" : "Couldn't create database.<end>Database \"testdb\" already exists.<end>",
    "status" : "failure",
    "task" : "createdb",
-   "uuid" : "1876951040000000000"
+   "uuid" : "1877908931382247367"
 }
 ```
 
