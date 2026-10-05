@@ -142,6 +142,12 @@ using namespace std;
 #endif /* !WINDOWS */
 
 #define        ER_FEATURE_DEPRECATED   -2
+
+#if defined (WINDOWS)
+#define UNLINK(file) _unlink(file)
+#else
+#define UNLINK(file) unlink(file)
+#endif
 #define MAX_TRIES_FIND_CHILD_PID 20
 
 extern T_USER_TOKEN_INFO *user_token_info;
@@ -10477,6 +10483,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
   char filename[PATH_MAX];
   char cubrid_tmp_path[PATH_MAX];
   char *fullpath_with_filename = NULL;
+  int ret = 0;
 
   const char *casrunnertmp_short[] =
   { "log_converted", "cas_log_tmp", "log_run" };
@@ -10533,15 +10540,9 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PERMISSION;
     }
 
-#if defined(WINDOWS)
-  snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-	    DEL_FILE_OPT, fullpath_with_filename);
-#else
-  snprintf (command, sizeof (command), "%s %s %s", DEL_DIR, DEL_DIR_OPT,
-	    fullpath_with_filename);
-#endif
+  ret = UNLINK (fullpath_with_filename);
 
-  if (system (command) == -1)
+  if (ret != 0)
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
 		fullpath_with_filename);
@@ -10815,32 +10816,11 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_WITH_MSG;
 	}
 
-      snprintf (command, sizeof (command), "%s %s %s", DEL_FILE,
-		DEL_FILE_OPT, path);
-
-      output = popen (command, "r");
-      memset (buf, '\0', sizeof (buf));
-      if (output != NULL)
+      if (UNLINK (path) != 0)
 	{
-	  if (fgets (buf, PATH_MAX, output) != NULL)
-	    {
-#if defined(WINDOWS)
-	      pclose (output);
-	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove %s",
-			full_path_buf);
-	      return ERR_WITH_MSG;
-#endif
-	      if (get_broker_info_from_filename (path, broker_name, &as_id) < 0
-		  || cm_del_cas_log (broker_name, as_id, &error) < 0)
-		{
-		  pclose (output);
-		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
-			    error.err_msg);
-		  return ERR_WITH_MSG;
-		}
-	    }
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove: %s", full_path_buf);
+	  return ERR_WITH_MSG;
 	}
-      pclose (output);
     }                /* end of for */
 
   return ERR_NO_ERROR;
