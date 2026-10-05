@@ -10542,7 +10542,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
 
   ret = UNLINK (fullpath_with_filename);
 
-  if (ret != 0)
+  if (ret != 0 && errno != ENOENT)
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
 		fullpath_with_filename);
@@ -10818,7 +10818,9 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (UNLINK (path) != 0)
 	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove: %s", full_path_buf);
+	  char errbuf[CM_STRERROR_BUF_LEN];
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove file '%s' (%s)", path,
+		    STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
 	}
     }                /* end of for */
