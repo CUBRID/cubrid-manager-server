@@ -350,19 +350,13 @@ unzip (const char *zip_file, const char *unzip_dir)
           if (access (unzip_file, 0) != 0
               && !CreateDirectory (unzip_file, NULL))
 #else
-          mode_t old_mode = umask (0);
-          if (access (unzip_file, 0) != 0 && mkdir (unzip_file, 0700) != 0)
+          if (access (unzip_file, 0) != 0
+              && (mkdir (unzip_file, 0700) != 0 || chmod (unzip_file, 0700) != 0))
 #endif
             {
-#ifndef WINDOWS
-              umask (old_mode);
-#endif
               mz_zip_reader_end (&zip_archive);
               return MZ_FALSE;
             }
-#ifndef WINDOWS
-          umask (old_mode);
-#endif
           continue;
         }
 

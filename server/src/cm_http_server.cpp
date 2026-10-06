@@ -577,22 +577,25 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
   /* init SSL libray is must. */
   SSL_library_init ();
 
-  /* Currently, we support upto TLS_v1.2 */
-#if !defined (WINDOWS)
   ctx = SSL_CTX_new (TLS_server_method ());
-#else
-  ctx = SSL_CTX_new (TLSv1_server_method ());
-#endif
 
   if (!ctx)
     {
       LOG_ERROR ("-- Web server: Fail to generate CTX for openSSL.");
+      return NULL;
     }
   SSL_CTX_set_options (ctx,
                        SSL_OP_SINGLE_DH_USE |
                        SSL_OP_SINGLE_ECDH_USE |
 		       SSL_OP_NO_SSLv3 |
                        SSL_OP_NO_SSLv2);
+
+  if (SSL_CTX_set_min_proto_version (ctx, TLS1_2_VERSION) != 1)    /* we don't want support TLSv1.0, TLSv1.1 */
+    {
+      LOG_ERROR ("-- CUBRID Manager Server: OpenSSL error: cannot set minimum TLS version to 1.2.");
+      SSL_CTX_free (ctx);
+      return NULL;
+    }
 
   /* Find and set up our server certificate. */
   server_setup_certs (ctx, certificate_chain, private_key);

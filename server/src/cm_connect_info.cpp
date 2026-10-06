@@ -42,7 +42,7 @@ int
 dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 {
   FILE *infile;
-  int lfd, retval;
+  int retval;
   int get_len, buf_len;
   char *strbuf;
   char sbuf[512];
@@ -50,10 +50,16 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 
   /* check if ip is an existing ip */
   retval = 0;
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      /*
+       * This function has no way to report a message and its normal
+       * return domain is {0, 1} (not found/found), not an ERR_* code, so
+       * a lock failure is reported the same way an unreadable conlist
+       * already is below
+       */
+      return retval;
     }
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
@@ -83,7 +89,6 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
           FREE_MEM (strbuf);
         }
     }
-  uRemoveLockFile (lfd);
 
   return retval;
 }
@@ -94,10 +99,10 @@ dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
 {
   FILE *outfile;
   char strbuf[512];
-  int lock_fd, retval;
+  int retval;
 
-  lock_fd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, strbuf));
-  if (lock_fd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       return -1;
     }
@@ -112,7 +117,6 @@ dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
       fclose (outfile);
       retval = 0;
     }
-  uRemoveLockFile (lock_fd);
 
   return retval;
 }
@@ -130,18 +134,17 @@ dbmt_con_delete (const char *ip, const char *port)
   FILE *infile, *outfile;
   char tmpfile[PATH_MAX];
   char conn_list_file[512];
-  int lock_fd, retval;
+  int retval;
 
-  lock_fd =
-    uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, tmpfile));
-  if (lock_fd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       return -1;
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
   infile = fopen (conn_list_file, "r");
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_DELETE, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_DELETE, PATH_MAX);
   outfile = fopen (tmpfile, "w");
 
   if (infile == NULL || outfile == NULL)
@@ -184,7 +187,6 @@ dbmt_con_delete (const char *ip, const char *port)
       move_file (tmpfile, conn_list_file);
       retval = 0;
     }
-  uRemoveLockFile (lock_fd);
 
   return retval;
 }
@@ -194,15 +196,15 @@ dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
                       const char *port, const char *dbname, char *_dbmt_error)
 {
   FILE *infile;
-  int lfd, retval = -1;
+  int retval = -1;
   char ip_t[20], port_t[10];
   char *prev, *next, *tok[2];
   char *strbuf = NULL;
   char sbuf[512];
   int buf_len, get_len;
 
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");
       return retval;
@@ -311,8 +313,6 @@ con_read_dbinfo_err:
       FREE_MEM (strbuf);
     }
 
-  uRemoveLockFile (lfd);
-
   return retval;
 }
 
@@ -322,7 +322,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
                        char *_dbmt_error)
 {
   FILE *infile, *outfile;
-  int lfd, retval = -1;
+  int retval = -1;
   char tmpfile[PATH_MAX], conn_list_file[512];
   char date[15], time[10];
   char *prev, *next, *tok[2];
@@ -333,15 +333,15 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
   T_DBMT_CON_INFO con_info;
   memset (&con_info, 0, sizeof (T_DBMT_CON_INFO));
 
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");
       return retval;
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_WRITE_DBINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_WRITE_DBINFO, PATH_MAX);
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
   outfile = fopen (tmpfile, "w");
@@ -531,8 +531,6 @@ con_write_dbinfo_err:
       FREE_MEM (con_info.con_dbinfo);
     }
   move_file (tmpfile, conn_list_file);
-
-  uRemoveLockFile (lfd);
 
   return retval;
 }

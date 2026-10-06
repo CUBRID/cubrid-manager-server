@@ -57,7 +57,7 @@ Unzip the package of CUBRID and you can find the source code of CMS here: cubrid
 
 ### build and install on windows
 
-If you want to build CMS on windows, VS2008 must be installed.
+If you want to build CMS on windows, VS2017 must be installed.
 
 1. Open a commander "cmd.exe" and Move to the directory where the source is stored.
 
@@ -72,7 +72,6 @@ If you want to build CMS on windows, VS2008 must be installed.
 	```
 
 	- `--prefix=%CUBRID%` : It specifies a directory to be installed.
-	- `--enable-64bit` : Used to build in a 64-bit environment since supporting 64-bit from CUBRID 2008 R2.0 or higher.
 	- `--with-cubrid-dir=%CUBRID%` : Option specifies the directory CUBRID is installed.
 
 

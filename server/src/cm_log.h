@@ -52,14 +52,22 @@ using namespace std;
 #define mutex_t                           CRITICAL_SECTION
 #define mutex_init(mutex)                 InitializeCriticalSection(&mutex)
 #define mutex_lock(mutex)                 EnterCriticalSection(&mutex)
+/*
+ * mutex_trylock (mutex) - non-blocking lock attempt, added alongside the
+ *   unconditional mutex_lock () above so a caller can build a BOUNDED
+ *   wait (trylock + sleep-and-retry in a loop, giving up after some
+ *   total budget) instead of blocking forever.
+ */
+#define mutex_trylock(mutex)              TryEnterCriticalSection(&mutex)
 #define mutex_unlock(mutex)               LeaveCriticalSection(&mutex)
 #define mutex_destory(mutex)              DeleteCriticalSection(&mutex)
 #else
 #define mutex_t                           pthread_mutex_t
 #define mutex_init(mutex)                 pthread_mutex_init(&mutex, NULL)
 #define mutex_lock(mutex)                 pthread_mutex_lock(&mutex)
-#define mutex_unlock(mutex)               pthread_mutex_unlock(&mutex)
-#define mutex_destory(mutex)              pthread_mutex_destroy(&mutex)
+#define mutex_trylock(mutex)               (pthread_mutex_trylock(&mutex) == 0)
+#define mutex_unlock(mutex)                pthread_mutex_unlock(&mutex)
+#define mutex_destory(mutex)               pthread_mutex_destroy(&mutex)
 #endif
 
 #define MAX_DATE_TIME_LENGTH   128
@@ -126,8 +134,9 @@ class CLog
     {
       char buff[MAX_DATE_TIME_LENGTH] = "unkonwn";
       time_t lt;
+      struct tm ltm;
       time (&lt);
-      tm *t = localtime (&lt);
+      tm *t = LOCALTIME_R (&lt, &ltm);
       if (t)
         {
           strftime (buff, MAX_DATE_TIME_LENGTH, "%Y%m%d %H:%M:%S", t);
@@ -154,9 +163,15 @@ class CLog
     _get_current_time_year_mon_day_hour_minute_second (char *current_time)
     {
       time_t cur_time;
+      struct tm cur_tm;
+      tm *t;
 
       time (&cur_time);
-      strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", localtime (&cur_time));
+      t = LOCALTIME_R (&cur_time, &cur_tm);
+      if (t)
+        {
+          strftime (current_time, MAX_DATE_TIME_LENGTH, "%Y%m%d%H%M%S", t);
+        }
     }
 
 #if defined(WINDOWS)
@@ -311,19 +326,67 @@ class CLog
       static CLog *instance_log = NULL;
       static CLog *instance_err = NULL;
 
+      /*
+       * Serializes the lazy-create/recreate check below for each of
+       * instance_log/instance_err, mirroring the function-local static
+       * holder pattern cm_auto_jobs_mutex () uses (cm_server_util.cpp).
+       */
+      struct mutex_holder
+      {
+        mutex_t m;
+        mutex_holder (void)
+        {
+          mutex_init (m);
+        }
+        ~mutex_holder (void)
+        {
+          /*
+           * deliberately empty
+           */
+        }
+      };
+      static mutex_holder log_holder;
+      static mutex_holder err_holder;
+
+      /*
+       * scoped_lock - locks a mutex_t on construction, unlocks it on
+       *   destruction. Unlike the bare mutex_lock ()/mutex_unlock () pair
+       *   this replaces, the unlock still happens if new CLog (TRUE)
+       *   below throws
+       */
+      struct scoped_lock
+      {
+        mutex_t &m;
+        scoped_lock (mutex_t &m) : m (m)
+        {
+          mutex_lock (m);
+        }
+        ~scoped_lock (void)
+        {
+          mutex_unlock (m);
+        }
+
+      private:
+        scoped_lock (const scoped_lock &);
+        scoped_lock &operator= (const scoped_lock &);
+      };
+
       if ((logLevel <= CLog::xWARN) && (logLevel >= CLog::xFATAL))
         {
           // write log into error log file
 
+          scoped_lock lock (err_holder.m);
           if ((instance_err == NULL) || (access (sco.szErrorLog, F_OK) < 0))
             {
               instance_err = new CLog (TRUE);
             }
+
           return instance_err;
         }
       else
         {
           // write log into normal log file
+          scoped_lock lock (log_holder.m);
           if ((instance_log == NULL) || (access (sco.szAccessLog, F_OK) < 0))
             {
               instance_log = new CLog (TRUE);
@@ -424,6 +487,26 @@ class CLog
       bool shouldBackupFiles = false;
 
       mutex_lock (m_cs);
+
+      if (isErrorLog == true)
+        {
+          if (m_pErrFile == NULL)
+            {
+              mutex_unlock (m_cs);
+              delete[]buffer;
+              return;
+            }
+        }
+      else
+        {
+          if (m_pLogFile == NULL)
+            {
+              mutex_unlock (m_cs);
+              delete[]buffer;
+              return;
+            }
+        }
+
       if (isErrorLog == true)
         {
           fprintf (m_pErrFile, "[%s] [%s] [%6d] %s\n",

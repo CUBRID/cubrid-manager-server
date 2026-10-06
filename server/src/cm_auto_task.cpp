@@ -185,7 +185,7 @@ ts_get_server_version (nvplist *req, nvplist *res)
   const char *argv[5];
 
   nv_update_val (res, "task", "getversion");
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_SERVER_VERSION, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_SERVER_VERSION, PATH_MAX);
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
@@ -194,7 +194,7 @@ ts_get_server_version (nvplist *req, nvplist *res)
   argv[0] = cmd_name;
   argv[1] = NULL;
 
-  run_child (argv, 1, NULL, tmpfile, NULL, NULL);	/* cubrid_rel */
+  run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, NULL, NULL);	/* cubrid_rel */
 
   if ((infile = fopen (tmpfile, "r")) != NULL)
     {
