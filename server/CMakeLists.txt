@@ -163,7 +163,7 @@ set(CMS_WARN_FLAGS -Wall -W -Wwrite-strings -Wno-cast-qual -Wno-unused -pthread)
 
 # ---------------------------------------------------------------------------- targets
 set(CM_ADMIN_SOURCES
-  ${CMS_SRC_DIR}/cm_text_encryption.c
+  ${CMS_SRC_DIR}/cm_text_encryption.cpp
   ${CMS_SRC_DIR}/cm_config.cpp
   ${CMS_SRC_DIR}/cm_server_util.cpp
   ${CMS_SRC_DIR}/cm_user.cpp
@@ -171,15 +171,18 @@ set(CM_ADMIN_SOURCES
   ${CMS_SRC_DIR}/cm_cmd_util.cpp
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_cmd_task.cpp
+  ${CMS_SRC_DIR}/cm_server_status.cpp
   )
 
 set(CUB_MANAGER_SOURCES
   ${CMS_SRC_DIR}/cm_server_util.cpp
   ${CMS_SRC_DIR}/cm_autojob.cpp
-  ${CMS_SRC_DIR}/cm_text_encryption.c
+  ${CMS_SRC_DIR}/cm_text_encryption.cpp
   ${CMS_SRC_DIR}/cm_config.cpp
   ${CMS_SRC_DIR}/cm_job_task.cpp
   ${CMS_SRC_DIR}/cm_cmd_exec.cpp
+  ${CMS_SRC_DIR}/cm_server_status.cpp
+  ${CMS_SRC_DIR}/cm_mem_cpu_stat.cpp
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_auto_task.cpp
   ${CMS_SRC_DIR}/cm_httpd.cpp
