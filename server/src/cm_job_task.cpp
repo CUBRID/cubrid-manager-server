@@ -12140,43 +12140,32 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
   gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
-  /* set environment that the script need to run. */
+  if (!is_authorized_filename (script_path, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
 
+  /*
+   * validate the environment variables the script needs to run.
+   * they are passed only to the child process through extra_envp;
+   * the environment of the CMS process itself is not changed.
+   */
   for (i = 0; i < req->nvplist_leng; i++)
     {
       nv_lookup (req, i, &n, &v);
-      if ((n != NULL) && (v != NULL) && (strcmp (n, "envvar") == 0))
+      if ((n == NULL) || (strcmp (n, "envvar") != 0))
 	{
-	  envc++;
-	  bool invalid_env = true;
-
-	  if (v != NULL && strlen (v) != 0)
-	    {
-	      std::string entry = v;
-	      std::string env_name = extract_env_name (entry);
-
-	      if (is_allowed_script_env (env_name))
-		{
-		  invalid_env = false;
-		}
-	    }
-
-	  if (invalid_env)
-	    {
-	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s",
-			v ? v : "(NULL)");
-	      return ERR_WITH_MSG;
-	    }
-
-	  if (v)
-	    {
-	      if (!setenv_using_putenv_fmt (v))
-		{
-		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "set environment failed: %s", v);
-		  return ERR_WITH_MSG;
-		}
-	    }
+	  continue;
 	}
+
+      if (v == NULL || strlen (v) == 0 || !is_allowed_script_env (extract_env_name (v)))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s",
+		    v ? v : "(NULL)");
+	  return ERR_WITH_MSG;
+	}
+
+      envc++;
     }
 
   if (envc > 0)
@@ -12198,11 +12187,6 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	}
       extra_envp[envc] = NULL;
-    }
-
-  if (!is_authorized_filename (script_path, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
     }
 
   argv[argc++] = script_path;
