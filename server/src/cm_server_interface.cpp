@@ -27,6 +27,8 @@
 #include <signal.h>
 #include <map>
 #include <random>
+#include <list>
+#include <cctype>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -196,14 +198,10 @@ cub_cm_init_env ()
   char conf_name[256];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
   char process_name[PATH_MAX];
-  char default_cubrid_lang_type[PATH_MAX];
-  char default_cubrid_lang_msg_type[PATH_MAX];
 
   tmpstrbuf[0]= '\0';
   //  char *charset = NULL;
   snprintf (process_name, PATH_MAX, "%s", CMS_NAME);
-  snprintf (default_cubrid_lang_type, PATH_MAX, "CUBRID_LANG=en_US");
-  snprintf (default_cubrid_lang_msg_type, PATH_MAX, "CUBRID_MSG_LANG=en_US");
 
   sys_config_init ();
   uReadEnvVariables (process_name);
@@ -231,19 +229,18 @@ cub_cm_init_env ()
     }
 
   memset (&cub_httpd_env, 0, sizeof (cubrid_env_t));
-  putenv (default_cubrid_lang_type);    /* set as default language type */
-  putenv (default_cubrid_lang_msg_type);    /* set as default language type */
+  PUT_ENV ("CUBRID_LANG", "en_US");
 
   snprintf (cub_httpd_env.cubrid_err_log, MAX_PATH,
-            "CUBRID_ERROR_LOG=%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
-  putenv (cub_httpd_env.cubrid_err_log);
+	    "%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
+  PUT_ENV ("CUBRID_ERROR_LOG", cub_httpd_env.cubrid_err_log);
 
   snprintf (cub_httpd_env.cubrid, MAX_PATH, "CUBRID=%s", sco.szCubrid);
-  putenv (cub_httpd_env.cubrid);
+  PUT_ENV ("CUBRID", sco.szCubrid);
 
   snprintf (cub_httpd_env.cubrid_databases, MAX_PATH, "CUBRID_DATABASES=%s",
             sco.szCubrid_databases);
-  putenv (cub_httpd_env.cubrid_databases);
+  PUT_ENV ("CUBRID_DATABASES", sco.szCubrid_databases);
 
   mutex_init (cm_mutex);
   g_cms_start_time = time (NULL);
@@ -557,6 +554,26 @@ static const char *async_capable_tasks[] =
   "stopdb",
   "unloaddb",
   NULL
+};
+
+class async_request
+{
+  public:
+    INT64 uuid;
+    Json::Value request;
+    Json::Value response;
+    int status;
+    time_t created_at;
+    time_t finished_at;
+    std::vector <std::string> db_names;
+    std::string requester_id;
+    bool holds_async_slot;
+    bool holds_timeout_fallback_slot;
+    bool is_long_async_job;
+#ifndef WINDOWS
+    pthread_mutex_t *mutex;
+    pthread_cond_t *cond;
+#endif
 };
 
 static bool
@@ -978,25 +995,6 @@ class async_job_state_guard
     async_job_state_guard &operator= (const async_job_state_guard &);
 };
 
-class async_request
-{
-  public:
-    INT64 uuid;
-    Json::Value request;
-    Json::Value response;
-    int status;
-    time_t created_at;
-    time_t finished_at;
-    std::vector <std::string> db_names;
-    std::string requester_id;
-    bool holds_async_slot;
-    bool holds_timeout_fallback_slot;
-    bool is_long_async_job;
-#ifndef WINDOWS
-    pthread_mutex_t *mutex;
-    pthread_cond_t *cond;
-#endif
-};
 
 /*
  * async_request_guard - RAII guard owning a heap-allocated async_request

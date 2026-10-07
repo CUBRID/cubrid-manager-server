@@ -63,7 +63,6 @@
 #include "cm_config.h"
 #include "cm_autojob.h"
 #include "cm_auto_task.h"
-#include "cm_cci_interface.h"
 #include "cm_server_interface.h"
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
@@ -277,11 +276,7 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
 
   try
     {
-      if (!strcmp ((char *) arg, "cci"))
-	{
-	  cub_cci_request_handler (root, response);
-	}
-      else if (!strcmp ((char *) arg, "cm_api"))
+      if (strcmp ((char *) arg, "cm_api") == 0)
 	{
 	  cub_cm_request_handler (root, response);
 	}
@@ -301,15 +296,11 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
       build_server_header (response, ERR_WITH_MSG, "internal server error");
     }
 
-
-  //outustr = utf8_encode(writer.write(response).c_str());
-  //printf("---------------------\n%s\n", outustr);
+  cub_cm_request_handler (root, response);
   evb = evbuffer_new ();
   if (NULL == evb)
     {
       free (body);
-      //utf8_clean(inustr);
-      //utf8_clean(outustr);
       return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
     }
 
@@ -323,27 +314,39 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
   evhttp_send_reply (req, HTTP_OK, "OK", evb);
   evbuffer_free (evb);
   free (body);
-  //utf8_clean(inustr);
-  //utf8_clean(outustr);
 
   return;
 }
-
-static int cub_loop_flag = 1;
 
 void
-cub_ctrl_request_handler (struct evhttp_request *req, void *arg)
+cub_reject_request_handler (struct evhttp_request *req, void *arg)
 {
-  evhttp_send_reply (req, HTTP_OK, "", NULL);
-  cub_loop_flag = 0;
+  struct evbuffer *evb = evbuffer_new ();
+
+  if (evb)
+{
+      evhttp_add_header (evhttp_request_get_output_headers (req),
+			 "Content-Type", "application/json;charset=utf-8");
+      evbuffer_add_printf (evb, "{ \"error\" : \"Not Found\" }");
+    }
+
+  evhttp_send_reply (req, HTTP_NOTFOUND, "Not Found", evb);
+
+  if (evb)
+    {
+      evbuffer_free (evb);
+    }
+
   return;
 }
 
+#if !defined (NDEBUG)
 void
 cub_post_request_handler (struct evhttp_request *req, void *arg)
 {
   string post_msg = "{ \"success\" : true }";
   string req_uri (req->uri);
+  std::string cookie;
   char token[TOKEN_ENC_LENGTH];
   size_t token_pos;
   int code;
@@ -351,13 +354,19 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
   size_t fname_pos = 0;
   size_t tmp_pos = 0;
   struct evbuffer *evb = evbuffer_new();
+  const char *cookie_header = evhttp_find_header (req->input_headers, "COOKIE");
 
   code = HTTP_OK;
   reason = "OK";
   token[0] = '\0';
   token_pos = 0;
 
-  string cookie (evhttp_find_header (req->input_headers, "COOKIE"));
+  if (cookie_header == NULL || strlen (cookie_header) == 0)
+    {
+      goto send_nok_reply;
+    }
+
+  cookie = cookie_header;
   token_pos = cookie.find ("token=");
   if (token_pos == string::npos)
     {
@@ -366,15 +375,15 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
 
   cookie.copy (token, TOKEN_ENC_LENGTH - 1, token_pos + strlen ("token="));
   token[TOKEN_ENC_LENGTH - 1] = '\0';
-  if (ext_ut_validate_token (token))
+  if (!ext_ut_validate_token (token))
     {
-      goto send_reply;
+      goto send_nok_reply;
     }
-
   for (int index = 0; index < NUM_OF_FILES_IN_URL; ++index)
     {
       char fname[PATH_MAX];
-      string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string path = fname_path;
       fname[0] = '\0';
       fname_pos = req_uri.find ("fname=", tmp_pos);
       if (fname_pos == string::npos && index == 0)
@@ -392,14 +401,23 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
         {
           tmp_pos = req_uri.length();
         }
+
+      if ((tmp_pos - fname_pos) >= PATH_MAX)
+	{
+	  goto send_nok_reply;
+	}
+
       req_uri.copy (fname, tmp_pos - fname_pos + 1, fname_pos);
       fname[tmp_pos - fname_pos] = '\0';
+
       if (strcmp (fname, "") != 0 || strcmp (fname, "&") != 0)
         {
-          if (strstr (fname, "..") || strstr (fname, "\\") || strstr (fname, "/"))
+	  path += fname;
+	  if (is_invalid_filename (fname) || !is_subpath (sco.dbmt_tmp_dir, path.c_str ()))
             {
-              continue;
+	      goto send_nok_reply;
             }
+
           fname_path += fname;
           unlink (fname_path.c_str());
         }
@@ -423,16 +441,7 @@ send_reply:
   return;
 }
 
-void
-cub_timeout_cb (evutil_socket_t fd, short event, void *arg)
-{
-  struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-    }
-}
-
+#endif
 
 /**
  * @brief callback function to gather monitoring data
@@ -443,11 +452,6 @@ start_monitor_stat_cb (evutil_socket_t fd, short event, void *arg)
   struct timeval stat_tv = { STAT_MONITOR_INTERVAL, 0 };
 
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
 
   // [CUBRIDSUS-11917]sleep the thread for a while when the CUBRID is starting
   if (work_ctx->first)
@@ -469,11 +473,7 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
 {
   struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
+
 #ifdef WINDOWS
   unsigned long thread_status;
   GetExitCodeThread ((HANDLE) auto_task_tid, &thread_status);
@@ -506,7 +506,6 @@ start_service ()
 {
   struct worker_context *start_ctx[DEFAULT_THRD_NUM];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
-  struct timeval tv = { sco.iMonitorInterval, 0 };
   int nfd, err, i = 0;
 
   tmpstrbuf[0] = '\0';
@@ -557,11 +556,7 @@ start_service ()
 
       if (i > 1)        /* DEFAULT_THRD_NUM - 1 for request handler */
         {
-          start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_PERSIST, cub_timeout_cb, (void *) start_ctx[i]);
-          if (start_ctx[i]->timer == NULL)
-            {
-              continue;
-            }
+	  start_ctx[i]->timer = NULL;
 
           start_ctx[i]->httpd = evhttp_new (start_ctx[i]->base);
           if (start_ctx[i]->httpd == NULL)
@@ -578,13 +573,13 @@ start_service ()
           evhttp_set_timeout (start_ctx[i]->httpd, DEFAULT_HTTP_TIMEOUT);
           /* This is the magic that lets evhttp use SSL. */
           evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
-          evhttp_set_cb (start_ctx[i]->httpd, "/cci",
-                         cub_generic_request_handler, (void *) "cci");
           evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
-          evhttp_set_cb (start_ctx[i]->httpd, "/ctrl", cub_ctrl_request_handler, NULL);
+#if defined (NDEBUG)
+	  evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#else
           evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
-          /* Start web server*/
-          evhttp_set_gencb (start_ctx[i]->httpd, load_webfiles_cb, (void *) sco.szCWMPath);
+	  evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#endif
         }
       else if (i == 1)
         {
@@ -620,10 +615,6 @@ start_service ()
         {
           struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
           evtimer_add (start_ctx[i]->timer, &auto_task_tv);
-        }
-      else
-        {
-          evtimer_add (start_ctx[i]->timer, &tv);
         }
 #ifdef WINDOWS
       start_ctx[i]->ths =

@@ -300,6 +300,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
    * If the cubrid engine version fails to be determined at startup,
    * the default version (currently 11.4) is assumed.
    */
+
   if (cubrid_version_major < 10 || (cubrid_version_major == 10 && cubrid_version_minor == 0))
     {
       res = new SpaceDbResultOldFormat();
@@ -348,13 +349,17 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   const char *extra_envp[3];
   int envc = 0;
 
-#ifdef HPUX
-  char jvm_env_string[32];
-#endif
-
   cmd_start_master ();
+
   gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
   gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
+
+  /* unset CUBRID_ERROR_LOG environment variable, using default value */
+#if defined(WINDOWS)
+  PUT_ENV ("CUBRID_ERROR_LOG", "");
+#else
+  unsetenv ("CUBRID_ERROR_LOG");
+#endif
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -370,16 +375,6 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   argv[4] = NULL;
 
   extra_envp[envc++] = "CUBRID_ERROR_LOG=";    /* removing env variable CUBRID_ERROR_LOG if exists */
-
-#ifdef HPUX
-#ifdef HPUX_IA64
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.so");
-#else /* pa-risc */
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.sl");
-#endif
-  extra_envp[envc++] = jvm_env_string;
-#endif
-
   extra_envp[envc] = NULL;
 
   pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL, extra_envp);    /* start server */
@@ -1159,21 +1154,28 @@ _size_to_byte_by_unit (double orgin_num, char unit)
 
 void SpaceDbResultNewFormat::add_volume (char *str_buf)
 {
-  char purpose[128], volume_name[PATH_MAX], type[32];
+  char purpose[COLUMN_VALUE_MAX_SIZE], volume_name[4096], type[COLUMN_VALUE_MAX_SIZE];
   struct stat statbuf;
 
   SpaceDbVolumeInfoNewFormat volume;
-  sscanf (str_buf, "%d %s %s DATA %d %d %d %s", &volume.volid, type, purpose,
+
+  memset (&volume, 0, sizeof (volume));
+  purpose[0] = volume_name[0] = type[0] = '\0';
+
+  sscanf (str_buf, "%d %31s %31s DATA %d %d %d %4095s", &volume.volid, type, purpose,
           &volume.used_size,
           &volume.free_size,
           &volume.total_size,
           volume_name);
-  strcpy (volume.purpose, purpose);
-  strcpy (volume.type, type);
-  strcpy (volume.volume_name, volume_name);
 
-  stat (volume_name, &statbuf);
+  strcpy_limit (volume.purpose, purpose, sizeof (volume.purpose));
+  strcpy_limit (volume.type, type, sizeof (volume.type));
+  strcpy_limit (volume.volume_name, volume_name, sizeof (volume.volume_name));
+
+  if (stat (volume_name, &statbuf) == 0)
+    {
   volume.date = statbuf.st_mtime;
+    }
 
   volumes.push_back (volume);
 }
@@ -1270,8 +1272,8 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
   else
     {
       *p = '\0';
-      snprintf (volume.location, sizeof (volume.location) - 1, "%s", vol_name);
-      snprintf (volume.vol_name, sizeof (volume.vol_name) - 1, "%s", p + 1);
+      snprintf (volume.location, sizeof (volume.location), "%s", vol_name);
+      snprintf (volume.vol_name, sizeof (volume.vol_name), "%s", p + 1);
       *p = '/';
     }
 
@@ -1284,7 +1286,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
   nv_update_val_int (res, "pagesize", page_size);
   nv_update_val_int (res, "logpagesize", log_page_size);
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", volumes[i].vol_name);
@@ -1297,7 +1299,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
       nv_add_nvp (res, "close", "spaceinfo");
     }
 
-  for (int i = 0; i < temporary_volumes.size(); i++)
+  for (size_t i = 0; i < temporary_volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", temporary_volumes[i].vol_name);
@@ -1328,7 +1330,7 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
       nv_add_nvp (res, "close", "dbinfo");
     }
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "type", volumes[i].type);
@@ -1359,7 +1361,8 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
 
 int SpaceDbResultOldFormat::get_cnt_tpage()
 {
-  int cnt_tpage = 0, i;
+  int cnt_tpage = 0;
+  size_t i;
 
   for (i = 0; i < volumes.size(); i++)
     {
@@ -1377,7 +1380,7 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 {
   int cnt_tpage = 0;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       cnt_tpage += volumes[i].total_size;
     }
@@ -1387,18 +1390,18 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 
 time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "DATA")
           || uStringEqual (volumes[i].purpose, "INDEX"))
         {
           strcpy (volname, volumes[i].vol_name);
-          snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
           if (!stat (strbuf, &statbuf))
             {
               mytime = statbuf.st_mtime;
@@ -1411,17 +1414,17 @@ time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 
 time_t SpaceDbResultNewFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "PERMANENT"))
         {
           strcpy (volname, volumes[i].volume_name);
-          snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
           if (!stat (strbuf, &statbuf))
             {
               mytime = statbuf.st_mtime;
@@ -1682,12 +1685,15 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
         {
           break;
         }
-      sscanf (str_buf, "%s %s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
+      if (index < DATABASE_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %31s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
               databaseSpaceDescriptions[index].purpose, &databaseSpaceDescriptions[index].volume_count,
               &databaseSpaceDescriptions[index].used_size,
               &databaseSpaceDescriptions[index].free_size,
               &databaseSpaceDescriptions[index].total_size);
       index++;
+    }
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
@@ -1727,14 +1733,16 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
         {
           continue;
         }
-
-      sscanf (str_buf, "%s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
+      if (index < FILES_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
               &fileSpaceDescriptions[index].file_count,
               &fileSpaceDescriptions[index].used_size,
               &fileSpaceDescriptions[index].file_table_size,
               &fileSpaceDescriptions[index].reserved_size,
               &fileSpaceDescriptions[index].total_size);
       index++;
+    }
     }
 
   fclose (fp);

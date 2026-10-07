@@ -29,6 +29,16 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>            /* isalpha()        */
+#include <inttypes.h>         /* SCNu64           */
+
+#include <iostream>
+#include <cctype>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <unordered_set>
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -40,6 +50,9 @@
 #include <sys/timeb.h>
 #include <winternl.h>
 #include <aclapi.h>           /* Get/SetNamedSecurityInfo () - move_file () ACL preservation */
+#include <windows.h>
+#include <shellapi.h>
+#include <tchar.h>
 #else
 #include <sys/types.h>        /* umask()          */
 #include <sys/stat.h>         /* umask(), stat()  */
@@ -51,6 +64,8 @@
 #include <sys/statvfs.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <wordexp.h>
+#include <cstdlib>
 #if defined(LINUX)
 #include <sys/wait.h>
 #endif /* LINUX */
@@ -209,6 +224,21 @@ cm_auto_jobs_mutex (void)
 /* for ut_getdelim */
 #define MAX_LINE ((int)(10*1024*1024))
 #define MIN_CHUNK 4096
+
+namespace
+{
+  const std::unordered_set <std::string> &allowed_script_env_names ()
+  {
+    static const std::unordered_set <std::string> kAllowed =
+    {
+      "LANG",
+      "TZ",
+      "CUBRID_TMP",
+    };
+
+    return kAllowed;
+  }
+}
 
 static T_FSERVER_TASK_INFO task_info[] =
 {
@@ -409,44 +439,21 @@ static int _maybe_ip_addr (char *hostname);
 static int _ip_equal_addrinfo (struct addrinfo *ai, char *token);
 static int get_short_filename (char *ret_name, int ret_name_len,
                                char *short_filename);
-static bool is_process_running (const char *process_name, unsigned int sleep_time);
+static bool delete_directory (const std::string &path);
+bool attempt_to_access_parent_dir (const char *path);
 
-/**
-* is_process_running is to check process running or not by checking pid
-* process_name: the name of process that must be in $CUBRID/bin
-* sleep_time: millisecond
-*/
-static bool
-is_process_running (const char *process_name, unsigned int sleep_time)
-{
-  FILE *input = NULL;
-  char buf[16], cmd[PATH_MAX];
+const std::string ALLOWED_ENV_VARS[] = {"CUBRID", "CUBRID_DATABASES"};
+const size_t ALLOWED_ENV_VARS_COUNT = sizeof (ALLOWED_ENV_VARS) / sizeof (ALLOWED_ENV_VARS[0]);
 
-  SLEEP_MILISEC (0, sleep_time);
+/*
+ * We allow $CUBRID on Linux and %CUBRID% on Windows.
+ */
 
-#if !defined (DO_NOT_USE_CUBRIDENV)
-  sprintf (cmd, "%s/%s/%s getpid", sco.szCubrid, CUBRID_DIR_BIN,
-           process_name);
+#if defined (WINDOWS)
+const std::string FORBIDDEN_CHARS = "` \t$&(|)><\n\r*;{}[]";
 #else
-  sprintf (cmd, "%s/%s getpid", CUBRID_BINDIR, process_name);
+const std::string FORBIDDEN_CHARS = "` \t%&(|)><\n\r;*{}[]";
 #endif
-  input = popen (cmd, "r");
-  if (input == NULL)
-    {
-      return false;
-    }
-
-  memset (buf, '\0', sizeof (buf));
-  if ((fgets (buf, 16, input) == NULL) || atoi (buf) <= 0)
-    {
-      pclose (input);
-      return false;
-    }
-
-  pclose (input);
-
-  return true;
-}
 
 int
 _op_check_is_localhost (char *token, char *hname)
@@ -664,14 +671,17 @@ ut_getline (char **lineptr, int *n, FILE *fp)
 void
 uRemoveCRLF (char *str)
 {
-    size_t i;
+  size_t len;
+
   if (str == NULL)
     {
       return;
     }
-  for (i = strlen (str) - 1; (i >= 0) && (str[i] == 10 || str[i] == 13); i--)
+
+  len = strlen (str);
+  while (len > 0 && (str[len - 1] == 10 || str[len - 1] == 13))
     {
-      str[i] = '\0';
+      str[--len] = '\0';
     }
 }
 
@@ -1133,7 +1143,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
   int i;
   int dbcnt;
   char strbuf[1024];
-  int dbvect[MAX_INSTALLED_DB];
+  int dbvect[MAX_INSTALLED_DB] = { 0 };
   FILE *outfp;
   T_SERVER_STATUS_INFO *info;
 
@@ -1154,7 +1164,7 @@ uWriteDBnfo2 (T_SERVER_STATUS_RESULT *cmd_res)
       else
         {
           info = (T_SERVER_STATUS_INFO *) cmd_res->result;
-          for (i = 0; i < cmd_res->num_result; i++)
+	  for (i = 0; i < cmd_res->num_result && dbcnt < MAX_INSTALLED_DB; i++)
             {
               if (dbcnt >= MAX_INSTALLED_DB)
                 {
@@ -1354,42 +1364,17 @@ uRemoveLockFile (int outfd)
 int
 uRemoveDir (char *dir, int remove_file_in_dir)
 {
-  char path[1024];
-  char command[2048];
-
   if (dir == NULL)
     {
       return ERR_DIR_REMOVE_FAIL;
     }
 
-  strcpy (path, dir);
-  memset (command, '\0', sizeof (command));
-  ut_trim (path);
-
-#if defined(WINDOWS)
-  unix_style_path (path);
-#endif
-
-  if (access (path, F_OK) == 0)
-    {
-      if (remove_file_in_dir == REMOVE_DIR_FORCED)
-        {
-          sprintf (command, "%s %s \"%s\"", DEL_DIR, DEL_DIR_OPT, path);
-          if (system (command) == -1)
+  if (access (dir, F_OK) != 0)
             {
-              return ERR_DIR_REMOVE_FAIL;
-            }
-        }
-      else
-        {
-          if (rmdir (path) == -1)
-            {
-              return ERR_DIR_REMOVE_FAIL;
-            }
-        }
+      return ERR_NO_ERROR;
     }
 
-  return ERR_NO_ERROR;
+  return delete_directory (dir) ? ERR_NO_ERROR  : ERR_DIR_REMOVE_FAIL;
 }
 
 #if defined(WINDOWS)
@@ -1532,12 +1517,12 @@ folder_copy (const char *src_folder, const char *dest_folder)
 
   while ((dirp = readdir (dp)) != NULL)
     {
-      char src_path[PATH_MAX];
-      char dest_path[PATH_MAX];
+      char src_path[COMPOSED_PATH_MAX];
+      char dest_path[COMPOSED_PATH_MAX];
 
-      snprintf (src_path, sizeof (src_path) - 1, "%s/%s", src_dir,
+      snprintf (src_path, sizeof (src_path), "%s/%s", src_dir,
                 dirp->d_name);
-      snprintf (dest_path, sizeof (dest_path) - 1, "%s/%s", dest_dir,
+      snprintf (dest_path, sizeof (dest_path), "%s/%s", dest_dir,
                 dirp->d_name);
 
       stat (src_path, &statbuf);
@@ -2468,6 +2453,8 @@ is_cmserver_process (int pid, const char *module_name)
 
   unlink (result_file);
   return return_value;
+#else
+  return -1;
 #endif
 }
 
@@ -3955,6 +3942,11 @@ get_short_filename (char *ret_name, int ret_name_len,
   char *path_p = NULL;
   unsigned int filename_len = 0;
 
+  if (short_filename == NULL)
+    {
+      return -1;
+    }
+
 #if defined(WINDOWS)
   path_p = strrchr (short_filename, '\\');
 #else
@@ -3962,11 +3954,6 @@ get_short_filename (char *ret_name, int ret_name_len,
 #endif
 
   if (path_p != NULL)
-    {
-      return -1;
-    }
-
-  if (short_filename == NULL)
     {
       return -1;
     }
@@ -4009,7 +3996,7 @@ ut_get_filename (char *fullpath, int with_ext, char *ret_filename)
   filename = strrchr (fullpath, '/');
 #endif
 
-  if ((filename == NULL) || ((filename + 1) == NULL))
+  if (filename == NULL)
     {
       return -1;
     }
@@ -4404,8 +4391,8 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
 int
 ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
 {
-  long vmem_pages;
-  long rmem_pages;
+  unsigned long vmem_pages;
+  unsigned long rmem_pages;
   char fname[PATH_MAX];
   FILE *cpufp = NULL;
   FILE *memfp = NULL;
@@ -4435,15 +4422,9 @@ ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid)
       fclose (cpufp);
       return -1;
     }
-#if __WORDSIZE == 64
-  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%lu%lu",
+  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%" SCNu64 "%" SCNu64,
           &stat->cpu_user, &stat->cpu_kernel);
   fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
-#else
-  fscanf (cpufp, "%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%*s%llu%llu",
-          &stat->cpu_user, &stat->cpu_kernel);
-  fscanf (memfp, "%lu%lu", &vmem_pages, &rmem_pages);    /* 'size' and 'resident' in stat file */
-#endif
 
   stat->mem_virtual = vmem_pages * sysconf (_SC_PAGESIZE);
   stat->mem_physical = rmem_pages * sysconf (_SC_PAGESIZE);
@@ -4459,9 +4440,9 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
 {
   char linebuf[LINE_MAX];
   char prefix[50];
-  uint64_t nice;
-  uint64_t buffers;
-  uint64_t cached;
+  uint64_t nice = 0;
+  uint64_t buffers = 0;
+  uint64_t cached = 0;
   FILE *cpufp = NULL;
   FILE *memfp = NULL;
   int n_cpuitem = 0;
@@ -4487,6 +4468,7 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
   if (memfp == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "meminfo_file");
+      fclose (cpufp);
       return ERR_FILE_OPEN_FAIL;
     }
 
@@ -4495,13 +4477,9 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "cpu"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu%lu%lu%lu%lu", &stat->cpu_user, &nice,
+	  sscanf (linebuf, "%*s%" SCNu64 "%" SCNu64 "%" SCNu64 "%" SCNu64 "%" SCNu64,
+		  &stat->cpu_user, &nice,
                   &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
-#else
-          sscanf (linebuf, "%*s%llu%llu%llu%llu%llu", &stat->cpu_user, &nice,
-                  &stat->cpu_kernel, &stat->cpu_idle, &stat->cpu_iowait);
-#endif
 
           stat->cpu_user += nice;
           n_cpuitem++;
@@ -4518,54 +4496,30 @@ ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error)
       sscanf (linebuf, "%49s", prefix);
       if (!strcmp (prefix, "MemTotal:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_physical_total);
-#else
-          sscanf (linebuf, "%*s%llu", &stat->mem_physical_total);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_physical_total);
           n_memitem++;
         }
       if (!strcmp (prefix, "MemFree:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_physical_free);
-#else
-          sscanf (linebuf, "%*s%llu", &stat->mem_physical_free);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_physical_free);
           n_memitem++;
         }
       if (!strcmp (prefix, "Buffers:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &buffers);
-#else
-          sscanf (linebuf, "%*s%llu", &buffers);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &buffers);
         }
       if (!strcmp (prefix, "Cached:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &cached);
-#else
-          sscanf (linebuf, "%*s%llu", &cached);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &cached);
         }
       if (!strcmp (prefix, "SwapTotal:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_swap_total);
-#else
-          sscanf (linebuf, "%*s%llu", &stat->mem_swap_total);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_swap_total);
           n_memitem++;
         }
       if (!strcmp (prefix, "SwapFree:"))
         {
-#if __WORDSIZE == 64
-          sscanf (linebuf, "%*s%lu", &stat->mem_swap_free);
-#else
-          sscanf (linebuf, "%*s%llu", &stat->mem_swap_free);
-#endif
+	  sscanf (linebuf, "%*s%" SCNu64, &stat->mem_swap_free);
           n_memitem++;
         }
     }
@@ -4602,9 +4556,9 @@ ut_record_cubrid_utility_log_stderr (const char *msg)
       return -1;
     }
 #if !defined(WINDOWS)
-  fprintf (stderr, msg);
+  fprintf (stderr, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }
@@ -4617,9 +4571,9 @@ ut_record_cubrid_utility_log_stdout (const char *msg)
       return -1;
     }
 #if !defined(WINDOWS)
-  fprintf (stdout, msg);
+  fprintf (stdout, "%s", msg);
 #endif
-  cm_util_log_write_errstr (msg);
+  cm_util_log_write_errstr ("%s", msg);
 
   return 0;
 }
@@ -4693,4 +4647,630 @@ ut_child_exited_ok (int exit_code)
 #else
   return (WIFEXITED (exit_code) != 0 && WEXITSTATUS (exit_code) == 0);
 #endif
+}
+
+#if defined (WINDOWS)
+static bool
+delete_directory (const std::string &rawPath)
+{
+  char abs_path[MAX_PATH + 1];
+  if (GetFullPathNameA (rawPath.c_str (), MAX_PATH, abs_path, NULL) == 0)
+    {
+      return false;
+    }
+
+  std::string path (abs_path);
+  for (size_t i = 0; i < path.length(); ++i)
+    {
+      if (path[i] == '/')
+	{
+	  path[i] = '\\';
+	}
+    }
+
+  strncpy (abs_path, path.c_str (), MAX_PATH - 1);
+  abs_path[path.length ()] = '\0';
+  abs_path[path.length () + 1] = '\0';
+
+  SHFILEOPSTRUCTA file_op = { 0 };
+
+  file_op.hwnd = NULL;
+  file_op.wFunc = FO_DELETE;
+  file_op.pFrom = abs_path;
+  file_op.fFlags = FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT;
+
+  int result = SHFileOperationA (&file_op);
+
+  return (result == 0);
+}
+#else
+static bool
+delete_directory (const std::string &path)
+{
+  DIR *dir = opendir (path.c_str ());
+  if (!dir)
+    {
+      return false;
+    }
+
+  struct dirent *entry;
+  bool success = true;
+
+  while ((entry = readdir (dir)) != nullptr)
+    {
+      std::string name = entry->d_name;
+      if (name == "." || name == "..")
+	{
+	  continue;
+	}
+
+      std::string fullPath = path + "/" + name;
+      struct stat statbuf;
+
+      if (lstat (fullPath.c_str (), &statbuf) == 0)
+	{
+	  if (S_ISDIR (statbuf.st_mode))
+	    {
+	      if (!delete_directory (fullPath))
+		{
+		  success = false;
+		}
+	    }
+	  else
+	    {
+	      if (unlink (fullPath.c_str ()) != 0)
+		{
+		  success = false;
+		}
+	    }
+	}
+    }
+
+  closedir (dir);
+
+  if (success && rmdir (path.c_str ()) == 0)
+    {
+      return true;
+    }
+
+  return false;
+}
+#endif
+
+bool
+isValidEnvChar (char c)
+{
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '_');
+}
+
+bool
+isEnvVarAllowed (const std::string &var_name)
+{
+  for (size_t i = 0; i < ALLOWED_ENV_VARS_COUNT; ++i)
+    {
+      if (ALLOWED_ENV_VARS[i] == var_name)
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool
+is_invalid_filename (const char *filename)
+{
+  return is_valid_filename (filename) ? false : true;
+}
+
+bool
+is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
+{
+  bool ret = is_valid_filename (filename) ? false : true;
+
+  if (ret)
+    {
+      if (filename == NULL)
+	{
+	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: (null)");
+	}
+      else
+	{
+	  std::string path = filename;
+
+	  /*
+	   * we want to change % to * in reply message, for example, %CUBRID% to *CUBRID*
+	   */
+
+	  if (!path.empty ())
+	    {
+	      std::replace (path.begin (), path.end (), '%', '*');
+	    }
+	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path.c_str ());
+	}
+    }
+
+  return ret;
+}
+
+bool
+is_valid_filename (const char *filename, std::string &expanded_path)
+{
+  if (filename == NULL || strlen (filename) == 0 || strlen (filename) > PATH_MAX)
+    {
+      return false;
+    }
+
+  std::string origin_path = filename;
+
+  try
+    {
+      expanded_path = expand_env_path (origin_path);
+    }
+  catch (const std::invalid_argument &e)
+    {
+      return false;
+    }
+
+  if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  return true;
+}
+
+bool
+is_valid_filename (const char *filename)
+{
+  if (filename == NULL || strlen (filename) == 0)
+    {
+      return false;
+    }
+
+  std::string origin_path = filename;
+  std::string expanded_path;
+
+  try
+    {
+      expanded_path = expand_env_path (origin_path);
+    }
+  catch (const std::invalid_argument &e)
+    {
+      return false;
+    }
+
+  if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  return true;
+}
+
+bool
+attempt_to_access_parent_dir (const char *path)
+{
+  if (path == NULL)
+    {
+      return false;
+    }
+
+  std::string filename = path;
+
+  if (filename.empty ())
+    {
+      return false;
+    }
+
+  if (filename.front () == '/' || filename.front () == '\\')
+    {
+      return true;
+    }
+
+  if (filename.length () >= 2 && filename[1] == ':' && std::isalpha (static_cast <unsigned char> (filename[0])))
+    {
+      return true;
+    }
+
+  if (filename.find ("..") != std::string::npos)
+    {
+      return true;
+    }
+
+  return false;
+}
+
+bool
+is_invalid_schema_file_lists (char *path, char *_dbmt_error)
+{
+  if (path == NULL)
+    {
+      return false;
+    }
+
+  bool ret = false;
+  std::ifstream file (path);
+
+  if (!file.is_open ())
+    {
+      return false;
+    }
+
+  std::string line;
+
+  while (std::getline (file, line))
+    {
+      if (!line.empty () && line.back () == '\r')
+	{
+	  line.pop_back ();
+	}
+
+      if (line.empty ())
+	{
+	  continue;
+	}
+
+      if (is_invalid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid filename or attempt to access file in parent path: %s",
+		    line.c_str ());
+	  ret = true;
+	  break;
+	}
+    }
+
+  return ret;
+}
+
+std::vector<std::string> split_path (const std::string &path, char seperator)
+{
+  std::vector<std::string> tokens;
+  std::stringstream ss (path);
+  std::string token;
+
+  while (std::getline (ss, token, seperator))
+    {
+      if (!token.empty ())
+	{
+	  tokens.push_back (token);
+	}
+    }
+
+  return tokens;
+}
+
+std::string clean_path (const std::string &path, char seperator)
+{
+  std::vector<std::string> tokens = split_path (path, seperator);
+  std::vector<std::string> cleaned;
+
+  for (const auto &token : tokens)
+    {
+      if (token == ".")
+	{
+	  continue;
+	}
+
+      if (token == "..")
+	{
+	  if (!cleaned.empty ())
+	    {
+	      cleaned.pop_back ();
+	    }
+	  continue;
+	}
+
+      cleaned.push_back (token);
+    }
+
+  std::string result;
+  for (const auto &token : cleaned)
+    {
+      result += seperator + token;
+    }
+
+  return result.empty () ? std::string (1, seperator) : result;
+}
+
+std::string
+expand_env_path (const std::string &path)
+{
+#if defined (WINDOWS)
+  DWORD bufferSize = ExpandEnvironmentStringsA (path.c_str (), nullptr, 0);
+  if (bufferSize == 0)
+    {
+      return path;
+    }
+
+  std::string expanded (bufferSize, '\0');
+  ExpandEnvironmentStringsA (path.c_str (), &expanded[0], bufferSize);
+
+  expanded.erase (std::find (expanded.begin (), expanded.end (), '\0'), expanded.end ());
+  return expanded;
+#else
+  std::string result;
+  result.reserve (path.size ());
+
+  size_t i = 0;
+  while (i < path.size ())
+    {
+      char c = path[i];
+
+      if (c == '$')
+	{
+	  size_t start = i + 1;
+	  bool braced = (start < path.size () && path[start] == '{');
+	  size_t name_start = braced ? start + 1 : start;
+	  size_t j = name_start;
+
+	  while (j < path.size ()
+		 && (std::isalnum ((unsigned char) path[j]) || path[j] == '_'))
+	    {
+	      ++j;
+	    }
+
+	  if (j == name_start)
+	    {
+	      result += c;
+	      ++i;
+	      continue;
+	    }
+
+	  std::string var_name = path.substr (name_start, j - name_start);
+	  size_t after = j;
+
+	  if (braced)
+	    {
+	      if (after >= path.size () || path[after] != '}')
+		{
+		  throw std::invalid_argument ("malformed ${} in path: " + path);
+		}
+	      ++after;
+	    }
+
+	  const char *val = std::getenv (var_name.c_str ());
+	  if (val == nullptr)
+	    {
+	      throw std::invalid_argument ("undefined env var: " + var_name);
+	    }
+
+	  result += val;
+	  i = after;
+	}
+      else
+	{
+	  result += c;
+	  ++i;
+	}
+    }
+
+  return result;
+#endif
+}
+
+bool
+is_subpath (const char *allowd_path, const char *path)
+{
+#if defined (WINDOWS)
+  char seperator = '\\';
+#else
+  char seperator = '/';
+#endif
+  if (allowd_path == NULL || path == NULL)
+    {
+      return false;
+    }
+
+  std::string allowed_dir = allowd_path;
+  std::string user_path = path;
+  if (allowed_dir.empty () || user_path.empty ())
+    {
+      return false;
+    }
+#if defined (WINDOWS)
+  std::replace (allowed_dir.begin (), allowed_dir.end (), '/', '\\');
+  std::replace (user_path.begin (), user_path.end (), '/', '\\');
+  std::transform (allowed_dir.begin (), allowed_dir.end (), allowed_dir.begin (), ::tolower);
+  std::transform (user_path.begin (), user_path.end (), user_path.begin (), ::tolower);
+#endif
+  std::string clean_allowed = clean_path (allowed_dir, seperator);
+  std::string clean_user = clean_path (user_path, seperator);
+
+  if (clean_allowed.empty () || clean_user.empty ())
+    {
+      return false;
+    }
+
+  if (clean_allowed.back () != seperator)
+    {
+      clean_allowed += seperator;
+    }
+  if (clean_user.back () != seperator)
+    {
+      clean_user += seperator;
+    }
+#if defined (WINDOWS)
+  if (clean_allowed.substr (0, 2) != clean_user.substr (0, 2))
+    {
+      return false;
+    }
+#endif
+  return clean_user.rfind (clean_allowed, 0) == 0;
+}
+
+bool
+is_authorized_filename (const char *path, char *_dbmt_error)
+{
+  std::string expanded_path;
+
+  if (path == NULL || !is_valid_filename (path, expanded_path))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path ? path : "(NULL)");
+      return false;
+    }
+
+  if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
+    {
+      return true;
+    }
+
+  std::string origin_path = path;
+  std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
+
+  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
+	    allowed_path.c_str (), origin_path.c_str ());
+
+  return false;
+}
+
+bool
+is_valid_env_name_format (const std::string &name)
+{
+  if (name.empty ())
+    {
+      return false;
+    }
+
+  if (!std::isalpha (static_cast <unsigned char> (name[0])) && name[0] != '_')
+    {
+      return false;
+    }
+
+  for (char c : name)
+    {
+      if (!std::isalnum (static_cast <unsigned char> (c)) && c != '_')
+	{
+	  return false;
+	}
+    }
+
+  return true;
+}
+
+bool
+is_allowed_script_env (const std::string &name)
+{
+  if (!is_valid_env_name_format (name))
+    {
+      return false;
+    }
+
+  const auto &allowed = allowed_script_env_names ();
+
+  return allowed.find (name) != allowed.end ();
+}
+
+std::string
+extract_env_name (const std::string &env_entry)
+{
+  if (env_entry.empty ())
+    {
+      return "";
+    }
+
+  size_t pos = env_entry.find ('=');
+
+  if (pos == std::string::npos)
+    {
+      return "";
+    }
+
+  return env_entry.substr (0, pos);
+}
+
+bool
+is_pid_dir (const std::string &name)
+{
+  if (name.empty ())
+    {
+      return false;
+    }
+
+  for (char c:name)
+    {
+      if (!std::isdigit (static_cast < unsigned char > (c)))
+	{
+	  return false;
+	}
+    }
+
+  return true;
+}
+
+bool
+get_proc_uid (const std::string &pid, uid_t &uid)
+{
+  std::ifstream status_file ("/proc/" + pid + "/status");
+
+  if (!status_file.is_open ())
+    {
+      return false;
+    }
+
+  std::string line;
+  while (std::getline (status_file, line))
+    {
+      if (line.compare (0, 4, "Uid:") == 0)
+	{
+	  std::istringstream iss (line.substr (4));
+	  iss >> uid;
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool
+get_proc_comm (const std::string &pid, std::string &comm)
+{
+  std::ifstream comm_file ("/proc/" + pid + "/comm");
+
+  if (!comm_file.is_open ())
+    {
+      return false;
+    }
+
+  std::getline (comm_file, comm);
+
+  while (!comm.empty () && std::isspace (static_cast < unsigned char > (comm.back ())))
+    {
+      comm.pop_back ();
+    }
+
+  return true;
+}
+
+bool
+setenv_using_putenv_fmt (const std::string &nameValue, int overwrite)
+{
+  size_t eqPos = nameValue.find ('=');
+
+  if (eqPos == std::string::npos)
+    {
+      return false;
+    }
+
+  std::string name = nameValue.substr (0, eqPos);
+  std::string value = nameValue.substr (eqPos + 1);
+
+  if (name.empty ())
+    {
+      return false;
+    }
+
+#if defined(WINDOWS)
+  errno_t err = _putenv_s (name.c_str (), value.c_str ());
+  if (err != 0)
+    {
+      return false;
+    }
+#else
+  if (setenv (name.c_str (), value.c_str (), overwrite) != 0)
+    {
+      return false;
+    }
+#endif
+
+  return true;
 }

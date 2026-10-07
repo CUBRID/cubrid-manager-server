@@ -25,6 +25,8 @@
 #ifndef _CM_SERVER_UTIL_H_
 #define _CM_SERVER_UTIL_H_
 
+#include <string>
+
 #include "cm_porting.h"
 #include "cm_dep.h"
 #include "cm_cmd_exec.h"
@@ -38,9 +40,20 @@
 #include <limits.h>
 #include <stdint.h>
 #else
-#ifndef uint64_t
-typedef unsigned __int64 uint64_t;
+typedef unsigned int uid_t;
 #endif
+
+#if defined (_MSC_VER) && (_MSC_VER < 1600)
+typedef unsigned __int64 uint64_t;
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int16 uint16_t;
+typedef unsigned __int8  uint8_t;
+#endif
+
+#if defined (WINDOWS)
+#define PUT_ENV(name,val) _putenv_s(name,val)
+#else
+#define PUT_ENV(name,val) setenv(name,val,1)
 #endif
 
 #define makestring1(x) #x
@@ -61,7 +74,7 @@ typedef unsigned __int64 uint64_t;
 #define BYTES_IN_M (1024 * 1024)
 #define BYTES_IN_G (1024 * 1024 * 1024)
 
-#define RSA_KEY_SIZE 1024
+#define RSA_KEY_SIZE 2048
 
 #ifdef _DEBUG_
 #include "deb.h"
@@ -370,4 +383,21 @@ bool ut_child_exited_ok (int exit_code);
 int ut_validate_auth (nvplist *req);
 #endif
 
+bool is_valid_filename (const char *filename);
+bool is_invalid_filename (const char *filename);
+bool is_valid_filename (const char *filename, std::string &expanded_path);
+bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
+bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
+bool is_subpath (const char *allowd_path, const char *path);
+bool is_authorized_filename (const char *path, char *_dbmt_error);
+bool attempt_to_access_parent_dir (const char *path);
+bool is_allowed_script_env (const std::string &name);
+std::string expand_env_path (const std::string &path);
+std::string extract_env_name (const std::string &env_entry);
+#if !defined (WINDOWS)
+bool is_pid_dir (const std::string &name);
+bool get_proc_uid (const std::string &pid, uid_t &uid);
+bool get_proc_comm (const std::string &pid, std::string &comm);
+#endif
+bool setenv_using_putenv_fmt (const std::string &nameValue, int overwrite = 1);
 #endif                /* _CM_SERVER_UTIL_H_ */

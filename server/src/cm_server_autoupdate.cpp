@@ -226,7 +226,6 @@ generate_update_script (char *patch_name, char *url, char *path,
 }
 
 #else
-
 int
 generate_update_script (char *patch_name, char *url, char *path,
                         char *_dbmt_error)
@@ -289,7 +288,6 @@ generate_update_script (char *patch_name, char *url, char *path,
 
   return ERR_NO_ERROR;
 }
-
 #endif
 
 mz_bool

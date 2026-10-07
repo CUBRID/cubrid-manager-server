@@ -94,9 +94,9 @@ get_msg_by_id (int ptn_id)
   for (i = 0; msg_str_ptn[i].ptn_id != PTN_UNDEFINE; i++)
     {
       if ((int) msg_str_ptn[i].ptn_id == ptn_id)
-        {
-          return msg_str_ptn[i].ptn_msg;
-        }
+	{
+	  return msg_str_ptn[i].ptn_msg;
+	}
     }
 
   return NULL;
@@ -111,10 +111,10 @@ run_task (const char *task_name, int argc, const char *argv[])
   for (i = 0; cmd_info[i].cmd_name != NULL; i++)
     {
       if (task_name != NULL && strcmp (task_name, cmd_info[i].cmd_name) == 0)
-        {
-          retval = (*cmd_info[i].cmd_func) (argc, argv);
-          return retval;
-        }
+	{
+	  retval = (*cmd_info[i].cmd_func) (argc, argv);
+	  return retval;
+	}
     }
 
   return E_CMD_NOT_EXIST;
@@ -129,13 +129,13 @@ utility_make_getopt_optstring (struct option *opt_array, char *buf)
   for (i = 0; opt_array[i].name; i++)
     {
       if (opt_array[i].val < 255)
-        {
-          *p++ = (char) opt_array[i].val;
-          if (opt_array[i].has_arg)
-            {
-              *p++ = ':';
-            }
-        }
+	{
+	  *p++ = (char) opt_array[i].val;
+	  if (opt_array[i].has_arg)
+	    {
+	      *p++ = ':';
+	    }
+	}
     }
   *p = '\0';
   return buf;
@@ -166,10 +166,10 @@ get_cmdname_by_id (int cmd_id, char *cmd_name, int buf_size)
   for (i = 0; cmd_info[i].cmd_name != NULL; i++)
     {
       if (cmd_id == (int) cmd_info[i].cmd_id)
-        {
-          snprintf (cmd_name, buf_size - 1, cmd_info[i].cmd_name);
-          return 0;
-        }
+	{
+	  snprintf (cmd_name, buf_size - 1, cmd_info[i].cmd_name);
+	  return 0;
+	}
     }
 
   return -1;
@@ -188,20 +188,20 @@ print_help_msg (int cmd_id)
     case CMD_ADDUSER:
       printf ("adduser: Add a DBMT user to the cmserver.\n");
       printf (pattern_usage,
-              "adduser [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DBMT_USER_PWD
-              ">");
+	      "adduser [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DBMT_USER_PWD
+	      ">");
       printf ("valid options:\n");
       printf (pattern, "-b", "--broker",
-              "Authority of broker, default: none; allowed:");
+	      "Authority of broker, default: none; allowed:");
       printf (pattern2, " ", "none, admin, monitor");
       printf (pattern, "-c", "--dbcreate",
-              "Authority of creating a database, only admin user has the auth to create a database;");
+	      "Authority of creating a database, only admin user has the auth to create a database;");
       printf (pattern2, " ", "default: none;  allowed: none, admin");
       printf (pattern, "-m", "--monitor",
-              "Authority of monitoring host & database, default: none; allowed:");
+	      "Authority of monitoring host & database, default: none; allowed:");
       printf (pattern2, " ", "none, admin, monitor");
       printf (pattern, "-d", "--dbinfo",
-              "DBINFO should be formatted as follows:");
+	      "DBINFO should be formatted as follows:");
       printf (pattern2, " ", "\"<dbname>;<uid>;<broker_ip>,<broker_port>\"");
       break;
 
@@ -218,28 +218,28 @@ print_help_msg (int cmd_id)
     case CMD_DELDBINFO:
       printf ("deldbinfo: Delete a dbinfo of the specified DBMT user.\n");
       printf (pattern_usage,
-              "deldbinfo <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME ">");
+	      "deldbinfo <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME ">");
       break;
 
     case CMD_ADDDBINFO:
       printf ("adddbinfo: Add a dbinfo to a DBMT user.\n");
       printf (pattern_usage,
-              "adddbinfo [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME
-              ">");
+	      "adddbinfo [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME
+	      ">");
       printf ("valid options:\n");
       printf (pattern, "-u", "--uid",
-              "Uid is the dbuser of the database; default: dba");
+	      "Uid is the dbuser of the database; default: dba");
       printf (pattern, "-h", "--host",
-              "Host is the ipaddr of the broker; default: localhost");
+	      "Host is the ipaddr of the broker; default: localhost");
       printf (pattern, "-p", "--port",
-              "Port is the port of broker; default: 30000");
+	      "Port is the port of broker; default: 30000");
       break;
 
     case CMD_CHGDBINFO:
       printf ("changedbinfo: Add a dbinfo to a DBMT user.\n");
       printf (pattern_usage,
-              "changedbinfo [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME
-              ">");
+	      "changedbinfo [OPTIONS] <" ARG_DBMT_USER_NAME "> <" ARG_DB_NAME
+	      ">");
       printf ("valid options:\n");
       printf (pattern, "-u", "--uid  ", "Uid is the dbuser of the database");
       printf (pattern, "-h", "--host", "Host is the ipaddr of the broker");
@@ -250,27 +250,27 @@ print_help_msg (int cmd_id)
       printf
       ("changeuserpwd: Change the password of the specified DBMT user.\n");
       printf (pattern_usage,
-              "changeuserpwd [OPTIONS] <" ARG_DBMT_USER_NAME ">");
+	      "changeuserpwd [OPTIONS] <" ARG_DBMT_USER_NAME ">");
       printf ("valid options:\n");
       printf (pattern, "-o", "--oldpass", "Old password of the DBMT user.");
       printf (pattern, "-n", "--newpass", "New password of the DBMT user.");
       printf (pattern_long_only, "--adminpass",
-              "Admin password should be set when old password is not offered.");
+	      "Admin password should be set when old password is not offered.");
       break;
 
     case CMD_CHGUSER_AUTH:
       printf
       ("changeuserauth: Change the authority info of the DBMT user.\n");
       printf (pattern_usage,
-              "changeuserauth [OPTIONS] <" ARG_DBMT_USER_NAME ">");
+	      "changeuserauth [OPTIONS] <" ARG_DBMT_USER_NAME ">");
       printf ("valid options:\n");
       printf (pattern, "-b", "--broker", "Authority of broker; allowed:");
       printf (pattern2, " ", "none, admin, monitor");
       printf (pattern, "-c", "--dbcreate",
-              "Authority of creating a database, only admin user has the authority to create database;");
+	      "Authority of creating a database, only admin user has the authority to create database;");
       printf (pattern2, " ", "allowed: none, admin");
       printf (pattern, "-m", "--monitor",
-              "Authority of monitoring host and database; allowed:");
+	      "Authority of monitoring host and database; allowed:");
       printf (pattern2, " ", "none, admin, monitor");
       break;
 
