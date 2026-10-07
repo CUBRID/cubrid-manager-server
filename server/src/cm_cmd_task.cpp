@@ -463,7 +463,7 @@ cmd_viewuser (int argc, const char *in_argv[])
     }
   else
     {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1,
+      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, "%s",
 		get_msg_by_id (PTN_ARG_NUM_ERR));
       retval = E_ARG_ERR;
       goto error_return;
@@ -916,7 +916,7 @@ cmd_deldbinfo (int argc, const char *in_argv[])
 
   if (argc != 3)
     {
-      snprintf (error_msg, DBMT_USER_NAME_LEN - 1, get_msg_by_id (PTN_ARG_NUM_ERR));
+      snprintf (error_msg, DBMT_USER_NAME_LEN - 1, "%s", get_msg_by_id (PTN_ARG_NUM_ERR));
       retval = E_ARG_ERR;
       goto error_clean_return;
     }
@@ -1354,7 +1354,7 @@ _add_dbinfo_to_dbinfo_array (const char *dbinfo_str,
 
   if (*dbmt_dbinfo == NULL)
     {
-      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, get_msg_by_id (PTN_MEM_ALLOC_ERR));
+      snprintf (error_msg, DBMT_ERROR_MSG_SIZE - 1, "%s", get_msg_by_id (PTN_MEM_ALLOC_ERR));
       return E_FAILURE;
     }
 
