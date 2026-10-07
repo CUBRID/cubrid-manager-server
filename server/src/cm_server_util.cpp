@@ -22,6 +22,10 @@
  * cm_server_util.cpp -
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
