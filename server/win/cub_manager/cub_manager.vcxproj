@@ -104,7 +104,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\cm_autojob.cpp" />
     <ClCompile Include="..\..\src\cm_auto_task.cpp" />
-    <ClCompile Include="..\..\src\cm_cci_interface.cpp" />
     <ClCompile Include="..\..\src\cm_cmd_exec.cpp" />
     <ClCompile Include="..\..\src\cm_config.cpp" />
     <ClCompile Include="..\..\src\cm_connect_info.cpp" />
