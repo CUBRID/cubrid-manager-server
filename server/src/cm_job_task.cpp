@@ -5227,6 +5227,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   struct stat statbuf;
   const char *argv[30];
   int argc = 0;
+  bool use_hash_file = false;
   T_DB_SERVICE_MODE db_mode;
   char fullpath[PATH_MAX + 16];	/* holds "<path>/files/" */
   char dba_user[32] = "dba";
@@ -5293,6 +5294,21 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (is_invalid_filename_with_msg (fullpath, _dbmt_error))
     {
       return ERR_WITH_MSG;
+    }
+
+  use_hash_file = (usehash != NULL && strcmp (usehash, "yes") == 0);
+  if (use_hash_file)
+    {
+      if (hashdir == NULL)
+	{
+	  strcpy (_dbmt_error, "hashdir");
+	  return ERR_PARAM_MISSING;
+	}
+
+      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
 
   if (access (fullpath, F_OK) < 0)
@@ -5366,13 +5382,8 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "--" UNLOAD_OUTPUT_PATH_L;
   argv[argc++] = fullpath;
 
-  if ((usehash != NULL) && (strcmp (usehash, "yes") == 0))
+  if (use_hash_file)
     {
-      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
-	{
-	  return ERR_WITH_MSG;
-	}
-
       argv[argc++] = "--" UNLOAD_HASH_FILE_L;
       argv[argc++] = hashdir;
     }
