@@ -643,12 +643,13 @@ extern const char *autobackup_period_week[AUTOBACKUP_PERIOD_WEEK_NUM];
 extern int cubrid_version_major;
 extern int cubrid_version_minor;
 extern char cubrid_version_build[CUBRID_VERSION_BUILD_LEN];
-void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size);
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version,
+				       size_t build_version_size);
 #define CUBRID_VERS(major,minor)	((major)*100 + (minor))
 
 extern int auto_conf_delete (T_DBMT_FILE_ID fid, char *dbname);
 extern int auto_conf_rename (T_DBMT_FILE_ID fid, char *src_dbname,
-                             char *dest_dbname);
+			     char *dest_dbname);
 extern int auto_conf_execquery_update_dbuser (const char *src_db_uid,
     const char *dest_db_uid,
     const char *dest_db_passwd);

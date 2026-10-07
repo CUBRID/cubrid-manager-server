@@ -235,16 +235,16 @@ typedef struct
 } T_BROKER_DIAGDATA;
 
 #define MAX_STATDUMP_PROC 16
- typedef struct
- {
-   int pid;         /* the dispatcher pid run_child_env () returned */
-   int status;
-   int interval;
-   time_t started;
-   int worker_pid;  /* pid of the dispatcher's own worker child */
-   long long dispatcher_start_time;
-   long long worker_start_time;
- } T_STATDUMP_STAT;
+typedef struct
+{
+  int pid;         /* the dispatcher pid run_child_env () returned */
+  int status;
+  int interval;
+  time_t started;
+  int worker_pid;  /* pid of the dispatcher's own worker child */
+  long long dispatcher_start_time;
+  long long worker_start_time;
+} T_STATDUMP_STAT;
 
 typedef struct
 {
@@ -360,8 +360,8 @@ static char *_get_format_time ();
 static void read_stdout_stderr_as_err (char *tmp_out_file, char *tmp_err_file,
 				       char *_dbmt_error);
 static int run_child_with_msg (const char *const argv[], int wait_flag,
-		       char *task_name, char *stdout_file, char *_dbmt_error,
-		       const char *envp[] = NULL);
+			       char *task_name, char *stdout_file, char *_dbmt_error,
+			       const char *envp[] = NULL);
 static int _check_backup_info (const char *conf_item[], int check_backupid,
 			       char *_dbmt_error);
 static int _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -441,7 +441,7 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
  */
 static int
 run_child_with_msg (const char *const argv[], int wait_flag, char *task_name,
-	    char *stdout_file, char *_dbmt_error, const char *envp[])
+		    char *stdout_file, char *_dbmt_error, const char *envp[])
 {
   char tmp_out_file[PATH_MAX];
   char tmp_err_file[PATH_MAX];
@@ -904,12 +904,12 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 	   * this is a best-effort cache sync failing, not the requested operation.
 	   */
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-	            "WARNING: "
-	            "the password for database user '%s' on database '%s' was "
-	            "changed, but updating the cached password in "
-	            "autoexecquery.conf failed (lock timeout, file I/O error, "
-	            "or an internal update error); manual check recommended",
-	            new_db_user_name, db_name);
+		    "WARNING: "
+		    "the password for database user '%s' on database '%s' was "
+		    "changed, but updating the cached password in "
+		    "autoexecquery.conf failed (lock timeout, file I/O error, "
+		    "or an internal update error); manual check recommended",
+		    new_db_user_name, db_name);
 	  nv_update_val (res, "note", _dbmt_error);
 	  ut_error_log (req, _dbmt_error);
 	  return ERR_NO_ERROR;
@@ -2003,7 +2003,7 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
       T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
-	      (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
+			      (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
 
       if (tmp == NULL)
 	{
@@ -3150,13 +3150,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
        * Warning: the createdb already happened, but may still need manual cleanup.
        */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "WARNING: "
-                "database '%s' was created on disk, but it could not be "
-                "registered in cmdb.pass (lock timeout, file I/O error, or "
-                "an internal update error); the database is NOT currently "
-                "manageable through CMS for user '%s' until cmdb.pass is "
-                "corrected manually",
-                dbname, dbmt_user_name);
+		"WARNING: "
+		"database '%s' was created on disk, but it could not be "
+		"registered in cmdb.pass (lock timeout, file I/O error, or "
+		"an internal update error); the database is NOT currently "
+		"manageable through CMS for user '%s' until cmdb.pass is "
+		"corrected manually",
+		dbname, dbmt_user_name);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
@@ -3192,7 +3192,8 @@ bookkeeping_failed_files_list (int failed_mask, char *buf, size_t buf_size)
   {
     int bit;
     const char *name;
-  } entries[] = {
+  } entries[] =
+  {
     { BOOKKEEPING_FAILED_CMDB_PASS,      "cmdb.pass" },
     { BOOKKEEPING_FAILED_ADDVOLDB_CONF,  "the auto-job addvoldb config file" },
     { BOOKKEEPING_FAILED_BACKUPDB_CONF,  "the auto-job backupdb config file" },
@@ -3210,12 +3211,12 @@ bookkeeping_failed_files_list (int failed_mask, char *buf, size_t buf_size)
   buf[0] = '\0';
   for (i = 0; i < sizeof (entries) / sizeof (entries[0]); i++)
     {
-      if (!(failed_mask & entries[i].bit))
-        {
-          continue;
-        }
+      if (! (failed_mask & entries[i].bit))
+	{
+	  continue;
+	}
       snprintf (buf + strlen (buf), buf_size - strlen (buf),
-                "%s%s", wrote_any ? ", " : "", entries[i].name);
+		"%s%s", wrote_any ? ", " : "", entries[i].name);
       wrote_any = 1;
     }
 }
@@ -3342,12 +3343,12 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
        */
       bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "WARNING: "
-                "database '%s' was deleted, but the following bookkeeping "
-                "file(s) could not be updated (lock timeout, file I/O "
-                "error, or an internal update error): %s; manual check "
-                "recommended",
-                dbname, failed_files);
+		"WARNING: "
+		"database '%s' was deleted, but the following bookkeeping "
+		"file(s) could not be updated (lock timeout, file I/O "
+		"error, or an internal update error): %s; manual check "
+		"recommended",
+		dbname, failed_files);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
@@ -3621,13 +3622,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
        */
       bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "WARNING: "
-                "database '%s' was renamed to '%s', but the following "
-                "bookkeeping file(s) could not be updated (lock timeout, "
-                "file I/O error, or an internal update error): %s; stale "
-                "entries still referencing the old name '%s' may remain "
-                "and should be checked and cleaned up manually",
-                dbname, newdbname, failed_files, dbname);
+		"WARNING: "
+		"database '%s' was renamed to '%s', but the following "
+		"bookkeeping file(s) could not be updated (lock timeout, "
+		"file I/O error, or an internal update error): %s; stale "
+		"entries still referencing the old name '%s' may remain "
+		"and should be checked and cleaned up manually",
+		dbname, newdbname, failed_files, dbname);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
@@ -4299,17 +4300,17 @@ copydb_finale:
        * Warning: the copy already happened, but may still need manual cleanup
        */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-                "WARNING: "
-                "database '%s' was copied to '%s', but cmdb.pass could "
-                "not be updated with the new database's dbinfo (lock "
-                "timeout, read failure, or an internal update error); "
-                "the copy itself succeeded, but '%s' may not be "
-                "manageable through CMS until cmdb.pass is corrected "
-                "manually%s",
-                srcdbname, destdbname, destdbname,
-                move_flag ? " (note: 'move' was requested, so the source "
-                             "database's cmdb.pass entry may also still "
-                             "be present and need manual cleanup)" : "");
+		"WARNING: "
+		"database '%s' was copied to '%s', but cmdb.pass could "
+		"not be updated with the new database's dbinfo (lock "
+		"timeout, read failure, or an internal update error); "
+		"the copy itself succeeded, but '%s' may not be "
+		"manageable through CMS until cmdb.pass is corrected "
+		"manually%s",
+		srcdbname, destdbname, destdbname,
+		move_flag ? " (note: 'move' was requested, so the source "
+		"database's cmdb.pass entry may also still "
+		"be present and need manual cleanup)" : "");
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
       return ERR_NO_ERROR;
@@ -4982,14 +4983,14 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (input_class_file)
     {
       if (access (input_class_file, F_OK) < 0)
-        {
-          snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
-          if (class_names != NULL)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
+	  if (class_names != NULL)
 	    {
 	      unlink (class_names_file);
 	    }
-          return ERR_WITH_MSG;
-        }
+	  return ERR_WITH_MSG;
+	}
 
       argv[argc++] = "-" COMPACT_INPUT_CLASS_FILE_S;
       argv[argc++] = input_class_file;
@@ -5915,8 +5916,8 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   if (file_not_exist (schema, "none", _dbmt_error) || file_not_exist (object, "none", _dbmt_error)
-     || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
-     || file_not_exist (schema_file_list, "none", _dbmt_error) || schema_file_not_exist (schema_file_list, _dbmt_error))
+      || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
+      || file_not_exist (schema_file_list, "none", _dbmt_error) || schema_file_not_exist (schema_file_list, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -5979,9 +5980,9 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (exit_status != 0)
     {
 #if defined (WINDOWS)
-  int exit_code = exit_status;
+      int exit_code = exit_status;
 #else
-  int exit_code = WIFEXITED (exit_status) ? WEXITSTATUS (exit_status) : exit_status;
+      int exit_code = WIFEXITED (exit_status) ? WEXITSTATUS (exit_status) : exit_status;
 #endif
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", exit_code);
       return ERR_WITH_MSG;
@@ -10819,8 +10820,8 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   int isdba = 0;
   char outfile[PATH_MAX];
   const char *statement = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ?
-	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;" :
-	"SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
+			  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;" :
+			  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
 
   targetid = nv_get_val (in, "targetid");
   dbname = nv_get_val (in, "dbname");
@@ -17165,24 +17166,24 @@ _find_statdumpd_worker_pid (int dispatcher_pid)
     {
       HANDLE snap = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
       if (snap != INVALID_HANDLE_VALUE)
-        {
-          PROCESSENTRY32 pe32;
-          pe32.dwSize = sizeof (pe32);
-          if (Process32First (snap, &pe32))
-            {
-              do
-                {
-                  if ((int) pe32.th32ParentProcessID == dispatcher_pid)
-                    {
-                      int child_pid = (int) pe32.th32ProcessID;
-                      CloseHandle (snap);
-                      return child_pid;
-                    }
-                }
-              while (Process32Next (snap, &pe32));
-            }
-          CloseHandle (snap);
-        }
+	{
+	  PROCESSENTRY32 pe32;
+	  pe32.dwSize = sizeof (pe32);
+	  if (Process32First (snap, &pe32))
+	    {
+	      do
+		{
+		  if ((int) pe32.th32ParentProcessID == dispatcher_pid)
+		    {
+		      int child_pid = (int) pe32.th32ProcessID;
+		      CloseHandle (snap);
+		      return child_pid;
+		    }
+		}
+	      while (Process32Next (snap, &pe32));
+	    }
+	  CloseHandle (snap);
+	}
       Sleep (100);
     }
 
@@ -17246,17 +17247,17 @@ _statdump_pid_is_alive (int pid, long long expected_start_time)
       FILETIME creation, exit_time, kernel, user;
 
       if (GetProcessTimes (h, &creation, &exit_time, &kernel, &user))
-        {
-          ULARGE_INTEGER uli;
-          uli.LowPart = creation.dwLowDateTime;
-          uli.HighPart = creation.dwHighDateTime;
-          if ((long long) uli.QuadPart != expected_start_time)
-            {
-              /* a different process now occupies this pid number */
-              CloseHandle (h);
-              return 0;
-            }
-        }
+	{
+	  ULARGE_INTEGER uli;
+	  uli.LowPart = creation.dwLowDateTime;
+	  uli.HighPart = creation.dwHighDateTime;
+	  if ((long long) uli.QuadPart != expected_start_time)
+	    {
+	      /* a different process now occupies this pid number */
+	      CloseHandle (h);
+	      return 0;
+	    }
+	}
     }
 
   alive = (GetExitCodeProcess (h, &exit_code) && exit_code == STILL_ACTIVE);
@@ -17298,17 +17299,17 @@ _win_kill_process_tree (int root_pid)
   for (i = 0; i < pids.size (); i++)
     {
       if (!Process32First (snap, &pe32))
-        {
-          break;
-        }
+	{
+	  break;
+	}
       do
-        {
-          if (pe32.th32ParentProcessID == pids[i]
-              && find (pids.begin (), pids.end (), pe32.th32ProcessID) == pids.end ())
-            {
-              pids.push_back (pe32.th32ProcessID);
-            }
-        }
+	{
+	  if (pe32.th32ParentProcessID == pids[i]
+	      && find (pids.begin (), pids.end (), pe32.th32ProcessID) == pids.end ())
+	    {
+	      pids.push_back (pe32.th32ProcessID);
+	    }
+	}
       while (Process32Next (snap, &pe32));
     }
 
@@ -17320,18 +17321,18 @@ _win_kill_process_tree (int root_pid)
     {
       HANDLE h = OpenProcess (PROCESS_TERMINATE, FALSE, pids[i - 1]);
       if (h == NULL)
-        {
-          /* already gone (typical: ERROR_INVALID_PARAMETER) is fine; */
-          if (GetLastError () != ERROR_INVALID_PARAMETER)
-            {
-              ret = -1;
-            }
-          continue;
-        }
+	{
+	  /* already gone (typical: ERROR_INVALID_PARAMETER) is fine; */
+	  if (GetLastError () != ERROR_INVALID_PARAMETER)
+	    {
+	      ret = -1;
+	    }
+	  continue;
+	}
       if (!TerminateProcess (h, 1))
-        {
-          ret = -1;
-        }
+	{
+	  ret = -1;
+	}
       CloseHandle (h);
     }
 
@@ -17385,35 +17386,35 @@ _find_first_child_pid_by_proc_scan (int parent_pid)
       FILE *fp;
 
       if (entry->d_name[0] < '0' || entry->d_name[0] > '9')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       candidate_pid = atoi (entry->d_name);
       if (candidate_pid <= 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       snprintf (path, sizeof (path), "/proc/%d/stat", candidate_pid);
       fp = fopen (path, "r");
       if (fp == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (fgets (buf, sizeof (buf), fp) != NULL)
-        {
-          char *rparen = strrchr (buf, ')');
-          if (rparen != NULL)
-            {
-              int ppid = -1;
+	{
+	  char *rparen = strrchr (buf, ')');
+	  if (rparen != NULL)
+	    {
+	      int ppid = -1;
 
-              if (sscanf (rparen + 2, "%*c %d", &ppid) == 1 && ppid == parent_pid)
-                {
-                  found_pid = candidate_pid;
-                }
-            }
-        }
+	      if (sscanf (rparen + 2, "%*c %d", &ppid) == 1 && ppid == parent_pid)
+		{
+		  found_pid = candidate_pid;
+		}
+	    }
+	}
       fclose (fp);
     }
 
@@ -17447,9 +17448,9 @@ _find_statdumpd_worker_pid (int dispatcher_pid)
       int child_pid = _find_child_pid (dispatcher_pid);
 
       if (child_pid > 0)
-        {
-          return child_pid;
-        }
+	{
+	  return child_pid;
+	}
       usleep (100 * 1000);
     }
 
@@ -17506,10 +17507,10 @@ _statdump_pid_is_alive (int pid, long long expected_start_time)
   if (_read_proc_stat_fields (pid, &state, &current_start_time) == 0)
     {
       if (expected_start_time >= 0 && current_start_time != expected_start_time)
-        {
-          /* a different process now occupies this pid number */
-          return 0;
-        }
+	{
+	  /* a different process now occupies this pid number */
+	  return 0;
+	}
       return (state != 'Z');
     }
 
@@ -17536,21 +17537,21 @@ _reap_dead_statdump_entries (void)
   while (itor != statdump_daemon.end ())
     {
       if (itor->second.status == STATD_RUNNING)
-        {
-          bool have_worker = itor->second.worker_pid > 0;
-          int check_pid = have_worker ? itor->second.worker_pid : itor->second.pid;
-          long long check_start_time = have_worker
-                                       ? itor->second.worker_start_time
-                                       : itor->second.dispatcher_start_time;
+	{
+	  bool have_worker = itor->second.worker_pid > 0;
+	  int check_pid = have_worker ? itor->second.worker_pid : itor->second.pid;
+	  long long check_start_time = have_worker
+				       ? itor->second.worker_start_time
+				       : itor->second.dispatcher_start_time;
 
-          if (!_statdump_pid_is_alive (check_pid, check_start_time))
-            {
-              map <string, T_STATDUMP_STAT>::iterator to_erase = itor;
-              ++itor;
-              statdump_daemon.erase (to_erase);
-              continue;
-            }
-        }
+	  if (!_statdump_pid_is_alive (check_pid, check_start_time))
+	    {
+	      map <string, T_STATDUMP_STAT>::iterator to_erase = itor;
+	      ++itor;
+	      statdump_daemon.erase (to_erase);
+	      continue;
+	    }
+	}
       ++itor;
     }
 }
@@ -17605,7 +17606,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   reserved.dispatcher_start_time = -1;
   reserved.worker_start_time = -1;
   pair <map <string, T_STATDUMP_STAT>::iterator, bool> inserted =
-    statdump_daemon.insert (make_pair (string (db_name), reserved));
+	  statdump_daemon.insert (make_pair (string (db_name), reserved));
 
   mutex_unlock (*_statdumpd_mutex ());
 
@@ -17648,7 +17649,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
      * than reading it here after the call returns
      */
     ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, devnull_out, devnull_err, NULL, NULL,
-                             &dispatcher_start_time);
+			     &dispatcher_start_time);
   }
 #endif
 
@@ -17682,8 +17683,8 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
     if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
       {
-        worker_itor->second.worker_pid = worker_pid;
-        worker_itor->second.worker_start_time = worker_start_time;
+	worker_itor->second.worker_pid = worker_pid;
+	worker_itor->second.worker_start_time = worker_start_time;
       }
 
     mutex_unlock (*_statdumpd_mutex ());
@@ -17726,14 +17727,14 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   mutex_lock (*_statdumpd_mutex ());
 
   map <string, T_STATDUMP_STAT>::iterator itor =
-    db_name ? statdump_daemon.find (db_name) : statdump_daemon.end ();
+	  db_name ? statdump_daemon.find (db_name) : statdump_daemon.end ();
   if (itor == statdump_daemon.end () || itor->second.status != STATD_RUNNING)
-   {
-     mutex_unlock (*_statdumpd_mutex ());
-     nv_update_val (res, "note", "no statdump running");
-     nv_update_val (res, "status", "failed");
-     return -1;
-   }
+    {
+      mutex_unlock (*_statdumpd_mutex ());
+      nv_update_val (res, "note", "no statdump running");
+      nv_update_val (res, "status", "failed");
+      return -1;
+    }
 
   pid = itor->second.pid;
   worker_pid = itor->second.worker_pid;
@@ -17750,13 +17751,13 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
    * kills pid's whole process tree (worker included) natively
    */
   ret_val = _statdump_pid_is_alive (pid, dispatcher_start_time)
-           ? _win_kill_process_tree (pid) : 0;
+	    ? _win_kill_process_tree (pid) : 0;
 #else
   if (worker_pid > 0)
     {
       ret_val = _statdump_pid_is_alive (worker_pid, worker_start_time)
-               ? ((kill ((pid_t) worker_pid, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1)
-               : 0;
+		? ((kill ((pid_t) worker_pid, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1)
+		: 0;
     }
   else if (_statdump_pid_is_alive (pid, dispatcher_start_time))
     {
@@ -17766,13 +17767,13 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       int discovered = _find_child_pid (pid);
 
       if (discovered <= 0)
-        {
-          ret_val = 0;    /* nothing found to kill */
-        }
+	{
+	  ret_val = 0;    /* nothing found to kill */
+	}
       else
-        {
-          ret_val = (kill ((pid_t) discovered, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1;
-        }
+	{
+	  ret_val = (kill ((pid_t) discovered, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1;
+	}
     }
   else
     {
@@ -17790,20 +17791,20 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       int check_errno = errno;
 
       if (still_running)
-        {
-          nv_add_nvp (res, "Linux_error", "process still running");
-        }
+	{
+	  nv_add_nvp (res, "Linux_error", "process still running");
+	}
       else if (check_errno == EPERM)
-        {
-          char errbuf[CM_STRERROR_BUF_LEN];
-          nv_add_nvp (res, "Linux_error", STRERROR_R (check_errno, errbuf, sizeof (errbuf)));
-        }
+	{
+	  char errbuf[CM_STRERROR_BUF_LEN];
+	  nv_add_nvp (res, "Linux_error", STRERROR_R (check_errno, errbuf, sizeof (errbuf)));
+	}
       else
-        {
-          /* pid is gone (ESRCH or similar): nothing to worry about */
-          ret_val = 0;
-        }
-   }
+	{
+	  /* pid is gone (ESRCH or similar): nothing to worry about */
+	  ret_val = 0;
+	}
+    }
 
   if (ret_val >= 0 && _statdump_pid_is_alive (pid, dispatcher_start_time))
     {
@@ -17816,20 +17817,20 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   itor = statdump_daemon.find (db_name);
 
   if (ret_val < 0)
-      {
-        /*
-         * kill failed: put the entry back to STATD_RUNNING (instead of
-         * leaving it stuck in STATD_STOPPING) so a retry can find it
-         */
-        if (itor != statdump_daemon.end ())
-          {
-            itor->second.status = STATD_RUNNING;
-          }
-        mutex_unlock (*_statdumpd_mutex ());
-        nv_add_nvp_int (res, "pid", pid);
-        nv_update_val (res, "status", "failed");
-        return ret_val;
-      }
+    {
+      /*
+       * kill failed: put the entry back to STATD_RUNNING (instead of
+       * leaving it stuck in STATD_STOPPING) so a retry can find it
+       */
+      if (itor != statdump_daemon.end ())
+	{
+	  itor->second.status = STATD_RUNNING;
+	}
+      mutex_unlock (*_statdumpd_mutex ());
+      nv_add_nvp_int (res, "pid", pid);
+      nv_update_val (res, "status", "failed");
+      return ret_val;
+    }
 
   if (itor != statdump_daemon.end ())
     {
@@ -17860,31 +17861,31 @@ get_statdump_daemon_list (void)
       info.interval = itor->second.interval;
       info.pid = (itor->second.worker_pid > 0) ? itor->second.worker_pid : itor->second.pid;
       switch (itor->second.status)
-        {
-        case STATD_STARTING:
-          info.status = "starting";
-          break;
-        case STATD_RUNNING:
-          info.status = "running";
-          break;
-        case STATD_STOPPING:
-          info.status = "stopping";
-          break;
-        default:
-          info.status = "unknown";
-          break;
-        }
+	{
+	case STATD_STARTING:
+	  info.status = "starting";
+	  break;
+	case STATD_RUNNING:
+	  info.status = "running";
+	  break;
+	case STATD_STOPPING:
+	  info.status = "stopping";
+	  break;
+	default:
+	  info.status = "unknown";
+	  break;
+	}
       if (itor->second.started > 0)
-        {
-          char started_buf[64];
-          time_to_str (itor->second.started, "%04d-%02d-%02d %02d:%02d:%02d",
-                       started_buf, TIME_STR_FMT_DATE_TIME);
-          info.started = started_buf;
-        }
+	{
+	  char started_buf[64];
+	  time_to_str (itor->second.started, "%04d-%02d-%02d %02d:%02d:%02d",
+		       started_buf, TIME_STR_FMT_DATE_TIME);
+	  info.started = started_buf;
+	}
       else
-        {
-          info.started = "";
-        }
+	{
+	  info.started = "";
+	}
       result.push_back (info);
     }
 
@@ -18107,7 +18108,7 @@ schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
     char drive[_MAX_DRIVE];
     char dir[PATH_MAX];
 
-    if (_splitpath_s(schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+    if (_splitpath_s (schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
       {
 	snprintf (path, PATH_MAX, "%s%s", drive, dir);
       }
@@ -18120,7 +18121,7 @@ schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
   }
 #else
   snprintf (path, PATH_MAX, "%s", schema_list_file);
-  if (dirname(path) == NULL)
+  if (dirname (path) == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
       fclose (fp);
@@ -18257,9 +18258,9 @@ is_ha_updates_disabled (char *dbname, char *_dbmt_error)
       vector <string> words;
 
       while (ss >> word)
-        {
-          words.push_back (word);
-        }
+	{
+	  words.push_back (word);
+	}
 
       if (words.size () == NUM_WORDS_EXPECTED && words[0] == "Server" && words[1] == dbname
 	  && words[5] == MSG_HA_MASTER_AND_ACTIVE)

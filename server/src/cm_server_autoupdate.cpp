@@ -41,7 +41,7 @@
 
 int
 generate_update_script (char *patch_name, char *url, char *path,
-                        char *_dbmt_error)
+			char *_dbmt_error)
 {
   unsigned char file_buffer[DOWNLOAD_BUFFER];
 
@@ -82,13 +82,13 @@ generate_update_script (char *patch_name, char *url, char *path,
   if (InternetAttemptConnect (0) != ERROR_SUCCESS)
     {
       sprintf (_dbmt_error,
-               "InternetAttemptConnect(): CM Server is offline.");
+	       "InternetAttemptConnect(): CM Server is offline.");
       return ERR_SYSTEM_CALL;
     }
 
   handle_open =
-    InternetOpen (TEXT ("auto_update"), INTERNET_OPEN_TYPE_PRECONFIG, NULL,
-                  NULL, 0);
+	  InternetOpen (TEXT ("auto_update"), INTERNET_OPEN_TYPE_PRECONFIG, NULL,
+			NULL, 0);
   if (handle_open == NULL)
     {
       sprintf (_dbmt_error, "InternetOpen() :  failed.");
@@ -97,8 +97,8 @@ generate_update_script (char *patch_name, char *url, char *path,
     }
 
   handle_connect =
-    InternetConnect (handle_open, host_name, INTERNET_INVALID_PORT_NUMBER,
-                     NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+	  InternetConnect (handle_open, host_name, INTERNET_INVALID_PORT_NUMBER,
+			   NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
   if (handle_connect == NULL)
     {
       sprintf (_dbmt_error, "InternetConnect(): failed.");
@@ -109,8 +109,8 @@ generate_update_script (char *patch_name, char *url, char *path,
     }
 
   handle_request =
-    HttpOpenRequest (handle_connect, TEXT ("GET"), remote_path, NULL, NULL,
-                     NULL, INTERNET_FLAG_RELOAD, 0);
+	  HttpOpenRequest (handle_connect, TEXT ("GET"), remote_path, NULL, NULL,
+			   NULL, INTERNET_FLAG_RELOAD, 0);
   if (handle_request == NULL)
     {
       sprintf (_dbmt_error, "HttpOpenRequest(): failed.");
@@ -125,7 +125,7 @@ generate_update_script (char *patch_name, char *url, char *path,
     {
       int err = GetLastError ();
       sprintf (_dbmt_error,
-               "HttpSendRequest(): failed,  an error %d happened.", err);
+	       "HttpSendRequest(): failed,  an error %d happened.", err);
 
       InternetCloseHandle (handle_request);
       InternetCloseHandle (handle_connect);
@@ -146,18 +146,18 @@ generate_update_script (char *patch_name, char *url, char *path,
     {
 
       if (!InternetReadFile
-          (handle_request, file_buffer, DOWNLOAD_BUFFER, &read_bytes))
-        {
-          sprintf (_dbmt_error, "InternetReadFile(): download file failed!");
+	  (handle_request, file_buffer, DOWNLOAD_BUFFER, &read_bytes))
+	{
+	  sprintf (_dbmt_error, "InternetReadFile(): download file failed!");
 
-          InternetCloseHandle (handle_request);
-          InternetCloseHandle (handle_connect);
-          InternetCloseHandle (handle_open);
+	  InternetCloseHandle (handle_request);
+	  InternetCloseHandle (handle_connect);
+	  InternetCloseHandle (handle_open);
 
-          fclose (fout);
+	  fclose (fout);
 
-          return ERR_SYSTEM_CALL;
-        }
+	  return ERR_SYSTEM_CALL;
+	}
 
       fwrite (file_buffer, sizeof (unsigned char), read_bytes, fout);
 
@@ -175,7 +175,7 @@ generate_update_script (char *patch_name, char *url, char *path,
   if (access (zip_folder, 0) != 0 && !CreateDirectory (zip_folder, NULL))
     {
       sprintf (_dbmt_error, "CreateDirectory(): create %s dir failed.",
-               zip_folder);
+	       zip_folder);
       return ERR_SYSTEM_CALL;
     }
 
@@ -196,24 +196,24 @@ generate_update_script (char *patch_name, char *url, char *path,
   // backup
   fprintf (fout, "md %sbackup\n", path);
   fprintf (fout,
-           "if exist %s\\bin\\cub_manager.exe copy /y %s\\bin\\cub_manager.exe %sbackup\\.\n",
-           sco.szCubrid, sco.szCubrid, path);
+	   "if exist %s\\bin\\cub_manager.exe copy /y %s\\bin\\cub_manager.exe %sbackup\\.\n",
+	   sco.szCubrid, sco.szCubrid, path);
   fprintf (fout,
-           "if exist %s\\bin\\cm_admin.exe copy /y %s\\bin\\cm_admin.exe %sbackup\\.\n",
-           sco.szCubrid, sco.szCubrid, path);
+	   "if exist %s\\bin\\cm_admin.exe copy /y %s\\bin\\cm_admin.exe %sbackup\\.\n",
+	   sco.szCubrid, sco.szCubrid, path);
 
   fprintf (fout, "cubrid service stop\n");
   fprintf (fout, "cub_manager stop\n");
 
   //update
   fprintf (fout, "if exist %s\\cub_* copy /y %s\\cub_* %s\\bin\\.\n",
-           zip_folder, zip_folder, sco.szCubrid);
+	   zip_folder, zip_folder, sco.szCubrid);
   fprintf (fout,
-           "if exist %s\\cm_admin copy /y %s\\cm_admin.exe %s\\bin\\.\n",
-           zip_folder, zip_folder, sco.szCubrid);
+	   "if exist %s\\cm_admin copy /y %s\\cm_admin.exe %s\\bin\\.\n",
+	   zip_folder, zip_folder, sco.szCubrid);
   fprintf (fout,
-           "for /f %%%%c in ('dir /b %s\\conf\\') do type %s\\conf\\%%%%c >> %s\\conf\\%%%%c\n",
-           zip_folder, zip_folder, sco.szCubrid);
+	   "for /f %%%%c in ('dir /b %s\\conf\\') do type %s\\conf\\%%%%c >> %s\\conf\\%%%%c\n",
+	   zip_folder, zip_folder, sco.szCubrid);
 
   fprintf (fout, "ping 127.0.0.1 -n 40 -w 1000 > nul\n");
   fprintf (fout, "cubrid service start\n");
@@ -228,7 +228,7 @@ generate_update_script (char *patch_name, char *url, char *path,
 #else
 int
 generate_update_script (char *patch_name, char *url, char *path,
-                        char *_dbmt_error)
+			char *_dbmt_error)
 {
   FILE *fout;
   char shell_name[PATH_MAX];
@@ -259,24 +259,24 @@ generate_update_script (char *patch_name, char *url, char *path,
 
   fprintf (fout, "mkdir %sbackup\n", path);
   fprintf (fout,
-           "cp %s/bin/cm_admin %s/bin/cub_manager %sbackup/.\n",
-           sco.szCubrid, sco.szCubrid, path);
+	   "cp %s/bin/cm_admin %s/bin/cub_manager %sbackup/.\n",
+	   sco.szCubrid, sco.szCubrid, path);
   fprintf (fout,
-           "if [ -e %spatch/cub_manager ]; then\n", path);
+	   "if [ -e %spatch/cub_manager ]; then\n", path);
   fprintf (fout, "\tcp %spatch/cub_* %s/bin/. -f\nfi\n", path, sco.szCubrid);
 
   fprintf (fout, "if [ -e %spatch/cm_admin ]; then\n", path);
   fprintf (fout, "\tcp %spatch/cm_admin %s/bin/. -f\nfi\n", path,
-           sco.szCubrid);
+	   sco.szCubrid);
 
 
   fprintf (fout, "if [ -d %spatch/conf ]; then\n", path);
   fprintf (fout, "\tfor conf_file in $(ls %spatch/conf)\n\tdo\n", path);
   fprintf (fout, "\t\tcp %s/conf/$conf_file %sbackup/.\n", sco.szCubrid,
-           path);
+	   path);
   fprintf (fout,
-           "\t\tcat %spatch/conf/$conf_file >> %s/conf/$conf_file\n\tdone\nfi\n",
-           path, sco.szCubrid);
+	   "\t\tcat %spatch/conf/$conf_file >> %s/conf/$conf_file\n\tdone\nfi\n",
+	   path, sco.szCubrid);
 
   fprintf (fout, "cubrid service restart\n");
   fprintf (fout, "echo \"CUBRID Manager Server is updated.n");
@@ -329,45 +329,45 @@ unzip (const char *zip_file, const char *unzip_dir)
       status = mz_zip_reader_file_stat (&zip_archive, i, &file_stat);
 
       if (!status)
-        {
-          mz_zip_reader_end (&zip_archive);
-          return MZ_FALSE;
-        }
+	{
+	  mz_zip_reader_end (&zip_archive);
+	  return MZ_FALSE;
+	}
 
       snprintf (unzip_file, MAX_LINE, "%s/%s", unzip_dir,
-                file_stat.m_filename);
+		file_stat.m_filename);
 
       file_index =
-        mz_zip_reader_locate_file (&zip_archive, file_stat.m_filename, NULL,
-                                   0);
+	      mz_zip_reader_locate_file (&zip_archive, file_stat.m_filename, NULL,
+					 0);
 
       if (mz_zip_reader_is_file_a_directory (&zip_archive, file_index))
-        {
-          //create sub directory according to the folder's name, which is zipped in zip file.
+	{
+	  //create sub directory according to the folder's name, which is zipped in zip file.
 #ifdef WINDOWS
-          if (access (unzip_file, 0) != 0
-              && !CreateDirectory (unzip_file, NULL))
+	  if (access (unzip_file, 0) != 0
+	      && !CreateDirectory (unzip_file, NULL))
 #else
-          if (access (unzip_file, 0) != 0
-              && (mkdir (unzip_file, 0700) != 0 || chmod (unzip_file, 0700) != 0))
+	  if (access (unzip_file, 0) != 0
+	      && (mkdir (unzip_file, 0700) != 0 || chmod (unzip_file, 0700) != 0))
 #endif
-            {
-              mz_zip_reader_end (&zip_archive);
-              return MZ_FALSE;
-            }
-          continue;
-        }
+	    {
+	      mz_zip_reader_end (&zip_archive);
+	      return MZ_FALSE;
+	    }
+	  continue;
+	}
 
       status =
-        mz_zip_reader_extract_file_to_file (&zip_archive,
-                                            file_stat.m_filename, unzip_file,
-                                            0);
+	      mz_zip_reader_extract_file_to_file (&zip_archive,
+		  file_stat.m_filename, unzip_file,
+		  0);
 
       if (!status)
-        {
-          mz_zip_reader_end (&zip_archive);
-          return MZ_FALSE;
-        }
+	{
+	  mz_zip_reader_end (&zip_archive);
+	  return MZ_FALSE;
+	}
     }
 
 

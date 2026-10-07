@@ -106,7 +106,7 @@ dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
 	  {
 	    size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
 	    T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
-		    (user_info == NULL ? malloc (new_size) : realloc (user_info, new_size));
+				    (user_info == NULL ? malloc (new_size) : realloc (user_info, new_size));
 
 	    if (tmp == NULL)
 	      {

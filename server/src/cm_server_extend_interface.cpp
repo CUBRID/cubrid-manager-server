@@ -119,40 +119,40 @@ ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
 
 int
 build_server_header (Json::Value &response, const int status,
-                     const char *note)
+		     const char *note)
 {
   response["status"] =
-    (status == ERR_NO_ERROR) ? STATUS_SUCCESS : STATUS_FAILURE;
+	  (status == ERR_NO_ERROR) ? STATUS_SUCCESS : STATUS_FAILURE;
   response["note"] = string (note);
   return status;
 }
 
 int
 get_ext_task_info (const char *task, int access_flag,
-                   T_EXT_TASK_FUNC *task_func, T_USER_AUTH *auth)
+		   T_EXT_TASK_FUNC *task_func, T_USER_AUTH *auth)
 {
   int i;
 
   for (i = 0; ext_task_info[i].task_str != NULL; i++)
     {
       if (!strcmp (task, ext_task_info[i].task_str))
-        {
-          if (access_flag < ext_task_info[i].access_level)
-            {
-              return 0;
-            }
-          if (task_func)
-            {
-              *task_func = ext_task_info[i].task_func;
-            }
+	{
+	  if (access_flag < ext_task_info[i].access_level)
+	    {
+	      return 0;
+	    }
+	  if (task_func)
+	    {
+	      *task_func = ext_task_info[i].task_func;
+	    }
 
-          if (auth)
-            {
-              *auth = ext_task_info[i].user_auth;
-            }
+	  if (auth)
+	    {
+	      *auth = ext_task_info[i].user_auth;
+	    }
 
-          return 1;
-        }
+	  return 1;
+	}
     }
 
   return 0;
@@ -180,21 +180,21 @@ ext_get_sys_diskinfo (Json::Value &request, Json::Value &response)
   while (drives)
     {
       if (drives & 1)
-        {
-          drivename = 'A' + flag;
-          drivename += ":";
-          if (GetDriveType (drivename.c_str ()) == DRIVE_FIXED)
-            {
-              drive.clear ();
-              GetDiskFreeSpaceEx (drivename.c_str (), NULL, &total_size,
-                                  &free_size);
-              drive["name"] = drivename;
-              drive["total_size"] = ull_to_str (total_size.QuadPart);
-              drive["free_size"] = ull_to_str (free_size.QuadPart);
+	{
+	  drivename = 'A' + flag;
+	  drivename += ":";
+	  if (GetDriveType (drivename.c_str ()) == DRIVE_FIXED)
+	    {
+	      drive.clear ();
+	      GetDiskFreeSpaceEx (drivename.c_str (), NULL, &total_size,
+				  &free_size);
+	      drive["name"] = drivename;
+	      drive["total_size"] = ull_to_str (total_size.QuadPart);
+	      drive["free_size"] = ull_to_str (free_size.QuadPart);
 
-              response["disk_info"].append (drive);
-            }
-        }
+	      response["disk_info"].append (drive);
+	    }
+	}
       drives >>= 1;
       flag++;
     }
@@ -213,7 +213,7 @@ ext_get_sys_diskinfo (Json::Value &request, Json::Value &response)
   if (error < 0)
     {
       return build_server_header (response, ERR_WITH_MSG,
-                                  "get file system info error!");
+				  "get file system info error!");
     }
 
   drive["name"] = "/";
@@ -320,9 +320,9 @@ bool write_json_to_file (string filepath, Json::Value &root)
 
     if (!ofs.is_open ())
       {
-        LOG_ERROR ("write_json_to_file (): failed to open temp file '%s' for '%s'",
+	LOG_ERROR ("write_json_to_file (): failed to open temp file '%s' for '%s'",
 		   tmp_path, filepath.c_str());
-        return FALSE;
+	return FALSE;
       }
 
     ofs << writer.write (root) << endl;
@@ -333,10 +333,10 @@ bool write_json_to_file (string filepath, Json::Value &root)
      */
     if (ofs.fail ())
       {
-        LOG_ERROR ("write_json_to_file (): failed to write '%s' (temp file '%s')",
+	LOG_ERROR ("write_json_to_file (): failed to write '%s' (temp file '%s')",
 		   filepath.c_str(), tmp_path);
-        unlink (tmp_path);
-        return FALSE;
+	unlink (tmp_path);
+	return FALSE;
       }
   }
 
@@ -420,10 +420,10 @@ bool ext_set_auto_jobs (const string jobkey, Json::Value &jobvalue)
   if (load_json_from_file ( conf_get_dbmt_file (FID_AUTO_JOBS_CONF, conf_path), root_jobs, &file_existed) == FALSE)
     {
       if (file_existed)
-        {
-          LOG_ERROR ("%s exists but could not be parsed as JSON; refusing to overwrite it", conf_path);
-          return FALSE;
-        }
+	{
+	  LOG_ERROR ("%s exists but could not be parsed as JSON; refusing to overwrite it", conf_path);
+	  return FALSE;
+	}
 
       LOG_WARN ("%s is not exist!", conf_path);
     }
@@ -454,10 +454,10 @@ ext_get_auto_start (Json::Value &request, Json::Value &response)
        * been saved yet - report an empty auto_start.
        */
       if (file_existed)
-        {
-          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return auto_start");
-          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
-        }
+	{
+	  LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return auto_start");
+	  return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+	}
 
       response[EXT_JOBS_AUTO_START] = Json::Value::null;
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -472,10 +472,10 @@ ext_set_auto_start (Json::Value &request, Json::Value &response)
 {
   Json::Value   root_jobs;
   JSON_FIND_V (request, EXT_JOBS_AUTO_START,
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(auto_start) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(auto_start) missing in the request"));
 
   JSON_FIND_V (request, "service",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
 
   file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
   if (!guard.ok ())
@@ -488,13 +488,13 @@ ext_set_auto_start (Json::Value &request, Json::Value &response)
 
     if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, root_jobs, &file_existed) == FALSE)
       {
-        if (file_existed)
-          {
-            LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update auto_start");
-            return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
-          }
+	if (file_existed)
+	  {
+	    LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update auto_start");
+	    return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+	  }
 
-        LOG_WARN ("autojob configure file is not exist or error format!");
+	LOG_WARN ("autojob configure file is not exist or error format!");
       }
   }
 
@@ -527,10 +527,10 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
   if (ext_get_auto_jobs (key, root_jobs, &file_existed) == FALSE)
     {
       if (file_existed)
-        {
-          LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return '%s'", key.c_str());
-          return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
-        }
+	{
+	  LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to return '%s'", key.c_str());
+	  return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+	}
 
       response["jobconf"] = Json::Value::null;
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -555,23 +555,23 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
   char encrypted[PASSWD_ENC_LENGTH];
 
   JSON_FIND_V (request, "service",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
 
   keyvalue = request["service"].asString();
   if (keyvalue == "mail_config")
     {
       if (request["jobconf"] != Json::Value::null
-          && request["jobconf"].type() == Json::objectValue
-          && request["jobconf"]["password"] != Json::Value::null)
-        {
-          password = request["jobconf"]["password"].asString();
-          uEncrypt (PASSWD_LENGTH, password.c_str(), encrypted);
-          request["jobconf"]["password"] = encrypted;
-        }
+	  && request["jobconf"].type() == Json::objectValue
+	  && request["jobconf"]["password"] != Json::Value::null)
+	{
+	  password = request["jobconf"]["password"].asString();
+	  uEncrypt (PASSWD_LENGTH, password.c_str(), encrypted);
+	  request["jobconf"]["password"] = encrypted;
+	}
       else
-        {
-          return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
-        }
+	{
+	  return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
+	}
     }
 
   /*
@@ -597,8 +597,8 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
 
     if (ext_get_auto_jobs (keyvalue, root_jobs, &file_existed) == FALSE && file_existed)
       {
-        LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update '%s'", keyvalue.c_str());
-        return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
+	LOG_ERROR ("autojobs.conf exists but could not be parsed as JSON; refusing to update '%s'", keyvalue.c_str());
+	return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
       }
   }
 
@@ -648,11 +648,11 @@ int ext_get_active_brokers (Json::Value &activebrokers)
   else
     {
       for (i = 0; i < uc_info.num_info; i++)
-        {
-          broker["name"] = uc_info.br_info[i].name;
-          broker["state"] = uc_info.br_info[i].status;
-          activebrokers["brokers"].append (broker);
-        }
+	{
+	  broker["name"] = uc_info.br_info[i].name;
+	  broker["state"] = uc_info.br_info[i].status;
+	  activebrokers["brokers"].append (broker);
+	}
       activebrokers["brokerstatus"] = "ON";
       cm_broker_info_free (&uc_info);
     }
@@ -714,27 +714,27 @@ int ext_exec_dbs_auto_start (const Json::Value &autodbs,  Json::Value &response)
       found = 0;
       dbname = autodbs[i].asString();
       for (j = 0; j < activedbs.size(); j++)
-        {
-          if (activedbs[j].asString() == dbname)
-            {
-              found = 1;
-              break;
-            }
-        }
+	{
+	  if (activedbs[j].asString() == dbname)
+	    {
+	      found = 1;
+	      break;
+	    }
+	}
 
       if (found == 0)
-        {
-          if (cmd_start_server ((char *)dbname.c_str(), err_buf, sizeof (err_buf)) < 0)
-            {
-              ext_autojobs_log ("databases", dbname.c_str(), err_buf);
-              response[EXT_JOBS_AUTO_START]["databases"][dbname] = err_buf;
-            }
-          else
-            {
-              ext_autojobs_log ("databases", dbname.c_str(), STATUS_SUCCESS);
-              response[EXT_JOBS_AUTO_START]["databases"][dbname] = STATUS_SUCCESS;
-            }
-        }
+	{
+	  if (cmd_start_server ((char *)dbname.c_str(), err_buf, sizeof (err_buf)) < 0)
+	    {
+	      ext_autojobs_log ("databases", dbname.c_str(), err_buf);
+	      response[EXT_JOBS_AUTO_START]["databases"][dbname] = err_buf;
+	    }
+	  else
+	    {
+	      ext_autojobs_log ("databases", dbname.c_str(), STATUS_SUCCESS);
+	      response[EXT_JOBS_AUTO_START]["databases"][dbname] = STATUS_SUCCESS;
+	    }
+	}
     }
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -763,41 +763,41 @@ int ext_exec_brokers_auto_start (const Json::Value &autobrokers,  Json::Value &r
       ext_cub_broker_start (request, response);
 
       if (response["status"] != "success")
-        {
-          ext_autojobs_log ("brokers", "unicas", response["note"].asString().c_str());
-          response[EXT_JOBS_AUTO_START]["brokers"]["@unicas"] = response["note"].asString();
-        }
+	{
+	  ext_autojobs_log ("brokers", "unicas", response["note"].asString().c_str());
+	  response[EXT_JOBS_AUTO_START]["brokers"]["@unicas"] = response["note"].asString();
+	}
       else
-        {
-          ext_autojobs_log ("brokers", "unicas", STATUS_SUCCESS);
-          response[EXT_JOBS_AUTO_START]["brokers"]["@unicas"] = STATUS_SUCCESS;
-        }
+	{
+	  ext_autojobs_log ("brokers", "unicas", STATUS_SUCCESS);
+	  response[EXT_JOBS_AUTO_START]["brokers"]["@unicas"] = STATUS_SUCCESS;
+	}
     }
 
   for (t = 0; t < autobrokers.size(); t++)
     {
       for (i = 0; i < activebrokers["brokers"].size(); i++)
-        {
-          bname = activebrokers["brokers"][i]["name"].asString();
-          if (bname == autobrokers[t].asString() &&
-              activebrokers["brokers"][i]["state"].asString() == "OFF")
-            {
-              request["task"] = "broker_start";
-              request["bname"] = bname;
-              ext_cub_broker_start (request, response);
+	{
+	  bname = activebrokers["brokers"][i]["name"].asString();
+	  if (bname == autobrokers[t].asString() &&
+	      activebrokers["brokers"][i]["state"].asString() == "OFF")
+	    {
+	      request["task"] = "broker_start";
+	      request["bname"] = bname;
+	      ext_cub_broker_start (request, response);
 
-              if (response["status"] != "success")
-                {
-                  ext_autojobs_log ("brokers", bname.c_str(), response["note"].asString().c_str());
-                  response[EXT_JOBS_AUTO_START]["brokers"][bname] = response["note"].asString();
-                }
-              else
-                {
-                  ext_autojobs_log ("brokers", bname.c_str(), STATUS_SUCCESS);
-                  response[EXT_JOBS_AUTO_START]["brokers"][bname] = STATUS_SUCCESS;
-                }
-            }
-        }
+	      if (response["status"] != "success")
+		{
+		  ext_autojobs_log ("brokers", bname.c_str(), response["note"].asString().c_str());
+		  response[EXT_JOBS_AUTO_START]["brokers"][bname] = response["note"].asString();
+		}
+	      else
+		{
+		  ext_autojobs_log ("brokers", bname.c_str(), STATUS_SUCCESS);
+		  response[EXT_JOBS_AUTO_START]["brokers"][bname] = STATUS_SUCCESS;
+		}
+	    }
+	}
     }
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
@@ -809,13 +809,13 @@ string format_time (string str_time)
   while ( itor != str_time.end())
     {
       if (*itor == ' ' || *itor == '/' || *itor == ':')
-        {
-          itor = str_time.erase (itor);
-        }
+	{
+	  itor = str_time.erase (itor);
+	}
       else
-        {
-          itor++;
-        }
+	{
+	  itor++;
+	}
     }
   return str_time;
 }
@@ -844,65 +844,65 @@ string build_report_log (Json::Value &report)
     case 0:
       logdata = report["db"];
       if (logdata != Json::Value::null)
-        {
-          if (logdata["result"] != Json::Value::null)
-            {
-              report_log += "<table><tr><th>Databases Log Message</th></tr>";
-              for (i = 0; i < logdata["result"].size(); i++)
-                {
-                  //report_log += "<td>" + logdata["result"][i]["file"].asString() + "</td>";
-                  tmp_str = "<tr><td>";
-                  for (j = 0; j < logdata["result"][i]["logs"].size(); j++)
-                    {
-                      tmp_str += "<br>" + logdata["result"][i]["logs"][j].asString();
-                      if (tmp_str.size() > 256)
-                        {
-                          tmp_str += "<br>more logs in " + logdata["result"][i]["file"].asString();
-                          break;
-                        }
-                    }
-                  report_log += tmp_str + "</td></tr>";
-                  if (report_log.size() > 1024)
-                    {
-                      report_log += "<tr><td>......</td></tr>";
-                      break;
-                    }
-                }
-              report_log += "</table>";
-            }
-          else
-            {
-              report_log += "<br>*** No record ***";
-            }
-        }
+	{
+	  if (logdata["result"] != Json::Value::null)
+	    {
+	      report_log += "<table><tr><th>Databases Log Message</th></tr>";
+	      for (i = 0; i < logdata["result"].size(); i++)
+		{
+		  //report_log += "<td>" + logdata["result"][i]["file"].asString() + "</td>";
+		  tmp_str = "<tr><td>";
+		  for (j = 0; j < logdata["result"][i]["logs"].size(); j++)
+		    {
+		      tmp_str += "<br>" + logdata["result"][i]["logs"][j].asString();
+		      if (tmp_str.size() > 256)
+			{
+			  tmp_str += "<br>more logs in " + logdata["result"][i]["file"].asString();
+			  break;
+			}
+		    }
+		  report_log += tmp_str + "</td></tr>";
+		  if (report_log.size() > 1024)
+		    {
+		      report_log += "<tr><td>......</td></tr>";
+		      break;
+		    }
+		}
+	      report_log += "</table>";
+	    }
+	  else
+	    {
+	      report_log += "<br>*** No record ***";
+	    }
+	}
       else
-        {
-          report_log += "<br>*** No record ***";
-        }
+	{
+	  report_log += "<br>*** No record ***";
+	}
       break;
     case 1:
       logdata = report["broker"];
       report_log += "<br>Log type : Broker start/stop log";
       if (logdata != Json::Value::null)
-        {
-          if (logdata["log"] != Json::Value::null)
-            {
-              report_log += "<table><tr bgcolor=rgb(227,227,227)><th>Broker Log Description</th></tr>";
-              for (i = 0; i < logdata["log"].size(); i++)
-                {
-                  report_log += "<tr><td>" + logdata["log"][i].asString() + "</td></tr>";
-                }
-              report_log += "</table>";
-            }
-          else
-            {
-              report_log += "<br>*** No record ***";
-            }
-        }
+	{
+	  if (logdata["log"] != Json::Value::null)
+	    {
+	      report_log += "<table><tr bgcolor=rgb(227,227,227)><th>Broker Log Description</th></tr>";
+	      for (i = 0; i < logdata["log"].size(); i++)
+		{
+		  report_log += "<tr><td>" + logdata["log"][i].asString() + "</td></tr>";
+		}
+	      report_log += "</table>";
+	    }
+	  else
+	    {
+	      report_log += "<br>*** No record ***";
+	    }
+	}
       else
-        {
-          report_log += "<br>*** No record ***";
-        }
+	{
+	  report_log += "<br>*** No record ***";
+	}
       break;
     default:
       break;
@@ -964,13 +964,13 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
     file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
     if (!guard.ok ())
       {
-        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+	return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
       }
 
     if (ext_get_auto_jobs (EXT_JOBS_MAIL_CONF, mail_conf) == FALSE)
       {
-        LOG_ERROR ("get mail config failed!");
-        return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
+	LOG_ERROR ("get mail config failed!");
+	return build_server_header (response, ERR_WITH_MSG, "get mail config failed!");
       }
   }
 
@@ -988,33 +988,33 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
   for (i = 0; i < mailreport.size(); i++)
     {
       if (mailreport[i]["receiver"] == Json::Value::null)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (mailreport[i]["dbname"]  == Json::Value::null)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (mailreport[i]["url_prefix"]  == Json::Value::null)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       next_exec = "";
       prev_exec = "";
       mailbody = "";
       if (mailreport[i]["prev_exec"] != Json::Value::null)
-        {
-          prev_exec = mailreport[i]["prev_exec"].asString();
-        }
+	{
+	  prev_exec = mailreport[i]["prev_exec"].asString();
+	}
       if (mailreport[i]["next_exec"] != Json::Value::null)
-        {
-          next_exec = mailreport[i]["next_exec"].asString();
-        }
+	{
+	  next_exec = mailreport[i]["next_exec"].asString();
+	}
       if ( strcmp (format_time, next_exec.c_str()) < 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       log_request["dbname"] = mailreport[i]["dbname"].asString();
       log_request["start_time"] = prev_exec;
@@ -1045,14 +1045,14 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       save_flag = 1;
 
       {
-        Json::Value upd;
-        upd["dbname"] = mailreport[i]["dbname"];
-        upd["receiver"] = mailreport[i]["receiver"];
-        upd["url_prefix"] = mailreport[i]["url_prefix"];
-        upd["period_type"] = (int) period_type;
-        upd["next_exec"] = next_exec_time;
-        upd["prev_exec"] = format_time;
-        sent_updates.append (upd);
+	Json::Value upd;
+	upd["dbname"] = mailreport[i]["dbname"];
+	upd["receiver"] = mailreport[i]["receiver"];
+	upd["url_prefix"] = mailreport[i]["url_prefix"];
+	upd["period_type"] = (int) period_type;
+	upd["next_exec"] = next_exec_time;
+	upd["prev_exec"] = format_time;
+	sent_updates.append (upd);
       }
     }
 
@@ -1064,102 +1064,102 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
        */
       file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
       if (guard.ok ())
-        {
-          /*
-           * a concurrent setautojobconf may have changed mail_report on disk
-           * in the meantime. Re-read it fresh here
-           */
-          Json::Value current;
-          bool report_existed = false;
+	{
+	  /*
+	   * a concurrent setautojobconf may have changed mail_report on disk
+	   * in the meantime. Re-read it fresh here
+	   */
+	  Json::Value current;
+	  bool report_existed = false;
 
-          if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, current, &report_existed) == FALSE)
-            {
-              if (report_existed)
-                {
-                  LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail: "
-                             "autojobs.conf is corrupt");
-                  return build_server_header (response, ERR_NO_ERROR,
-                                              "mail send attempted but schedule not saved; "
-                                              "the same report may be resent next time");
-                }
+	  if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, current, &report_existed) == FALSE)
+	    {
+	      if (report_existed)
+		{
+		  LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail: "
+			     "autojobs.conf is corrupt");
+		  return build_server_header (response, ERR_NO_ERROR,
+					      "mail send attempted but schedule not saved; "
+					      "the same report may be resent next time");
+		}
 
-              /* autojobs.conf missing is normal; fall back to our own copy. */
-              current = mailreport;
-            }
-          else if (current == Json::Value::null || !current.isArray ())
-            {
-              LOG_WARN ("mail_report changed to a non-array value on disk while mail was "
-                        "being sent (likely a concurrent setautojobconf); not saving the "
-                        "updated next_exec/prev_exec to avoid overwriting that change");
-              /*
-               * unlike the autojobs.conf-corrupt case above, mail_report
-               * itself is gone/replaced here, so there is no on-disk
-               * array left for the next run to find this entry in and resend
-               */
-              return build_server_header (response, ERR_NO_ERROR,
-                                          "mail send attempted; schedule not saved because "
-                                          "mail_report was changed concurrently");
-            }
+	      /* autojobs.conf missing is normal; fall back to our own copy. */
+	      current = mailreport;
+	    }
+	  else if (current == Json::Value::null || !current.isArray ())
+	    {
+	      LOG_WARN ("mail_report changed to a non-array value on disk while mail was "
+			"being sent (likely a concurrent setautojobconf); not saving the "
+			"updated next_exec/prev_exec to avoid overwriting that change");
+	      /*
+	       * unlike the autojobs.conf-corrupt case above, mail_report
+	       * itself is gone/replaced here, so there is no on-disk
+	       * array left for the next run to find this entry in and resend
+	       */
+	      return build_server_header (response, ERR_NO_ERROR,
+					  "mail send attempted; schedule not saved because "
+					  "mail_report was changed concurrently");
+	    }
 
-          /*
-           * dbname/receiver/url_prefix is not guaranteed unique (nothing
-           * validates that on setautojobconf), so a current[] entry that
-           * has already been claimed by an earlier sent_updates[] match
-           * must not be matched again, or a duplicate entry's update is
-           * silently dropped while the first duplicate absorbs both.
-           */
-          Json::Value consumed (Json::arrayValue);
-          for (unsigned int j = 0; j < current.size (); j++)
-            {
-              consumed[j] = false;
-            }
+	  /*
+	   * dbname/receiver/url_prefix is not guaranteed unique (nothing
+	   * validates that on setautojobconf), so a current[] entry that
+	   * has already been claimed by an earlier sent_updates[] match
+	   * must not be matched again, or a duplicate entry's update is
+	   * silently dropped while the first duplicate absorbs both.
+	   */
+	  Json::Value consumed (Json::arrayValue);
+	  for (unsigned int j = 0; j < current.size (); j++)
+	    {
+	      consumed[j] = false;
+	    }
 
-          for (unsigned int u = 0; u < sent_updates.size (); u++)
-            {
-              for (unsigned int j = 0; j < current.size (); j++)
-                {
-                  if (!consumed[j].asBool () &&
-                      current[j].get ("dbname", Json::Value::null) == sent_updates[u]["dbname"] &&
-                      current[j].get ("receiver", Json::Value::null) == sent_updates[u]["receiver"] &&
-                      current[j].get ("url_prefix", Json::Value::null) == sent_updates[u]["url_prefix"])
-                    {
-                      int sent_period_type = sent_updates[u].get ("period_type", 2).asInt ();
-                      int cur_period_type = current[j].get ("period_type", 2).asInt ();
+	  for (unsigned int u = 0; u < sent_updates.size (); u++)
+	    {
+	      for (unsigned int j = 0; j < current.size (); j++)
+		{
+		  if (!consumed[j].asBool () &&
+		      current[j].get ("dbname", Json::Value::null) == sent_updates[u]["dbname"] &&
+		      current[j].get ("receiver", Json::Value::null) == sent_updates[u]["receiver"] &&
+		      current[j].get ("url_prefix", Json::Value::null) == sent_updates[u]["url_prefix"])
+		    {
+		      int sent_period_type = sent_updates[u].get ("period_type", 2).asInt ();
+		      int cur_period_type = current[j].get ("period_type", 2).asInt ();
 
-                      if (cur_period_type != sent_period_type)
-                        {
-                          char recomputed_next_exec[PATH_MAX];
+		      if (cur_period_type != sent_period_type)
+			{
+			  char recomputed_next_exec[PATH_MAX];
 
-                          mail_report_compute_next_exec ((unsigned int) cur_period_type, cur_time,
-                                                          recomputed_next_exec);
-                          current[j]["next_exec"] = recomputed_next_exec;
-                        }
-                      else
-                        {
-                          current[j]["next_exec"] = sent_updates[u]["next_exec"];
-                        }
-                      current[j]["prev_exec"] = sent_updates[u]["prev_exec"];
-                      consumed[j] = true;
-                      break;
-                    }
-                }
-            }
+			  mail_report_compute_next_exec ((unsigned int) cur_period_type, cur_time,
+							 recomputed_next_exec);
+			  current[j]["next_exec"] = recomputed_next_exec;
+			}
+		      else
+			{
+			  current[j]["next_exec"] = sent_updates[u]["next_exec"];
+			}
+		      current[j]["prev_exec"] = sent_updates[u]["prev_exec"];
+		      consumed[j] = true;
+		      break;
+		    }
+		}
+	    }
 
-          if (ext_set_auto_jobs ("mail_report", current) == FALSE)
-            {
-              LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
-              return build_server_header (response, ERR_NO_ERROR,
-                                          "mail send attempted but schedule not saved; "
-                                          "the same report may be resent next time");
-            }
-        }
+	  if (ext_set_auto_jobs ("mail_report", current) == FALSE)
+	    {
+	      LOG_ERROR ("failed to save mail_report to autojobs.conf after sending mail");
+	      return build_server_header (response, ERR_NO_ERROR,
+					  "mail send attempted but schedule not saved; "
+					  "the same report may be resent next time");
+	    }
+	}
       else
-        {
-          LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
-          return build_server_header (response, ERR_NO_ERROR,
-                                      "mail send attempted but schedule not saved; "
-                                      "the same report may be resent next time");
-        }
+	{
+	  LOG_ERROR ("failed to lock autojobs.conf while saving mail_report");
+	  return build_server_header (response, ERR_NO_ERROR,
+				      "mail send attempted but schedule not saved; "
+				      "the same report may be resent next time");
+	}
     }
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -1178,13 +1178,13 @@ int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
     file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
     if (!guard.ok ())
       {
-        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+	return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
       }
 
     if (ext_get_auto_jobs (EXT_JOBS_MAIL_REPORT, mail_report) == FALSE)
       {
-        LOG_WARN ("get mail report config failed!");
-        return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
+	LOG_WARN ("get mail report config failed!");
+	return build_server_header (response, ERR_WITH_MSG, "get mail report config failed!");
       }
   }
 
@@ -1207,13 +1207,13 @@ int ext_exec_auto_start (Json::Value &request, Json::Value &response)
     file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
     if (!guard.ok ())
       {
-        return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
+	return build_server_header (response, ERR_WITH_MSG, "failed to lock autojobs.conf");
       }
 
     if (ext_get_auto_jobs (EXT_JOBS_AUTO_START, autojobs) == FALSE)
       {
-        LOG_DEBUG ("get auto start jobs failed.");
-        return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
+	LOG_DEBUG ("get auto start jobs failed.");
+	return build_server_header (response, ERR_WITH_MSG, "get auto start jobs failed.");
       }
   }
 
@@ -1258,7 +1258,7 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
   Json::Value logitem;
   FILE *fd;
   JSON_FIND_V (request, "dbname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
 
   dbname = request["dbname"].asString();
   if (request["start_time"] != Json::Value::null)
@@ -1299,53 +1299,53 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #else
       fname = dp->d_name;
 #endif
-        fname_len = (int) strlen (fname);
+      fname_len = (int) strlen (fname);
       /* the "4" is the size of ".err" */
       if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (memcmp (fname, dbname.c_str(), dbname.size()))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,    CUBRID_ERROR_LOG_DIR, fname);
       if (stat (buf, &statbuf) == 0)
-        {
-          time_to_str (statbuf.st_mtime, "%4d/%02d/%02d %02d:%02d:%02d", format_time, TIME_STR_FMT_DATE_TIME);
-          if (!start_d.empty() && strcmp (start_d.c_str(), format_time) > 0)
-            {
-              continue;
-            }
-          if (!end_d.empty() && strcmp (end_d.c_str(), format_time) < 0)
-            {
-              continue;
-            }
-          logitem.clear();
-          logitem["file"] = buf;
-          fd = fopen (buf, "r");
-          if (fd == NULL)
-            {
-              continue;
-            }
-          while (fgets (logbuf, sizeof (logbuf), fd) != NULL)
-            {
-              ut_trim (logbuf);
-              logitem["logs"].append (logbuf);
-              logsize++;
-              if (logsize > 2000)
-                {
-                  break;
-                }
-            }
-          fclose (fd);
-          response["result"].append (logitem);
-          if (logsize > 2000)
-            {
-              response["overflow"] = 1;
-              break;
-            }
-        }
+	{
+	  time_to_str (statbuf.st_mtime, "%4d/%02d/%02d %02d:%02d:%02d", format_time, TIME_STR_FMT_DATE_TIME);
+	  if (!start_d.empty() && strcmp (start_d.c_str(), format_time) > 0)
+	    {
+	      continue;
+	    }
+	  if (!end_d.empty() && strcmp (end_d.c_str(), format_time) < 0)
+	    {
+	      continue;
+	    }
+	  logitem.clear();
+	  logitem["file"] = buf;
+	  fd = fopen (buf, "r");
+	  if (fd == NULL)
+	    {
+	      continue;
+	    }
+	  while (fgets (logbuf, sizeof (logbuf), fd) != NULL)
+	    {
+	      ut_trim (logbuf);
+	      logitem["logs"].append (logbuf);
+	      logsize++;
+	      if (logsize > 2000)
+		{
+		  break;
+		}
+	    }
+	  fclose (fd);
+	  response["result"].append (logitem);
+	  if (logsize > 2000)
+	    {
+	      response["overflow"] = 1;
+	      break;
+	    }
+	}
     }
 #if defined(WINDOWS)
   FindClose (handle);
@@ -1391,25 +1391,25 @@ int ext_get_broker_start_log (Json::Value &request, Json::Value &response)
       ut_trim (logbuf);
       strlog = logbuf;
       if (string_tokenize (logbuf, tok, 2) < 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       format_time = string (tok[0]) + " " + string (tok[1]);
       if (!start_d.empty() && strcmp (start_d.c_str(), format_time.c_str()) > 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (!end_d.empty() && strcmp (end_d.c_str(), format_time.c_str()) < 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       response["log"].append (strlog);
       logsize++;
       if (logsize > 2000)
-        {
-          response["overflow"] = 1;
-          break;
-        }
+	{
+	  response["overflow"] = 1;
+	  break;
+	}
     }
   fclose (fd);
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -1425,15 +1425,15 @@ int ext_send_mail (Json::Value &request, Json::Value &response)
   Json::Value result;
 
   JSON_FIND_V (request, "sender",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(sender) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(sender) missing in the request"));
   JSON_FIND_V (request, "receiver",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(receiver) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(receiver) missing in the request"));
   JSON_FIND_V (request, "smtp_server",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(smtp_server) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(smtp_server) missing in the request"));
   JSON_FIND_V (request, "username",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
   JSON_FIND_V (request, "password",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
 
   sender = request["sender"].asString();
   mail.setsender (sender);
@@ -1484,7 +1484,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
 
   JSON_FIND_V (request, "confname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
 
   confname= request["confname"].asString();
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
@@ -1517,7 +1517,7 @@ int ext_read_private_data (Json::Value &request, Json::Value &response)
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
 
   JSON_FIND_V (request, "confname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(confname) missing in the request"));
 
   confname= request["confname"].asString();
 
@@ -1574,12 +1574,12 @@ static int _find_dba_password (const string &dbname, const string &query_id, cha
       stream_buf >> tmp_dbname >> tmp_queryid >> tmp_id >> tmp_password;
 
       if (tmp_dbname == dbname || tmp_queryid == query_id)
-        {
+	{
 	  strncpy (userpass, tmp_password.c_str(), PASSWD_ENC_LENGTH - 1);
 	  userpass[PASSWD_ENC_LENGTH - 1] = '\0';
-          is_find = true;
-          break;
-        }
+	  is_find = true;
+	  break;
+	}
     }
   conf_file.close();
 
@@ -1662,7 +1662,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   if (!ext_get_id_from_token (request["token"].asString().c_str(), token_content))
     {
       return build_server_header (response, ERR_INVALID_TOKEN,
-                                  "Request is rejected due to invalid token. Please reconnect.");
+				  "Request is rejected due to invalid token. Please reconnect.");
     }
   conf_item[4] = token_content[2];
 
@@ -1674,9 +1674,9 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       stream_buf >> db_name >> ignored_info >> ignored_info >> ignored_info >>  db_uid;
 
       if (db_name != conf_item[0] || db_uid != conf_item[4])
-        {
-          tmp_file << line_buf << endl;
-        }
+	{
+	  tmp_file << line_buf << endl;
+	}
 
     }
   conf_file.close();
@@ -1685,15 +1685,15 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   index = 0;
 
   JSON_FIND_V (request, "dbname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
   JSON_FIND_V (request, "token",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(token) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(token) missing in the request"));
   JSON_FIND_V (request, "planlist",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(planlist) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(planlist) missing in the request"));
   planlist = request["planlist"];
 
   JSON_FIND_V (planlist[index], "queryplan",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(planquery) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(planquery) missing in the request"));
   queryplan = planlist[index]["queryplan"];
 
 
@@ -1702,23 +1702,23 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
     {
 
       JSON_FIND_V (queryplan[index], "username",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
       JSON_FIND_V (queryplan[index], "userpass",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(userpass) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(userpass) missing in the request"));
       JSON_FIND_V (queryplan[index], "period",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(period) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(period) missing in the request"));
       JSON_FIND_V (queryplan[index], "detail",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(detail) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(detail) missing in the request"));
       JSON_FIND_V (queryplan[index], "query_string",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(query_string) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(query_string) missing in the request"));
       JSON_FIND_V (queryplan[index], "query_id",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(query_id) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(query_id) missing in the request"));
 
       tmp_file.open (tmp_conf_file, ios::out | ios::app);
       if (!tmp_file.good())
-        {
-          return build_server_header (response, ERR_FILE_OPEN_FAIL, "Temporal file open error.");
-        }
+	{
+	  return build_server_header (response, ERR_FILE_OPEN_FAIL, "Temporal file open error.");
+	}
 
 
       // query_id
@@ -1734,22 +1734,22 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // that means this query plan just use previous password.
       // for more details, see tools-3464.
       if (queryplan[index]["userpass"].asString() == "none" ||
-          queryplan[index]["userpass"].asString() == "<<AUTO_QUERY_EMPTY_PASSWD>>")
-        {
-          uEncrypt (PASSWD_LENGTH, "", userpass);
-        }
+	  queryplan[index]["userpass"].asString() == "<<AUTO_QUERY_EMPTY_PASSWD>>")
+	{
+	  uEncrypt (PASSWD_LENGTH, "", userpass);
+	}
       else if (queryplan[index]["userpass"].asString() == "unknown" ||
-               queryplan[index]["userpass"].asString() == "<<AUTO_QUERY_PASSWD_NO_CHANGES>>")
-        {
-          if ((ret_val = _find_dba_password (conf_item[0], conf_item[1], userpass, _dbmt_error)) != ERR_NO_ERROR)
-            {
-              return build_server_header (response, ret_val, _dbmt_error);
-            }
-        }
+	       queryplan[index]["userpass"].asString() == "<<AUTO_QUERY_PASSWD_NO_CHANGES>>")
+	{
+	  if ((ret_val = _find_dba_password (conf_item[0], conf_item[1], userpass, _dbmt_error)) != ERR_NO_ERROR)
+	    {
+	      return build_server_header (response, ret_val, _dbmt_error);
+	    }
+	}
       else
-        {
-          uEncrypt (PASSWD_LENGTH, queryplan[index]["userpass"].asString().c_str(), userpass);
-        }
+	{
+	  uEncrypt (PASSWD_LENGTH, queryplan[index]["userpass"].asString().c_str(), userpass);
+	}
       conf_item[3] = userpass;
 
       // period
@@ -1760,15 +1760,15 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 
       if (count_and_get_last_word (conf_item[6], detail2) != 2)
 	{
-          char tmp[DBMT_ERROR_MSG_SIZE];
-          snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail: %s", conf_item[6].c_str());
-          tmp_file.close();
-          return build_server_header (response, ERR_WITH_MSG, tmp);
+	  char tmp[DBMT_ERROR_MSG_SIZE];
+	  snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Invalid time format in detail: %s", conf_item[6].c_str());
+	  tmp_file.close();
+	  return build_server_header (response, ERR_WITH_MSG, tmp);
 	}
 
       if (detail2[0] == 'i')
 	{
-          char tmp[DBMT_ERROR_MSG_SIZE];
+	  char tmp[DBMT_ERROR_MSG_SIZE];
 
 	  if (!is_positive_number (&detail2[1]))
 	    {
@@ -1779,7 +1779,7 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 	}
       else
 	{
-          char tmp[DBMT_ERROR_MSG_SIZE];
+	  char tmp[DBMT_ERROR_MSG_SIZE];
 
 	  if (is_invalid_time (detail2))
 	    {
@@ -1792,20 +1792,20 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
       // get sql script, checking its length
       sql_script = queryplan[index]["query_string"].asString();
       if (sql_script.length() == 0 || sql_script.length() > MAX_AUTOQUERY_SCRIPT_SIZE)
-        {
-          char tmp[DBMT_ERROR_MSG_SIZE];
-          snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Query script too long. MAX_AUTOQUERY_SCRIPT_SIZE:%d.",
-                    MAX_AUTOQUERY_SCRIPT_SIZE);
-          tmp_file.close();
+	{
+	  char tmp[DBMT_ERROR_MSG_SIZE];
+	  snprintf (tmp, DBMT_ERROR_MSG_SIZE-1, "Query script too long. MAX_AUTOQUERY_SCRIPT_SIZE:%d.",
+		    MAX_AUTOQUERY_SCRIPT_SIZE);
+	  tmp_file.close();
 
-          return build_server_header (response, ERR_WITH_MSG, tmp);
-        }
+	  return build_server_header (response, ERR_WITH_MSG, tmp);
+	}
       conf_item[7] = sql_script;
 
       for (int i = 0; i < 7; ++i)
-        {
-          tmp_file << conf_item[i] << ' ';
-        }
+	{
+	  tmp_file << conf_item[i] << ' ';
+	}
       tmp_file << conf_item[7] << endl;
 
       tmp_file.close();
@@ -1841,49 +1841,49 @@ static int _read_apply_info_cmd_output (const string &stdout_file, const string 
   while (getline (in_file, line_buf))
     {
       if (line_buf.find ("Delay in Applying Copied Log") != string::npos)
-        {
-          i = 2;
-          continue;
-        }
+	{
+	  i = 2;
+	  continue;
+	}
 
       if (line_buf.find ("Delayed log page count") != string::npos)
-        {
-          found = (unsigned int) line_buf.find (":");
+	{
+	  found = (unsigned int) line_buf.find (":");
 
-          str_result[i++] = line_buf.substr (found+2);
-          continue;
-        }
+	  str_result[i++] = line_buf.substr (found+2);
+	  continue;
+	}
 
       if (line_buf.find ("Estimated Delay") != string::npos)
-        {
+	{
 
-          unsigned int tmp_pos = (unsigned int) line_buf.find ("second(s)");
-          found = (unsigned int) line_buf.find (":");
+	  unsigned int tmp_pos = (unsigned int) line_buf.find ("second(s)");
+	  found = (unsigned int) line_buf.find (":");
 
-          str_result[i++] = line_buf.substr (found+2, tmp_pos-found-3);
-          if (str_result[i-1] == "-")
-            {
-              str_result[i-1] = "";
-            }
-          continue;
-        }
+	  str_result[i++] = line_buf.substr (found+2, tmp_pos-found-3);
+	  if (str_result[i-1] == "-")
+	    {
+	      str_result[i-1] = "";
+	    }
+	  continue;
+	}
 
       if (line_buf.find ("*** Active") != string::npos)
-        {
-          j = 6;
-          continue;
-        }
+	{
+	  j = 6;
+	  continue;
+	}
 
       if (line_buf.find ("EOF LSA") != string::npos)
-        {
-          found = (unsigned int) line_buf.find (":");
-          str_result[j] = line_buf.substr (found+2);
-          found = (unsigned int) str_result [j].find (" ");
-          str_result [j++].erase (found);
+	{
+	  found = (unsigned int) line_buf.find (":");
+	  str_result[j] = line_buf.substr (found+2);
+	  found = (unsigned int) str_result [j].find (" ");
+	  str_result [j++].erase (found);
 
-          found = (unsigned int) line_buf.find ("|");
-          str_result[j++] = line_buf.substr (found+2);
-        }
+	  found = (unsigned int) line_buf.find ("|");
+	  str_result[j++] = line_buf.substr (found+2);
+	}
     }
 
   return ERR_NO_ERROR;
@@ -1912,11 +1912,11 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   Json::Value copied_active_eof_lsa, active_eof_lsa;
 
   JSON_FIND_V (request, "copylogpath",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(copylogpath) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(copylogpath) missing in the request"));
   JSON_FIND_V (request, "remotehostname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
   JSON_FIND_V (request, "dbname",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(remotehostname) missing in the request"));
 
   gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
   gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
@@ -1996,9 +1996,9 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
 
 
   JSON_FIND_V (request, "targetid",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request"));
   JSON_FIND_V (request, "password",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
 
   user_id = request["targetid"].asString();
   password = request["password"].asString();
@@ -2006,7 +2006,7 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
   if (0 != IsValidUserName (user_id.c_str()))
     {
       return build_server_header (response, ERR_WITH_MSG,
-                                  "Invalid user name! User name should begin with a letter, and can only contain letters, digits or underscore. The length should be between 4 and 32.");
+				  "Invalid user name! User name should begin with a letter, and can only contain letters, digits or underscore. The length should be between 4 and 32.");
     }
 
   if (password.length() > PASSWD_LENGTH || password.length() < MIN_PASSWD_LENGTH)
@@ -2019,12 +2019,12 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
 
     if (!guard.ok ())
       {
-        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
+	return build_server_header (response, ERR_WITH_MSG, "internal lock error");
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
-        return build_server_header (response, retval, dbmt_error);
+	return build_server_header (response, retval, dbmt_error);
       }
 
     uEncrypt (PASSWD_LENGTH, password.c_str(), dbmt_password);
@@ -2032,159 +2032,159 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
     num_dbmt_user = dbmt_user.num_dbmt_user;
     for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
       {
-        if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
-          {
-            dbmt_user_free (&dbmt_user);
-            sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
-            return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
-          }
+	if (strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()) == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    sprintf (dbmt_error, "CUBRID Manager user(%s) already exist.", user_id.c_str());
+	    return build_server_header (response, ERR_DBMTUSER_EXIST, dbmt_error);
+	  }
       }
 
     // set user authority info
     if (Json::Value::null == request["authoritylist"])
       {
-        dbmt_user_free (&dbmt_user);
-        return build_server_header (response, ERR_PARAM_MISSING, "Parameter(authoritylist) missing in the request");
+	dbmt_user_free (&dbmt_user);
+	return build_server_header (response, ERR_PARAM_MISSING, "Parameter(authoritylist) missing in the request");
       }
     authoritylist = request["authoritylist"];
     Json::Value json_value = authoritylist;
 
     if (json_value["admin"] != Json::Value::null)
       {
-        if (json_value["admin"].asString() != "yes")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
-          }
-        auth |= AU_ADMIN;
+	if (json_value["admin"].asString() != "yes")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
+	  }
+	auth |= AU_ADMIN;
 
-        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                   num_authinfo + 2);
-        if (authinfo == NULL)
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-          }
+	authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+		   num_authinfo + 2);
+	if (authinfo == NULL)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	  }
 
-        dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
-        num_authinfo += 2;
+	dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
+	num_authinfo += 2;
       }
     else
       {
-        if (Json::Value::null == json_value["dbc"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbc or admin) missing in the authoritylist");
-          }
-        if (Json::Value::null == json_value["dbo"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbo or admin) missing in the authoritylist");
-          }
-        if (Json::Value::null == json_value["brk"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(brk or admin) missing in the authoritylist");
-          }
-        if (Json::Value::null == json_value["mon"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(mon or admin) missing in the authoritylist");
-          }
-        if (Json::Value::null == json_value["job"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(job or admin) missing in the authoritylist");
-          }
-        if (Json::Value::null == json_value["var"])
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(var or admin) missing in the authoritylist");
-          }
+	if (Json::Value::null == json_value["dbc"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbc or admin) missing in the authoritylist");
+	  }
+	if (Json::Value::null == json_value["dbo"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbo or admin) missing in the authoritylist");
+	  }
+	if (Json::Value::null == json_value["brk"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(brk or admin) missing in the authoritylist");
+	  }
+	if (Json::Value::null == json_value["mon"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(mon or admin) missing in the authoritylist");
+	  }
+	if (Json::Value::null == json_value["job"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(job or admin) missing in the authoritylist");
+	  }
+	if (Json::Value::null == json_value["var"])
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(var or admin) missing in the authoritylist");
+	  }
 
-        if (json_value["dbc"].asString() == "yes")
-          {
-            auth |= AU_DBC;
-          }
-        else if (json_value["dbc"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["dbc"].asString() == "yes")
+	  {
+	    auth |= AU_DBC;
+	  }
+	else if (json_value["dbc"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
+	  }
 
-        if (json_value["dbo"].asString() == "yes")
-          {
-            auth |= AU_DBO;
-          }
-        else if (json_value["dbo"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["dbo"].asString() == "yes")
+	  {
+	    auth |= AU_DBO;
+	  }
+	else if (json_value["dbo"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
+	  }
 
-        if (json_value["brk"].asString() == "yes")
-          {
-            auth |= AU_BRK;
-          }
-        else if (json_value["brk"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["brk"].asString() == "yes")
+	  {
+	    auth |= AU_BRK;
+	  }
+	else if (json_value["brk"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
+	  }
 
-        if (json_value["mon"].asString() == "yes")
-          {
-            auth |= AU_MON;
-          }
-        else if (json_value["mon"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["mon"].asString() == "yes")
+	  {
+	    auth |= AU_MON;
+	  }
+	else if (json_value["mon"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
+	  }
 
-        if (json_value["job"].asString() == "yes")
-          {
-            auth |= AU_JOB;
-          }
-        else if (json_value["job"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["job"].asString() == "yes")
+	  {
+	    auth |= AU_JOB;
+	  }
+	else if (json_value["job"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
+	  }
 
-        if (json_value["var"].asString() == "yes")
-          {
-            auth |= AU_VAR;
-          }
-        else if (json_value["var"].asString() != "no")
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
-          }
+	if (json_value["var"].asString() == "yes")
+	  {
+	    auth |= AU_VAR;
+	  }
+	else if (json_value["var"].asString() != "no")
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
+	  }
 
-        // all authorites are set as 'no'
-        if (auth == 0)
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
-          }
+	// all authorites are set as 'no'
+	if (auth == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
+	  }
 
-        authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                   num_authinfo + 7);
-        if (authinfo == NULL)
-          {
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-          }
-        num_authinfo += 7;
+	authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+		   num_authinfo + 7);
+	if (authinfo == NULL)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	  }
+	num_authinfo += 7;
 
-        // maybe only for debug
-        dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
-        dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
-        dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
-        dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
-        dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
-        dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
+	// maybe only for debug
+	dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
+	dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
+	dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
+	dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
+	dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
+	dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
       }
 
     sprintf (str_auth, "%u", auth);
@@ -2195,63 +2195,63 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
     // set db authority info
     if (Json::Value::null == request["dbauth"])
       {
-        FREE_MEM (authinfo);
-        dbmt_user_free (&dbmt_user);
-        return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbauth) missing in the request");
+	FREE_MEM (authinfo);
+	dbmt_user_free (&dbmt_user);
+	return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbauth) missing in the request");
       }
 
     dbauthlist = request["dbauth"];
 
     for (unsigned int i = 0; i < dbauthlist.size(); ++i)
       {
-        string dbname, dbid, dbpassword, broker_address;
+	string dbname, dbid, dbpassword, broker_address;
 
-        if (Json::Value::null == dbauthlist[i]["dbname"])
-          {
-            FREE_MEM (authinfo);
-            FREE_MEM (dbinfo);
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
-          }
-        if (Json::Value::null == dbauthlist[i]["dbid"])
-          {
-            FREE_MEM (authinfo);
-            FREE_MEM (dbinfo);
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
-          }
-        if (Json::Value::null == dbauthlist[i]["dbpassword"])
-          {
-            FREE_MEM (authinfo);
-            FREE_MEM (dbinfo);
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
-          }
-        if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
-          {
-            FREE_MEM (authinfo);
-            FREE_MEM (dbinfo);
-            dbmt_user_free (&dbmt_user);
-            return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
-          }
+	if (Json::Value::null == dbauthlist[i]["dbname"])
+	  {
+	    FREE_MEM (authinfo);
+	    FREE_MEM (dbinfo);
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
+	  }
+	if (Json::Value::null == dbauthlist[i]["dbid"])
+	  {
+	    FREE_MEM (authinfo);
+	    FREE_MEM (dbinfo);
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
+	  }
+	if (Json::Value::null == dbauthlist[i]["dbpassword"])
+	  {
+	    FREE_MEM (authinfo);
+	    FREE_MEM (dbinfo);
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
+	  }
+	if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
+	  {
+	    FREE_MEM (authinfo);
+	    FREE_MEM (dbinfo);
+	    dbmt_user_free (&dbmt_user);
+	    return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
+	  }
 
-        dbname = dbauthlist[i]["dbname"].asString();
-        dbid = dbauthlist[i]["dbid"].asString();
-        dbpassword = dbauthlist[i]["dbpassword"].asString();
-        broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
+	dbname = dbauthlist[i]["dbname"].asString();
+	dbid = dbauthlist[i]["dbid"].asString();
+	dbpassword = dbauthlist[i]["dbpassword"].asString();
+	broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
 
-        dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
-                 num_dbinfo, num_dbinfo + 1);
-        if (dbinfo == NULL)
-          {
-            FREE_MEM (authinfo);
-            dbmt_user_free (&dbmt_user);
+	dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
+		 num_dbinfo, num_dbinfo + 1);
+	if (dbinfo == NULL)
+	  {
+	    FREE_MEM (authinfo);
+	    dbmt_user_free (&dbmt_user);
 
-            return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-          }
-        num_dbinfo++;
+	    return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	  }
+	num_dbinfo++;
 
-        dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
+	dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
       }
 
     LOG_DEBUG ("set db authority info successfully.");
@@ -2260,22 +2260,22 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
     {
       size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
       T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
-              (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
+			      (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
 
       if (tmp == NULL)
-        {
-          FREE_MEM (authinfo);
-          FREE_MEM (dbinfo);
-          dbmt_user_free (&dbmt_user);
-          return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
-        }
+	{
+	  FREE_MEM (authinfo);
+	  FREE_MEM (dbinfo);
+	  dbmt_user_free (&dbmt_user);
+	  return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.") ;
+	}
       memset (tmp + num_dbmt_user, 0, sizeof (T_DBMT_USER_INFO));
       dbmt_user.user_info = tmp;
     }
 
     num_dbmt_user++;
     dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user-1]), user_id.c_str(), dbmt_password, num_authinfo,
-                            authinfo, num_dbinfo, dbinfo);
+			    authinfo, num_dbinfo, dbinfo);
     dbmt_user.num_dbmt_user = num_dbmt_user;
 
 
@@ -2283,15 +2283,15 @@ int ext_add_dbmt_user_new (Json::Value &request, Json::Value &response)
 
     if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
-        dbmt_user_free (&dbmt_user);
+	dbmt_user_free (&dbmt_user);
 
-        return build_server_header (response, retval, dbmt_error);
+	return build_server_header (response, retval, dbmt_error);
       }
     if ((retval = dbmt_user_write_pass_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
-        dbmt_user_free (&dbmt_user);
+	dbmt_user_free (&dbmt_user);
 
-        return build_server_header (response, retval, dbmt_error);
+	return build_server_header (response, retval, dbmt_error);
       }
   }
 
@@ -2339,7 +2339,7 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
   char str_auth[12]; // the length of number 2^32
 
   JSON_FIND_V (request, "targetid",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request."));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request."));
 
   user_id = request["targetid"].asString();
 
@@ -2347,117 +2347,117 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
     {
 
       if (json_value["admin"] != Json::Value::null)
-        {
-          if (json_value["admin"].asString() != "yes")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
-            }
+	{
+	  if (json_value["admin"].asString() != "yes")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "The value of 'admin' should be 'yes'!");
+	    }
 
-          auth |= AU_ADMIN;
+	  auth |= AU_ADMIN;
 
-          authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                     num_authinfo + 2);
-          if (authinfo == NULL)
-            {
-              return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-            }
+	  authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+		     num_authinfo + 2);
+	  if (authinfo == NULL)
+	    {
+	      return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	    }
 
-          dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
-          num_authinfo += 2;
-        }
+	  dbmt_user_set_authinfo (& (authinfo[1]), "admin", "yes");
+	  num_authinfo += 2;
+	}
       else
-        {
-          JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbc or admin) missing in the authoritylist"));
-          JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(dbo or admin) missing in the authoritylist"));
-          JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(brk or admin) missing in the authoritylist"));
-          JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(mon or admin) missing in the authoritylist"));
-          JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(job or admin) missing in the authoritylist"));
-          JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
-                       "Parameter(var or admin) missing in the authoritylist"));
+	{
+	  JSON_FIND_V (json_value, "dbc", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(dbc or admin) missing in the authoritylist"));
+	  JSON_FIND_V (json_value, "dbo", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(dbo or admin) missing in the authoritylist"));
+	  JSON_FIND_V (json_value, "brk", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(brk or admin) missing in the authoritylist"));
+	  JSON_FIND_V (json_value, "mon", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(mon or admin) missing in the authoritylist"));
+	  JSON_FIND_V (json_value, "job", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(job or admin) missing in the authoritylist"));
+	  JSON_FIND_V (json_value, "var", build_server_header (response, ERR_PARAM_MISSING,
+		       "Parameter(var or admin) missing in the authoritylist"));
 
 
-          if (json_value["dbc"].asString() == "yes")
-            {
-              auth |= AU_DBC;
-            }
-          else if (json_value["dbc"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["dbc"].asString() == "yes")
+	    {
+	      auth |= AU_DBC;
+	    }
+	  else if (json_value["dbc"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbc', it can only accept either 'yes' or 'no'.");
+	    }
 
-          if (json_value["dbo"].asString() == "yes")
-            {
-              auth |= AU_DBO;
-            }
-          else if (json_value["dbo"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["dbo"].asString() == "yes")
+	    {
+	      auth |= AU_DBO;
+	    }
+	  else if (json_value["dbo"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'dbo', it can only accept either 'yes' or 'no'.");
+	    }
 
-          if (json_value["brk"].asString() == "yes")
-            {
-              auth |= AU_BRK;
-            }
-          else if (json_value["brk"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["brk"].asString() == "yes")
+	    {
+	      auth |= AU_BRK;
+	    }
+	  else if (json_value["brk"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'brk', it can only accept either 'yes' or 'no'.");
+	    }
 
-          if (json_value["mon"].asString() == "yes")
-            {
-              auth |= AU_MON;
-            }
-          else if (json_value["mon"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["mon"].asString() == "yes")
+	    {
+	      auth |= AU_MON;
+	    }
+	  else if (json_value["mon"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'mon', it can only accept either 'yes' or 'no'.");
+	    }
 
-          if (json_value["job"].asString() == "yes")
-            {
-              auth |= AU_JOB;
-            }
-          else if (json_value["job"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["job"].asString() == "yes")
+	    {
+	      auth |= AU_JOB;
+	    }
+	  else if (json_value["job"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'job', it can only accept either 'yes' or 'no'.");
+	    }
 
-          if (json_value["var"].asString() == "yes")
-            {
-              auth |= AU_VAR;
-            }
-          else if (json_value["var"].asString() != "no")
-            {
-              return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
-            }
+	  if (json_value["var"].asString() == "yes")
+	    {
+	      auth |= AU_VAR;
+	    }
+	  else if (json_value["var"].asString() != "no")
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "invalid value in 'var', it can only accept either 'yes' or 'no'.");
+	    }
 
-          // all authorites are set as 'no'
-          if (auth == 0)
-            {
-              return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
-            }
+	  // all authorites are set as 'no'
+	  if (auth == 0)
+	    {
+	      return build_server_header (response, ERR_WITH_MSG, "It can't be allowed to set all authorities as \"no\".");
+	    }
 
-          authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
-                     num_authinfo + 7);
-          if (authinfo == NULL)
-            {
-              return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-            }
-          num_authinfo += 7;
+	  authinfo = (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo, sizeof (T_DBMT_USER_AUTHINFO), num_authinfo,
+		     num_authinfo + 7);
+	  if (authinfo == NULL)
+	    {
+	      return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	    }
+	  num_authinfo += 7;
 
-          // maybe only for debug
-          dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
-          dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
-          dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
-          dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
-          dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
-          dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
+	  // maybe only for debug
+	  dbmt_user_set_authinfo (& (authinfo[1]), "dbc", ((AU_DBC & auth)? "yes" : "no"));
+	  dbmt_user_set_authinfo (& (authinfo[2]), "dbo", ((AU_DBO & auth)? "yes" : "no"));
+	  dbmt_user_set_authinfo (& (authinfo[3]), "brk", ((AU_BRK & auth)? "yes" : "no"));
+	  dbmt_user_set_authinfo (& (authinfo[4]), "mon", ((AU_MON & auth)? "yes" : "no"));
+	  dbmt_user_set_authinfo (& (authinfo[5]), "job", ((AU_JOB & auth)? "yes" : "no"));
+	  dbmt_user_set_authinfo (& (authinfo[6]), "var", ((AU_VAR & auth)? "yes" : "no"));
 
-        }
+	}
 
       sprintf (str_auth, "%u", auth);
       dbmt_user_set_authinfo (& (authinfo[0]), "user_auth", str_auth);
@@ -2471,53 +2471,53 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
     {
 
       for (unsigned int i = 0; i < dbauthlist.size(); ++i)
-        {
+	{
 
-          string dbname, dbid, dbpassword, broker_address;
+	  string dbname, dbid, dbpassword, broker_address;
 
-          if (Json::Value::null == dbauthlist[i]["dbname"])
-            {
-              FREE_MEM (authinfo);
-              FREE_MEM (dbinfo);
-              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
-            }
-          if (Json::Value::null == dbauthlist[i]["dbid"])
-            {
-              FREE_MEM (authinfo);
-              FREE_MEM (dbinfo);
-              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
-            }
-          if (Json::Value::null == dbauthlist[i]["dbpassword"])
-            {
-              FREE_MEM (authinfo);
-              FREE_MEM (dbinfo);
-              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
-            }
-          if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
-            {
-              FREE_MEM (authinfo);
-              FREE_MEM (dbinfo);
-              return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
-            }
+	  if (Json::Value::null == dbauthlist[i]["dbname"])
+	    {
+	      FREE_MEM (authinfo);
+	      FREE_MEM (dbinfo);
+	      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the authoritylist");
+	    }
+	  if (Json::Value::null == dbauthlist[i]["dbid"])
+	    {
+	      FREE_MEM (authinfo);
+	      FREE_MEM (dbinfo);
+	      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbid) missing in the authoritylist");
+	    }
+	  if (Json::Value::null == dbauthlist[i]["dbpassword"])
+	    {
+	      FREE_MEM (authinfo);
+	      FREE_MEM (dbinfo);
+	      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbpassword) missing in the authoritylist");
+	    }
+	  if (Json::Value::null == dbauthlist[i]["dbbrokeraddress"])
+	    {
+	      FREE_MEM (authinfo);
+	      FREE_MEM (dbinfo);
+	      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbbrokeraddress) missing in the authoritylist");
+	    }
 
-          dbname = dbauthlist[i]["dbname"].asString();
-          dbid = dbauthlist[i]["dbid"].asString();
-          dbpassword = dbauthlist[i]["dbpassword"].asString();
-          broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
+	  dbname = dbauthlist[i]["dbname"].asString();
+	  dbid = dbauthlist[i]["dbid"].asString();
+	  dbpassword = dbauthlist[i]["dbpassword"].asString();
+	  broker_address = dbauthlist[i]["dbbrokeraddress"].asString();
 
-          dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
-                   num_dbinfo, num_dbinfo + 1);
-          if (dbinfo == NULL)
-            {
-              FREE_MEM (authinfo);
+	  dbinfo = (T_DBMT_USER_DBINFO *) increase_capacity (dbinfo, sizeof (T_DBMT_USER_DBINFO),
+		   num_dbinfo, num_dbinfo + 1);
+	  if (dbinfo == NULL)
+	    {
+	      FREE_MEM (authinfo);
 
-              return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
-            }
-          num_dbinfo++;
+	      return build_server_header (response, ERR_MEM_ALLOC, "Memory Allocation error.");
+	    }
+	  num_dbinfo++;
 
-          dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
+	  dbmt_user_set_dbinfo (& (dbinfo[num_dbinfo-1]), dbname.c_str(), "admin", dbid.c_str(), broker_address.c_str());
 
-        }
+	}
     }
 
   {
@@ -2525,100 +2525,100 @@ int ext_update_dbmt_user_new (Json::Value &request, Json::Value &response)
 
     if (!user_write_guard.ok ())
       {
-        FREE_MEM (authinfo);
-        FREE_MEM (dbinfo);
-        return build_server_header (response, ERR_WITH_MSG, "internal lock error");
+	FREE_MEM (authinfo);
+	FREE_MEM (dbinfo);
+	return build_server_header (response, ERR_WITH_MSG, "internal lock error");
       }
 
     if ((retval = dbmt_user_read_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
-        FREE_MEM (authinfo);
-        FREE_MEM (dbinfo);
-        return build_server_header (response, retval, dbmt_error);
+	FREE_MEM (authinfo);
+	FREE_MEM (dbinfo);
+	return build_server_header (response, retval, dbmt_error);
       }
 
     pos = -1;
     for (int i = 0;  i < dbmt_user.num_dbmt_user; ++i)
       {
-        if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
-          {
-            pos = i;
-            break;
-          }
+	if (!strcmp (dbmt_user.user_info[i].user_name, user_id.c_str()))
+	  {
+	    pos = i;
+	    break;
+	  }
       }
 
     if (pos < 0)
       {
-        FREE_MEM (authinfo);
-        FREE_MEM (dbinfo);
-        dbmt_user_free (&dbmt_user);
+	FREE_MEM (authinfo);
+	FREE_MEM (dbinfo);
+	dbmt_user_free (&dbmt_user);
 
-        return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
+	return build_server_header (response, ERR_GENERAL_ERROR, "the user doesn't exist!");
       }
 
     if (authinfo != NULL)
       {
-        free (dbmt_user.user_info[pos].authinfo);
-        dbmt_user.user_info[pos].authinfo = authinfo;
-        dbmt_user.user_info[pos].num_authinfo = num_authinfo;
+	free (dbmt_user.user_info[pos].authinfo);
+	dbmt_user.user_info[pos].authinfo = authinfo;
+	dbmt_user.user_info[pos].num_authinfo = num_authinfo;
 
       }
 
     if (dbinfo != NULL)
       {
-        if (dbmt_user.user_info[pos].dbinfo == NULL)
-          {
-            dbmt_user.user_info[pos].dbinfo = dbinfo;
-            dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
-            dbinfo = NULL;
-          }
-        else
-          {
-            T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
-            for (int i = 0; i < num_dbinfo; ++i )
-              {
-                int tmp_pos = -1;
-                for (int j = 0; j < current_user->num_dbinfo; ++j)
-                  {
-                    if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
-                      {
-                        tmp_pos = j;
-                      }
-                  }
+	if (dbmt_user.user_info[pos].dbinfo == NULL)
+	  {
+	    dbmt_user.user_info[pos].dbinfo = dbinfo;
+	    dbmt_user.user_info[pos].num_dbinfo = num_dbinfo;
+	    dbinfo = NULL;
+	  }
+	else
+	  {
+	    T_DBMT_USER_INFO *current_user = dbmt_user.user_info+pos;
+	    for (int i = 0; i < num_dbinfo; ++i )
+	      {
+		int tmp_pos = -1;
+		for (int j = 0; j < current_user->num_dbinfo; ++j)
+		  {
+		    if (!strcmp (current_user->dbinfo[j].dbname, dbinfo[i].dbname))
+		      {
+			tmp_pos = j;
+		      }
+		  }
 
-                if (tmp_pos < 0)
-                  {
-                    current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
-                                           sizeof (T_DBMT_USER_DBINFO),
-                                           current_user->num_dbinfo,
-                                           current_user->num_dbinfo+1);
+		if (tmp_pos < 0)
+		  {
+		    current_user->dbinfo = (T_DBMT_USER_DBINFO *)increase_capacity (current_user->dbinfo,
+					   sizeof (T_DBMT_USER_DBINFO),
+					   current_user->num_dbinfo,
+					   current_user->num_dbinfo+1);
 
-                    if (current_user->dbinfo == NULL)
-                      {
-                        FREE_MEM (dbinfo);
-                        dbmt_user_free (&dbmt_user);
+		    if (current_user->dbinfo == NULL)
+		      {
+			FREE_MEM (dbinfo);
+			dbmt_user_free (&dbmt_user);
 
-                        return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
-                      }
-                    tmp_pos = current_user->num_dbinfo;
-                    current_user->num_dbinfo++;
-                  }
+			return build_server_header (response, ERR_MEM_ALLOC, "Memory allocation error.");
+		      }
+		    tmp_pos = current_user->num_dbinfo;
+		    current_user->num_dbinfo++;
+		  }
 
-                dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
-                                      dbinfo[i].dbname,
-                                      dbinfo[i].auth,
-                                      dbinfo[i].uid,
-                                      dbinfo[i].broker_address);
-              }
-          }
+		dbmt_user_set_dbinfo (& (current_user->dbinfo[tmp_pos]),
+				      dbinfo[i].dbname,
+				      dbinfo[i].auth,
+				      dbinfo[i].uid,
+				      dbinfo[i].broker_address);
+	      }
+	  }
       }
 
     if ((retval = dbmt_user_write_auth_locked (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
       {
-        FREE_MEM (dbinfo);
-        dbmt_user_free (&dbmt_user);
+	FREE_MEM (dbinfo);
+	dbmt_user_free (&dbmt_user);
 
-        return build_server_header (response, retval, dbmt_error);
+	return build_server_header (response, retval, dbmt_error);
       }
   }
 
@@ -2725,19 +2725,19 @@ int ext_ut_add_dblist_to_response (Json::Value &response, bool is_add_dbpath)
 
       int i = 0;
       while (getline (in_hname, hname[i], ':'))
-        {
-          if (hname[i] == "127.0.0.1" || hname[i] == str_hostname || hname[i] == "localhost")
-            {
-              db["dbname"] = dbname;
-              if (is_add_dbpath)
-                {
-                  db["dbdir"] = dbpath;
-                }
-              dbs.append (db);
-              break;
-            }
-          i++;
-        }
+	{
+	  if (hname[i] == "127.0.0.1" || hname[i] == str_hostname || hname[i] == "localhost")
+	    {
+	      db["dbname"] = dbname;
+	      if (is_add_dbpath)
+		{
+		  db["dbdir"] = dbpath;
+		}
+	      dbs.append (db);
+	      break;
+	    }
+	  i++;
+	}
     }
 
   dblist["dbs"] = dbs;
@@ -2760,99 +2760,99 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
       ostringstream tmp_oss;
 
       if (dbmt_user.user_info[i].user_name[0] == '\0')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       user[ENCRYPT_ARG ("id")] = dbmt_user.user_info[i].user_name;
       if (is_add_pwd)
-        {
-          user["passwd"] = dbmt_user.user_info[i].user_passwd;
-        }
+	{
+	  user["passwd"] = dbmt_user.user_info[i].user_passwd;
+	}
 
       json_value.clear();
 
       // add user authority info
       for (int j = 0; j < dbmt_user.user_info[i].num_authinfo; ++j)
-        {
-          if (dbmt_user.user_info[i].authinfo[j].domain[0] == '\0')
-            {
-              continue;
-            }
+	{
+	  if (dbmt_user.user_info[i].authinfo[j].domain[0] == '\0')
+	    {
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "dbo"))
-            {
-              json_value["dbo"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "dbo"))
+	    {
+	      json_value["dbo"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "dbc"))
-            {
-              json_value["dbc"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "dbc"))
+	    {
+	      json_value["dbc"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "brk"))
-            {
-              json_value["brk"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "brk"))
+	    {
+	      json_value["brk"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "mon"))
-            {
-              json_value["mon"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "mon"))
+	    {
+	      json_value["mon"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "job"))
-            {
-              json_value["job"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "job"))
+	    {
+	      json_value["job"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "var"))
-            {
-              json_value["var"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "var"))
+	    {
+	      json_value["var"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "all"))
-            {
-              json_value["all"] = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "all"))
+	    {
+	      json_value["all"] = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
 
-          if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "user_auth"))
-            {
-              user_auth = dbmt_user.user_info[i].authinfo[j].auth;
-              continue;
-            }
-        }
+	  if (!strcmp (dbmt_user.user_info[i].authinfo[j].domain, "user_auth"))
+	    {
+	      user_auth = dbmt_user.user_info[i].authinfo[j].auth;
+	      continue;
+	    }
+	}
 
       authority_list.append (json_value);
 
       tmp_oss << AU_ADMIN;
       if (!strcasecmp (dbmt_user.user_info[i].user_name, "admin") ||
-          user_auth == tmp_oss.str())
-        {
-          user["user_auth"] = "admin";
-        }
+	  user_auth == tmp_oss.str())
+	{
+	  user["user_auth"] = "admin";
+	}
       else
-        {
-          user["user_auth"] = user_auth;
-        }
+	{
+	  user["user_auth"] = user_auth;
+	}
       user["authority_list"] = authority_list;
 
       json_value.clear();
       // add user db info
       for (int j = 0; j < dbmt_user.user_info[i].num_dbinfo; ++j)
-        {
-          json_value[ENCRYPT_ARG ("dbid")] = dbmt_user.user_info[i].dbinfo[j].uid;
-          json_value["dbname"] = dbmt_user.user_info[i].dbinfo[j].dbname;
-          json_value["dbbrokeraddress"] = dbmt_user.user_info[i].dbinfo[j].broker_address;
+	{
+	  json_value[ENCRYPT_ARG ("dbid")] = dbmt_user.user_info[i].dbinfo[j].uid;
+	  json_value["dbname"] = dbmt_user.user_info[i].dbinfo[j].dbname;
+	  json_value["dbbrokeraddress"] = dbmt_user.user_info[i].dbinfo[j].broker_address;
 
-          dbauth["auth_info"].append (json_value);
-        }
+	  dbauth["auth_info"].append (json_value);
+	}
 
       user["dbauth"].append (dbauth);
       userlist["user"].append (user);
@@ -2864,7 +2864,7 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
 
 static bool _validate_token_active_time (time_t &active_time)
 {
-    size_t len = 0;
+  size_t len = 0;
 
   active_time = 0;
   len = strlen (sco.szTokenActiveTime);
@@ -2877,9 +2877,9 @@ static bool _validate_token_active_time (time_t &active_time)
   for (size_t i = 0; i < len; ++i)
     {
       if (!isdigit (sco.szTokenActiveTime[i]))
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
     }
 
   active_time = atol (sco.szTokenActiveTime);
@@ -3108,12 +3108,12 @@ bool ext_ut_validate_auth (Json::Value &request)
   for (int index = 0; index < dbmt_user.num_dbmt_user; ++index)
     {
       if (strcmp (dbmt_user.user_info[index].user_name, user_id.c_str()) == 0)
-        {
-          auth_info = dbmt_user.user_info[index].authinfo;
-          num_authinfo = dbmt_user.user_info[index].num_authinfo;
-          matches = true;
-          break;
-        }
+	{
+	  auth_info = dbmt_user.user_info[index].authinfo;
+	  num_authinfo = dbmt_user.user_info[index].num_authinfo;
+	  matches = true;
+	  break;
+	}
     }
 
   // the user doesn't exist
@@ -3126,10 +3126,10 @@ bool ext_ut_validate_auth (Json::Value &request)
   for (int index = 0; index < num_authinfo; ++index)
     {
       if (!strcmp (auth_info[index].domain, "user_auth"))
-        {
-          istringstream (string (auth_info[index].auth)) >> auth_user;
-          break;
-        }
+	{
+	  istringstream (string (auth_info[index].auth)) >> auth_user;
+	  break;
+	}
     }
 
   dbmt_user_free (&dbmt_user);
@@ -3138,13 +3138,13 @@ bool ext_ut_validate_auth (Json::Value &request)
   if (auth_user == 0)
     {
       if (user_id == "admin")
-        {
-          auth_user = AU_ADMIN;
-        }
+	{
+	  auth_user = AU_ADMIN;
+	}
       else
-        {
-          auth_user = ALL_AUTHORITY;
-        }
+	{
+	  auth_user = ALL_AUTHORITY;
+	}
     }
 
   if (auth_user == AU_ADMIN)
@@ -3162,7 +3162,7 @@ int ext_get_mon_interval (Json::Value &request, Json::Value &response)
   if (false == (cm_mon_stat::get_instance())->get_mon_interval (interval))
     {
       return build_server_header (response, ERR_WITH_MSG,
-                                  "Get interval failed, because the monitoring module is not initialized!");
+				  "Get interval failed, because the monitoring module is not initialized!");
     }
   response["interval"] = int (interval);
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
@@ -3173,7 +3173,7 @@ int ext_set_mon_interval (Json::Value &request, Json::Value &response)
   int interval = 0;
   response["task"] = request["task"];
   JSON_FIND_V (request, "interval",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(interval) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(interval) missing in the request"));
   interval = request["interval"].asInt();
   if (interval < MIN_INTERVAL)
     {
@@ -3185,7 +3185,7 @@ int ext_set_mon_interval (Json::Value &request, Json::Value &response)
     {
       stringstream sstr;
       sstr << "The interval " << interval << " seconds is bigger than or equal to the maximum interval " << MAX_INTERVAL <<
-           " seconds";
+	   " seconds";
       return build_server_header (response, ERR_WITH_MSG, sstr.str().c_str());
     }
   if (true == (cm_mon_stat::get_instance())->set_mon_interval (interval))
@@ -3195,7 +3195,7 @@ int ext_set_mon_interval (Json::Value &request, Json::Value &response)
   else
     {
       return build_server_header (response, ERR_WITH_MSG,
-                                  "Set monitoring interval for monitoring statistic failed!");
+				  "Set monitoring interval for monitoring statistic failed!");
     }
 }
 
@@ -3204,25 +3204,25 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &response)
   response["task"] = request["task"];
   string errmsg = "";
   JSON_FIND_V (request, "metric",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(metric) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(metric) missing in the request"));
   JSON_FIND_V (request, "dtype",
-               build_server_header (response, ERR_PARAM_MISSING, "Parameter(dtype) missing in the request"));
+	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(dtype) missing in the request"));
   if (0 == strncmp ("db_", request["metric"].asString().c_str(), strlen ("db_")))
     {
       JSON_FIND_V (request, "dbname",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
     }
   if (0 == strncmp ("vol_", request["metric"].asString().c_str(), strlen ("vol_")))
     {
       JSON_FIND_V (request, "dbname",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(dbname) missing in the request"));
       JSON_FIND_V (request, "volname",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(volname) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(volname) missing in the request"));
     }
   if (0 == strncmp ("broker_", request["metric"].asString().c_str(), strlen ("broker_")))
     {
       JSON_FIND_V (request, "bname",
-                   build_server_header (response, ERR_PARAM_MISSING, "Parameter(bname) missing in the request"));
+		   build_server_header (response, ERR_PARAM_MISSING, "Parameter(bname) missing in the request"));
     }
   if (true == (cm_mon_stat::get_instance())->get_mon_statistic (request, response, errmsg))
     {
@@ -3236,7 +3236,7 @@ int ext_get_mon_statistic (Json::Value &request, Json::Value &response)
 
 static int count_and_get_last_word (string str, char *word)
 {
-  stringstream ss(str);
+  stringstream ss (str);
   string token;
   int count = 0;
 
@@ -3262,16 +3262,16 @@ static int is_invalid_time (char *str)
   char colon;
   string timestr = str;
 
-  stringstream ss(timestr);
+  stringstream ss (timestr);
 
-  if (!(ss >> hour >> colon >> minute))
+  if (! (ss >> hour >> colon >> minute))
     {
       return 1;
     }
 
   if (!ss.eof() || colon != ':' || hour < 0 || hour > 23 || minute < 0 || minute > 59)
     {
-        return 1;
+      return 1;
     }
 
   return 0;
