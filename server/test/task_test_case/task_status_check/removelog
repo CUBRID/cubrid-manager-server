@@ -1,0 +1,4 @@
+{"task":"removelog",
+"token":"",
+"files":[{"path":"$CUBRID/tmp/test_removelog.log"}]
+}

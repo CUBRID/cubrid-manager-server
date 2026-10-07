@@ -1,0 +1,8 @@
+{
+   "level0": "$CUBRID_DATABASES/alatestdb/backup/alatestdb_backup_lv0/alatestdb_bk0v000",
+   "level1": "none",
+   "level2": "none",
+   "note": "none",
+   "status": "success",
+   "task": "getbackuplist"
+}

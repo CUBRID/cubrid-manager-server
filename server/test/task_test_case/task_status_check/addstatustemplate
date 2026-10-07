@@ -1,0 +1,8 @@
+{"task":"addstatustemplate",
+"token":"",
+"name":"dbserver_clier_requet",
+"desc":"client_request",
+"db_name":"demodb",
+"sampling_term":"5",
+"target_config":[{"server_conn_cli_request":"1 1"}]
+}

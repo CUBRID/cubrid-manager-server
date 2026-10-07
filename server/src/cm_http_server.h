@@ -52,23 +52,6 @@
 #define O_BINARY 0x8000  //used for open  files that contains some unicodes
 #endif
 
-
-/**
- * @brief load_webfiles_cb
- * This callback gets invoked when we get any http request that doesn't match
- * any other callback.  Like any evhttp server callback, it has a simple job:
- * it must eventually call evhttp_send_error() or evhttp_send_reply().
- * It is a real http server,if want add SSL connection. must be called after:
- * create_sslconn_cb and init_SSL
- * @param req
- * http reuqest
- * See also: struct evhttp_request
- * @param arg
- * The path or the files that need to be called.
- * @return
- */
-void load_webfiles_cb (struct evhttp_request *req, void *arg);
-
 /**
  * @brief create_sslconn_cb
  * This callback is responsible for creating a new SSL connection

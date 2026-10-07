@@ -1,0 +1,5 @@
+{
+   "note": "Set monitoring interval for monitoring statistic failed!",
+   "status": "failure",
+   "task": "set_mon_interval"
+}

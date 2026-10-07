@@ -11,7 +11,20 @@ The adddbmtuser interface will create a new database manager user.
 | targetid | user name |
 | password | user password |
 | dbauth | a list of databases which is taken in charge by this user |
-| authoritylist | the authorities granted to this user, including dbo,brk,mon,job,var,dbc and admin |
+| casauth | the broker authority of the CM user |
+| dbcreate | the database creation authority of the CM user |
+| statusmonitorauth | the monitoring authority of the CM user |
+
+### dbauth
+
+dbauth is composed of objects with following structure
+
+| **Key** | **Description** |
+| --- | --- |
+| dbname | database name |
+| dbid | the database user id used to connect to that database |
+| dbpassword | the password of that database user |
+| dbbrokeraddress | the address of the broker used to connect to that database |
 
 ## Request Sample
 
@@ -19,30 +32,19 @@ The adddbmtuser interface will create a new database manager user.
 {
   "task": "adddbmtuser",
   "token": "...",
-  "password": "1234567",
-  "targetid": "hqy_admin280",
+  "targetid": "monitor1",
+  "password": "1111",
   "dbauth": [
     {
-      "dbname": "db_3",
+      "dbname": "demodb",
       "dbid": "dba",
       "dbpassword": "",
-      "dbbrokeraddress": "localhost, 33000"
-    },
-    {
-      "dbname": "db_5",
-      "dbid": "dba",
-      "dbpassword": "",
-      "dbbrokeraddress": "localhost, 33000"
+      "dbbrokeraddress": "localhost,33000"
     }
   ],
-  "authoritylist": {
-    "dbc": "yes",
-    "dbo": "no",
-    "brk": "no",
-    "mon": "no",
-    "job": "no",
-    "var": "yes"
-  }
+  "casauth": "admin",
+  "dbcreate": "none",
+  "statusmonitorauth": "admin"
 }
 ```
 
@@ -68,59 +70,43 @@ The adddbmtuser interface will create a new database manager user.
 
 ```json
 {
-    "dblist": {
-        "dbs": [
+   "__EXEC_TIME" : "4 ms",
+   "dblist" : [
+      {
+         "dbs" : [
             {
-                "dbname": "demodb"
+               "dbname" : "demodb"
             }
-        ]
-    },
-    "note": "none",
-    "status": "success",
-    "task": "adddbmtuser",
-    "userlist": {
-        "user": [
+         ]
+      }
+   ],
+   "note" : "none",
+   "status" : "success",
+   "task" : "adddbmtuser",
+   "userlist" : [
+      {
+         "user" : [
             {
-                "@id": "admin",
-                "authority_list": null,
-                "dbauth": {
-                    "auth_info": [
+               "@id" : "admin",
+               "casauth" : "admin",
+               "dbauth" : [
+                  {
+                     "auth_info" : [
                         {
-                            "@dbid": "dba",
-                            "dbbrokeraddress": "10.34.135.62,30000",
-                            "dbname": "demodb"
+                           "@dbid" : "dba",
+                           "dbbrokeraddress" : "localhost,33000",
+                           "dbname" : "demodb"
                         }
-                    ]
-                },
-                "user_auth": "admin"
-            },
-            {
-                "@id": "hqy_admin225",
-                "authority_list": {
-                    "brk": "yes",
-                    "dbc": "no",
-                    "dbo": "yes",
-                    "job": "no",
-                    "mon": "no",
-                    "var": "no"
-                },
-                "dbauth": {
-                    "auth_info": [
-                        {
-                            "@dbid": "dba",
-                            "dbbrokeraddress": "localhost, 33000",
-                            "dbname": "db_3"
-                        },
-                        {
-                            "@dbid": "dba",
-                            "dbbrokeraddress": "localhost, 33000",
-                            "dbname": "db_5"
-                        }
-                    ]
-                },
-                "user_auth": "6"
+                     ]
+                  }
+               ],
+               "dbcreate" : "admin",
+               "statusmonitorauth" : "admin"
             }
-        ]
-    }
+         ]
+      }
+   ]
 }
 ```
+
+> Lists are shortened to 1 entry here.

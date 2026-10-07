@@ -1,0 +1,12 @@
+{
+   "note": "none",
+   "query_result_file": "$CUBRID/tmp/log_run_res_<tmpid>",
+   "query_result_file_num": "1",
+   "result_list": [
+      {
+         "result": "stddev : 0.000000"
+      }
+   ],
+   "status": "success",
+   "task": "executecasrunner"
+}

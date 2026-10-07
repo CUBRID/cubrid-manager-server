@@ -1,0 +1,6 @@
+{
+   "existfile": "$CUBRID/log/manager/cub_manager.log",
+   "note": "none",
+   "status": "success",
+   "task": "checkfile"
+}

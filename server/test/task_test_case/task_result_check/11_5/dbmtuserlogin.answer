@@ -1,0 +1,8 @@
+{
+   "@targetid": "admin",
+   "authority": "isdba",
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "task": "dbmtuserlogin"
+}

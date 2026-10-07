@@ -54,3 +54,22 @@ The restoredb interface will restore a database from backup.
    "task" : "restoredb"
 }
 ```
+
+## Response JSON Syntax
+
+| **Key** | **Description** |
+| --- | --- |
+| task | task name |
+| status | execution result, success or failed. |
+| note | if failed, a brief description will be given here |
+
+## Response Sample
+
+```
+{
+   "__EXEC_TIME" : "12 ms",
+   "note" : "none",
+   "status" : "success",
+   "task" : "restoredb"
+}
+```

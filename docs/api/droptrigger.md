@@ -8,6 +8,8 @@ Drop a trigger.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
+| triggername | the name of the trigger to be dropped |
 
 ## Request Sample
 
@@ -27,12 +29,14 @@ Drop a trigger.
 | task | task name |
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
+| dbname | database name |
 
 ## Response Sample
 
 ```
 {
-   "__EXEC_TIME" : "72 ms",
+   "__EXEC_TIME" : "40 ms",
+   "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
    "task" : "droptrigger"

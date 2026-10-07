@@ -1,0 +1,72 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="res">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
+    </Filter>
+    <Filter Include="cmserver">
+      <UniqueIdentifier>{24763dd7-5d35-46a9-a54e-70853414f645}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource.h">
+      <Filter>res</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cm_cmd_task.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cm_cmd_util.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cm_log.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cm_porting.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cm_server_util.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\getopt.h">
+      <Filter>cmserver</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="version.rc">
+      <Filter>res</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\cm_cmd.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_cmd_task.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_cmd_util.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_config.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_connect_info.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_server_util.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_text_encryption.c">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_user.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\cm_win_wsa.c">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\getopt_long.c">
+      <Filter>cmserver</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

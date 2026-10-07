@@ -61,7 +61,7 @@ class cm_mon_stat
     bool set_mon_interval (time_t interval);
     bool get_mon_interval (time_t &interval) const;
     bool get_mon_statistic (const Json::Value req, Json::Value &res,
-                            string &errmsg) const;
+			    string &errmsg) const;
 
   protected:
     cm_mon_stat (string data_path);
@@ -80,19 +80,19 @@ class cm_mon_stat
     void aggregate_2_hour (time_t gather_time);
     void aggregate_2_day (time_t gather_time);
     void aggregate_os (int read_offset, int buf_base, int write_offset,
-                       AGG_TYPE atype, time_t gather_time);
+		       AGG_TYPE atype, time_t gather_time);
     void aggregate_dbs (int read_offset, int buf_base, int write_offset,
-                        AGG_TYPE atype, time_t gather_time);
+			AGG_TYPE atype, time_t gather_time);
     void aggregate_brokers (int read_offset, int buf_base, int write_offset,
-                            AGG_TYPE atype, time_t gather_time);
+			    AGG_TYPE atype, time_t gather_time);
     void gather_daily_brokers_mon (time_t gather_time);
     bool gather_dbs_tran_query (time_t gather_time, Json::Value &db_tq);
     void gather_daily_dbs_mon (time_t gather_time);
     void gather_daily_os_mon (time_t gather_time);
     bool reset_mon_file (string fpath, int block_num, int mlen,
-                         int new_interval);
+			 int new_interval);
     bool get_rrd_data (MDTYPE mdtype, string dpath, int didx, int midx,
-                       int pfactor, bool ddiff, int mlen, Json::Value &res, string &errmsg) const;
+		       int pfactor, bool ddiff, int mlen, Json::Value &res, string &errmsg) const;
     bool m_get_mon_statistic (const Json::Value req, Json::Value &res, string &errmsg) const;
 
   private:

@@ -1,0 +1,7 @@
+{
+   "freespace": "<volatile>",
+   "note": "none",
+   "status": "success",
+   "task": "getaddvolstatus",
+   "volpath": "$CUBRID_DATABASES/demodb"
+}

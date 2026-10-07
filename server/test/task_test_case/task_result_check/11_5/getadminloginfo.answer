@@ -1,0 +1,13 @@
+{
+   "adminloginfo": [
+      {
+         "lastupdate": "<date>",
+         "owner": "cubrid",
+         "path": "$CUBRID/log/broker/cubrid_broker.log",
+         "size": "<volatile>"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getadminloginfo"
+}

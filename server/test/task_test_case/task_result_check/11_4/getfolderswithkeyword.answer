@@ -1,0 +1,10 @@
+{
+   "folders": [
+      {
+         "foldername": "test_result_folder"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getfolderswithkeyword"
+}

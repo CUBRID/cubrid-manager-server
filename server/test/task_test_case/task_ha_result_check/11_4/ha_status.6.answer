@@ -1,0 +1,33 @@
+{
+   "current_node": "ha-test-80",
+   "current_node_state": "slave",
+   "ha_info": [
+      {
+         "applylogdb": "test2@localhost:$CUBRID_DATABASES/test2_ha-test-81",
+         "applylogdb_pid": "164773",
+         "applylogdb_state": "registered",
+         "copylogdb": "test2@ha-test-81:$CUBRID_DATABASES/test2_ha-test-81",
+         "copylogdb_pid": "164769",
+         "copylogdb_state": "registered",
+         "dbname": "test2"
+      },
+      {
+         "applylogdb": "test@localhost:$CUBRID_DATABASES/test_ha-test-81",
+         "applylogdb_pid": "164771",
+         "applylogdb_state": "registered",
+         "copylogdb": "test@ha-test-81:$CUBRID_DATABASES/test_ha-test-81",
+         "copylogdb_pid": "164767",
+         "copylogdb_state": "registered",
+         "dbname": "test"
+      }
+   ],
+   "nodeA": "ha-test-82",
+   "nodeA_state": "replica",
+   "nodeB": "ha-test-81",
+   "nodeB_state": "master",
+   "nodeC": "ha-test-80",
+   "nodeC_state": "slave",
+   "note": "none",
+   "status": "success",
+   "task": "ha_status"
+}
