@@ -4687,6 +4687,22 @@ delete_directory (const std::string &rawPath)
 static bool
 delete_directory (const std::string &path)
 {
+  struct stat path_stat;
+
+  if (lstat (path.c_str (), &path_stat) != 0)
+    {
+      return false;
+    }
+
+  /*
+   * not a directory (a regular file, a symbolic link, ...): remove it
+   * like "rm -rf" did. a symbolic link is removed itself, not its target.
+   */
+  if (!S_ISDIR (path_stat.st_mode))
+    {
+      return (unlink (path.c_str ()) == 0);
+    }
+
   DIR *dir = opendir (path.c_str ());
   if (!dir)
     {
