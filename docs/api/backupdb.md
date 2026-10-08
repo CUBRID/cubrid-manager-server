@@ -35,7 +35,6 @@ The backupdb interface will create a database backup file.
   "check": "y",
   "mt": "0",
   "zip": "y",
-  "safereplication": "n",
   "async":"yes"
 }
 ```
@@ -46,6 +45,25 @@ The backupdb interface will create a database backup file.
 * If **volname is omitted**, backupdir is used as the database backup directory.
 * The final backup directory name must be used as the **pathname** for the restoredb API.
 * *volname* can be omitted, but *backupdir* cannot.
+
+## Response JSON Syntax
+
+| **Key** | **Description** |
+| --- | --- |
+| task | task name |
+| status | execution result, success or failed. |
+| note | if failed, a brief description will be given here |
+
+## Response Sample
+
+```
+{
+   "__EXEC_TIME" : "12 ms",
+   "note" : "none",
+   "status" : "success",
+   "task" : "backupdb"
+}
+```
 
 ## Response Sample (async mode)
 ```
