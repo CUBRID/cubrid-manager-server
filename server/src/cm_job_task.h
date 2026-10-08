@@ -48,12 +48,6 @@
 #define TRANSACTION_NO_WAIT_MODE_ENVP                                                   \
       { "CUBRID_LOCK_TIMEOUT_IN_SECS=1", "CUBRID_ISOLATION_LEVEL=TRAN_READ_COMMITTED", NULL }
 
-#define SET_TRANSACTION_NO_WAIT_MODE_ENV()                                              \
-      do {                                                                              \
-      PUT_ENV("CUBRID_LOCK_TIMEOUT_IN_SECS","1");                                 \
-      PUT_ENV("CUBRID_ISOLATION_LEVEL","TRAN_READ_COMMITTED");                    \
-    } while (0)
-
 typedef enum
 {
   TS_UNDEFINED,
