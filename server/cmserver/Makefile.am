@@ -20,8 +20,6 @@
 SSL_RSA_BITS=2048
 confdir = ${prefix}/conf
 
-SSL_RSA_BITS=2048
-
 SUBDIRS = conf
 
 SRC = $(top_srcdir)/src
