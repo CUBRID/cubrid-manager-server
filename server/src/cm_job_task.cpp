@@ -16396,52 +16396,19 @@ ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error)
   char shell_name[PATH_MAX];
   char err_log[PATH_MAX];
   char output_log[PATH_MAX];
-  const char *argv[3];
+#ifndef WINDOWS
+  char cmd[PATH_MAX];
+#endif
+  char *argv[2];
 
   int ret_val = 0;
 
-  patch_name = nv_get_val (req, "patch_name");
-  if (patch_name == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "patch_name");
-      return ERR_PARAM_MISSING;
-    }
-#ifdef WINDOWS
-  sprintf (path, "%s\\", sco.dbmt_tmp_dir);
-#else
-  sprintf (path, "%s/", sco.dbmt_tmp_dir);
+#ifndef WINDOWS
+  pid_t pid = 0;
 #endif
 
-  if ((ret_val =
-	       generate_update_script (patch_name, sco.szAutoUpdateURL, path,
-				       _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return ret_val;
-    }
-
-  sprintf (shell_name, "%s" SHELL_NAME, path);
-  sprintf (err_log, "%scms.autoupdate.err", path);
-  sprintf (output_log, "%scms.autoupdate.log", path);
-
-#ifdef WINDOWS
-  argv[0] = shell_name;
-  argv[1] = NULL;
-  ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, output_log, err_log, NULL);
-
-#else
-  argv[0] = "/bin/sh";
-  argv[1] = shell_name;
-  argv[2] = NULL;
-
-  ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, output_log, err_log, NULL);
-  if (ret_val < 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "run_child_env(): %s", shell_name);
-      return ERR_SYSTEM_CALL;
-    }
-#endif
-
-  return ERR_NO_ERROR;
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "We do not support autoupdate anymore");
+  return ERR_WITH_MSG;
 }
 
 int
