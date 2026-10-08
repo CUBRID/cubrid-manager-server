@@ -17864,12 +17864,13 @@ get_statdump_daemon_list (void)
 static int
 _hash_cert (char *hash_value, char *file_path)
 {
-  MD5_CTX mdContext;
-  unsigned char data[RSA_KEY_SIZE];
-  unsigned char md5_final[MD5_DIGEST_LENGTH];
-  char md5_final_hex[MD5_DIGEST_LENGTH];
+  EVP_MD_CTX *mdContext = NULL;
+  unsigned char data[1024];	/* file read buffer */
+  unsigned char md5_final[EVP_MAX_MD_SIZE];
+  char *hash_p = NULL;
+  unsigned int md5_len = 0;
   int bytes = 0;
-  int i = 0;
+  unsigned int i = 0;
   FILE *inFile = NULL;
 
   if ((inFile = fopen (file_path, "rb")) == NULL)
@@ -17877,19 +17878,44 @@ _hash_cert (char *hash_value, char *file_path)
       return 1;
     }
 
-  MD5_Init (&mdContext);
-
-  while ((bytes = (int) fread (data, 1, RSA_KEY_SIZE, inFile)) != 0)
+  if ((mdContext = EVP_MD_CTX_new ()) == NULL)
     {
-      MD5_Update (&mdContext, data, bytes);
+      fclose (inFile);
+      return 1;
     }
-  MD5_Final (md5_final, &mdContext);
+
+  if (EVP_DigestInit_ex (mdContext, EVP_md5 (), NULL) != 1)
+    {
+      EVP_MD_CTX_free (mdContext);
+      fclose (inFile);
+      return 1;
+    }
+
+  while ((bytes = (int) fread (data, 1, sizeof (data), inFile)) != 0)
+    {
+      if (EVP_DigestUpdate (mdContext, data, bytes) != 1)
+	{
+	  EVP_MD_CTX_free (mdContext);
+	  fclose (inFile);
+	  return 1;
+	}
+    }
+
+  if (EVP_DigestFinal_ex (mdContext, md5_final, &md5_len) != 1)
+    {
+      EVP_MD_CTX_free (mdContext);
+      fclose (inFile);
+      return 1;
+    }
+
+  EVP_MD_CTX_free (mdContext);
   fclose (inFile);
 
-  for (i = 0; i < MD5_DIGEST_LENGTH; i++)
+  hash_p = hash_value + strlen (hash_value);
+  for (i = 0; i < md5_len; i++)
     {
-      snprintf (md5_final_hex, 3, "%x", md5_final[i]);
-      strncat (hash_value, md5_final_hex, 3);
+      snprintf (hash_p, 3, "%02x", md5_final[i]);
+      hash_p += 2;
     }
   return 0;
 }
@@ -17904,7 +17930,6 @@ _is_default_cert (char *_dbmt_error)
 {
   char new_hash_value[33];
   char default_cert_path[PATH_MAX];
-  const char *default_hash_file = "df6a39a5565f858e40b6a7a3b0dee779";
   int compare_ret = 0;
 
   new_hash_value[0] = '\0';
