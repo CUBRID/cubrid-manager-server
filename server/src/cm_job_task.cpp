@@ -17529,7 +17529,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val = ERR_NO_ERROR;
   char *db_name, *interval_str;
   int interval = 0;
-  char *argv [10];
+  const char *argv[10];
   char path [512];
   int argc = 0;
   char note [20];
