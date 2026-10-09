@@ -1,0 +1,89 @@
+{
+   "dblist": [
+      {
+         "dbs": [
+            {
+               "dbname": "demodb"
+            }
+         ]
+      },
+      {
+         "dbs": [
+            {
+               "dbname": "demodb"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "adddbmtuser",
+   "userlist": [
+      {
+         "user": [
+            {
+               "@id": "admin",
+               "casauth": "admin",
+               "dbauth": [
+                  {
+                     "auth_info": [
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "localhost,33000",
+                           "dbname": "demodb"
+                        }
+                     ]
+                  }
+               ],
+               "dbcreate": "admin",
+               "statusmonitorauth": "admin"
+            },
+            {
+               "@id": "yifan",
+               "casauth": "admin",
+               "dbauth": null,
+               "dbcreate": "none",
+               "statusmonitorauth": "admin"
+            }
+         ]
+      },
+      {
+         "user": [
+            {
+               "@id": "admin",
+               "casauth": "admin",
+               "dbauth": [
+                  {
+                     "auth_info": [
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "localhost,33000",
+                           "dbname": "demodb"
+                        }
+                     ]
+                  }
+               ],
+               "dbcreate": "admin",
+               "statusmonitorauth": "admin"
+            },
+            {
+               "@id": "yifan",
+               "casauth": "admin",
+               "dbauth": [
+                  {
+                     "auth_info": [
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "localhost,33000",
+                           "dbname": "demodb"
+                        }
+                     ]
+                  }
+               ],
+               "dbcreate": "none",
+               "statusmonitorauth": "admin"
+            }
+         ]
+      }
+   ]
+}

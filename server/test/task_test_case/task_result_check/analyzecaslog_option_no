@@ -1,0 +1,4 @@
+{"task":"analyzecaslog",
+"token":"",
+"logfilelist":[{"logfile":"$CUBRID/tmp/test_analyzecaslog.sql.log"}],
+"option_t":"no"}

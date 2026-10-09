@@ -1,0 +1,13 @@
+{
+   "cpu_idle": "<volatile>",
+   "cpu_iowait": "<volatile>",
+   "cpu_kernel": "<volatile>",
+   "cpu_user": "<volatile>",
+   "mem_phy_free": "<volatile>",
+   "mem_phy_total": "134630449152",
+   "mem_swap_free": "942166016",
+   "mem_swap_total": "17179865088",
+   "note": "none",
+   "status": "success",
+   "task": "gethoststat"
+}

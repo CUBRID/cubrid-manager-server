@@ -61,21 +61,21 @@ extern "C"
 {
 #endif
 
-  int getopt (int, char *const *, const char *);
-  int getopt_long (int, char *const *, const char *,
-		   const struct option *, int *);
+int getopt (int, char *const *, const char *);
+int getopt_long (int, char *const *, const char *,
+		 const struct option *, int *);
 
 /* On some platforms, this is in libc, but not in a system header */
 #ifndef _OPTRESET_DECLARED
 #define _OPTRESET_DECLARED
-  extern int optreset;
+extern int optreset;
 #endif
 #ifndef _GETOPT_DECLARED
 #define _GETOPT_DECLARED
-  extern char *optarg;
-  extern int opterr;
-  extern int optind;
-  extern int optopt;
+extern char *optarg;
+extern int opterr;
+extern int optind;
+extern int optopt;
 #endif
 
 #ifdef __cplusplus

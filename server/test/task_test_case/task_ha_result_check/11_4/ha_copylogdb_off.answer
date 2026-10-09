@@ -1,0 +1,5 @@
+{
+   "note": "Invalid request format",
+   "status": "failure",
+   "task": "ha_copylogdb"
+}

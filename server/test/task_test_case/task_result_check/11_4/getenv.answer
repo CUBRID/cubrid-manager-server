@@ -1,0 +1,15 @@
+{
+   "BROKERVER": "VERSION 11.4.6.1953",
+   "CUBRID": "$CUBRID",
+   "CUBRIDVER": "CUBRID 11.4.6 (11.4.6.1953-c447ed0) (64bit release build for Linux) (Aug 27 2026 12:02:39)",
+   "CUBRID_DATABASES": "$CUBRID_DATABASES",
+   "CUBRID_DBMT": "$CUBRID",
+   "HOSTMONTAB0": "OFF",
+   "HOSTMONTAB1": "OFF",
+   "HOSTMONTAB2": "OFF",
+   "HOSTMONTAB3": "OFF",
+   "note": "none",
+   "osinfo": "LINUX",
+   "status": "success",
+   "task": "getenv"
+}

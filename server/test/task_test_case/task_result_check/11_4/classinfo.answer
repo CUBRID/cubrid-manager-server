@@ -1,0 +1,313 @@
+{
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "systemclass": [
+      {
+         "class": [
+            {
+               "classname": "db_root",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_user",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_password",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_authorization",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_authorizations",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_trigger",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_class",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_attribute",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_domain",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_method",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_meth_sig",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_meth_arg",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_meth_file",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_query_spec",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_index",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_index_key",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_auth",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_partition",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_data_type",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_stored_procedure",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_stored_procedure_args",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_stored_procedure_code",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_serial",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_ha_apply_info",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_collation",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_charset",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "dual",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_synonym",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "_db_server",
+               "owner": "DBA",
+               "virtual": "normal"
+            },
+            {
+               "classname": "db_attr_setdomain_elm",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_server",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_class",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_direct_super_class",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_vclass",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_attribute",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_method",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_meth_arg",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_meth_arg_setdomain_elm",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_meth_file",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_index",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_index_key",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_auth",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_trig",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_partition",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_stored_procedure",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_stored_procedure_args",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_collation",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_charset",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_synonym",
+               "owner": "DBA",
+               "virtual": "view"
+            }
+         ]
+      }
+   ],
+   "task": "classinfo",
+   "userclass": [
+      {
+         "class": [
+            {
+               "classname": "public.stadium",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.code",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.nation",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.event",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.athlete",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.participant",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.olympic",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.game",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.record",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.history",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            }
+         ]
+      }
+   ]
+}

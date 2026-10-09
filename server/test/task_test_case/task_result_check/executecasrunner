@@ -1,0 +1,11 @@
+{"task":"executecasrunner",
+"token":"",
+"dbname":"demodb",
+"brokername":"query_editor",
+"username":"dba",
+"passwd":"",
+"num_thread":"1",
+"repeat_count":"1",
+"executelogfile":"no",
+"logstring":[],
+"show_queryresult":"yes"}

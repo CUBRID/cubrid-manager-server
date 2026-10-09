@@ -1,0 +1,299 @@
+dbmtuserlogin
+updatedbmtuser_admin
+updatedbmtuser_nullid,failure
+updatedbmtuser_errformat,failure
+setdbmtpasswd_admin
+
+login_errver,failure
+login_nullid,failure
+login_notask,failure
+login_nouser,failure
+login_errpasswd,failure
+setloglevel
+getcmsenv
+getprocstat
+getsysdiskinfo
+startinfo
+
+getdbmtuserinfo
+userverify
+userverify_fail,failure
+adddbmtuser
+adddbmtuser_existid,failure
+adddbmtuser_nullid,failure
+adddbmtuser_nullpasswd,failure
+setdbmtpasswd
+setdbmtpasswd_errid,failure
+setdbmtpasswd_errpasswd,failure
+setdbmtpasswd_nullid,failure
+setdbmtpasswd_nullpasswd,failure
+updatedbmtuser_newuser
+
+checkdir
+
+createdb
+sleep 10
+createdb_accesslog,failure
+createdb_errlogpath,failure
+createdb_errlogpath1,failure
+createdb_errvolpath,failure
+createdb_nulldbname,failure
+createdb_nulllogsize,failure
+createdb_nullnumpage,failure
+createdb_nullpagesize,failure
+createdb_nullvolpath,failure
+createdb_fail_with_dup_name,failure
+startdb
+sleep 10
+startdb_fail,failure
+
+checkdb
+sleep 10
+checkdb_nullname,failure
+getdbsize
+gettransactioninfo
+killtransaction
+
+// add vol, then spacedb
+addvoldb
+sleep 10
+addvoldb_bigsize,failure
+addvoldb_nullpurpose,failure
+addvoldb_nullsize,failure
+dbspaceinfo
+dbspace
+lockdb
+sleep 10
+backupdb
+sleep 10
+backupdb_nulldir,failure
+backupdb_nullname,failure
+// "safereplication" was dropped in a2393c2 (it used to append a backticked `repl_safe_page` command), 
+// so the key is now ignored and the backup succeeds.
+backupdb_rep
+sleep 10
+backupdbinfo
+
+// test auto tasks.
+//addbackupinfo
+getbackupinfo
+getbackuplist
+setbackupinfo
+setautoexecquery
+getautoexecquery
+getautoexecqueryerrlog,success
+getautoexecqueryerrlog_optional,success
+getautobackupdberrlog
+getautobackupdberrlog_optional
+deletebackupinfo
+
+optimizedb
+sleep 10
+stopdb
+sleep 10
+backupvolinfo
+// createdb_optional and loaddb_optional cover the optional parameters of
+// createdb and loaddb against a database of their own. loaddb_optional runs
+// with delete_orignal_files off so the loaddb case below still finds its input.
+createdb_optional
+sleep 10
+loaddb_optional
+sleep 10
+deletedb_for_optional
+sleep 10
+
+loaddb
+sleep 10
+restoredb
+sleep 10
+
+// compactdb runs against a database of its own: create it, compact it, drop it.
+createdb_for_compactdb
+sleep 10
+compactdb
+sleep 10
+deletedb_for_compactdb
+sleep 10
+
+copydb
+sleep 10
+copydb_nulldest,failure
+copydb_nulldestpath,failure
+copydb_nullexvolpath,failure
+copydb_nulllogpath,failure
+copydb_nullop,failure
+copydb_nullsrc,failure
+
+addstatustemplate
+updatestatustemplate
+getstatustemplate
+removestatustemplate
+
+// the server emits the trigger DDL without a statement terminator, so the last
+// value of each case carries the ';' (action / status+priority / triggername).
+addtrigger
+altertrigger
+// gettriggerinfo has to run while the trigger exists; after droptrigger it
+// only ever answers "triggerlist": null.
+gettriggerinfo
+droptrigger
+
+getautoaddvol
+getautoaddvollog
+getautoaddvollog_optional
+getaddvolstatus
+setautoaddvol
+
+getlogfileinfo
+getloginfo,success
+// viewlog reads the manager log this suite is writing to, from line 1,
+// so its content grows with every run. status only.
+viewlog,success
+removelog
+
+
+startinfo
+//setsysparam
+
+/* delete new database */
+deletedbmtuser
+deletedbmtuser_erruser,failure
+deletedbmtuser_nullid,failure
+// the rejected cases run first, they need "destinationdb" to still be there.
+renamedb_nullrename,failure
+renamedb_adoff,failure
+renamedb_erropen,failure
+// renamedb renames destinationdb to anotherdb, so drop anotherdb afterwards.
+renamedb
+sleep 10
+deletedb_for_renamedb
+sleep 10
+// advanced mode maps every permanent volume by hand, so it runs against a
+// database of its own whose volume set is known: <db> and <db>_x001.
+createdb_for_renameadv
+sleep 10
+renamedb_advanced
+sleep 10
+deletedb_for_renameadv
+sleep 10
+unloaddb
+sleep 10
+unloaddb_optional
+sleep 10
+unloaddb_nullname,failure
+unloaddb_nulltarget,failure
+unloaddb_nulltargetdir,failure
+deletedb
+sleep 10
+
+/* broker api related tasks */
+stopbroker
+sleep 10
+startbroker
+sleep 10
+getaddbrokerinfo
+getbrokerdiagdata
+getbrokerdiagdata_optional
+getbrokersinfo
+getbrokerstatus
+broker_stop
+sleep 10
+broker_stop_errbroker,failure
+broker_stop_nullbroker,failure
+broker_start
+sleep 10
+broker_start_errbroker,failure
+broker_start_nullbroker,failure
+broker_restart
+sleep 10
+broker_restart_errbroker,failure
+broker_restart_nullbroker,failure
+deletebroker
+executecasrunner
+executecasrunner_optional
+/* db api related tasks */
+class
+classinfo
+// gettriggerinfo moved up next to addtrigger, see above
+// optimizedb  # removed: duplicate of the earlier optimizedb; alatestdb is already deleted here
+updateattribute
+userinfo
+createuser
+updateuser
+updateuser_nullpasswd,failure
+// omitting "userpass" means "keep the current password", only "__NULL__" and
+// an empty string are rejected (ts_update_user, cm_job_task.cpp:830).
+updateuser_nopasswd
+deleteuser
+/* other tasks */
+unloadinfo
+loadaccesslog,success
+checkfile
+analyzecaslog
+analyzecaslog_option_no
+analyzecaslog_nolist,failure
+getadminloginfo
+getallsysparam
+getallsysparam_errorconf,failure
+getallsysparam_nullconf,failure
+getenv
+resetlog
+
+getcaslogtopresult
+removecasrunnertmpfile
+paramdump
+paramdump_nullname,failure
+statdump
+statdump_nullname,failure
+// start_statdump must stay right before stop_statdump: stop fails with
+// "no statdump running" unless the background process was just started.
+start_statdump
+sleep 10
+stop_statdump
+sleep 10
+plandump
+plandump_nullname,failure
+
+// create a new database to test copydb.
+createdb_for_copydb
+sleep 10
+copydb_advance
+sleep 10
+deletedb_for_copydb
+sleep 10
+
+// get host stat
+gethoststat,success
+getdbprocstat
+getdbprocstat_all
+getstandbyserverstat
+getdbmode
+
+// tasks set conf files
+setsysparam_cmconf
+setsysparam_nullconf,failure
+setsysparam_cubridconf
+getdiagdata
+getdiagdata_optional
+killprocess
+
+//broker_setparam skip
+//broker_setparam
+
+getenvvarbyname
+copyfolder
+deletefolder
+
+getfolderswithkeyword
+
+runscript
+
+getfiletotallinenum
+keepalive
+
+// monitoring statistic 
+get_mon_interval
+set_mon_interval
+get_mon_statistic,success
+
+logout

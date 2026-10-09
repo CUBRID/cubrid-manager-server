@@ -1,0 +1,64 @@
+{
+   "brokersinfo": [
+      {
+         "broker": [
+            {
+               "access_list": "0",
+               "access_mode": "RW",
+               "appl_server_shm_id": "30000",
+               "as": "5",
+               "auto": "ON",
+               "error_query": "0",
+               "jq": "0",
+               "keep_conn": "AUTO",
+               "log": "$CUBRID/log/broker",
+               "long_query": "0",
+               "long_query_time": "60.00",
+               "long_tran": "0",
+               "long_tran_time": "60.00",
+               "name": "query_editor",
+               "pid": "<volatile>",
+               "port": "30000",
+               "query": "0",
+               "req": "0",
+               "ses": "300",
+               "source_env": "0",
+               "sqll": "ALL",
+               "state": "ON",
+               "tran": "0",
+               "type": "CAS"
+            },
+            {
+               "access_list": "0",
+               "access_mode": "RW",
+               "appl_server_shm_id": "33000",
+               "as": "5",
+               "auto": "ON",
+               "error_query": "0",
+               "jq": "0",
+               "keep_conn": "AUTO",
+               "log": "$CUBRID/log/broker",
+               "long_query": "0",
+               "long_query_time": "60.00",
+               "long_tran": "0",
+               "long_tran_time": "60.00",
+               "name": "broker1",
+               "pid": "<volatile>",
+               "port": "33000",
+               "query": "0",
+               "req": "0",
+               "ses": "300",
+               "source_env": "0",
+               "sqll": "ALL",
+               "state": "ON",
+               "tran": "0",
+               "type": "CAS"
+            }
+         ]
+      }
+   ],
+   "brokerstatus": "ON",
+   "note": "none",
+   "status": "success",
+   "task": "getbrokersinfo"
+}

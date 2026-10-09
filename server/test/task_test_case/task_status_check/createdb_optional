@@ -1,0 +1,19 @@
+{
+"task": "createdb",
+"token": "",
+"dbname": "optionaldb",
+"numpage": "10240",
+"pagesize": "4096",
+"logsize": "10240",
+"logpagesize": "4096",
+"genvolpath": "$CUBRID_DATABASES/optionaldb",
+"logvolpath": "$CUBRID_DATABASES/optionaldb",
+"exvol": [
+{
+"optionaldb_data_x001": "data;100;$CUBRID_DATABASES/optionaldb"
+}
+],
+"overwrite_config_file": "YES",
+"overwrite_exvol_file": "YES",
+"charset": "en_US"
+}

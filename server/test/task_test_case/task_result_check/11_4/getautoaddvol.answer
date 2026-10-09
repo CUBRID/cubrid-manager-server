@@ -1,0 +1,11 @@
+{
+   "data": "ON",
+   "data_ext_page": "200",
+   "data_warn_outofspace": "0.05",
+   "index": "ON",
+   "index_ext_page": "200",
+   "index_warn_outofspace": "0.05",
+   "note": "none",
+   "status": "success",
+   "task": "getautoaddvol"
+}

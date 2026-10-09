@@ -1,0 +1,14 @@
+{
+"task": "createdb",
+"token": "",
+"dbname": "copydb",
+"numpage": "10240",
+"pagesize": "4096",
+"logpagesize": "4096",
+"logsize": "10240",
+"genvolpath": "$CUBRID_DATABASES/copydb",
+"logvolpath": "$CUBRID_DATABASES/copydb",
+"exvol": [],
+"overwrite_config_file": "YES",
+"charset": "en_US"
+}

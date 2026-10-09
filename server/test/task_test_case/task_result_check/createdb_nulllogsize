@@ -1,0 +1,5 @@
+{"task":"createdb",
+"token":"",
+"dbname":"alatestdb",
+"numpage":"10240",
+"pagesize":"4096"}

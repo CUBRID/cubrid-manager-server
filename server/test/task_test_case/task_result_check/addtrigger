@@ -1,0 +1,11 @@
+{"task":"addtrigger",
+"token":"",
+"dbname":"demodb",
+"triggername":"example",
+"conditiontime":"BEFORE",
+"eventtype":"STATEMENT UPDATE",
+"action":"REJECT;",
+"eventtarget":"history(score)",
+"condition":"1=1",
+"status":"ACTIVE",
+"priority":"00.00"}

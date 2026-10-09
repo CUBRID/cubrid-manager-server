@@ -1,0 +1,9 @@
+{"task":"copydb",
+"token":"",
+"srcdbname":"alatestdb",
+"destdbname":"destinationdb",
+"destdbpath":"$CUBRID_DATABASES/destinationdb",
+"logpath":"$CUBRID_DATABASES/destinationdb",
+"overwrite":"y",
+"move":"n",
+"advanced":"off"}

@@ -1,0 +1,5 @@
+{
+   "note": "'deact' command is invalid.<end>Type 'cubrid --help' to see usage.<end>",
+   "status": "failure",
+   "task": "rolechange"
+}

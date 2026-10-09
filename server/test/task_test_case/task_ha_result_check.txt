@@ -1,0 +1,56 @@
+// CUBRID Manager Server -- HA task set.
+//
+// The set assumes: database "test", db user "dba" with no password, and
+// "ha-test-81" as the peer node of the host under test.
+//
+//   python3 test_tasks.py task_ha_result_check.txt -a  11.4   # baseline, once
+//   python3 test_tasks.py task_ha_result_check.txt -fc 11.4   # compare
+//
+
+// ---- 1. the state the run finds ----
+ha_status
+heartbeatlist
+heartbeatlist_specify_dblist
+getdbmode
+getstandbyserverstat
+
+// ---- 2. parameter validation. ts_ha_copylogdb / ts_ha_applylogdb reject a
+// request that is missing dbname, on_off or peer_node, ts_changemode one
+// without dbname and ts_get_db_mode one without dblist (cm_job_task.cpp), so
+// these are judged by their status and never get a baseline.
+ha_copylogdb_nodbname,failure
+ha_copylogdb_noonoff,failure
+ha_copylogdb_nopeer,failure
+ha_applylogdb_nodbname,failure
+ha_applylogdb_noonoff,failure
+ha_applylogdb_nopeer,failure
+changemode_nulldbname,failure
+getdbmode_nulldblist,failure
+
+// ---- 3. reload: rereads cubrid_ha.conf, the processes keep running ----
+ha_reload
+ha_status
+
+// ---- 4. copylogdb and applylogdb off, then back on. applylogdb goes down
+// first and comes up last: it is the consumer of what copylogdb writes.
+ha_applylogdb_off
+ha_copylogdb_off
+heartbeatlist
+ha_copylogdb_on
+ha_applylogdb_on
+heartbeatlist
+
+// ---- 5. server mode ----
+changemode
+getdbmode
+
+// ---- 6. heartbeat down and up, first for one database, then for all ----
+ha_stop_dbname
+ha_status
+ha_start_dbname
+ha_status
+ha_stop
+ha_status
+ha_start
+ha_status
+

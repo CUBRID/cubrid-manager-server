@@ -25,6 +25,8 @@
 #ifndef _CM_SERVER_UTIL_H_
 #define _CM_SERVER_UTIL_H_
 
+#include <string>
+
 #include "cm_porting.h"
 #include "cm_dep.h"
 #include "cm_cmd_exec.h"
@@ -38,9 +40,20 @@
 #include <limits.h>
 #include <stdint.h>
 #else
-#ifndef uint64_t
-typedef unsigned __int64 uint64_t;
+typedef unsigned int uid_t;
 #endif
+
+#if defined (_MSC_VER) && (_MSC_VER < 1600)
+typedef unsigned __int64 uint64_t;
+typedef unsigned __int32 uint32_t;
+typedef unsigned __int16 uint16_t;
+typedef unsigned __int8  uint8_t;
+#endif
+
+#if defined (WINDOWS)
+#define PUT_ENV(name,val) _putenv_s(name,val)
+#else
+#define PUT_ENV(name,val) setenv(name,val,1)
 #endif
 
 #define makestring1(x) #x
@@ -61,7 +74,7 @@ typedef unsigned __int64 uint64_t;
 #define BYTES_IN_M (1024 * 1024)
 #define BYTES_IN_G (1024 * 1024 * 1024)
 
-#define RSA_KEY_SIZE 1024
+#define RSA_KEY_SIZE 2048
 
 #ifdef _DEBUG_
 #include "deb.h"
@@ -135,9 +148,9 @@ typedef struct
 
 int _op_check_is_localhost (char *token, char *tmpdbname);
 void append_host_to_dbname (char *name_buf, const char *dbname,
-                            int buf_len);
+			    int buf_len);
 void *increase_capacity (void *ptr, int block_size, int old_count,
-                         int new_count);
+			 int new_count);
 char *strcpy_limit (char *dest, const char *src, int buf_len);
 int ut_getdelim (char **lineptr, int *n, int delimiter, FILE *fp);
 int ut_getline (char **lineptr, int *n, FILE *fp);
@@ -213,34 +226,34 @@ class file_resource_guard
       start_ms = ut_get_msec_marker ();
 
       for (;;)
-        {
-          if (mutex_trylock (m_proc_mutex))
-            {
-              mutex_acquired = true;
-              break;
-            }
+	{
+	  if (mutex_trylock (m_proc_mutex))
+	    {
+	      mutex_acquired = true;
+	      break;
+	    }
 
-          elapsed_ms = ut_get_msec_marker () - start_ms;
-          if (elapsed_ms >= LOCK_FILE_DEFAULT_TIMEOUT_MS)
-            {
-              /* out of budget: give up. m_fd stays -1, so ok ()
-                 correctly reports failure and there is nothing to
-                 release (the mutex was never acquired here). */
-              LOG_ERROR ("file_resource_guard: gave up waiting for the "
-                         "in-process mutex guarding '%s' (lock_fid=%d) "
-                         "after %lldms (limit %dms) without acquiring it",
-                         path, (int) lock_fid, (long long) elapsed_ms,
-                         LOCK_FILE_DEFAULT_TIMEOUT_MS);
-              break;
-            }
+	  elapsed_ms = ut_get_msec_marker () - start_ms;
+	  if (elapsed_ms >= LOCK_FILE_DEFAULT_TIMEOUT_MS)
+	    {
+	      /* out of budget: give up. m_fd stays -1, so ok ()
+	         correctly reports failure and there is nothing to
+	         release (the mutex was never acquired here). */
+	      LOG_ERROR ("file_resource_guard: gave up waiting for the "
+			 "in-process mutex guarding '%s' (lock_fid=%d) "
+			 "after %lldms (limit %dms) without acquiring it",
+			 path, (int) lock_fid, (long long) elapsed_ms,
+			 LOCK_FILE_DEFAULT_TIMEOUT_MS);
+	      break;
+	    }
 
-          SLEEP_MILISEC (0, retry_interval_ms);
-        }
+	  SLEEP_MILISEC (0, retry_interval_ms);
+	}
 
       if (!mutex_acquired)
-        {
-          return;
-        }
+	{
+	  return;
+	}
 
       /*
        * Whatever time the mutex wait above consumed comes out of the
@@ -252,29 +265,29 @@ class file_resource_guard
       elapsed_ms = ut_get_msec_marker () - start_ms;
       remaining_ms = LOCK_FILE_DEFAULT_TIMEOUT_MS - elapsed_ms;
       if (remaining_ms < 0)
-        {
-          remaining_ms = 0;
-        }
+	{
+	  remaining_ms = 0;
+	}
 
       m_fd = uCreateLockFile (path, (int) remaining_ms);
       if (m_fd < 0)
-        {
-          LOG_ERROR ("file_resource_guard: uCreateLockFile () for '%s' "
-                     "(lock_fid=%d) failed within its remaining %lldms "
-                     "budget (%lldms already spent acquiring the "
-                     "in-process mutex)", path, (int) lock_fid,
-                     (long long) remaining_ms, (long long) elapsed_ms);
-          mutex_unlock (m_proc_mutex);
-        }
+	{
+	  LOG_ERROR ("file_resource_guard: uCreateLockFile () for '%s' "
+		     "(lock_fid=%d) failed within its remaining %lldms "
+		     "budget (%lldms already spent acquiring the "
+		     "in-process mutex)", path, (int) lock_fid,
+		     (long long) remaining_ms, (long long) elapsed_ms);
+	  mutex_unlock (m_proc_mutex);
+	}
     }
 
     ~file_resource_guard (void)
     {
       if (m_fd >= 0)
-        {
-          uRemoveLockFile (m_fd);
-          mutex_unlock (m_proc_mutex);
-        }
+	{
+	  uRemoveLockFile (m_fd);
+	  mutex_unlock (m_proc_mutex);
+	}
     }
 
     bool ok (void) const
@@ -308,7 +321,7 @@ int string_tokenize (char *str, char *tok[], int num_tok);
 int string_tokenize2 (char *str, char *tok[], int num_tok, int c);
 int string_tokenize3 (char *str, char *tok[], int num_tok, int has_comma[]);
 int ut_get_task_info (const char *task, char *access_log_flag,
-                      T_TASK_FUNC *task_func, T_USER_AUTH *auth);
+		      T_TASK_FUNC *task_func, T_USER_AUTH *auth);
 char *time_to_str (time_t t, const char *fmt, char *buf, int type);
 int read_from_socket (SOCKET fd, char *buf, int size);
 int write_to_socket (SOCKET fd, const char *buf, int size);
@@ -331,19 +344,19 @@ char *nt_style_path (char *path, char *new_path_buf);
 
 int _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd);
 void uGenerateStatus (nvplist *req, nvplist *res, int retval,
-                      const char *_dbmt_error);
+		      const char *_dbmt_error);
 int ut_validate_token (nvplist *req);
 void _ut_timeval_diff (struct timeval *start, struct timeval *end,
-                       int *res_msec);
+		       int *res_msec);
 char *ut_token_generate (char *client_ip, char *client_port,
-                         char *dbmt_id, int proc_id, time_t login_time);
+			 char *dbmt_id, int proc_id, time_t login_time);
 void _accept_connection (nvplist *cli_request, nvplist *cli_response);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
 int run_child_env (const char *const argv[], int wait_flag, const char *stdin_file, char *stdout_file,
-                   char *stderr_file, int *exit_status, const char *envp[] = NULL,
-                   long long *out_start_time = NULL);
+		   char *stderr_file, int *exit_status, const char *envp[] = NULL,
+		   long long *out_start_time = NULL);
 
 #if !defined (WINDOWS)
 int ut_get_proc_stat_fields (pid_t pid, char *state_out, long long *start_time_out);
@@ -356,7 +369,7 @@ void env_mutex_unlock (void);
 int IsValidUserName (const char *pUserName);
 int ut_get_token_active_time (time_t *active_time);
 int remove_extra_subdir (const char *dirpath, const char *pattern,
-                         unsigned int save_num);
+			 unsigned int save_num);
 int ut_get_filename (char *fullpath, int with_ext, char *ret_filename);
 int ut_get_host_stat (T_CMS_HOST_STAT *stat, char *_dbmt_error);
 int ut_get_proc_stat (T_CMS_PROC_STAT *stat, int pid);
@@ -370,4 +383,21 @@ bool ut_child_exited_ok (int exit_code);
 int ut_validate_auth (nvplist *req);
 #endif
 
+bool is_valid_filename (const char *filename);
+bool is_invalid_filename (const char *filename);
+bool is_valid_filename (const char *filename, std::string &expanded_path);
+bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
+bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
+bool is_subpath (const char *allowd_path, const char *path);
+bool is_authorized_filename (const char *path, char *_dbmt_error);
+bool attempt_to_access_parent_dir (const char *path);
+bool is_allowed_script_env (const std::string &name);
+std::string expand_env_path (const std::string &path);
+std::string extract_env_name (const std::string &env_entry);
+#if !defined (WINDOWS)
+bool is_pid_dir (const std::string &name);
+bool get_proc_uid (const std::string &pid, uid_t &uid);
+bool get_proc_comm (const std::string &pid, std::string &comm);
+#endif
+bool setenv_using_putenv_fmt (const std::string &nameValue, int overwrite = 1);
 #endif                /* _CM_SERVER_UTIL_H_ */

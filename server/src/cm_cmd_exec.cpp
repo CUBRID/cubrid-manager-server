@@ -55,8 +55,8 @@ static const char *get_cubrid_mode_opt (T_CUBRID_MODE mode);
 static void read_spacedb_output (GeneralSpacedbResult *res, char *out_file);
 
 static int read_start_server_output (char *stdout_log_file,
-                                     char *stderr_log_file,
-                                     char *_dbmt_error);
+				     char *stderr_log_file,
+				     char *_dbmt_error);
 
 static int _size_to_byte_by_unit (double orgin_num, char unit);
 
@@ -71,7 +71,7 @@ static void _fill_dbmt_error_from_errfile (const char *err_file, char *_dbmt_err
 
 T_CSQL_RESULT *
 cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
-          char *infile, char *command, char *error_continue)
+	  char *infile, char *command, char *error_continue)
 {
   char cubrid_err_file[PATH_MAX];
   char out_file[PATH_MAX];
@@ -95,10 +95,10 @@ cmd_csql (char *dbname, char *uid, char *passwd, T_CUBRID_MODE mode,
       argv[argc++] = uid;
 
       if (passwd)
-        {
-          argv[argc++] = "--" CSQL_PASSWORD_L;
-          argv[argc++] = passwd;
-        }
+	{
+	  argv[argc++] = "--" CSQL_PASSWORD_L;
+	  argv[argc++] = passwd;
+	}
     }
   if (infile)
     {
@@ -170,7 +170,8 @@ _parse_version_field (const char *s, int *out)
   return;
 }
 
-void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version, size_t build_version_size)
+void find_and_parse_cub_admin_version (int &major_version, int &minor_version, char *build_version,
+				       size_t build_version_size)
 {
   const char *argv[3];
   char tmpfile[PATH_MAX], strbuf[BUFFER_MAX_LEN];
@@ -189,7 +190,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   if (gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "cub_admin_version", TS_GET_SERVER_VERSION, PATH_MAX) < 0)
     {
       LOG_ERROR ("Unable to determine cubrid version due to a system error. Set version to %d.%d defined by default.",
-                 cubrid_version_major, cubrid_version_minor);
+		 cubrid_version_major, cubrid_version_minor);
       return;
     }
   argv[0] = cmd_name;
@@ -199,14 +200,14 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   if (run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, NULL, NULL) < 0)
     {
       LOG_ERROR ("Unable to determine cubrid version due to a system error. Set version to %d.%d defined by default.",
-                 cubrid_version_major, cubrid_version_minor);
+		 cubrid_version_major, cubrid_version_minor);
       unlink (tmpfile);
       return;
     }
   if ((infile = fopen (tmpfile, "r")) == NULL)
     {
       LOG_ERROR ("Unable to determine cubrid version due to a system error. Set version to %d.%d defined by default.",
-                 cubrid_version_major, cubrid_version_minor);
+		 cubrid_version_major, cubrid_version_minor);
       unlink (tmpfile);
       return;
     }
@@ -214,7 +215,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   if (!fgets (strbuf, sizeof (strbuf), infile) || ! fgets (strbuf, sizeof (strbuf), infile))
     {
       LOG_ERROR ("Unable to determine cubrid version due to a system error. Set version to %d.%d defined by default.",
-                 cubrid_version_major, cubrid_version_minor);
+		 cubrid_version_major, cubrid_version_minor);
       fclose (infile);
       unlink (tmpfile);
       return;
@@ -223,7 +224,7 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   if (sscanf (strbuf, "%*s %127s", version) != 1)
     {
       LOG_ERROR ("Unable to parse cubrid version from '%s'. Set version to %d.%d defined by default.",
-                 strbuf, cubrid_version_major, cubrid_version_minor);
+		 strbuf, cubrid_version_major, cubrid_version_minor);
       fclose (infile);
       unlink (tmpfile);
       return;
@@ -246,13 +247,13 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
   if (local_major < 0 || local_minor < 0)
     {
       LOG_ERROR ("Unable to parse cubrid version from '%s'. Set version to %d.%d defined by default.",
-                 vers_buf, cubrid_version_major, cubrid_version_minor);
+		 vers_buf, cubrid_version_major, cubrid_version_minor);
     }
   else if (local_major < 10) /* this CMS supports version 10.0 or higher */
     {
       LOG_ERROR ("cubrid version %d.%d is not supported (10.0 or higher required). "
-                 "Set version to %d.%d defined by default.",
-                 local_major, local_minor, cubrid_version_major, cubrid_version_minor);
+		 "Set version to %d.%d defined by default.",
+		 local_major, local_minor, cubrid_version_major, cubrid_version_minor);
     }
   else
     {
@@ -264,19 +265,19 @@ void find_and_parse_cub_admin_version (int &major_version, int &minor_version, c
     {
       char *lparen = strchr (strbuf, '(');
       if (lparen != NULL)
-        {
-          char *rparen = strchr (lparen + 1, ')');
-          if (rparen != NULL && rparen > lparen + 1)
-            {
-              size_t len = (size_t) (rparen - (lparen + 1));
-              if (len >= build_version_size)
-                {
-                  len = build_version_size - 1;
-                }
-              strncpy (build_version, lparen + 1, len);
-              build_version[len] = '\0';
-            }
-        }
+	{
+	  char *rparen = strchr (lparen + 1, ')');
+	  if (rparen != NULL && rparen > lparen + 1)
+	    {
+	      size_t len = (size_t) (rparen - (lparen + 1));
+	      if (len >= build_version_size)
+		{
+		  len = build_version_size - 1;
+		}
+	      strncpy (build_version, lparen + 1, len);
+	      build_version[len] = '\0';
+	    }
+	}
     }
 
   fclose (infile);
@@ -300,6 +301,7 @@ cmd_spacedb (const char *dbname, T_CUBRID_MODE mode)
    * If the cubrid engine version fails to be determined at startup,
    * the default version (currently 11.4) is assumed.
    */
+
   if (cubrid_version_major < 10 || (cubrid_version_major == 10 && cubrid_version_minor == 0))
     {
       res = new SpaceDbResultOldFormat();
@@ -348,11 +350,8 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   const char *extra_envp[3];
   int envc = 0;
 
-#ifdef HPUX
-  char jvm_env_string[32];
-#endif
-
   cmd_start_master ();
+
   gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
   gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
 
@@ -369,34 +368,29 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   argv[3] = dbname;
   argv[4] = NULL;
 
-  extra_envp[envc++] = "CUBRID_ERROR_LOG=";    /* removing env variable CUBRID_ERROR_LOG if exists */
-
-#ifdef HPUX
-#ifdef HPUX_IA64
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.so");
-#else /* pa-risc */
-  strcpy (jvm_env_string, "LD_PRELOAD=libjvm.sl");
-#endif
-  extra_envp[envc++] = jvm_env_string;
-#endif
-
+  /*
+   * unset CUBRID_ERROR_LOG only for the server process, so that it uses the
+   * default error log; the CMS process keeps its own CUBRID_ERROR_LOG.
+   */
+  extra_envp[envc++] = "CUBRID_ERROR_LOG=";
   extra_envp[envc] = NULL;
 
-  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL, extra_envp);    /* start server */
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL,
+		       extra_envp);    /* start server */
 
   if (pid < 0)
     {
       if (err_buf)
-        {
-          sprintf (err_buf, "system error : %s %s %s %s", cmd_name, PRINT_CMD_SERVER, PRINT_CMD_START, dbname);
-        }
+	{
+	  sprintf (err_buf, "system error : %s %s %s %s", cmd_name, PRINT_CMD_SERVER, PRINT_CMD_START, dbname);
+	}
       unlink (stdout_log_file);
       unlink (stderr_log_file);
       return -1;
     }
 
   ret_val =
-    read_start_server_output (stdout_log_file, stderr_log_file, err_buf);
+	  read_start_server_output (stdout_log_file, stderr_log_file, err_buf);
   unlink (stdout_log_file);
   unlink (stderr_log_file);
 
@@ -432,11 +426,11 @@ cmd_stop_server (char *dbname, char *err_buf, int err_buf_size)
     {
       /* stop_server */
       if (err_buf)
-        {
-          sprintf (strbuf, "Command returned error : %s %s %s %s", cmd_name,
-                   PRINT_CMD_SERVER, PRINT_CMD_STOP, dbname);
-          strncpy (err_buf, strbuf, err_buf_size - 1);
-        }
+	{
+	  sprintf (strbuf, "Command returned error : %s %s %s %s", cmd_name,
+		   PRINT_CMD_SERVER, PRINT_CMD_STOP, dbname);
+	  strncpy (err_buf, strbuf, err_buf_size - 1);
+	}
       return -1;
     }
 
@@ -444,9 +438,9 @@ cmd_stop_server (char *dbname, char *err_buf, int err_buf_size)
     {
       SLEEP_MILISEC (interval, 0);
       if (!cms_is_database_active (dbname))
-        {
-          return 0;
-        }
+	{
+	  return 0;
+	}
     }
   if (err_buf)
     {
@@ -466,7 +460,7 @@ cmd_start_master (void)
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
   sprintf (cmd_name, "%s/%s%s", sco.szCubrid,
-           CUBRID_DIR_BIN, UTIL_MASTER_NAME);
+	   CUBRID_DIR_BIN, UTIL_MASTER_NAME);
 #else
   sprintf (cmd_name, "%s/%s", CUBRID_BINDIR, UTIL_MASTER_NAME);
 #endif
@@ -522,7 +516,7 @@ _fill_dbmt_error_from_errfile (const char *err_file, char *_dbmt_error)
 
 int
 cmd_class_info_sa (const char *dbname, const char *uid, const char *passwd,
-                   const char *cli_ver_val, nvplist *out, char *_dbmt_error)
+		   const char *cli_ver_val, nvplist *out, char *_dbmt_error)
 {
   char strbuf[1024];
   char outfile[PATH_MAX], errfile[PATH_MAX];
@@ -604,9 +598,9 @@ cmd_class_info_sa (const char *dbname, const char *uid, const char *passwd,
       char name[32], value[128];
 
       if (sscanf (strbuf, "%31s %127s", name, value) < 2)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       nv_add_nvp (out, name, value);
     }
   fclose (fp);
@@ -619,7 +613,7 @@ class_info_sa_finale:
 
 int
 cmd_get_triggerinfo_sa (const char *dbname, const char *uid, const char *passwd,
-                        nvplist *res, char *_dbmt_error)
+			nvplist *res, char *_dbmt_error)
 {
   char outfile[PATH_MAX], errfile[PATH_MAX];
   int ret_val = ERR_NO_ERROR;
@@ -753,35 +747,35 @@ read_csql_error_file (char *err_file, char *err_buf, int err_buf_size)
     {
       memset (buf, 0, sizeof (buf));
       if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       ut_trim (buf);
 
       if ((strncasecmp (buf, "ERROR", 5) == 0))
-        {
-          if (err_buf != NULL)
-            {
-              snprintf (err_buf, err_buf_size - 1, "%s", buf + 6);
-            }
-            msg_size = (int) strlen (buf + 6);
-          break;
-        }
+	{
+	  if (err_buf != NULL)
+	    {
+	      snprintf (err_buf, err_buf_size - 1, "%s", buf + 6);
+	    }
+	  msg_size = (int) strlen (buf + 6);
+	  break;
+	}
       else if (strstr (buf, "*** ERROR") != NULL)
-        {
-          memset (buf, 0, sizeof (buf));
-          if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
-            {
-              break;
-            }
-          if (err_buf != NULL)
-            {
-              snprintf (err_buf, err_buf_size - 1, "%s", buf);
-            }
-            msg_size = (int) strlen (buf);
-          break;
-        }
+	{
+	  memset (buf, 0, sizeof (buf));
+	  if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
+	    {
+	      break;
+	    }
+	  if (err_buf != NULL)
+	    {
+	      snprintf (err_buf, err_buf_size - 1, "%s", buf);
+	    }
+	  msg_size = (int) strlen (buf);
+	  break;
+	}
     }
 
   fclose (fp);
@@ -824,66 +818,66 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
     {
       memset (buf, 0, sizeof (buf));
       if (fgets (buf, sizeof (buf) - 1, fp) == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
       for (i = 0; i < sizeof (buf) - 2; i++)
-        {
-          if (buf[i] == '\0')
-            {
-              if (buf[i + 1] == '\0')
-                {
-                  break;
-                }
+	{
+	  if (buf[i] == '\0')
+	    {
+	      if (buf[i + 1] == '\0')
+		{
+		  break;
+		}
 
-              buf[i] = ' ';
-            }
-        }
+	      buf[i] = ' ';
+	    }
+	}
       ut_trim (buf);
       if (buf[0] == '\0')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strncmp (buf, "---", 3) == 0 ||
-          strncmp (buf, "***", 3) == 0 ||
-          strncmp (buf, "<<<", 3) == 0 || strncmp (buf, "Time:", 5) == 0)
-        {
-          if (strstr (buf, "- DEBUG") != NULL)
-            {
-              is_debug = 1;
-            }
-          else
-            {
-              is_debug = 0;
-              rm_prev_flag = 1;
-            }
-          continue;
-        }
+	  strncmp (buf, "***", 3) == 0 ||
+	  strncmp (buf, "<<<", 3) == 0 || strncmp (buf, "Time:", 5) == 0)
+	{
+	  if (strstr (buf, "- DEBUG") != NULL)
+	    {
+	      is_debug = 1;
+	    }
+	  else
+	    {
+	      is_debug = 0;
+	      rm_prev_flag = 1;
+	    }
+	  continue;
+	}
       /* ignore all the debug information, until find new line start with "---"|"***"|"<<<"|"Time:". */
       if (is_debug != 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (rm_prev_flag != 0)
-        {
-          msg_size = 0;
-        }
+	{
+	  msg_size = 0;
+	}
 
       if (append_end)
-        {
-          strcat (buf, "<end>");
-        }
+	{
+	  strcat (buf, "<end>");
+	}
 
       if ((err_buf_size - msg_size - 1) > 0)
-        {
-          strncpy (err_buf + msg_size, buf, err_buf_size - msg_size - 1);
-        }
+	{
+	  strncpy (err_buf + msg_size, buf, err_buf_size - msg_size - 1);
+	}
       else
-        {
-          break;
-        }
-        msg_size += (int) strlen (buf);
+	{
+	  break;
+	}
+      msg_size += (int) strlen (buf);
       rm_prev_flag = 0;
     }
   err_buf[err_buf_size - 1] = '\0';
@@ -893,7 +887,7 @@ read_error_file (const char *err_file, char *err_buf, int err_buf_size)
 
 int
 read_error_file2 (char *err_file, char *err_buf, int err_buf_size,
-                  int *err_code)
+		  int *err_code)
 {
   FILE *fp;
   char buf[1024];
@@ -919,65 +913,65 @@ read_error_file2 (char *err_file, char *err_buf, int err_buf_size,
       char *p = NULL;
       size_t len;
       if (fgets (buf, sizeof (buf), fp) == NULL)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       /* start with "ERROR: " */
       len = strlen (buf);
       if (len > 7 && memcmp (buf, "ERROR: ", 7) == 0)
-        {
-          /* ignore a newline character if it exists */
-          if (buf[len - 1] == '\n')
-            {
-              len--;
-            }
-          len -= 7;
+	{
+	  /* ignore a newline character if it exists */
+	  if (buf[len - 1] == '\n')
+	    {
+	      len--;
+	    }
+	  len -= 7;
 
-          if (len >= (size_t) err_buf_size)
-            {
-              len = (size_t) err_buf_size - 1;
-            }
+	  if (len >= (size_t) err_buf_size)
+	    {
+	      len = (size_t) err_buf_size - 1;
+	    }
 
-          memcpy (err_buf, buf + 7, len);
-          err_buf[len] = 0;
+	  memcpy (err_buf, buf + 7, len);
+	  err_buf[len] = 0;
 
-          success = 0;
-          continue;
-        }
+	  success = 0;
+	  continue;
+	}
 
       /* find "CODE = " */
       p = strstr (buf, "CODE = ");
       if (p != NULL)
-        {
-          if (sscanf (p, "CODE = %d", err_code) != 1)
-            {
-              continue;
-            }
+	{
+	  if (sscanf (p, "CODE = %d", err_code) != 1)
+	    {
+	      continue;
+	    }
 
-          success = 0;
-          found = 1;
+	  success = 0;
+	  found = 1;
 
-          /* read error description */
-          if (fgets (buf, sizeof (buf), fp) == NULL)
-            {
-              break;
-            }
+	  /* read error description */
+	  if (fgets (buf, sizeof (buf), fp) == NULL)
+	    {
+	      break;
+	    }
 
-          len = strlen (buf);
-          if (len > 0 && buf[len - 1] == '\n')
-            {
-              len--;
-            }
+	  len = strlen (buf);
+	  if (len > 0 && buf[len - 1] == '\n')
+	    {
+	      len--;
+	    }
 
-          if (len >= (size_t) err_buf_size)
-            {
-              len = (size_t) err_buf_size - 1;
-            }
+	  if (len >= (size_t) err_buf_size)
+	    {
+	      len = (size_t) err_buf_size - 1;
+	    }
 
-          memcpy (err_buf, buf, len);
-          err_buf[len] = 0;
-        }
+	  memcpy (err_buf, buf, len);
+	  err_buf[len] = 0;
+	}
     }
 
   fclose (fp);
@@ -1067,7 +1061,7 @@ read_spacedb_output (GeneralSpacedbResult *res, char *out_file)
 
 static int
 read_start_server_output (char *stdout_file, char *stderr_file,
-                          char *_dbmt_error)
+			  char *_dbmt_error)
 {
   FILE *fp, *fp2;
   char buf[1024];
@@ -1078,51 +1072,51 @@ read_start_server_output (char *stdout_file, char *stderr_file,
     {
       fp = fopen (stdout_file, "r");
       if (fp != NULL)
-        {
-          while (fgets (buf, sizeof (buf), fp) != NULL)
-            {
-              if (strncmp (buf, "++", 2) == 0)
-                {
-                  if ((strp = strchr (buf, ':')) && strstr (strp, "fail"))
-                    {
-                      retval = -1;
-                      break;
-                    }
-                }
-            }
-          fclose (fp);
-        }
+	{
+	  while (fgets (buf, sizeof (buf), fp) != NULL)
+	    {
+	      if (strncmp (buf, "++", 2) == 0)
+		{
+		  if ((strp = strchr (buf, ':')) && strstr (strp, "fail"))
+		    {
+		      retval = -1;
+		      break;
+		    }
+		}
+	    }
+	  fclose (fp);
+	}
     }
 
   if (access (stderr_file, F_OK) == 0)
     {
       fp2 = fopen (stderr_file, "r");
       if (fp2 != NULL)
-        {
-          int len = 0;
-          while (fgets (buf, sizeof (buf), fp2) != NULL)
-            {
-              ut_trim (buf);
-                len += (int) strlen (buf);
-              if (len < (DBMT_ERROR_MSG_SIZE - 1))
-                {
-                  strcpy (_dbmt_error, buf);
-                  _dbmt_error += len;
-                }
-              else
-                {
-                  strcpy_limit (_dbmt_error, buf, DBMT_ERROR_MSG_SIZE);
-                  strcpy_limit (_dbmt_error + DBMT_ERROR_MSG_SIZE - 4, "...", 4);
-                  break;
-                }
-            }
+	{
+	  int len = 0;
+	  while (fgets (buf, sizeof (buf), fp2) != NULL)
+	    {
+	      ut_trim (buf);
+	      len += (int) strlen (buf);
+	      if (len < (DBMT_ERROR_MSG_SIZE - 1))
+		{
+		  strcpy (_dbmt_error, buf);
+		  _dbmt_error += len;
+		}
+	      else
+		{
+		  strcpy_limit (_dbmt_error, buf, DBMT_ERROR_MSG_SIZE);
+		  strcpy_limit (_dbmt_error + DBMT_ERROR_MSG_SIZE - 4, "...", 4);
+		  break;
+		}
+	    }
 
-          if (len != 0 && retval != -1)
-            {
-              retval = 1;
-            }
-          fclose (fp2);
-        }
+	  if (len != 0 && retval != -1)
+	    {
+	      retval = 1;
+	    }
+	  fclose (fp2);
+	}
     }
 
   return retval;
@@ -1159,21 +1153,28 @@ _size_to_byte_by_unit (double orgin_num, char unit)
 
 void SpaceDbResultNewFormat::add_volume (char *str_buf)
 {
-  char purpose[128], volume_name[PATH_MAX], type[32];
+  char purpose[COLUMN_VALUE_MAX_SIZE], volume_name[4096], type[COLUMN_VALUE_MAX_SIZE];
   struct stat statbuf;
 
   SpaceDbVolumeInfoNewFormat volume;
-  sscanf (str_buf, "%d %s %s DATA %d %d %d %s", &volume.volid, type, purpose,
-          &volume.used_size,
-          &volume.free_size,
-          &volume.total_size,
-          volume_name);
-  strcpy (volume.purpose, purpose);
-  strcpy (volume.type, type);
-  strcpy (volume.volume_name, volume_name);
 
-  stat (volume_name, &statbuf);
-  volume.date = statbuf.st_mtime;
+  memset (&volume, 0, sizeof (volume));
+  purpose[0] = volume_name[0] = type[0] = '\0';
+
+  sscanf (str_buf, "%d %31s %31s DATA %d %d %d %4095s", &volume.volid, type, purpose,
+	  &volume.used_size,
+	  &volume.free_size,
+	  &volume.total_size,
+	  volume_name);
+
+  strcpy_limit (volume.purpose, purpose, sizeof (volume.purpose));
+  strcpy_limit (volume.type, type, sizeof (volume.type));
+  strcpy_limit (volume.volume_name, volume_name, sizeof (volume.volume_name));
+
+  if (stat (volume_name, &statbuf) == 0)
+    {
+      volume.date = statbuf.st_mtime;
+    }
 
   volumes.push_back (volume);
 }
@@ -1218,20 +1219,20 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
   if (strcmp (token, "TEMP") == 0)
     {
       if (strcmp (purpose, "TEMP") != 0)
-        {
-          return FALSE;
-        }
+	{
+	  return FALSE;
+	}
       else
-        {
-          strcat (purpose, " ");
-          strcat (purpose, token);
-        }
+	{
+	  strcat (purpose, " ");
+	  strcat (purpose, token);
+	}
 
       token = STRTOK (NULL, " ", &saveptr);
       if (token == NULL)
-        {
-          return FALSE;
-        }
+	{
+	  return FALSE;
+	}
     }
   total_page = atoi (token);
 
@@ -1270,8 +1271,8 @@ int SpaceDbResultOldFormat::get_volume_info (char *str_buf, SpaceDbVolumeInfoOld
   else
     {
       *p = '\0';
-      snprintf (volume.location, sizeof (volume.location) - 1, "%s", vol_name);
-      snprintf (volume.vol_name, sizeof (volume.vol_name) - 1, "%s", p + 1);
+      snprintf (volume.location, sizeof (volume.location), "%s", vol_name);
+      snprintf (volume.vol_name, sizeof (volume.vol_name), "%s", p + 1);
       *p = '/';
     }
 
@@ -1284,7 +1285,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
   nv_update_val_int (res, "pagesize", page_size);
   nv_update_val_int (res, "logpagesize", log_page_size);
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", volumes[i].vol_name);
@@ -1293,11 +1294,11 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
       nv_add_nvp_int (res, "totalpage", volumes[i].total_size);
       nv_add_nvp_int (res, "freepage", volumes[i].free_size);
       ts_add_nvp_time (res, "date", volumes[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
+		       NV_ADD_DATE);
       nv_add_nvp (res, "close", "spaceinfo");
     }
 
-  for (int i = 0; i < temporary_volumes.size(); i++)
+  for (size_t i = 0; i < temporary_volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "spacename", temporary_volumes[i].vol_name);
@@ -1306,7 +1307,7 @@ void SpaceDbResultOldFormat::create_result (nvplist *res)
       nv_add_nvp_int (res, "totalpage", temporary_volumes[i].total_size);
       nv_add_nvp_int (res, "freepage", temporary_volumes[i].free_size);
       ts_add_nvp_time (res, "date", temporary_volumes[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
+		       NV_ADD_DATE);
       nv_add_nvp (res, "close", "spaceinfo");
     }
 }
@@ -1328,7 +1329,7 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
       nv_add_nvp (res, "close", "dbinfo");
     }
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       nv_add_nvp (res, "open", "spaceinfo");
       nv_add_nvp (res, "type", volumes[i].type);
@@ -1340,7 +1341,7 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
       nv_add_nvp_int (res, "freepage", volumes[i].free_size);
       nv_add_nvp_int (res, "totalpage", volumes[i].total_size);
       ts_add_nvp_time (res, "date", volumes[i].date, "%04d%02d%02d",
-                       NV_ADD_DATE);
+		       NV_ADD_DATE);
       nv_add_nvp (res, "close", "spaceinfo");
     }
 
@@ -1359,7 +1360,8 @@ void SpaceDbResultNewFormat::create_result (nvplist *res)
 
 int SpaceDbResultOldFormat::get_cnt_tpage()
 {
-  int cnt_tpage = 0, i;
+  int cnt_tpage = 0;
+  size_t i;
 
   for (i = 0; i < volumes.size(); i++)
     {
@@ -1377,7 +1379,7 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 {
   int cnt_tpage = 0;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       cnt_tpage += volumes[i].total_size;
     }
@@ -1387,23 +1389,23 @@ int SpaceDbResultNewFormat::get_cnt_tpage()
 
 time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "DATA")
-          || uStringEqual (volumes[i].purpose, "INDEX"))
-        {
-          strcpy (volname, volumes[i].vol_name);
-          snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
-          if (!stat (strbuf, &statbuf))
-            {
-              mytime = statbuf.st_mtime;
-            }
-        }
+	  || uStringEqual (volumes[i].purpose, "INDEX"))
+	{
+	  strcpy (volname, volumes[i].vol_name);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
+	  if (!stat (strbuf, &statbuf))
+	    {
+	      mytime = statbuf.st_mtime;
+	    }
+	}
     }
 
   return mytime;
@@ -1411,22 +1413,22 @@ time_t SpaceDbResultOldFormat::get_my_time (char *dbloca)
 
 time_t SpaceDbResultNewFormat::get_my_time (char *dbloca)
 {
-  char strbuf[BUFFER_MAX_LEN];
+  char strbuf[COMPOSED_PATH_MAX];
   char volname[PATH_MAX] = { '\0' };
   time_t mytime = time (NULL);;
   struct stat statbuf;
 
-  for (int i = 0; i < volumes.size(); i++)
+  for (size_t i = 0; i < volumes.size(); i++)
     {
       if (uStringEqual (volumes[i].purpose, "PERMANENT"))
-        {
-          strcpy (volname, volumes[i].volume_name);
-          snprintf (strbuf, BUFFER_MAX_LEN, "%s/%s", dbloca, volname);
-          if (!stat (strbuf, &statbuf))
-            {
-              mytime = statbuf.st_mtime;
-            }
-        }
+	{
+	  strcpy (volname, volumes[i].volume_name);
+	  snprintf (strbuf, sizeof (strbuf), "%s/%s", dbloca, volname);
+	  if (!stat (strbuf, &statbuf))
+	    {
+	      mytime = statbuf.st_mtime;
+	    }
+	}
     }
 
   return mytime;
@@ -1440,22 +1442,22 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
     {
       frate = ajFreeSpace (this, "DATA");
       if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
-        {
-          page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
-        }
+	{
+	  page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
+	}
       if (curr->data_warn_outofspace >= frate)
-        {
-          if (db_mode == HA_MODE)
-            {
-              append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                     sizeof (dbname_at_hostname));
-              aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
-            }
-          else
-            {
-              aj_add_volume (curr->dbname, "data", page_add, page_size);
-            }
-        }
+	{
+	  if (db_mode == HA_MODE)
+	    {
+	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
+				     sizeof (dbname_at_hostname));
+	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
+	    }
+	  else
+	    {
+	      aj_add_volume (curr->dbname, "data", page_add, page_size);
+	    }
+	}
     }
 
   page_add = curr->index_ext_page;
@@ -1463,22 +1465,22 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
     {
       frate = ajFreeSpace (this, "INDEX");
       if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
-        {
-          page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
-        }
+	{
+	  page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
+	}
       if (curr->index_warn_outofspace >= frate)
-        {
-          if (db_mode == HA_MODE)
-            {
-              append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                     sizeof (dbname_at_hostname));
-              aj_add_volume (dbname_at_hostname, "index", page_add, page_size);
-            }
-          else
-            {
-              aj_add_volume (curr->dbname, "index", page_add, page_size);
-            }
-        }
+	{
+	  if (db_mode == HA_MODE)
+	    {
+	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
+				     sizeof (dbname_at_hostname));
+	      aj_add_volume (dbname_at_hostname, "index", page_add, page_size);
+	    }
+	  else
+	    {
+	      aj_add_volume (curr->dbname, "index", page_add, page_size);
+	    }
+	}
     }
 }
 
@@ -1490,22 +1492,22 @@ void SpaceDbResultNewFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
     {
       frate = ajFreeSpace (this, "PERMANENT");
       if (page_add < MIN_AUTO_ADDVOL_PAGE_SIZE)
-        {
-          page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
-        }
+	{
+	  page_add = MIN_AUTO_ADDVOL_PAGE_SIZE;
+	}
       if (curr->data_warn_outofspace >= frate)
-        {
-          if (db_mode == 2)
-            {
-              append_host_to_dbname (dbname_at_hostname, curr->dbname,
-                                     sizeof (dbname_at_hostname));
-              aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
-            }
-          else
-            {
-              aj_add_volume (curr->dbname, "data", page_add, page_size);
-            }
-        }
+	{
+	  if (db_mode == 2)
+	    {
+	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
+				     sizeof (dbname_at_hostname));
+	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
+	    }
+	  else
+	    {
+	      aj_add_volume (curr->dbname, "data", page_add, page_size);
+	    }
+	}
     }
 }
 
@@ -1521,101 +1523,101 @@ void SpaceDbResultOldFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (strncmp (str_buf, "Space", 5) == 0)
-        {
-          int matchs = 0;
-          double page_size = 0.0;
-          char page_unit = 'H';
+	{
+	  int matchs = 0;
+	  double page_size = 0.0;
+	  char page_unit = 'H';
 
-          /*
-          * The log format looks like the following:
-          * Space description for database 'demodb' with pagesize 16.0K. (log pagesize: 16.0K)
-          */
-          tmp_p = strstr (str_buf, "pagesize");
-          if (tmp_p == NULL)
-            {
-              goto spacedb_error;
-            }
+	  /*
+	  * The log format looks like the following:
+	  * Space description for database 'demodb' with pagesize 16.0K. (log pagesize: 16.0K)
+	  */
+	  tmp_p = strstr (str_buf, "pagesize");
+	  if (tmp_p == NULL)
+	    {
+	      goto spacedb_error;
+	    }
 
-          if ((matchs =
-                 sscanf (tmp_p, "pagesize %lf%c", &page_size, &page_unit)) != 2)
-            {
-              goto spacedb_error;
-            }
+	  if ((matchs =
+		       sscanf (tmp_p, "pagesize %lf%c", &page_size, &page_unit)) != 2)
+	    {
+	      goto spacedb_error;
+	    }
 
-          if ((db_page_size =
-                 _size_to_byte_by_unit (page_size, page_unit)) < 0)
-            {
-              goto spacedb_error;
-            }
+	  if ((db_page_size =
+		       _size_to_byte_by_unit (page_size, page_unit)) < 0)
+	    {
+	      goto spacedb_error;
+	    }
 
-          tmp_p = strstr (str_buf, "log pagesize:");
-          if (tmp_p != NULL)
-            {
-              if ((matchs =
-                     sscanf (tmp_p, "log pagesize: %lf%c", &page_size,
-                             &page_unit)) != 2)
-                {
-                  goto spacedb_error;
-                }
+	  tmp_p = strstr (str_buf, "log pagesize:");
+	  if (tmp_p != NULL)
+	    {
+	      if ((matchs =
+			   sscanf (tmp_p, "log pagesize: %lf%c", &page_size,
+				   &page_unit)) != 2)
+		{
+		  goto spacedb_error;
+		}
 
-              if ((log_page_size =
-                     _size_to_byte_by_unit (page_size, page_unit)) < 0)
-                {
-                  goto spacedb_error;
-                }
-            }
-          else
-            {
-              /* log pagesize default value */
-              log_page_size = 4096;
-            }
-        }
+	      if ((log_page_size =
+			   _size_to_byte_by_unit (page_size, page_unit)) < 0)
+		{
+		  goto spacedb_error;
+		}
+	    }
+	  else
+	    {
+	      /* log pagesize default value */
+	      log_page_size = 4096;
+	    }
+	}
 
       else if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
     {
       ut_trim (str_buf);
       if (str_buf[0] == '\0' || str_buf[0] == '-')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       if (strncmp (str_buf, "Space", 5) == 0)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       if (add_volume (str_buf))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
     {
       ut_trim (str_buf);
       if (str_buf[0] == '\0' || str_buf[0] == '-')
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strncmp (str_buf, "Volid", 5) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       if (add_temporary_volume (str_buf))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
     }
   set_page_size (db_page_size);
   set_log_page_size (log_page_size);
@@ -1640,34 +1642,34 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (strncmp (str_buf, "Space", 5) == 0)
-        {
-          p = strstr (str_buf, "pagesize");
-          if (p)
-            {
-              sscanf (p, "pagesize %lf%c", &page_size, &page_unit);
-              if ((db_page_size =
-                     _size_to_byte_by_unit (page_size, page_unit)) < 0)
-                {
-                  goto spacedb_error;
-                }
-              set_page_size (db_page_size);
-            }
-          p = strstr (str_buf, "log pagesize:");
-          if (p)
-            {
-              sscanf (p, "log pagesize: %lf%c", &log_page_size_double, &log_page_unit);
-              if ((log_page_size =
-                     _size_to_byte_by_unit (log_page_size_double, log_page_unit)) < 0)
-                {
-                  goto spacedb_error;
-                }
-              set_log_page_size (log_page_size);
-            }
-        }
+	{
+	  p = strstr (str_buf, "pagesize");
+	  if (p)
+	    {
+	      sscanf (p, "pagesize %lf%c", &page_size, &page_unit);
+	      if ((db_page_size =
+			   _size_to_byte_by_unit (page_size, page_unit)) < 0)
+		{
+		  goto spacedb_error;
+		}
+	      set_page_size (db_page_size);
+	    }
+	  p = strstr (str_buf, "log pagesize:");
+	  if (p)
+	    {
+	      sscanf (p, "log pagesize: %lf%c", &log_page_size_double, &log_page_unit);
+	      if ((log_page_size =
+			   _size_to_byte_by_unit (log_page_size_double, log_page_unit)) < 0)
+		{
+		  goto spacedb_error;
+		}
+	      set_log_page_size (log_page_size);
+	    }
+	}
       if (strncmp (str_buf, "type", 4) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
@@ -1675,19 +1677,22 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (strncmp (str_buf, "Space", 5) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
       if (!is_valid_database_description (str_buf))
-        {
-          break;
-        }
-      sscanf (str_buf, "%s %s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
-              databaseSpaceDescriptions[index].purpose, &databaseSpaceDescriptions[index].volume_count,
-              &databaseSpaceDescriptions[index].used_size,
-              &databaseSpaceDescriptions[index].free_size,
-              &databaseSpaceDescriptions[index].total_size);
-      index++;
+	{
+	  break;
+	}
+      if (index < DATABASE_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %31s DATA %d %d %d %d", databaseSpaceDescriptions[index].type,
+		  databaseSpaceDescriptions[index].purpose, &databaseSpaceDescriptions[index].volume_count,
+		  &databaseSpaceDescriptions[index].used_size,
+		  &databaseSpaceDescriptions[index].free_size,
+		  &databaseSpaceDescriptions[index].total_size);
+	  index++;
+	}
     }
 
   while (fgets (str_buf, sizeof (str_buf), fp))
@@ -1695,14 +1700,14 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (strncmp (str_buf, "Detailed", 8) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
 
       if (!is_valid_volume_description (str_buf))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       add_volume (str_buf);
     }
@@ -1712,9 +1717,9 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (strncmp (str_buf, "data_type", 9) == 0)
-        {
-          break;
-        }
+	{
+	  break;
+	}
     }
 
   index = 0;
@@ -1724,17 +1729,19 @@ void SpaceDbResultNewFormat::read_spacedb_output (FILE *fp)
       ut_trim (str_buf);
 
       if (!is_valid_file_description (str_buf))
-        {
-          continue;
-        }
-
-      sscanf (str_buf, "%s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
-              &fileSpaceDescriptions[index].file_count,
-              &fileSpaceDescriptions[index].used_size,
-              &fileSpaceDescriptions[index].file_table_size,
-              &fileSpaceDescriptions[index].reserved_size,
-              &fileSpaceDescriptions[index].total_size);
-      index++;
+	{
+	  continue;
+	}
+      if (index < FILES_DESCRIPTION_NUM_LINES)
+	{
+	  sscanf (str_buf, "%31s %d %d %d %d %d\n", fileSpaceDescriptions[index].data_type,
+		  &fileSpaceDescriptions[index].file_count,
+		  &fileSpaceDescriptions[index].used_size,
+		  &fileSpaceDescriptions[index].file_table_size,
+		  &fileSpaceDescriptions[index].reserved_size,
+		  &fileSpaceDescriptions[index].total_size);
+	  index++;
+	}
     }
 
   fclose (fp);

@@ -27,6 +27,8 @@
 #include <signal.h>
 #include <map>
 #include <random>
+#include <list>
+#include <cctype>
 
 #ifdef WINDOWS
 #include <process.h>
@@ -151,8 +153,8 @@ draw_async_uuid_seq_bits (const char *label)
     {
       char tmpbuf[DBMT_ERROR_MSG_SIZE];
       snprintf (tmpbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : no usable random source for %s (%s); falling back to pid.\n",
-                label, e.what ());
+		"CUBRID Manager Server : no usable random source for %s (%s); falling back to pid.\n",
+		label, e.what ());
       ut_record_cubrid_utility_log_stderr (tmpbuf);
       return (INT64) getpid () & ((INT64 (1) << ASYNC_UUID_SEQ_BITS) - 1);
     }
@@ -175,11 +177,11 @@ mon_stat_init (void)
   if (access (sco.sMonStatDataPath, F_OK) < 0)
     {
       if (mkdir (sco.sMonStatDataPath, 0755) < 0)
-        {
-          fprintf (stderr, "Error while creating monitoring data path(%s)\n",
-                   sco.sMonStatDataPath);
-          return -1;
-        }
+	{
+	  fprintf (stderr, "Error while creating monitoring data path(%s)\n",
+		   sco.sMonStatDataPath);
+	  return -1;
+	}
     }
 
   if (!cm_mon_stat::get_instance ()->initial ())
@@ -196,14 +198,10 @@ cub_cm_init_env ()
   char conf_name[256];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
   char process_name[PATH_MAX];
-  char default_cubrid_lang_type[PATH_MAX];
-  char default_cubrid_lang_msg_type[PATH_MAX];
 
   tmpstrbuf[0]= '\0';
   //  char *charset = NULL;
   snprintf (process_name, PATH_MAX, "%s", CMS_NAME);
-  snprintf (default_cubrid_lang_type, PATH_MAX, "CUBRID_LANG=en_US");
-  snprintf (default_cubrid_lang_msg_type, PATH_MAX, "CUBRID_MSG_LANG=en_US");
 
   sys_config_init ();
   uReadEnvVariables (process_name);
@@ -211,7 +209,7 @@ cub_cm_init_env ()
   if (uReadSystemConfig () < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : Cannot find the configuration file[%s].\n",
-                conf_get_dbmt_file (FID_DBMT_CONF, conf_name));
+		conf_get_dbmt_file (FID_DBMT_CONF, conf_name));
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       exit (1);
     }
@@ -231,19 +229,18 @@ cub_cm_init_env ()
     }
 
   memset (&cub_httpd_env, 0, sizeof (cubrid_env_t));
-  putenv (default_cubrid_lang_type);    /* set as default language type */
-  putenv (default_cubrid_lang_msg_type);    /* set as default language type */
+  PUT_ENV ("CUBRID_LANG", "en_US");
 
   snprintf (cub_httpd_env.cubrid_err_log, MAX_PATH,
-            "CUBRID_ERROR_LOG=%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
-  putenv (cub_httpd_env.cubrid_err_log);
+	    "%s/cmclt.%d.err", sco.dbmt_tmp_dir, (int) getpid ());
+  PUT_ENV ("CUBRID_ERROR_LOG", cub_httpd_env.cubrid_err_log);
 
   snprintf (cub_httpd_env.cubrid, MAX_PATH, "CUBRID=%s", sco.szCubrid);
-  putenv (cub_httpd_env.cubrid);
+  PUT_ENV ("CUBRID", sco.szCubrid);
 
   snprintf (cub_httpd_env.cubrid_databases, MAX_PATH, "CUBRID_DATABASES=%s",
-            sco.szCubrid_databases);
-  putenv (cub_httpd_env.cubrid_databases);
+	    sco.szCubrid_databases);
+  PUT_ENV ("CUBRID_DATABASES", sco.szCubrid_databases);
 
   mutex_init (cm_mutex);
   g_cms_start_time = time (NULL);
@@ -277,9 +274,9 @@ is_no_token_cmd (int task_code)
   for (i = 0; no_token_cmd[i] != -1; i++)
     {
       if (task_code == no_token_cmd[i])
-        {
-          return 1;
-        }
+	{
+	  return 1;
+	}
     }
 
   return 0;
@@ -341,31 +338,31 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* if database name is specified */
       if (dbname)
-        {
-          memset (dbid, 0, 32);
-          memset (dbpasswd, 0, 80);
-          _ut_get_dbaccess (req, dbid, dbpasswd);
-          nv_add_nvp (req, "_DBID", dbid);
-          nv_add_nvp (req, "_DBPASSWD", dbpasswd);
-          nv_add_nvp (req, "_DBNAME", dbname);
-        }
+	{
+	  memset (dbid, 0, 32);
+	  memset (dbpasswd, 0, 80);
+	  _ut_get_dbaccess (req, dbid, dbpasswd);
+	  nv_add_nvp (req, "_DBID", dbid);
+	  nv_add_nvp (req, "_DBPASSWD", dbpasswd);
+	  nv_add_nvp (req, "_DBNAME", dbname);
+	}
     }
 
   sprintf (_dbmt_error, "?");    /* prevent to have null string */
   if (task_code == TS_UNDEFINED)
     {
       if (task != NULL)
-        {
-          strcpy (_dbmt_error, task);
-        }
+	{
+	  strcpy (_dbmt_error, task);
+	}
       retval = ERR_UNDEFINED_TASK;
     }
   else
     {
       if (access_log_flag)
-        {
-          ut_access_log (req, NULL);
-        }
+	{
+	  ut_access_log (req, NULL);
+	}
 
       /* record the start time of running cub_manager */
       gettimeofday (&task_begin, NULL);
@@ -380,7 +377,7 @@ ch_process_request (nvplist *req, nvplist *res)
 
       /* add cub_manager task running time to response. */
       snprintf (elapsed_time_str, sizeof (elapsed_time_str), "%d ms",
-                elapsed_msec);
+		elapsed_msec);
       nv_add_nvp (res, "__EXEC_TIME", elapsed_time_str);
     }
 
@@ -399,29 +396,29 @@ json_to_nv (Json::Value &root, const char *name, nvplist *nv)
       int size = root.size ();
 
       for (int index = 0; index < size; ++index)
-        {
-          if (!strcmp (name, "line") || !strcmp (name, "confdata")
-              || !strcmp (name, "group"))
-            {
-              json_to_nv (root[index], name, nv);
-            }
-          else
-            {
-              nv_add_nvp (nv, "open", name);
-              json_to_nv (root[index], name, nv);
-              nv_add_nvp (nv, "close", name);
-            }
-        }
+	{
+	  if (!strcmp (name, "line") || !strcmp (name, "confdata")
+	      || !strcmp (name, "group"))
+	    {
+	      json_to_nv (root[index], name, nv);
+	    }
+	  else
+	    {
+	      nv_add_nvp (nv, "open", name);
+	      json_to_nv (root[index], name, nv);
+	      nv_add_nvp (nv, "close", name);
+	    }
+	}
     }
     break;
     case Json::objectValue:
     {
       Json::Value::Members members (root.getMemberNames ());
       for (Json::Value::Members::iterator it = members.begin ();
-           it != members.end (); ++it)
-        {
-          json_to_nv (root[*it], (*it).c_str (), nv);
-        }
+	   it != members.end (); ++it)
+	{
+	  json_to_nv (root[*it], (*it).c_str (), nv);
+	}
     }
     break;
     case Json::intValue:
@@ -450,37 +447,37 @@ nv_to_json (nvplist *ref, char *value, int &index, Json::Value &root)
   for (; index < ref->nvplist_size; ++index)
     {
       if (ref->nvpairs[index] == NULL
-          || dst_buffer (ref->nvpairs[index]->name) == NULL)
-        {
-          continue;
-        }
+	  || dst_buffer (ref->nvpairs[index]->name) == NULL)
+	{
+	  continue;
+	}
       pname = dst_buffer (ref->nvpairs[index]->name);
       pvalue = dst_buffer (ref->nvpairs[index]->value);
       if (!strcmp (pname, "open"))
-        {
-          array.clear ();
-          nv_to_json (ref, pvalue, ++index, array);
-          if (!array.empty ())
-            {
-              root[pvalue].append (array);
-            }
-          else
-            {
-              root[pvalue] = array;
-            }
-        }
+	{
+	  array.clear ();
+	  nv_to_json (ref, pvalue, ++index, array);
+	  if (!array.empty ())
+	    {
+	      root[pvalue].append (array);
+	    }
+	  else
+	    {
+	      root[pvalue] = array;
+	    }
+	}
       else if (!strcmp (pname, "close") && !strcmp (pvalue, value))
-        {
-          break;
-        }
+	{
+	  break;
+	}
       else if (IS_SPECIAL_KEY)
-        {
-          root[pname].append ((pvalue == NULL) ? "" : pvalue);
-        }
+	{
+	  root[pname].append ((pvalue == NULL) ? "" : pvalue);
+	}
       else
-        {
-          root[pname] = (pvalue == NULL) ? "" : pvalue;
-        }
+	{
+	  root[pname] = (pvalue == NULL) ? "" : pvalue;
+	}
     }
 
   return 1;
@@ -510,10 +507,10 @@ cub_cm_extend_request (Json::Value &request, Json::Value &response)
       task = request["task"].asString ();
       response["task"] = task;
       if (get_ext_task_info (task.c_str (), 0, &task_func, NULL))
-        {
-          (*task_func) (request, response);
-          return 1;
-        }
+	{
+	  (*task_func) (request, response);
+	  return 1;
+	}
     }
   catch (exception &e)
     {
@@ -559,15 +556,35 @@ static const char *async_capable_tasks[] =
   NULL
 };
 
+class async_request
+{
+  public:
+    INT64 uuid;
+    Json::Value request;
+    Json::Value response;
+    int status;
+    time_t created_at;
+    time_t finished_at;
+    std::vector <std::string> db_names;
+    std::string requester_id;
+    bool holds_async_slot;
+    bool holds_timeout_fallback_slot;
+    bool is_long_async_job;
+#ifndef WINDOWS
+    pthread_mutex_t *mutex;
+    pthread_cond_t *cond;
+#endif
+};
+
 static bool
 is_async_capable_task (const string &task_name)
 {
   for (int i = 0; async_capable_tasks[i] != NULL; i++)
     {
       if (task_name == async_capable_tasks[i])
-        {
-          return true;
-        }
+	{
+	  return true;
+	}
     }
 
   return false;
@@ -602,9 +619,9 @@ is_exclusive_db_task (const string &task_name)
   for (int i = 0; exclusive_db_tasks[i] != NULL; i++)
     {
       if (task_name == exclusive_db_tasks[i])
-        {
-          return true;
-        }
+	{
+	  return true;
+	}
     }
 
   return false;
@@ -629,13 +646,13 @@ exclusive_dbnames_for_request (const Json::Value &request, const string &task_na
       string dest = request.get ("destdbname", "").asString ();
 
       if (!src.empty ())
-        {
-          names.push_back (src);
-        }
+	{
+	  names.push_back (src);
+	}
       if (!dest.empty () && dest != src)
-        {
-          names.push_back (dest);
-        }
+	{
+	  names.push_back (dest);
+	}
     }
   else if (task_name == "renamedb")
     {
@@ -643,13 +660,13 @@ exclusive_dbnames_for_request (const Json::Value &request, const string &task_na
       string dest = request.get ("rename", "").asString ();
 
       if (!src.empty ())
-        {
-          names.push_back (src);
-        }
+	{
+	  names.push_back (src);
+	}
       if (!dest.empty () && dest != src)
-        {
-          names.push_back (dest);
-        }
+	{
+	  names.push_back (dest);
+	}
     }
   else
     {
@@ -671,9 +688,9 @@ join_dbnames (const vector <string> &dbnames)
   for (size_t i = 0; i < dbnames.size (); i++)
     {
       if (!joined.empty ())
-        {
-          joined += ",";
-        }
+	{
+	  joined += ",";
+	}
       joined += dbnames[i];
     }
 
@@ -688,7 +705,7 @@ static bool
 is_db_running_async (const std::string &dbname)
 {
   return !dbname.empty ()
-         && db_running_async.find (dbname) != db_running_async.end ();
+	 && db_running_async.find (dbname) != db_running_async.end ();
 }
 
 static std::string
@@ -711,34 +728,34 @@ db_running_async_task (const std::string &dbname)
  */
 static bool
 db_running_async_start (const vector <string> &dbnames, const string &task_name,
-                        string *busy_name = NULL, string *busy_task = NULL)
+			string *busy_name = NULL, string *busy_task = NULL)
 {
   for (size_t i = 0; i < dbnames.size (); i++)
     {
       if (is_db_running_async (dbnames[i]))
-        {
-          if (busy_name != NULL)
-            {
-              *busy_name = dbnames[i];
-            }
-          if (busy_task != NULL)
-            {
-              *busy_task = db_running_async_task (dbnames[i]);
-            }
-          return false;
-        }
+	{
+	  if (busy_name != NULL)
+	    {
+	      *busy_name = dbnames[i];
+	    }
+	  if (busy_task != NULL)
+	    {
+	      *busy_task = db_running_async_task (dbnames[i]);
+	    }
+	  return false;
+	}
     }
 
   size_t i = 0;
   try
     {
       for (i = 0; i < dbnames.size (); i++)
-        {
-          if (!dbnames[i].empty ())
-            {
-              db_running_async[dbnames[i]] = task_name;
-            }
-        }
+	{
+	  if (!dbnames[i].empty ())
+	    {
+	      db_running_async[dbnames[i]] = task_name;
+	    }
+	}
     }
   catch (...)
     {
@@ -747,12 +764,12 @@ db_running_async_start (const vector <string> &dbnames, const string &task_name,
        * inserted is a harmless no-op.
        */
       for (size_t j = 0; j <= i && j < dbnames.size (); j++)
-        {
-          if (!dbnames[j].empty ())
-            {
-              db_running_async.erase (dbnames[j]);
-            }
-        }
+	{
+	  if (!dbnames[j].empty ())
+	    {
+	      db_running_async.erase (dbnames[j]);
+	    }
+	}
       throw;
     }
 
@@ -769,15 +786,15 @@ db_running_async_done (const vector <string> &dbnames)
   for (size_t i = 0; i < dbnames.size (); i++)
     {
       if (!dbnames[i].empty ())
-        {
-          db_running_async.erase (dbnames[i]);
-        }
+	{
+	  db_running_async.erase (dbnames[i]);
+	}
     }
 }
 
 static int
 build_db_busy_response (Json::Value &response, const std::string &dbname,
-                        const std::string &running_task)
+			const std::string &running_task)
 {
   string note = "database '" + dbname + "' is busy with another task";
   if (!running_task.empty ())
@@ -836,11 +853,11 @@ async_timeout_fallback_acquire (void)
   if (num_timeout_fallback_jobs == sco.iMaxNumAsyncTask && !timeout_fallback_warned)
     {
       LOG_ERROR ("async_timeout_fallback_acquire : %d synchronous requests are "
-                 "currently tracked as timeout fallbacks after exceeding "
-                 "http_timeout (%d sec), reached max_num_async_task (%d); "
-                 "this may mean http_timeout is set too low for the tasks "
-                 "being run, or the server is degraded.",
-                 num_timeout_fallback_jobs, sco.iHttpTimeout, sco.iMaxNumAsyncTask);
+		 "currently tracked as timeout fallbacks after exceeding "
+		 "http_timeout (%d sec), reached max_num_async_task (%d); "
+		 "this may mean http_timeout is set too low for the tasks "
+		 "being run, or the server is degraded.",
+		 num_timeout_fallback_jobs, sco.iHttpTimeout, sco.iMaxNumAsyncTask);
       timeout_fallback_warned = true;
     }
 }
@@ -874,8 +891,8 @@ build_async_task_limit_response (Json::Value &response)
   char note[128];
 
   snprintf (note, sizeof (note),
-            "maximum number of concurrent async tasks (%d) reached; try again later",
-            sco.iMaxNumAsyncTask);
+	    "maximum number of concurrent async tasks (%d) reached; try again later",
+	    sco.iMaxNumAsyncTask);
   response["job-status"] = "rejected";
   return build_server_header (response, ERR_WITH_MSG, note);
 }
@@ -930,24 +947,24 @@ class async_job_state_guard
     ~async_job_state_guard (void)
     {
       if (!m_armed || (!m_has_marker && !m_has_slot))
-        {
-          /*
-           * nothing was ever actually acquired (either disarmed, or an
-           * exception unwound through here before set_marker ()/
-           * set_slot ())
-           */
-          return;
-        }
+	{
+	  /*
+	   * nothing was ever actually acquired (either disarmed, or an
+	   * exception unwound through here before set_marker ()/
+	   * set_slot ())
+	   */
+	  return;
+	}
 
       cm_lock_guard lg;
       if (m_has_marker)
-        {
-          db_running_async_done (*m_dbnames);
-        }
+	{
+	  db_running_async_done (*m_dbnames);
+	}
       if (m_has_slot)
-        {
-          async_job_slot_release ();
-        }
+	{
+	  async_job_slot_release ();
+	}
     }
 
     /* stores &dbnames, not a copy - see the class comment above */
@@ -978,25 +995,6 @@ class async_job_state_guard
     async_job_state_guard &operator= (const async_job_state_guard &);
 };
 
-class async_request
-{
-  public:
-    INT64 uuid;
-    Json::Value request;
-    Json::Value response;
-    int status;
-    time_t created_at;
-    time_t finished_at;
-    std::vector <std::string> db_names;
-    std::string requester_id;
-    bool holds_async_slot;
-    bool holds_timeout_fallback_slot;
-    bool is_long_async_job;
-#ifndef WINDOWS
-    pthread_mutex_t *mutex;
-    pthread_cond_t *cond;
-#endif
-};
 
 /*
  * async_request_guard - RAII guard owning a heap-allocated async_request
@@ -1015,37 +1013,37 @@ class async_request_guard
       m_pstmt->mutex = NULL;
       m_pstmt->cond = NULL;
       try
-        {
-          m_pstmt->mutex = new pthread_mutex_t;
-          m_pstmt->cond = new pthread_cond_t;
-        }
+	{
+	  m_pstmt->mutex = new pthread_mutex_t;
+	  m_pstmt->cond = new pthread_cond_t;
+	}
       catch (...)
-        {
-          delete m_pstmt->mutex;
-          delete m_pstmt;
-          throw;
-        }
+	{
+	  delete m_pstmt->mutex;
+	  delete m_pstmt;
+	  throw;
+	}
 #endif
     }
 
     ~async_request_guard (void)
     {
       if (m_owns)
-        {
+	{
 #ifndef WINDOWS
-          if (m_cond_inited)
-            {
-              pthread_cond_destroy (m_pstmt->cond);
-            }
-          if (m_mutex_inited)
-            {
-              pthread_mutex_destroy (m_pstmt->mutex);
-            }
-          delete m_pstmt->mutex;
-          delete m_pstmt->cond;
+	  if (m_cond_inited)
+	    {
+	      pthread_cond_destroy (m_pstmt->cond);
+	    }
+	  if (m_mutex_inited)
+	    {
+	      pthread_mutex_destroy (m_pstmt->mutex);
+	    }
+	  delete m_pstmt->mutex;
+	  delete m_pstmt->cond;
 #endif
-          delete m_pstmt;
-        }
+	  delete m_pstmt;
+	}
     }
 
     async_request *get (void) const
@@ -1103,33 +1101,33 @@ reap_stale_async_jobs (void)
       async_request *cur = itor->second;
 
       if (cur->status != 0 && (now - cur->finished_at) > sco.iAsyncJobTtlSec)
-        {
-          itor = request_map.erase (itor);
+	{
+	  itor = request_map.erase (itor);
 #ifndef WINDOWS
-          pthread_mutex_destroy (cur->mutex);
-          pthread_cond_destroy (cur->cond);
-          delete cur->mutex;
-          delete cur->cond;
+	  pthread_mutex_destroy (cur->mutex);
+	  pthread_cond_destroy (cur->cond);
+	  delete cur->mutex;
+	  delete cur->cond;
 #endif
-          delete cur;
-          continue;
-        }
+	  delete cur;
+	  continue;
+	}
 
       if (cur->status == 0 && !cur->is_long_async_job
-          && (now - cur->created_at) > sco.iAsyncLongJobSec)
-        {
-          string task_name = cur->request.get ("task", "unknown").asString ();
+	  && (now - cur->created_at) > sco.iAsyncLongJobSec)
+	{
+	  string task_name = cur->request.get ("task", "unknown").asString ();
 
-          LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
-                     "running for %d sec, past async_long_job_sec (%d sec); "
-                     "its worker thread cannot be safely cancelled, so it is being "
-                     "left in request_map until it actually finishes.",
-                     (long long) cur->uuid, task_name.c_str (), join_dbnames (cur->db_names).c_str (),
-                     (int) (now - cur->created_at), sco.iAsyncLongJobSec);
+	  LOG_ERROR ("reap_stale_async_jobs : job %lld (task '%s', db '%s') has been "
+		     "running for %d sec, past async_long_job_sec (%d sec); "
+		     "its worker thread cannot be safely cancelled, so it is being "
+		     "left in request_map until it actually finishes.",
+		     (long long) cur->uuid, task_name.c_str (), join_dbnames (cur->db_names).c_str (),
+		     (int) (now - cur->created_at), sco.iAsyncLongJobSec);
 
-          /* log this only once per job, not on every reap_stale_async_jobs () call */
-          cur->is_long_async_job = true;
-        }
+	  /* log this only once per job, not on every reap_stale_async_jobs () call */
+	  cur->is_long_async_job = true;
+	}
 
       ++itor;
     }
@@ -1167,7 +1165,7 @@ cm_async_request_handler (void *lpArg)
   catch (...)
     {
       LOG_ERROR ("cm_async_request_handler : unhandled non-standard exception "
-                "while processing an async task.");
+		 "while processing an async task.");
       response["status"] = STATUS_FAILURE;
       response["note"] = "internal server error";
     }
@@ -1193,11 +1191,11 @@ cm_async_request_handler (void *lpArg)
 
     if (async_param->holds_async_slot)
       {
-        async_job_slot_release ();
+	async_job_slot_release ();
       }
     if (async_param->holds_timeout_fallback_slot)
       {
-        async_timeout_fallback_release ();
+	async_timeout_fallback_release ();
       }
 #ifndef WINDOWS
     /*
@@ -1288,7 +1286,7 @@ next_async_uuid (void)
 #ifdef WINDOWS
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600, bool no_wait = false)
+			  unsigned long time_out = 600, bool no_wait = false)
 {
   HANDLE hHandles;
   DWORD ThreadID;
@@ -1303,13 +1301,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       string busy_name, busy_task;
       bool started;
       {
-        cm_lock_guard lg;
-        started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+	cm_lock_guard lg;
+	started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
       }
       if (!started)
-        {
-          return build_db_busy_response (response, busy_name, busy_task);
-        }
+	{
+	  return build_db_busy_response (response, busy_name, busy_task);
+	}
       state_guard.set_marker (dbnames);
     }
 
@@ -1317,13 +1315,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       bool acquired;
       {
-        cm_lock_guard lg;
-        acquired = async_job_slot_try_acquire ();
+	cm_lock_guard lg;
+	acquired = async_job_slot_try_acquire ();
       }
       if (!acquired)
-        {
-          return build_async_task_limit_response (response);
-        }
+	{
+	  return build_async_task_limit_response (response);
+	}
       state_guard.set_slot ();
     }
 
@@ -1345,11 +1343,11 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   }
 
   hHandles =
-    CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
+	  CreateThread (NULL, 0, cm_async_request_handler, pstmt, 0, &ThreadID);
   if (hHandles == NULL)
     {
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to execute task");
+				  "failed to execute task");
     }
 
   /*
@@ -1364,9 +1362,9 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       CloseHandle (hHandles);
       {
-        cm_lock_guard lg;
-        reap_stale_async_jobs ();
-        request_map[pstmt->uuid] = pstmt;
+	cm_lock_guard lg;
+	reap_stale_async_jobs ();
+	request_map[pstmt->uuid] = pstmt;
       }
 
       put_uuid (response, pstmt->uuid);
@@ -1380,19 +1378,19 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       CloseHandle (hHandles);
       {
-        cm_lock_guard lg;
-        reap_stale_async_jobs ();
-        request_map[pstmt->uuid] = pstmt;
-        /*
-         * the pstmt->status == 0: the job is still running past
-         * sco.iHttpTimeout and can't be cancelled, so track it as a
-         * timeout fallback job
-         */
-        if (pstmt->status == 0)
-          {
-            async_timeout_fallback_acquire ();
-            pstmt->holds_timeout_fallback_slot = true;
-          }
+	cm_lock_guard lg;
+	reap_stale_async_jobs ();
+	request_map[pstmt->uuid] = pstmt;
+	/*
+	 * the pstmt->status == 0: the job is still running past
+	 * sco.iHttpTimeout and can't be cancelled, so track it as a
+	 * timeout fallback job
+	 */
+	if (pstmt->status == 0)
+	  {
+	    async_timeout_fallback_acquire ();
+	    pstmt->holds_timeout_fallback_slot = true;
+	  }
       }
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
@@ -1407,7 +1405,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
 #else
 int
 cm_execute_request_async (Json::Value &request, Json::Value &response,
-                          unsigned long time_out = 600, bool no_wait = false)
+			  unsigned long time_out = 600, bool no_wait = false)
 {
   int err = 0;
   pthread_t async_thrd;
@@ -1422,13 +1420,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
       string busy_name, busy_task;
       bool started;
       {
-        cm_lock_guard lg;
-        started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
+	cm_lock_guard lg;
+	started = db_running_async_start (dbnames, task_name, &busy_name, &busy_task);
       }
       if (!started)
-        {
-          return build_db_busy_response (response, busy_name, busy_task);
-        }
+	{
+	  return build_db_busy_response (response, busy_name, busy_task);
+	}
       state_guard.set_marker (dbnames);
     }
 
@@ -1436,13 +1434,13 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       bool acquired;
       {
-        cm_lock_guard lg;
-        acquired = async_job_slot_try_acquire ();
+	cm_lock_guard lg;
+	acquired = async_job_slot_try_acquire ();
       }
       if (!acquired)
-        {
-          return build_async_task_limit_response (response);
-        }
+	{
+	  return build_async_task_limit_response (response);
+	}
       state_guard.set_slot ();
     }
 
@@ -1454,7 +1452,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread mutex.");
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
   pstmt_guard.set_mutex_inited ();
 
@@ -1463,7 +1461,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       LOG_ERROR ("cm_execute_request_async : fail to set thread condition.");
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
   pstmt_guard.set_cond_inited ();
 
@@ -1488,7 +1486,7 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
     {
       LOG_ERROR ("cm_execute_request_async : fail to create thread.");
       return build_server_header (response, ERR_WITH_MSG,
-                                  "failed to run task.");
+				  "failed to run task.");
     }
 
   /*
@@ -1510,9 +1508,9 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
   if (no_wait)
     {
       {
-        cm_lock_guard lg;
-        reap_stale_async_jobs ();
-        request_map[pstmt->uuid] = pstmt;
+	cm_lock_guard lg;
+	reap_stale_async_jobs ();
+	request_map[pstmt->uuid] = pstmt;
       }
 
       put_uuid (response, pstmt->uuid);
@@ -1537,22 +1535,22 @@ cm_execute_request_async (Json::Value &request, Json::Value &response,
        * find it later. the original code returned here without ever
        */
       {
-        cm_lock_guard lg;
-        reap_stale_async_jobs ();
-        request_map[pstmt->uuid] = pstmt;
-        /*
-         * track this as a timeout fallback job
-         */
-        if (pstmt->status == 0)
-          {
-            async_timeout_fallback_acquire ();
-            pstmt->holds_timeout_fallback_slot = true;
-          }
+	cm_lock_guard lg;
+	reap_stale_async_jobs ();
+	request_map[pstmt->uuid] = pstmt;
+	/*
+	 * track this as a timeout fallback job
+	 */
+	if (pstmt->status == 0)
+	  {
+	    async_timeout_fallback_acquire ();
+	    pstmt->holds_timeout_fallback_slot = true;
+	  }
       }
       put_uuid (response, pstmt->uuid);
       response["job-status"] = "running";
       LOG_ERROR ("cm_execute_request_async : Timeout %ld secs: task '%s'. %s",
-		time_out, task_name.c_str(), join_dbnames (dbnames).c_str ());
+		 time_out, task_name.c_str(), join_dbnames (dbnames).c_str ());
       return build_server_header (response, ERR_WITH_MSG, "timeout");
     }
 
@@ -1596,18 +1594,18 @@ parse_uuid (const Json::Value &v, INT64 &out)
     {
       const string s = v.asString ();
       if (s.empty ())
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
 
       /*
        * strtoull ()/_strtoui64 () accept a leading '-' and wrap it into
        * a huge unsigned value instead of failing
        */
       if (s[0] == '-')
-        {
-          return false;
-        }
+	{
+	  return false;
+	}
 
       char *endptr = NULL;
       errno = 0;
@@ -1620,10 +1618,10 @@ parse_uuid (const Json::Value &v, INT64 &out)
       unsigned long long parsed = strtoull (s.c_str (), &endptr, 10);
 #endif
       if (endptr == s.c_str () || *endptr != '\0' || errno == ERANGE
-         || parsed > (unsigned long long) INT64_MAX)
-        {
-          return false;
-        }
+	  || parsed > (unsigned long long) INT64_MAX)
+	{
+	  return false;
+	}
 
       out = (INT64) parsed;
       return true;
@@ -1773,31 +1771,31 @@ ext_get_server_status (Json::Value &request, Json::Value &response)
       total++;
 
       if (cur->status != 0)
-        {
-          finished_pending_ttl++;
-          continue;
-        }
+	{
+	  finished_pending_ttl++;
+	  continue;
+	}
 
       running++;
 
       int elapsed_sec = (int) (now - cur->created_at);
       if (elapsed_sec > oldest_running_sec)
-        {
-          oldest_running_sec = elapsed_sec;
-        }
+	{
+	  oldest_running_sec = elapsed_sec;
+	}
 
       if (cur->is_long_async_job)
-        {
-          long_jobs++;
+	{
+	  long_jobs++;
 
-          Json::Value j;
-          put_uuid (j, cur->uuid);
-          j["task"] = cur->request.get ("task", "unknown").asString ();
-          j["db_name"] = join_dbnames (cur->db_names);
-          j["requester_id"] = cur->requester_id;
-          j["elapsed_sec"] = elapsed_sec;
-          long_job_list.append (j);
-        }
+	  Json::Value j;
+	  put_uuid (j, cur->uuid);
+	  j["task"] = cur->request.get ("task", "unknown").asString ();
+	  j["db_name"] = join_dbnames (cur->db_names);
+	  j["requester_id"] = cur->requester_id;
+	  j["elapsed_sec"] = elapsed_sec;
+	  long_job_list.append (j);
+	}
     }
 
   Json::Value req_map_status;
@@ -1860,22 +1858,22 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
 
     if (ext_ut_validate_token (request, response) != ERR_NO_ERROR)
       {
-        response["task"] = request["task"].asString();
-        return 1;
+	response["task"] = request["task"].asString();
+	return 1;
       }
 
     if (!ext_ut_validate_auth (request))
       {
-        response["status"] = STATUS_FAILURE;
-        response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
-        response["task"] = request["task"].asString();
+	response["status"] = STATUS_FAILURE;
+	response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
+	response["task"] = request["task"].asString();
 
-        return 1;
+	return 1;
       }
 
     if (cub_check_async_status (request, response))
       {
-        return 1;
+	return 1;
       }
 
     task_name = request["task"].asString ();
@@ -1886,11 +1884,11 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
      */
     if (task_name == "getserverstatus")
       {
-        dispatched = true;
-        if (cub_cm_extend_request (request, response))
-          {
-            return 1;
-          }
+	dispatched = true;
+	if (cub_cm_extend_request (request, response))
+	  {
+	    return 1;
+	  }
       }
   }
 
@@ -1901,8 +1899,8 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
 
   const Json::Value &async_val = request.get ("async", "no");
   want_async = async_val.isString ()
-               && uStringEqual (async_val.asString ().c_str (), "yes")
-               && is_async_capable_task (task_name);
+	       && uStringEqual (async_val.asString ().c_str (), "yes")
+	       && is_async_capable_task (task_name);
 
   cm_execute_request_async (request, response, sco.iHttpTimeout, want_async);
 
