@@ -355,13 +355,6 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmserverstart", TS_CMSERVERSTART, PATH_MAX);
   gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmserverstart2", TS_CMSERVERSTART, PATH_MAX);
 
-  /* unset CUBRID_ERROR_LOG environment variable, using default value */
-#if defined(WINDOWS)
-  PUT_ENV ("CUBRID_ERROR_LOG", "");
-#else
-  unsetenv ("CUBRID_ERROR_LOG");
-#endif
-
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
   sprintf (cmd_name, "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, UTIL_CUBRID);
@@ -375,7 +368,11 @@ cmd_start_server (char *dbname, char *err_buf, int err_buf_size)
   argv[3] = dbname;
   argv[4] = NULL;
 
-  extra_envp[envc++] = "CUBRID_ERROR_LOG=";    /* removing env variable CUBRID_ERROR_LOG if exists */
+  /*
+   * unset CUBRID_ERROR_LOG only for the server process, so that it uses the
+   * default error log; the CMS process keeps its own CUBRID_ERROR_LOG.
+   */
+  extra_envp[envc++] = "CUBRID_ERROR_LOG=";
   extra_envp[envc] = NULL;
 
   pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL,
