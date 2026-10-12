@@ -688,7 +688,7 @@ uRemoveCRLF (char *str)
 char *
 time_to_str (time_t t, const char *fmt, char *buf, int type)
 {
-  struct tm ltm;
+  struct tm ltm = {};
   struct tm *tm_p;
 
   tm_p = LOCALTIME_R (&t, &ltm);

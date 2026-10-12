@@ -666,7 +666,7 @@ static void
 ext_autojobs_log (const char *service, const char *serv_name, const char *errmsg)
 {
   time_t tt;
-  struct tm tm_buf;
+  struct tm tm_buf = {};
   tm *t;
   FILE *outfile;
   char logfile[MAX_PATH];

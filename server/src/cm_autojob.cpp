@@ -1089,7 +1089,7 @@ static void
 aj_execquery_handler (void *hd, time_t prev_check_time, time_t cur_time)
 {
   time_t execquery_time;
-  struct tm exec_tm, cur_tm, *tm_p;
+  struct tm exec_tm, cur_tm = {}, *tm_p;
   autoexecquery_node *c;
   query_period_details *detail1 = NULL;
   int tm_wday = 0;
@@ -1198,7 +1198,7 @@ aj_execquery_get_exec_time (autoexecquery_node *c,
     {
       int interval = is_positive_number (&c->detail2[1]);
       time_t prev_day_sec = 0;
-      struct tm prev_tm, *tm_p;
+      struct tm prev_tm = {}, *tm_p;
 
       tm_p = LOCALTIME_R (&prev_check_time, &prev_tm);
       if (tm_p == NULL)
@@ -1419,7 +1419,7 @@ static void
 aj_autobackupdb_handler (void *hd, time_t prev_check_time, time_t cur_time)
 {
   time_t backup_time;
-  struct tm backup_tm, cur_tm, prev_tm, *tm_p;
+  struct tm backup_tm, cur_tm = {}, prev_tm = {}, *tm_p;
   autobackupdb_node *c;
 
   backup_period_details *period_date = NULL;

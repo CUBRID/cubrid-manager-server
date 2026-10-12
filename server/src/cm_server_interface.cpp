@@ -1696,7 +1696,7 @@ fill_server_identity (Json::Value &target)
 {
   time_t now = time (NULL);
   char start_time_buf[64];
-  struct tm start_tm;
+  struct tm start_tm = {};
 
   if (LOCALTIME_R (&g_cms_start_time, &start_tm) != NULL)
     {

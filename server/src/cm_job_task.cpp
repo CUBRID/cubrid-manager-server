@@ -16278,7 +16278,7 @@ _get_format_time ()
 {
   char *buff = (char *) malloc (sizeof (char) * LINE_MAX);
   time_t lt;
-  struct tm ltm;
+  struct tm ltm = {};
   struct tm *t;
 
   if (buff == NULL)
