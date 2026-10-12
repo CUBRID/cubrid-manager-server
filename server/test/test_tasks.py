@@ -80,21 +80,30 @@ def answer_base(slot):
 
 
 def parse_list_line(line):
-    """Split a scenario line into (case name, expected status, status only).
+    """Split a scenario line into (case name, expected status, status only,
+    synchronous only).
 
     A line is either
 
         <case>              compared against <case>.answer by --file-check
         <case>,<status>      checked by its status field only
+        <case>,sync          must succeed without being turned into an async job
 
     The comma form is what marks a case as status only: negative cases
     (`userverify_fail,failure`) and cases whose response cannot have a stable
     baseline (`loadaccesslog,success`). Those never get an .answer, and
     --file-check judges them by the status they declare.
+
+    `,sync` is a status only case expecting success whose response must come
+    back synchronously: no `uuid`, no `job-status`. It is how a case checks
+    that "async":"yes" is ignored by a task that does not support it.
     """
     name, comma, expected = line.partition(",")
     expected = expected.strip()
-    return name.strip(), (expected or "success"), bool(comma)
+    must_be_sync = (expected == "sync")
+    if must_be_sync:
+        expected = "success"
+    return name.strip(), (expected or "success"), bool(comma), must_be_sync
 
 
 # Values that differ on every run even when the server behaves identically:
@@ -108,6 +117,8 @@ VOLATILE_KEYS = frozenset((
     "mem_physical", "mem_virtual", "mem_phy_free",
     "free_size", "freespace", "size", "total",
     "token",
+    # job id of an async (or timed out) request, new on every run
+    "uuid",
 ))
 
 # Timestamps and temporary file names are embedded in longer strings, so they
@@ -354,7 +365,60 @@ def print_response(response):
               % (len(lines) - RESPONSE_LINES, REPORT_BASE))
 
 
-def send_one(name, req, token, expected="success", casefile=""):
+# A request answered with "job-status":"running" and a "uuid" has not finished:
+# either it asked for "async":"yes", or it ran past the server's http_timeout
+# and was left running in the background ("status":"failure", "note":"timeout").
+# The runner then polls gettaskstatus with that uuid and judges the case by the
+# job's final response, never by the immediate one.
+ASYNC_POLL_SEC = 1.0
+ASYNC_WAIT_SEC = 600
+
+
+def is_running_job(data):
+    return (isinstance(data, dict) and data.get("job-status") == "running"
+            and data.get("uuid") not in (None, ""))
+
+
+def follow_job(name, data, token):
+    """Poll gettaskstatus until the job `data` announced is no longer running.
+
+    Returns (final data, final body, problem). `problem` is None when the job
+    ended, otherwise a (status, note) pair to record instead: the job outlived
+    ASYNC_WAIT_SEC, or a poll did not answer in JSON.
+
+    The uuid is sent back exactly as received (a string): it can be 19 digits,
+    more than a double holds, so it must never go through a number.
+    """
+    uuid = str(data["uuid"])
+    # A later case can look the same job up again ("uuid":"$LAST_ASYNC_UUID").
+    runtime_vars["$LAST_ASYNC_UUID"] = uuid
+    started = time.time()
+    print("%s : job %s running (note: %s), polling gettaskstatus"
+          % (name, uuid, data.get("note", "none")))
+    poll = {"task": "gettaskstatus", "token": token, "uuid": uuid}
+    while True:
+        time.sleep(ASYNC_POLL_SEC)
+        body = exec_task(cmsip, port, url, json.dumps(poll)).decode(
+            errors="replace")
+        try:
+            data = json.loads(body)
+        except ValueError:
+            return None, body, ("invalid",
+                                "non JSON gettaskstatus response: %s"
+                                % body[:200])
+        if data.get("job-status") != "running":
+            print("    job %s ended after %.0f s: %s"
+                  % (uuid, time.time() - started,
+                     data.get("job-status", data.get("note", ""))))
+            return data, body, None
+        if time.time() - started >= ASYNC_WAIT_SEC:
+            return None, body, ("timeout",
+                                "job %s still running after %d s"
+                                % (uuid, ASYNC_WAIT_SEC))
+
+
+def send_one(name, req, token, expected="success", casefile="",
+             must_be_sync=False):
     req["token"] = token
     task = req.get("task", name)
     response = exec_task(cmsip, port, url, json.dumps(req))
@@ -370,6 +434,20 @@ def send_one(name, req, token, expected="success", casefile=""):
                "non JSON response: %s" % response[:200], expected, body,
                quiet=file_check)
         return {"task": task, "status": "failure"}
+    if must_be_sync:
+        if "uuid" in data or "job-status" in data:
+            record(name, casefile, task, "async",
+                   "expected a synchronous response, got job %s (%s)"
+                   % (data.get("uuid"), data.get("job-status")),
+                   expected, body, quiet=file_check)
+            return data
+    elif is_running_job(data):
+        final, final_body, problem = follow_job(name, data, token)
+        if problem:
+            record(name, casefile, task, problem[0], problem[1], expected,
+                   final_body, quiet=file_check)
+            return {"task": task, "status": "failure"}
+        data, body = final, final_body
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task, data.get("status"), data.get("note", ""),
@@ -393,7 +471,7 @@ def result_slot(name):
 
 
 def do_one_job(name, taskfile, token, expected="success", record_files=True,
-               status_only=False):
+               status_only=False, must_be_sync=False):
     """Run one case: every request in it, then the answer handling.
 
     `status_only` comes from the ",<status>" form in the scenario file. Such a
@@ -404,9 +482,10 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     if isinstance(request, list):
         for index, req in enumerate(request):
             data = send_one("%s[%d]" % (name, index), req, token, expected,
-                            taskfile)
+                            taskfile, must_be_sync)
     else:
-        data = send_one(name, request, token, expected, taskfile)
+        data = send_one(name, request, token, expected, taskfile,
+                        must_be_sync)
     # An array case sends several requests; its answer covers all of them, in
     # order, so that the file is the record of the whole case.
     entries = results[before:]
@@ -535,9 +614,9 @@ def do_all_jobs(token):
                 print("sleep %s" % wait.group(1))
                 time.sleep(seconds)
                 continue
-            name, expected, status_only = parse_list_line(line)
+            name, expected, status_only, must_be_sync = parse_list_line(line)
             do_one_job(name, case_path(name), token, expected,
-                       status_only=status_only)
+                       status_only=status_only, must_be_sync=must_be_sync)
 
 
 def first_difference(expected_txt, actual):
@@ -568,6 +647,14 @@ def dump_one(name, token):
             print(json.dumps(data, indent=3, sort_keys=True, ensure_ascii=False))
         except ValueError:
             print(response.decode(errors="replace"))
+            continue
+        # Print the final response of a job too: the immediate one of an
+        # async request only says that it started.
+        if is_running_job(data):
+            final, final_body, problem = follow_job(name, data, token)
+            print(final_body if problem else
+                  json.dumps(final, indent=3, sort_keys=True,
+                             ensure_ascii=False))
 
 
 def stop_test_servers():

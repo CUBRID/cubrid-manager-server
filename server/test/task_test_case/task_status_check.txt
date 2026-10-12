@@ -50,6 +50,21 @@ startdb_fail,failure
 checkdb
 sleep 10
 checkdb_nullname,failure
+
+// async execution. A response with "job-status":"running" and a uuid is
+// followed with gettaskstatus until the job ends, and judged by the final one.
+checkdb_async
+// the finished job of checkdb_async, looked up again by its uuid
+gettaskstatus_done
+startdb_async_fail,failure
+// "async" on a task that does not support it is ignored: plain synchronous run
+getdbsize_async,sync
+gettaskstatus_nouuid,failure
+gettaskstatus_emptyuuid,failure
+gettaskstatus_negativeuuid,failure
+gettaskstatus_textuuid,failure
+gettaskstatus_notfound,failure
+
 getdbsize
 gettransactioninfo
 killtransaction
