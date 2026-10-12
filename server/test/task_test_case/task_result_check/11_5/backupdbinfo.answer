@@ -1,0 +1,14 @@
+{
+   "dbdir": "$CUBRID_DATABASES/alatestdb/backup",
+   "freespace": "<volatile>",
+   "level0": [
+      {
+         "data": "<timestamp>",
+         "path": "$CUBRID_DATABASES/alatestdb/backup/alatestdb_backup_lv0/alatestdb_bk0v000",
+         "size": "<volatile>"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "backupdbinfo"
+}

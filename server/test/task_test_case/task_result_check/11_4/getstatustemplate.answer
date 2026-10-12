@@ -1,0 +1,32 @@
+{
+   "note": "none",
+   "status": "success",
+   "task": "getstatustemplate",
+   "templatelist": [
+      {
+         "template": [
+            {
+               "cas_st_active_session": "0.1",
+               "cas_st_request": "0.1",
+               "cas_st_transaction": "0.1",
+               "close": "target_config",
+               "db_name": " ",
+               "desc": "status monitor template of broker",
+               "name": "broker_template",
+               "sampling_term": "1"
+            },
+            {
+               "_PROGNAME": "ager",
+               "close": "target_config",
+               "db_name": "demodb",
+               "desc": "status monitor template of demodb",
+               "name": "dbserver_clier_requet",
+               "sampling_term": "1",
+               "server_conn_cli_request": "1",
+               "task": "tatustemplate",
+               "token": "<volatile>"
+            }
+         ]
+      }
+   ]
+}

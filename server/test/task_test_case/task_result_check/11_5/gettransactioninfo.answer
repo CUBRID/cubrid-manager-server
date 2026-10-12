@@ -1,0 +1,34 @@
+{
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "task": "gettransactioninfo",
+   "transactioninfo": [
+      {
+         "transaction": [
+            {
+               "@user": "DBA",
+               "SQL_ID": "empty",
+               "host": "$HOSTNAME",
+               "pid": "<volatile>",
+               "program": "csql",
+               "query_time": "0.00",
+               "tran_time": "<volatile>",
+               "tranindex": "<volatile>",
+               "wait_for_lock_holder": "-1"
+            },
+            {
+               "@user": "DBA",
+               "SQL_ID": "empty",
+               "host": "$HOSTNAME",
+               "pid": "<volatile>",
+               "program": "csql",
+               "query_time": "0.00",
+               "tran_time": "<volatile>",
+               "tranindex": "<volatile>",
+               "wait_for_lock_holder": "-1"
+            }
+         ]
+      }
+   ]
+}

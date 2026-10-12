@@ -1,0 +1,4 @@
+{"task":"kill_process",
+"token":"",
+"pid":"$TEST_KILL_PID",
+"name":"test_proc"}

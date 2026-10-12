@@ -1,0 +1,7 @@
+{
+   "current_node": "ha-test-80",
+   "current_node_state": "unknown",
+   "note": "none",
+   "status": "success",
+   "task": "ha_status"
+}

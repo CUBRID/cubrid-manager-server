@@ -1,0 +1,20 @@
+{
+   "note": "none",
+   "resultfile": "$CUBRID/tmp/analyzelog_res_<tmpid>",
+   "resultlist": [
+      {
+         "result": [
+            {
+               "exec_time": "0.133",
+               "qindex": "[Q1]"
+            },
+            {
+               "exec_time": "0.047",
+               "qindex": "[Q2]"
+            }
+         ]
+      }
+   ],
+   "status": "success",
+   "task": "analyzecaslog"
+}

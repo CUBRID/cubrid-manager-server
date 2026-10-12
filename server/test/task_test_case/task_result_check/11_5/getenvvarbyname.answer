@@ -1,0 +1,6 @@
+{
+   "CUBRID": "$CUBRID",
+   "note": "none",
+   "status": "success",
+   "task": "getenvvarbyname"
+}

@@ -39,6 +39,12 @@
 
 static void _print_help (void);
 
+#if _MSC_VER >= 1900
+extern "C" {
+  FILE __iob_func[3] = { *stdin, *stdout, *stderr };
+}
+#endif
+
 int
 main (int argc, char *argv[])
 {
@@ -75,7 +81,7 @@ static void
 _print_help (void)
 {
   const char *title_pattern =
-    "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
+	  "cmserver utility, version R%s\nusage: %s <utility-name> [args]\n";
   printf (title_pattern, CM_ADMIN_VERSION, CM_ADMIN_NAME);
   print_cmd ();
 

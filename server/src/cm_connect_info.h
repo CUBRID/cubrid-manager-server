@@ -47,16 +47,16 @@ typedef struct
 
 int dbmt_con_search (const char *ip, const char *port, char *cli_ver);
 int dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
-                  const char *user_name);
+		  const char *user_name);
 int dbmt_con_delete (const char *ip, const char *port);
 
 int dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
-                          const char *port, const char *dbname,
-                          char *_dbmt_error);
+			  const char *port, const char *dbname,
+			  char *_dbmt_error);
 int dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
-                           const char *port, const char *dbname,
-                           int creat_flag, char *_dbmt_error);
+			   const char *port, const char *dbname,
+			   int creat_flag, char *_dbmt_error);
 void dbmt_con_set_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *dbname,
-                          const char *uid, const char *passwd);
+			  const char *uid, const char *passwd);
 
 #endif /* _CM_CONNECT_INFO_H_ */

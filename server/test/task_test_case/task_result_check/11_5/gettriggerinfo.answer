@@ -1,0 +1,24 @@
+{
+   "dbname": "demodb",
+   "note": "none",
+   "status": "success",
+   "task": "gettriggerinfo",
+   "triggerlist": [
+      {
+         "triggerinfo": [
+            {
+               "action": "REJECT",
+               "actiontime": "BEFORE",
+               "condition": "1=1",
+               "conditiontime": "BEFORE",
+               "eventtype": "STATEMENT UPDATE",
+               "name": "dba.example",
+               "priority": "0.00000",
+               "status": "INACTIVE",
+               "target_att": "score",
+               "target_class": "public.history"
+            }
+         ]
+      }
+   ]
+}

@@ -24,7 +24,8 @@ Get database process statistics.
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| status | execution result, success or failed. |
+| note | if failed, a brief description will be given here |
 | dbstat | information of database status |
 
 

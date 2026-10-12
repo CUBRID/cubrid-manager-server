@@ -1,0 +1,6 @@
+{"task":"renamedb",
+"token":"",
+"dbname":"destinationdb",
+"rename":"anotherdb",
+"exvolpath":"none",
+"advanced":"on"}

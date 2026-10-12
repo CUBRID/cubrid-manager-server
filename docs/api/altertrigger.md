@@ -8,6 +8,10 @@ Alter a trigger.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
+| triggername | the name of the trigger to be altered |
+| status | ACTIVE or INACTIVE |
+| priority | the priority of the trigger |
 
 ## Request Sample
 
@@ -27,15 +31,17 @@ Alter a trigger.
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| status | execution result, success or failed. |
+| status | execution result, success or failed. Not the trigger status of the request, which happens to share the key name |
 | note | if failed, a brief description will be given here |
+| dbname | database name |
 
 
 ## Response Sample
 
 ```
 {
-   "__EXEC_TIME" : "72 ms",
+   "__EXEC_TIME" : "40 ms",
+   "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
    "task" : "altertrigger"

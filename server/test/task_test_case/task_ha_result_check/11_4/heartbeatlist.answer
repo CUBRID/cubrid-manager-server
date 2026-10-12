@@ -1,0 +1,123 @@
+{
+   "currentnode": "ha-test-80",
+   "currentnodestate": "master",
+   "hadbinfolist": [
+      {
+         "server": [
+            {
+               "applylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "test2",
+                           "hostname": "localhost",
+                           "logpath": "$CUBRID_DATABASES/test2_ha-test-81",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "copylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "test2",
+                           "hostname": "ha-test-81",
+                           "logpath": "$CUBRID_DATABASES/test2_ha-test-81",
+                           "mode": "sync",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "dbmode": [
+                  {
+                     "dbname": "test2",
+                     "server_mode": "active",
+                     "server_msg": "none"
+                  }
+               ],
+               "dbprocinfo": [
+                  {
+                     "dbname": "test2",
+                     "pid": "<volatile>",
+                     "state": "registered_and_active"
+                  }
+               ]
+            },
+            {
+               "applylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "test",
+                           "hostname": "localhost",
+                           "logpath": "$CUBRID_DATABASES/test_ha-test-81",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "copylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "test",
+                           "hostname": "ha-test-81",
+                           "logpath": "$CUBRID_DATABASES/test_ha-test-81",
+                           "mode": "sync",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "dbmode": [
+                  {
+                     "dbname": "test",
+                     "server_mode": "active",
+                     "server_msg": "none"
+                  }
+               ],
+               "dbprocinfo": [
+                  {
+                     "dbname": "test",
+                     "pid": "<volatile>",
+                     "state": "registered_and_active"
+                  }
+               ]
+            }
+         ]
+      }
+   ],
+   "hanodelist": [
+      {
+         "node": [
+            {
+               "hostname": "ha-test-82",
+               "ip": "192.168.3.82",
+               "priority": "32767",
+               "state": "replica"
+            },
+            {
+               "hostname": "ha-test-81",
+               "ip": "192.168.3.81",
+               "priority": "2",
+               "state": "slave"
+            },
+            {
+               "hostname": "ha-test-80",
+               "ip": "192.168.3.80",
+               "priority": "1",
+               "state": "master"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "heartbeatlist"
+}

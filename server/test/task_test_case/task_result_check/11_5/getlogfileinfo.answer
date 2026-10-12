@@ -1,0 +1,83 @@
+{
+   "broker": "query_editor",
+   "from": "",
+   "logfileinfo": [
+      {
+         "logfile": [
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_1.sql.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_1.slow.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_2.sql.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_2.slow.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_3.sql.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_3.slow.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_4.sql.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_4.slow.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_5.sql.log",
+               "size": "<volatile>",
+               "type": "script"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/sql_log/query_editor_5.slow.log",
+               "size": "<volatile>",
+               "type": "script"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getlogfileinfo"
+}

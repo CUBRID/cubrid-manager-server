@@ -8,6 +8,13 @@ Set auto addvol option.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
+| data | ON or OFF, enable the automatic extension of the data volume |
+| data_warn_outofspace | the free space ratio which triggers the extension of the data volume |
+| data_ext_page | the number of the pages added to the data volume at every extension |
+| index | ON or OFF, enable the automatic extension of the index volume |
+| index_warn_outofspace | the free space ratio which triggers the extension of the index volume |
+| index_ext_page | the number of the pages added to the index volume at every extension |
 
 ## Request Sample
 

@@ -63,7 +63,6 @@
 #include "cm_config.h"
 #include "cm_autojob.h"
 #include "cm_auto_task.h"
-#include "cm_cci_interface.h"
 #include "cm_server_interface.h"
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
@@ -240,7 +239,7 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
       return;
     }
 
-  data = (char *) evbuffer_pullup(input, len);
+  data = (char *) evbuffer_pullup (input, len);
   if (data == NULL)
     {
       evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
@@ -275,41 +274,35 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
 
   cub_add_private_param (req, root);
 
+  if (strcmp ((char *) arg, "cm_api") != 0)
+    {
+      free (body);
+      return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
+    }
+
   try
     {
-      if (!strcmp ((char *) arg, "cci"))
-	{
-	  cub_cci_request_handler (root, response);
-	}
-      else if (!strcmp ((char *) arg, "cm_api"))
-	{
-	  cub_cm_request_handler (root, response);
-	}
+      cub_cm_request_handler (root, response);
     }
   catch (const std::exception &e)
     {
       LOG_ERROR ("cub_generic_request_handler : unhandled exception while "
-                "processing request: %s", e.what ());
+		 "processing request: %s", e.what ());
       response = Json::Value (Json::objectValue);
       build_server_header (response, ERR_WITH_MSG, e.what ());
     }
   catch (...)
     {
       LOG_ERROR ("cub_generic_request_handler : unhandled non-standard "
-                "exception while processing request.");
+		 "exception while processing request.");
       response = Json::Value (Json::objectValue);
       build_server_header (response, ERR_WITH_MSG, "internal server error");
     }
 
-
-  //outustr = utf8_encode(writer.write(response).c_str());
-  //printf("---------------------\n%s\n", outustr);
   evb = evbuffer_new ();
   if (NULL == evb)
     {
       free (body);
-      //utf8_clean(inustr);
-      //utf8_clean(outustr);
       return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
     }
 
@@ -323,27 +316,39 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
   evhttp_send_reply (req, HTTP_OK, "OK", evb);
   evbuffer_free (evb);
   free (body);
-  //utf8_clean(inustr);
-  //utf8_clean(outustr);
 
   return;
 }
-
-static int cub_loop_flag = 1;
 
 void
-cub_ctrl_request_handler (struct evhttp_request *req, void *arg)
+cub_reject_request_handler (struct evhttp_request *req, void *arg)
 {
-  evhttp_send_reply (req, HTTP_OK, "", NULL);
-  cub_loop_flag = 0;
+  struct evbuffer *evb = evbuffer_new ();
+
+  if (evb)
+    {
+      evhttp_add_header (evhttp_request_get_output_headers (req),
+			 "Content-Type", "application/json;charset=utf-8");
+      evbuffer_add_printf (evb, "{ \"error\" : \"Not Found\" }");
+    }
+
+  evhttp_send_reply (req, HTTP_NOTFOUND, "Not Found", evb);
+
+  if (evb)
+    {
+      evbuffer_free (evb);
+    }
+
   return;
 }
 
+#if !defined (NDEBUG)
 void
 cub_post_request_handler (struct evhttp_request *req, void *arg)
 {
   string post_msg = "{ \"success\" : true }";
   string req_uri (req->uri);
+  std::string cookie;
   char token[TOKEN_ENC_LENGTH];
   size_t token_pos;
   int code;
@@ -351,13 +356,19 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
   size_t fname_pos = 0;
   size_t tmp_pos = 0;
   struct evbuffer *evb = evbuffer_new();
+  const char *cookie_header = evhttp_find_header (req->input_headers, "COOKIE");
 
   code = HTTP_OK;
   reason = "OK";
   token[0] = '\0';
   token_pos = 0;
 
-  string cookie (evhttp_find_header (req->input_headers, "COOKIE"));
+  if (cookie_header == NULL || strlen (cookie_header) == 0)
+    {
+      goto send_nok_reply;
+    }
+
+  cookie = cookie_header;
   token_pos = cookie.find ("token=");
   if (token_pos == string::npos)
     {
@@ -366,43 +377,52 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
 
   cookie.copy (token, TOKEN_ENC_LENGTH - 1, token_pos + strlen ("token="));
   token[TOKEN_ENC_LENGTH - 1] = '\0';
-  if (ext_ut_validate_token (token))
+  if (!ext_ut_validate_token (token))
     {
-      goto send_reply;
+      goto send_nok_reply;
     }
-
   for (int index = 0; index < NUM_OF_FILES_IN_URL; ++index)
     {
       char fname[PATH_MAX];
-      string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string fname_path = string (sco.dbmt_tmp_dir) + "/";
+      std::string path = fname_path;
       fname[0] = '\0';
       fname_pos = req_uri.find ("fname=", tmp_pos);
       if (fname_pos == string::npos && index == 0)
-        {
-          goto send_nok_reply;
-        }
+	{
+	  goto send_nok_reply;
+	}
       else if (fname_pos == string::npos)
-        {
-          goto send_reply;
-        }
+	{
+	  goto send_reply;
+	}
 
       fname_pos += strlen ("fname=");
       tmp_pos = req_uri.find ("&", fname_pos);
       if (tmp_pos == string::npos)
-        {
-          tmp_pos = req_uri.length();
-        }
+	{
+	  tmp_pos = req_uri.length();
+	}
+
+      if ((tmp_pos - fname_pos) >= PATH_MAX)
+	{
+	  goto send_nok_reply;
+	}
+
       req_uri.copy (fname, tmp_pos - fname_pos + 1, fname_pos);
       fname[tmp_pos - fname_pos] = '\0';
+
       if (strcmp (fname, "") != 0 || strcmp (fname, "&") != 0)
-        {
-          if (strstr (fname, "..") || strstr (fname, "\\") || strstr (fname, "/"))
-            {
-              continue;
-            }
-          fname_path += fname;
-          unlink (fname_path.c_str());
-        }
+	{
+	  path += fname;
+	  if (is_invalid_filename (fname) || !is_subpath (sco.dbmt_tmp_dir, path.c_str ()))
+	    {
+	      goto send_nok_reply;
+	    }
+
+	  fname_path += fname;
+	  unlink (fname_path.c_str());
+	}
     }
 
 send_nok_reply:
@@ -423,16 +443,7 @@ send_reply:
   return;
 }
 
-void
-cub_timeout_cb (evutil_socket_t fd, short event, void *arg)
-{
-  struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-    }
-}
-
+#endif
 
 /**
  * @brief callback function to gather monitoring data
@@ -443,11 +454,6 @@ start_monitor_stat_cb (evutil_socket_t fd, short event, void *arg)
   struct timeval stat_tv = { STAT_MONITOR_INTERVAL, 0 };
 
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
 
   // [CUBRIDSUS-11917]sleep the thread for a while when the CUBRID is starting
   if (work_ctx->first)
@@ -469,11 +475,7 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
 {
   struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
   struct worker_context *work_ctx = (struct worker_context *) arg;
-  if (!cub_loop_flag)
-    {
-      event_base_loopexit (work_ctx->base, NULL);
-      return;
-    }
+
 #ifdef WINDOWS
   unsigned long thread_status;
   GetExitCodeThread ((HANDLE) auto_task_tid, &thread_status);
@@ -506,7 +508,6 @@ start_service ()
 {
   struct worker_context *start_ctx[DEFAULT_THRD_NUM];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
-  struct timeval tv = { sco.iMonitorInterval, 0 };
   int nfd, err, i = 0;
 
   tmpstrbuf[0] = '\0';
@@ -520,7 +521,7 @@ start_service ()
   if (ctx == NULL)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : cannot initialize SSL context");
+		"CUBRID Manager Server : cannot initialize SSL context");
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
@@ -530,8 +531,8 @@ start_service ()
   if (nfd < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : The port %d is still used by other process.\n",
-                sco.iCMS_port);
+		"CUBRID Manager Server : The port %d is still used by other process.\n",
+		sco.iCMS_port);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
@@ -540,15 +541,15 @@ start_service ()
     {
       start_ctx[i] = (struct worker_context *) malloc (sizeof (struct worker_context));
       if (start_ctx[i] == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       start_ctx[i]->base = event_base_new ();
       if (start_ctx[i]->base == NULL)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       start_ctx[i]->first = true;
 #ifndef WINDOWS
@@ -556,81 +557,73 @@ start_service ()
 #endif
 
       if (i > 1)        /* DEFAULT_THRD_NUM - 1 for request handler */
-        {
-          start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_PERSIST, cub_timeout_cb, (void *) start_ctx[i]);
-          if (start_ctx[i]->timer == NULL)
-            {
-              continue;
-            }
+	{
+	  start_ctx[i]->timer = NULL;
 
-          start_ctx[i]->httpd = evhttp_new (start_ctx[i]->base);
-          if (start_ctx[i]->httpd == NULL)
-            {
-              continue;
-            }
+	  start_ctx[i]->httpd = evhttp_new (start_ctx[i]->base);
+	  if (start_ctx[i]->httpd == NULL)
+	    {
+	      continue;
+	    }
 
-          err = evhttp_accept_socket (start_ctx[i]->httpd, nfd);
-          if (err != 0)
-            {
-              continue;
-            }
+	  err = evhttp_accept_socket (start_ctx[i]->httpd, nfd);
+	  if (err != 0)
+	    {
+	      continue;
+	    }
 
-          evhttp_set_timeout (start_ctx[i]->httpd, DEFAULT_HTTP_TIMEOUT);
-          /* This is the magic that lets evhttp use SSL. */
-          evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
-          evhttp_set_cb (start_ctx[i]->httpd, "/cci",
-                         cub_generic_request_handler, (void *) "cci");
-          evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
-          evhttp_set_cb (start_ctx[i]->httpd, "/ctrl", cub_ctrl_request_handler, NULL);
-          evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
-          /* Start web server*/
-          evhttp_set_gencb (start_ctx[i]->httpd, load_webfiles_cb, (void *) sco.szCWMPath);
-        }
+	  evhttp_set_timeout (start_ctx[i]->httpd, DEFAULT_HTTP_TIMEOUT);
+	  /* This is the magic that lets evhttp use SSL. */
+	  evhttp_set_bevcb (start_ctx[i]->httpd, create_sslconn_cb, ctx);
+	  evhttp_set_cb (start_ctx[i]->httpd, "/cm_api", cub_generic_request_handler, (void *) "cm_api");
+#if defined (NDEBUG)
+	  evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#else
+	  evhttp_set_cb (start_ctx[i]->httpd, "/upload", cub_post_request_handler, NULL);
+	  evhttp_set_gencb (start_ctx[i]->httpd, cub_reject_request_handler, NULL);
+#endif
+	}
       else if (i == 1)
-        {
-          /* index 1 for starting monitor of auto jobs */
-          start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_TIMEOUT, start_monitor_auto_jobs_cb,
-                                           (void *) start_ctx[i]);
-          if (start_ctx[i]->timer == NULL)
-            {
-              ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : Failed to start monitor of auto job.\n");
-              return -1;
-            }
-          start_ctx[i]->httpd = NULL;
-        }
+	{
+	  /* index 1 for starting monitor of auto jobs */
+	  start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_TIMEOUT, start_monitor_auto_jobs_cb,
+					   (void *) start_ctx[i]);
+	  if (start_ctx[i]->timer == NULL)
+	    {
+	      ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : Failed to start monitor of auto job.\n");
+	      return -1;
+	    }
+	  start_ctx[i]->httpd = NULL;
+	}
       else
-        {
-          /* index 0 for monitoring status job */
-          start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_TIMEOUT, start_monitor_stat_cb,
-                                           (void *) start_ctx[i]);
-          if (start_ctx[i]->timer == NULL)
-            {
-              ut_record_cubrid_utility_log_stderr (
-                "CUBRID Manager Server : Failed to start monitoring state job.\n");
-              return -1; /* Start monitor status job failed */
-            }
-          start_ctx[i]->httpd = NULL;
-        }
+	{
+	  /* index 0 for monitoring status job */
+	  start_ctx[i]->timer = event_new (start_ctx[i]->base, -1, EV_TIMEOUT, start_monitor_stat_cb,
+					   (void *) start_ctx[i]);
+	  if (start_ctx[i]->timer == NULL)
+	    {
+	      ut_record_cubrid_utility_log_stderr (
+		      "CUBRID Manager Server : Failed to start monitoring state job.\n");
+	      return -1; /* Start monitor status job failed */
+	    }
+	  start_ctx[i]->httpd = NULL;
+	}
       if (i == 0)
-        {
-          struct timeval stat_tv = { 1, 0 };
-          evtimer_add (start_ctx[i]->timer, &stat_tv);
-        }
+	{
+	  struct timeval stat_tv = { 1, 0 };
+	  evtimer_add (start_ctx[i]->timer, &stat_tv);
+	}
       else if (i == 1)
-        {
-          struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
-          evtimer_add (start_ctx[i]->timer, &auto_task_tv);
-        }
-      else
-        {
-          evtimer_add (start_ctx[i]->timer, &tv);
-        }
+	{
+	  struct timeval auto_task_tv = { sco.iMonitorInterval, 0 };
+	  evtimer_add (start_ctx[i]->timer, &auto_task_tv);
+	}
 #ifdef WINDOWS
       start_ctx[i]->ths =
-        CreateThread (NULL, 0, dispatch_thread, start_ctx[i], 0, NULL);
+	      CreateThread (NULL, 0, dispatch_thread, start_ctx[i], 0, NULL);
 #else
       pthread_create (& (start_ctx[i]->ths), NULL, dispatch_thread,
-                      (void *) start_ctx[i]);
+		      (void *) start_ctx[i]);
 #endif
     }
 
@@ -638,19 +631,19 @@ start_service ()
     {
 #ifdef WINDOWS
       if (start_ctx[i]->ths != INVALID_HANDLE_VALUE)
-        {
-          WaitForSingleObject (start_ctx[i]->ths, INFINITE);
-        }
+	{
+	  WaitForSingleObject (start_ctx[i]->ths, INFINITE);
+	}
 #else
       if (start_ctx[i]->ths != 0)
-        {
-          pthread_join (start_ctx[i]->ths, NULL);
-        }
+	{
+	  pthread_join (start_ctx[i]->ths, NULL);
+	}
 #endif
       if (start_ctx[i] != NULL)
-        {
-          free (start_ctx[i]);
-        }
+	{
+	  free (start_ctx[i]);
+	}
     }
 
   thread_cleanup_SSL ();
@@ -682,20 +675,20 @@ stop_service ()
     {
       pidfile = fopen (cub_manager_pid_file, "rt");
       if (pidfile != NULL)
-        {
-          fscanf (pidfile, "%d", &pidnum);
-          fclose (pidfile);
-        }
+	{
+	  fscanf (pidfile, "%d", &pidnum);
+	  fclose (pidfile);
+	}
 
       if ((pidfile == NULL) || ((kill (pidnum, SIGTERM)) < 0))
-        {
-          ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : Failed to stop the server.\n");
-        }
+	{
+	  ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : Failed to stop the server.\n");
+	}
       else
-        {
-          unlink (conf_get_dbmt_file (FID_CMSERVER_PID, cub_manager_pid_file));
-          unlink (conf_get_dbmt_file (FID_CONN_LIST, connect_list_file));
-        }
+	{
+	  unlink (conf_get_dbmt_file (FID_CMSERVER_PID, cub_manager_pid_file));
+	  unlink (conf_get_dbmt_file (FID_CONN_LIST, connect_list_file));
+	}
     }
 
   return;
@@ -770,9 +763,9 @@ automation_start (void *ud)
   for (i = 0; i < AUTOJOB_SIZE; ++i)
     {
       if (ajob_list[i].ajob_loader)
-        {
-          ajob_list[i].ajob_loader (& (ajob_list[i]));
-        }
+	{
+	  ajob_list[i].ajob_loader (& (ajob_list[i]));
+	}
     }
 
   prev_check_time = time (NULL);
@@ -783,30 +776,30 @@ automation_start (void *ud)
 
       MUTEX_LOCK (aj_thread_mutex);
       if (0 != aj_tinfo.is_running)
-        {
-          if (cur_time - aj_tinfo.stime > sco.iAutoJobTimeout)
-            {
-              THREAD_CANCEL (aj_tinfo.thread_id);
-              snprintf (strbuf, sizeof (strbuf), "%s - - -", ACCESS_LOG);
-              write_manager_access_log (strbuf,
-                                        "Auto jobs execute too long, Cancel the thread");
-              aj_tinfo.is_running = 0;
-            }
-        }
+	{
+	  if (cur_time - aj_tinfo.stime > sco.iAutoJobTimeout)
+	    {
+	      THREAD_CANCEL (aj_tinfo.thread_id);
+	      snprintf (strbuf, sizeof (strbuf), "%s - - -", ACCESS_LOG);
+	      write_manager_access_log (strbuf,
+					"Auto jobs execute too long, Cancel the thread");
+	      aj_tinfo.is_running = 0;
+	    }
+	}
       if (0 == aj_tinfo.is_running)
-        {
-          T_THREAD tid;
-          aj_thread_info *ptr_aj_tinfo;
-          aj_tinfo.ajob_list = ajob_list;
-          aj_tinfo.cur_time = cur_time;
-          aj_tinfo.prev_check_time = prev_check_time;
-          ptr_aj_tinfo = &aj_tinfo;
-          THREAD_BEGIN (tid, aj_thread_r, ptr_aj_tinfo);
-          aj_tinfo.is_running = 1;
-          aj_tinfo.thread_id = tid;
-          aj_tinfo.stime = cur_time;
-          prev_check_time = cur_time;
-        }
+	{
+	  T_THREAD tid;
+	  aj_thread_info *ptr_aj_tinfo;
+	  aj_tinfo.ajob_list = ajob_list;
+	  aj_tinfo.cur_time = cur_time;
+	  aj_tinfo.prev_check_time = prev_check_time;
+	  ptr_aj_tinfo = &aj_tinfo;
+	  THREAD_BEGIN (tid, aj_thread_r, ptr_aj_tinfo);
+	  aj_tinfo.is_running = 1;
+	  aj_tinfo.thread_id = tid;
+	  aj_tinfo.stime = cur_time;
+	  prev_check_time = cur_time;
+	}
       MUTEX_UNLOCK (aj_thread_mutex);
     }
 
@@ -832,19 +825,19 @@ aj_thread_r (void *aj)
       /* check automation configure file and see if it has changed since last access */
       stat (ajob_list[i].config_file, &statbuf);
       if (ajob_list[i].last_modi != statbuf.st_mtime)
-        {
-          ajob_list[i].last_modi = statbuf.st_mtime;
-          if (ajob_list[i].ajob_loader)
-            {
-              ajob_list[i].ajob_loader (& (ajob_list[i]));
-            }
-        }
+	{
+	  ajob_list[i].last_modi = statbuf.st_mtime;
+	  if (ajob_list[i].ajob_loader)
+	    {
+	      ajob_list[i].ajob_loader (& (ajob_list[i]));
+	    }
+	}
 
       /* if unchanged, go ahead and check value */
       if (ajob_list[i].is_on && ajob_list[i].ajob_handler)
-        {
-          ajob_list[i].ajob_handler (ajob_list[i].hd, prev_check_time, cur_time);
-        }
+	{
+	  ajob_list[i].ajob_handler (ajob_list[i].hd, prev_check_time, cur_time);
+	}
     }
 
   MUTEX_LOCK (aj_thread_mutex);
@@ -893,38 +886,38 @@ main (int argc, char **argv)
   if (argc >= 2)
     {
       if (strcmp (argv[1], "stop") == 0)
-        {
-          stop_service ();
-          exit (0);
-        }
+	{
+	  stop_service ();
+	  exit (0);
+	}
       else if (strcmp (argv[1], "--version") == 0)
-        {
-          fprintf (stdout, "CUBRID Manager Server ver : %s\n",
-                   makestring (BUILD_NUMBER));
-          exit (0);
-        }
+	{
+	  fprintf (stdout, "CUBRID Manager Server ver : %s\n",
+		   makestring (BUILD_NUMBER));
+	  exit (0);
+	}
       else if (strcmp (argv[1], "getpid") == 0)
-        {
-          pidnum = get_processid ();
-          if (pidnum > 0)
-            {
-              fprintf (stdout, "%d\n", pidnum);
-            }
-          exit (0);
-        }
+	{
+	  pidnum = get_processid ();
+	  if (pidnum > 0)
+	    {
+	      fprintf (stdout, "%d\n", pidnum);
+	    }
+	  exit (0);
+	}
       else if (strcmp (argv[1], PRINT_CMD_START) != 0)
-        {
-          snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : Invalid command - %s\n", argv[1]);
-          ut_record_cubrid_utility_log_stderr (tmpstrbuf);
-          print_usage (argv[0]);
-          exit (1);
-        }
+	{
+	  snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : Invalid command - %s\n", argv[1]);
+	  ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+	  print_usage (argv[0]);
+	  exit (1);
+	}
     }
 
   if ((pidnum = get_processid ()) > 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : The [pid=%d] process has been running.\n", pidnum);
+		"CUBRID Manager Server : The [pid=%d] process has been running.\n", pidnum);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return 0;
     }
@@ -940,20 +933,22 @@ main (int argc, char **argv)
   if (ut_write_pid (conf_get_dbmt_file (FID_CMSERVER_PID, dbmt_file)) < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : Fail to store the pid file in (%s).\n", dbmt_file);
+		"CUBRID Manager Server : Fail to store the pid file in (%s).\n", dbmt_file);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       exit (1);
     }
 
   start_auto_thread ();
 
-  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build, sizeof (cubrid_version_build));
-  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor, cubrid_version_build);
+  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build,
+				    sizeof (cubrid_version_build));
+  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor,
+	    cubrid_version_build);
 
   if (start_service () < 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-                "CUBRID Manager Server : Fail to start service");
+		"CUBRID Manager Server : Fail to start service");
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       exit (1);
     }

@@ -1,0 +1,4 @@
+{"task":"deletedb",
+"token":"",
+"dbname":"compactdbtest",
+"delbackup":"y"}

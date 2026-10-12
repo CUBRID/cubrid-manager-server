@@ -1,0 +1,9 @@
+{"task":"setautoaddvol",
+"token":"",
+"dbname":"demodb",
+"data":"ON",
+"data_warn_outofspace":"0.05",
+"data_ext_page":"200",
+"index":"ON",
+"index_warn_outofspace":"0.05",
+"index_ext_page":"200"}

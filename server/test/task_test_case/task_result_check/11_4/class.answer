@@ -1,0 +1,89 @@
+{
+   "classinfo": [
+      {
+         "attribute": [
+            {
+               "default": "",
+               "indexed": "y",
+               "inherit": "public.athlete",
+               "name": "code",
+               "notnull": "y",
+               "shared": "n",
+               "type": "integer(10)",
+               "unique": "y"
+            },
+            {
+               "default": "",
+               "indexed": "n",
+               "inherit": "public.athlete",
+               "name": "name",
+               "notnull": "y",
+               "shared": "n",
+               "type": "character varying(40)",
+               "unique": "n"
+            },
+            {
+               "default": "",
+               "indexed": "n",
+               "inherit": "public.athlete",
+               "name": "gender",
+               "notnull": "n",
+               "shared": "n",
+               "type": "character(1)",
+               "unique": "n"
+            },
+            {
+               "default": "",
+               "indexed": "n",
+               "inherit": "public.athlete",
+               "name": "nation_code",
+               "notnull": "n",
+               "shared": "n",
+               "type": "character(3)",
+               "unique": "n"
+            },
+            {
+               "default": "",
+               "indexed": "n",
+               "inherit": "public.athlete",
+               "name": "event",
+               "notnull": "n",
+               "shared": "n",
+               "type": "character varying(30)",
+               "unique": "n"
+            }
+         ],
+         "classname": "public.athlete",
+         "constraint": [
+            {
+               "attribute": [
+                  "code"
+               ],
+               "name": "pk_athlete_code",
+               "type": "PRIMARY KEY"
+            },
+            {
+               "attribute": [
+                  "code"
+               ],
+               "name": "n_athlete_code",
+               "type": "NOT NULL"
+            },
+            {
+               "attribute": [
+                  "name"
+               ],
+               "name": "n_athlete_name",
+               "type": "NOT NULL"
+            }
+         ],
+         "dbname": "demodb",
+         "owner": "PUBLIC",
+         "type": "user",
+         "virtual": "normal"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "class"
+}

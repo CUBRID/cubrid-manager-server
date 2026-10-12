@@ -1,0 +1,38 @@
+{
+   "dblist": [
+      {
+         "dbs": [
+            {
+               "dbname": "demodb"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getdbmtuserinfo",
+   "userlist": [
+      {
+         "user": [
+            {
+               "@id": "admin",
+               "@passwd": "admin",
+               "casauth": "admin",
+               "dbauth": [
+                  {
+                     "auth_info": [
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "localhost,33000",
+                           "dbname": "demodb"
+                        }
+                     ]
+                  }
+               ],
+               "dbcreate": "admin",
+               "statusmonitorauth": "admin"
+            }
+         ]
+      }
+   ]
+}

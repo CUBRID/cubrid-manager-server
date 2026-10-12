@@ -8,6 +8,15 @@ Add a trigger.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| dbname | database name |
+| triggername | the name of the trigger |
+| conditiontime | BEFORE, AFTER or DEFERRED |
+| eventtype | the event which fires the trigger, such as `STATEMENT UPDATE` |
+| eventtarget | the target of the event, in the `<table>(<column>)` form |
+| condition | the condition of the trigger |
+| action | the action of the trigger, such as REJECT, INVALIDATE TRANSACTION or PRINT |
+| status | ACTIVE or INACTIVE |
+| priority | the priority of the trigger |
 
 ## Request Sample
 
@@ -32,14 +41,16 @@ Add a trigger.
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| status | execution result, success or failed. |
+| status | execution result, success or failed. Not the trigger status of the request, which happens to share the key name |
 | note | if failed, a brief description will be given here |
+| dbname | database name |
 
 ## Response Sample
 
 ```
 {
-   "__EXEC_TIME" : "72 ms",
+   "__EXEC_TIME" : "47 ms",
+   "dbname" : "demodb",
    "note" : "none",
    "status" : "success",
    "task" : "addtrigger"

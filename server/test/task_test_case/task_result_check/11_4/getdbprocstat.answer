@@ -1,0 +1,14 @@
+{
+   "dbstat": [
+      {
+         "cpu_kernel": "<volatile>",
+         "cpu_user": "<volatile>",
+         "dbname": "demodb",
+         "mem_physical": "<volatile>",
+         "mem_virtual": "<volatile>"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getdbprocstat"
+}

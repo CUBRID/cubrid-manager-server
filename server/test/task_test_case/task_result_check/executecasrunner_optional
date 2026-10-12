@@ -1,0 +1,13 @@
+{"task":"executecasrunner",
+"token":"",
+"dbname":"demodb",
+"brokername":"query_editor",
+"username":"dba",
+"passwd":"",
+"num_thread":"1",
+"repeat_count":"1",
+"executelogfile":"yes",
+"logfile":"$CUBRID/tmp/test_analyzecaslog.sql.log",
+"logstring":[],
+"show_queryresult":"yes",
+"show_queryplan":"yes"}

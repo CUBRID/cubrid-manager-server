@@ -1,0 +1,120 @@
+{
+   "dbinfo": [
+      {
+         "free_size": "<volatile>",
+         "purpose": "PERMANENT",
+         "total_size": "20480",
+         "type": "PERMANENT",
+         "used_size": "4480",
+         "volume_count": "3"
+      },
+      {
+         "free_size": "<volatile>",
+         "purpose": "TEMPORARY",
+         "total_size": "0",
+         "type": "PERMANENT",
+         "used_size": "0",
+         "volume_count": "0"
+      },
+      {
+         "free_size": "<volatile>",
+         "purpose": "TEMPORARY",
+         "total_size": "0",
+         "type": "TEMPORARY",
+         "used_size": "0",
+         "volume_count": "0"
+      }
+   ],
+   "dbname": "alatestdb",
+   "fileinfo": [
+      {
+         "data_type": "INDEX",
+         "file_count": "25",
+         "file_table_size": "25",
+         "reserved_size": "1533",
+         "total_size": "1600",
+         "used_size": "42"
+      },
+      {
+         "data_type": "HEAP",
+         "file_count": "33",
+         "file_table_size": "33",
+         "reserved_size": "1934",
+         "total_size": "2112",
+         "used_size": "145"
+      },
+      {
+         "data_type": "SYSTEM",
+         "file_count": "8",
+         "file_table_size": "8",
+         "reserved_size": "477",
+         "total_size": "576",
+         "used_size": "91"
+      },
+      {
+         "data_type": "TEMP",
+         "file_count": "0",
+         "file_table_size": "0",
+         "reserved_size": "0",
+         "total_size": "0",
+         "used_size": "0"
+      }
+   ],
+   "freespace": "<volatile>",
+   "logpagesize": "4096",
+   "note": "none",
+   "pagesize": "4096",
+   "spaceinfo": [
+      {
+         "date": "20260827",
+         "freepage": "7936",
+         "location": "$CUBRID_DATABASES/alatestdb/alatestdb",
+         "purpose": "PERMANENT",
+         "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb",
+         "totalpage": "12288",
+         "type": "PERMANENT",
+         "usedpage": "4352",
+         "volid": "0"
+      },
+      {
+         "date": "20260827",
+         "freepage": "4032",
+         "location": "$CUBRID_DATABASES/alatestdb/alatestdb_data_x001",
+         "purpose": "PERMANENT",
+         "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb_data_x001",
+         "totalpage": "4096",
+         "type": "PERMANENT",
+         "usedpage": "64",
+         "volid": "1"
+      },
+      {
+         "date": "20260827",
+         "freepage": "4032",
+         "location": "$CUBRID_DATABASES/alatestdb/alatestdb_x002",
+         "purpose": "PERMANENT",
+         "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb_x002",
+         "totalpage": "4096",
+         "type": "PERMANENT",
+         "usedpage": "64",
+         "volid": "2"
+      },
+      {
+         "date": "20260827",
+         "freepage": " ",
+         "location": "$CUBRID_DATABASES/alatestdb",
+         "spacename": "alatestdb_lgat",
+         "totalpage": "10240",
+         "type": "Active_log"
+      },
+      {
+         "date": "20260827",
+         "freepage": " ",
+         "location": "$CUBRID_DATABASES/alatestdb",
+         "spacename": "alatestdb_lgar_t",
+         "totalpage": "10240",
+         "type": "Archive_log"
+      }
+   ],
+   "status": "success",
+   "task": "dbspaceinfo"
+}

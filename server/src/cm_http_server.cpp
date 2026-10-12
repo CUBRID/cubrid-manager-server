@@ -104,9 +104,9 @@ static const char *guess_content_type (const char *path)
   for (ent = &content_type_table[0]; ent->extension; ++ent)
     {
       if (!evutil_ascii_strcasecmp (ent->extension, extension))
-        {
-          return ent->content_type;
-        }
+	{
+	  return ent->content_type;
+	}
     }
 
   return "application/misc";
@@ -138,269 +138,6 @@ int isDirectory (char *path)
 #endif
 
 /**
- * @brief load_webfiles_cb
- * This callback gets invoked when we get any http request that doesn't match
- * any other callback.  Like any evhttp server callback, it has a simple job:
- * it must eventually call evhttp_send_error() or evhttp_send_reply().
- * It is a real http server,if want add SSL connection. must be called after:
- * create_sslconn_cb and init_SSL
- * @param req
- * http reuqest
- * See also: struct evhttp_request
- * @param arg
- * The path or the files that need to be called.
- * @return
- */
-void load_webfiles_cb (struct evhttp_request *req, void *arg)
-{
-  struct evbuffer *evb       = NULL;
-  const char *docroot        = (char *)arg;
-  const char *uri            = NULL;
-  struct evhttp_uri *decoded = NULL;
-  const char *path           = NULL;
-  const char *default_path   = "/index.html";
-  char *decoded_path         = NULL;
-  char *whole_path           = NULL;
-  size_t len;
-  int fd                     = -1;
-  struct stat st;
-  int disable_directrory_listing = 1;
-  const char *get_query      = NULL;
-  const char *type           = "application/misc";
-
-#ifdef WINDOWS
-  WIN32_FIND_DATA FileData;
-  HANDLE handle;
-#endif
-
-  /* This is be debug print */
-  struct evkeyvalq *headers   = NULL;
-  struct evkeyval *header     = NULL;
-
-  if (sco.iSupportWebManager == FALSE)
-    {
-      web_error_404 (req);
-      LOG_WARN ("-- Web server: Not config support_web_manager");
-      goto done;
-    }
-
-  headers = evhttp_request_get_input_headers (req);
-  for (header = headers->tqh_first; header;
-       header = header->next.tqe_next)
-    {
-      if (string (header->key).compare ("User-Agent") == 0)
-        {
-          userAgent = header->value;
-        }
-    }
-
-  /* Decode the URI */
-  uri     = evhttp_request_get_uri (req);
-  decoded = evhttp_uri_parse (uri);
-  if (!decoded)
-    {
-      evhttp_send_error (req, HTTP_BADREQUEST, 0);
-      LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-      return;
-    }
-
-  get_query = evhttp_uri_get_query (decoded);
-  /* Basic path routing. */
-  path = evhttp_uri_get_path (decoded);
-
-  if (!path)
-    {
-      path = default_path;
-    }
-  if (strcmp (path, "/") == 0)
-    {
-      path = default_path;
-    }
-  /* We need to decode it, to see what path the user really wanted. */
-  decoded_path = evhttp_uridecode (path, 0, NULL);
-
-  if (decoded_path == NULL)
-    {
-      http_error_404 (req, fd);
-      LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-      goto done;
-    }
-
-  /* Don't allow any ".."s in the path, to avoid exposing stuff outside
-   * of the docroot.  This test is both overzealous and underzealous:
-   * it forbids aceptable paths like "/this/one..here", but it doesn't
-   * do anything to prevent symlink following."
-   */
-  if (strstr (decoded_path, ".."))
-    {
-      http_error_404 (req, fd);
-      goto done;
-    }
-
-  len = strlen (decoded_path) + strlen (docroot) + 2;
-
-  if (! (whole_path = (char *)malloc (len)))
-    {
-      http_error_404 (req, fd);
-      LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-      goto done;
-    }
-  evutil_snprintf (whole_path, len, "%s%s", docroot, decoded_path);
-  if (stat (whole_path, &st) < 0 )
-    {
-      http_error_404 (req, fd);
-      LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-      goto done;
-    }
-
-  /* This holds the content we're sending. */
-  evb = evbuffer_new ();
-#ifdef WINDOWS
-  const char *name = "unknown";
-  handle = FindFirstFile (whole_path, &FileData);
-  if (handle == INVALID_HANDLE_VALUE)
-    {
-      goto done;
-    }
-
-  if (isDirectory (whole_path))
-    {
-      const char *trailing_slash = "";
-      if (!strlen (path) || path[strlen (path)-1] != '/')
-        {
-          trailing_slash = "/";
-        }
-
-      evbuffer_add_printf (evb, "<html>\n <head>\n"
-                           "  <title>%s</title>\n"
-                           "  <base href='%s%s%s'>\n"
-                           " </head>\n"
-                           " <body>\n"
-                           "  <h1>%s</h1>\n"
-                           "  <ul>\n",
-                           decoded_path, /* XXX html-escape this. */
-                           uri_root, path, /* XXX html-escape this? */
-                           trailing_slash,
-                           decoded_path /* XXX html-escape this */);
-
-      while (FindNextFile (handle, &FileData))
-        {
-          name = FileData.cFileName;
-          evbuffer_add_printf (evb,
-                               "    <li><a href=\"%s\">%s</a>\n",
-                               name, name);/* XXX escape this */
-        }
-      FindClose (handle);
-      evbuffer_add_printf (evb, "</ul></body></html>\n");
-      evhttp_add_header (evhttp_request_get_output_headers (req),
-                         "Content-Type", "text/html");
-    }
-#else
-  // directory listing security
-  if (S_ISDIR (st.st_mode) && disable_directrory_listing)
-    {
-      http_error_404 (req, fd);
-      LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-      goto done;
-    }
-
-  if (S_ISDIR (st.st_mode))
-    {
-      /* If it's a directory, read the comments and make a little
-       * index page
-       */
-      DIR *d;
-      struct dirent *ent;
-      const char *trailing_slash = "";
-      if (!strlen (path) || path[strlen (path)-1] != '/')
-        {
-          trailing_slash = "/";
-        }
-
-      if (! (d = opendir (whole_path)))
-        {
-          http_error_404 (req, fd);
-          LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-          goto done;
-        }
-
-      evbuffer_add_printf (evb, "<html>\n <head>\n"
-                           "  <title>%s</title>\n"
-                           "  <base href='%s%s%s'>\n"
-                           " </head>\n"
-                           " <body>\n"
-                           "  <h1>%s</h1>\n"
-                           "  <ul>\n",
-                           decoded_path, /* XXX html-escape this. */
-                           uri_root, path, /* XXX html-escape this? */
-                           trailing_slash,
-                           decoded_path /* XXX html-escape this */);
-
-      while ((ent = readdir (d)))
-        {
-          const char *name = ent->d_name;
-          evbuffer_add_printf (evb,
-                               "    <li><a href=\"%s\">%s</a>\n",
-                               name, name);/* XXX escape this */
-        }
-      evbuffer_add_printf (evb, "</ul></body></html>\n");
-      closedir (d);
-      evhttp_add_header (evhttp_request_get_output_headers (req),
-                         "Content-Type", "text/html");
-    }
-#endif
-  else
-    {
-      /* Otherwise it's a file; add it to the buffer to get
-       * sent via sendfile
-       */
-      type = guess_content_type (decoded_path);
-      /* O_BINARY is used to open the files that
-       * contains unicode. otherwise,open files will be failed.
-       */
-      if ((fd = open (whole_path, O_RDONLY|O_BINARY)) < 0)
-        {
-          http_error_404 (req, fd);
-          LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-          goto done;
-        }
-
-      if (fstat (fd, &st) < 0)
-        {
-          /* Make sure the length still matches, now that we
-           * opened the file :/
-           */
-          http_error_404 (req, fd);
-          LOG_WARN ("-- %s -- %s -- Web server: bad request for [%s]", req->remote_host, userAgent, uri);
-          goto done;
-        }
-      evhttp_add_header (evhttp_request_get_output_headers (req),
-                         "Content-Type", type);
-      evbuffer_add_file (evb, fd, 0, st.st_size);
-    }
-
-  evhttp_send_reply (req, 200, "OK", evb);
-
-done:
-  if (decoded)
-    {
-      evhttp_uri_free (decoded);
-    }
-  if (decoded_path)
-    {
-      free (decoded_path);
-    }
-  if (whole_path)
-    {
-      free (whole_path);
-    }
-  if (evb)
-    {
-      evbuffer_free (evb);
-    }
-}
-
-/**
  * @brief create_sslconn_cb
  * This callback is responsible for creating a new SSL connection
  * and wrapping it in an OpenSSL bufferevent.  This is the way
@@ -418,17 +155,17 @@ struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg)
   SSL_CTX *ctx = (SSL_CTX *) arg;
 
   r = bufferevent_openssl_socket_new (base,
-                                      -1,
-                                      SSL_new (ctx),
-                                      BUFFEREVENT_SSL_ACCEPTING,
-                                      BEV_OPT_CLOSE_ON_FREE);
+				      -1,
+				      SSL_new (ctx),
+				      BUFFEREVENT_SSL_ACCEPTING,
+				      BEV_OPT_CLOSE_ON_FREE);
   if (r == NULL)
     {
       LOG_ERROR ("-- Web server: Failed to create SSL connection.");
       return NULL;
     }
 
-  bufferevent_openssl_set_allow_dirty_shutdown(r, 1);
+  bufferevent_openssl_set_allow_dirty_shutdown (r, 1);
   return r;
 }
 
@@ -444,8 +181,8 @@ struct bufferevent *create_sslconn_cb (struct event_base *base, void *arg)
  * @return
  */
 static void server_setup_certs (SSL_CTX *ctx,
-                                const char *certificate_chain,
-                                const char *private_key)
+				const char *certificate_chain,
+				const char *private_key)
 {
   if (1 != SSL_CTX_use_certificate_chain_file (ctx, certificate_chain))
     {
@@ -550,9 +287,9 @@ void thread_cleanup_SSL (void)
       total_locks = CRYPTO_num_locks ();
 
       for (i = 0; i < total_locks; i++)
-        {
-          MUTEX_DESTROY (lock_array[i]);
-        }
+	{
+	  MUTEX_DESTROY (lock_array[i]);
+	}
 
       OPENSSL_free (lock_array);
       lock_array = NULL;
@@ -585,10 +322,10 @@ SSL_CTX *init_SSL (const char *certificate_chain,const char *private_key)
       return NULL;
     }
   SSL_CTX_set_options (ctx,
-                       SSL_OP_SINGLE_DH_USE |
-                       SSL_OP_SINGLE_ECDH_USE |
+		       SSL_OP_SINGLE_DH_USE |
+		       SSL_OP_SINGLE_ECDH_USE |
 		       SSL_OP_NO_SSLv3 |
-                       SSL_OP_NO_SSLv2);
+		       SSL_OP_NO_SSLv2);
 
   if (SSL_CTX_set_min_proto_version (ctx, TLS1_2_VERSION) != 1)    /* we don't want support TLSv1.0, TLSv1.1 */
     {

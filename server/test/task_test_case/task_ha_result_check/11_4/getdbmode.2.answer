@@ -1,0 +1,12 @@
+{
+   "dbserver": [
+      {
+         "dbname": "test",
+         "server_mode": "active",
+         "server_msg": "none"
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "getdbmode"
+}

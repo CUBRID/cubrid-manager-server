@@ -8,6 +8,7 @@ The deletebroker interface deletes a specified database broker.
 | --- | --- |
 | task | task name |
 | token | token string encrypted. |
+| bname | the name of the broker to be deleted |
 
 ## Request Sample
 

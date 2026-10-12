@@ -1,0 +1,53 @@
+{
+   "dblist": [
+      {
+         "dbs": [
+            {
+               "dbname": "destinationdb"
+            },
+            {
+               "dbname": "alatestdb"
+            },
+            {
+               "dbname": "demodb"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "deletedbmtuser",
+   "userlist": [
+      {
+         "user": [
+            {
+               "@id": "admin",
+               "casauth": "admin",
+               "dbauth": [
+                  {
+                     "auth_info": [
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "",
+                           "dbname": "destinationdb"
+                        },
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "",
+                           "dbname": "alatestdb"
+                        },
+                        {
+                           "@dbid": "dba",
+                           "dbbrokeraddress": "localhost,33000",
+                           "dbname": "demodb"
+                        }
+                     ]
+                  }
+               ],
+               "dbcreate": "admin",
+               "statusmonitorauth": "admin"
+            }
+         ]
+      }
+   ]
+}

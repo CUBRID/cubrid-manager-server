@@ -22,3 +22,23 @@ Get the top result from a CAS log analysis file.
   "qindex": "[Q14]"
 }
 ```
+
+## Response JSON Syntax
+
+| **Key** | **Description** |
+| --- | --- |
+| task | task name |
+| status | execution result, success or failed. |
+| note | if failed, a brief description will be given here |
+| logstringlist | the lines of the requested query of the analysis result file |
+
+## Response Sample
+
+```
+{
+   "__EXEC_TIME" : "0 ms",
+   "note" : "none",
+   "status" : "success",
+   "task" : "getcaslogtopresult"
+}
+```

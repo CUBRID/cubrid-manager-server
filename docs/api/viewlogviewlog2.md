@@ -25,6 +25,8 @@ View specified log file.
 }
 ```
 
+`viewlog2` takes the same request and answers the same way.
+
 ## Response JSON Syntax
 
 | **Key** | **Description** |
@@ -32,8 +34,11 @@ View specified log file.
 | task | task name |
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
-| line | the content of log file |
-| log | log file list |
+| path | the full path of the log file that was read |
+| start | the first line number that was returned |
+| end | the last line number that was requested |
+| total | the number of lines the file has |
+| log | one entry holding a `line` array, one string per log line |
 
 ## Response Sample
 
@@ -81,3 +86,6 @@ View specified log file.
    "total" : "27"
 }
 ```
+
+> Lists are shortened to 3 entries here; the real response returned 1000
+> lines (`end` - `start` + 1, capped at what the file has).

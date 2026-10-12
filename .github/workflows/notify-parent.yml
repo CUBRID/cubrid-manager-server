@@ -1,0 +1,39 @@
+name: Notify parent (submodule bump)
+
+on:
+  push:
+    branches: [develop]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: ${{ github.event.head_commit != null }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SUBMODULE_BOT_APP_ID }}
+          private-key: ${{ secrets.SUBMODULE_BOT_APP_PRIVATE_KEY }}
+          owner: CUBRID
+          repositories: cubrid
+
+      - name: Dispatch submodule-bump to CUBRID/cubrid
+        env:
+          GH_TOKEN:   ${{ steps.app-token.outputs.token }}
+          SUB_PATH:   cubridmanager   # parent-side submodule path (this repo is cubrid-manager-server)
+          SHA:        ${{ github.sha }}
+          PUSHER:     ${{ github.actor }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          TITLE=${COMMIT_MSG%%$'\n'*}
+          PAYLOAD=$(jq -n --arg p "$SUB_PATH" --arg s "$SHA" --arg m "$TITLE" --arg u "$PUSHER" \
+            '{event_type:"submodule-bump",client_payload:{submodule_path:$p,sha:$s,commit_message:$m,pusher:$u}}')
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/CUBRID/cubrid/dispatches \
+            -d "$PAYLOAD"

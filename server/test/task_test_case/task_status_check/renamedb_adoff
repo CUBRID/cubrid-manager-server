@@ -1,0 +1,8 @@
+{"task":"renamedb",
+"token":"",
+"dbname":"destinationdb",
+"rename":"anotherdb",
+"exvolpath":"/root/testpass",
+"advanced":"off",
+"forcedel":"y",
+"volume":[{"$CUBRID_DATABASES/destinationdb/destinationdb": "$CUBRID_DATABASES/anotherdb/anotherdb"}]}

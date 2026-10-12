@@ -1,0 +1,12 @@
+{
+   "commit_counter": "136425",
+   "dbname": "test",
+   "delay_time": "941",
+   "delete_counter": "0",
+   "fail_counter": "0",
+   "insert_counter": "0",
+   "note": "none",
+   "status": "success",
+   "task": "getstandbyserverstat",
+   "update_counter": "0"
+}

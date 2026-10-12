@@ -1,0 +1,39 @@
+{
+   "lockinfo": [
+      {
+         "dinterval": "1.00",
+         "esc": "100000",
+         "lot": [
+            {
+               "maxnumlock": "-1",
+               "numallocated": "1000",
+               "numlocked": "0",
+               "sizelock": "242K"
+            }
+         ],
+         "transaction": [
+            {
+               "@uid": "",
+               "host": "",
+               "index": "0",
+               "isolevel": "COMMITTED READ",
+               "pid": "<volatile>",
+               "pname": "",
+               "timeout": ":"
+            },
+            {
+               "@uid": "DBA",
+               "host": "$HOSTNAME",
+               "index": "1",
+               "isolevel": "COMMITTED READ",
+               "pid": "<volatile>",
+               "pname": "lockdb",
+               "timeout": ":"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "lockdb"
+}

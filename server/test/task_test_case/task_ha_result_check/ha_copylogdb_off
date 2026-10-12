@@ -1,0 +1,5 @@
+{"task":"ha_copylogdb",
+"token":"",
+"dbname":"test",
+"on_off":"off",
+"peer_node":"ha-test-81"}

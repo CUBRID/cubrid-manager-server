@@ -1,0 +1,28 @@
+{
+   "note": "none",
+   "resultfile": "$CUBRID/tmp/analyzelog_res_<tmpid>",
+   "resultlist": [
+      {
+         "result": [
+            {
+               "avg": "0.133",
+               "cnt": "1",
+               "err": "0",
+               "max": "0.133",
+               "min": "0.133",
+               "qindex": "[Q1]"
+            },
+            {
+               "avg": "0.047",
+               "cnt": "1",
+               "err": "0",
+               "max": "0.047",
+               "min": "0.047",
+               "qindex": "[Q2]"
+            }
+         ]
+      }
+   ],
+   "status": "success",
+   "task": "analyzecaslog"
+}

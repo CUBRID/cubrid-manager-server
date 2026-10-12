@@ -15,6 +15,7 @@ Copy database.
 | overwrite | on-off indicating whether to replace existing database |
 | move | on-off indicating whether to remove existing database |
 | advanced | on-off indicating whether to offer local control files |
+| destdbpath | the directory the database volumes of the new database are created in |
 | async | default "no", if "yes" run the task in asynchronous mode |
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api

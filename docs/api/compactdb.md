@@ -49,12 +49,26 @@ Compact database.
 | task | task name |
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
+| log | the output of the compactdb utility |
+
+### log
+
+log is composed of objects with following structure
+
+| **Key** | **Description** |
+| --- | --- |
+| line | a line of the compactdb output |
 
 ## Response Sample
 
 ```
 {
-   "__EXEC_TIME" : "320 ms",
+   "__EXEC_TIME" : "728 ms",
+   "log" : [
+      {
+         "line" : [ "", "Pass 1", "" ]
+      }
+   ],
    "note" : "none",
    "status" : "success",
    "task" : "compactdb"
@@ -80,3 +94,5 @@ Compact database.
    "task" : "compactdb"
 }
 ```
+
+> Lists are shortened to 3 entries here.

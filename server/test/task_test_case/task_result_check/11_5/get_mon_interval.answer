@@ -1,0 +1,6 @@
+{
+   "interval": 60,
+   "note": "none",
+   "status": "success",
+   "task": "get_mon_interval"
+}

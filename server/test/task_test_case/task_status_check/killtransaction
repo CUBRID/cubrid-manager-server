@@ -1,0 +1,5 @@
+{"task":"killtransaction",
+"token":"",
+"dbname":"demodb",
+"type":"i",
+"parameter":"$TEST_TRANINDEX"}

@@ -1,0 +1,32 @@
+{
+   "activelist": [
+      {
+         "active": [
+            {
+               "dbname": "demodb"
+            }
+         ]
+      }
+   ],
+   "dblist": [
+      {
+         "dbs": [
+            {
+               "dbdir": "$CUBRID_DATABASES/destinationdb",
+               "dbname": "destinationdb"
+            },
+            {
+               "dbdir": "$CUBRID_DATABASES/alatestdb",
+               "dbname": "alatestdb"
+            },
+            {
+               "dbdir": "$CUBRID_DATABASES/demodb",
+               "dbname": "demodb"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "startinfo"
+}

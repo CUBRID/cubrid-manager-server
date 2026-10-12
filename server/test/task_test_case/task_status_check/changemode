@@ -1,0 +1,5 @@
+{"task":"changemode",
+"token":"",
+"dbname":"demodb",
+"modify":"active",
+"force":"y"}

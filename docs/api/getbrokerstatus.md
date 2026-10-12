@@ -28,7 +28,9 @@ Get broker status.
 | status | execution result, success or failed. |
 | note | if failed, a brief description will be given here |
 | bname | broker name |
+| time | the time the status was collected |
 | asinfo | cas' information |
+| as_c | the number of the current connections of the cas |
 | as_id | cas id |
 | as_pid | cas process id |
 | as_psize | cas process virtual memory size |
@@ -36,6 +38,7 @@ Get broker status.
 | as_cpu | cpu usage of cas process |
 | as_ctime | ctime of cas process |
 | as_lat | the last access time of cas process |
+| as_lct | the last connect time of the cas |
 | as_client_ip | client ip address |
 | as_cur | N/A |
 | as_dbhost | server host name |
@@ -45,6 +48,20 @@ Get broker status.
 | as_long_tran | the number of complicated transactions |
 | as_num_query | the number of queries |
 | as_num_tran | the number of transactions |
+| as_port | the port of the application server. It is returned on Windows only |
+| jobinfo | the list of the jobs waiting in the queue of the broker. It is returned only when the queue is not empty |
+
+### jobinfo
+
+jobinfo is composed of objects with following structure
+
+| **Key** | **Description** |
+| --- | --- |
+| job_id | the id of the job |
+| job_priority | the priority of the job |
+| job_ip | the client ip address of the job |
+| job_time | the time the job was received |
+| job_request | the request of the job |
 
 ## Response Sample
 

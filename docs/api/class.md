@@ -47,33 +47,45 @@ The class interface will get summary database class information.
 
 ```json
 {
-   "__EXEC_TIME" : "116 ms",
+   "__EXEC_TIME" : "29 ms",
    "classinfo" : [
       {
          "attribute" : [
             {
                "default" : "",
-               "indexed" : "n",
-               "inherit" : "table1",
-               "name" : "string1",
-               "notnull" : "n",
+               "indexed" : "y",
+               "inherit" : "public.athlete",
+               "name" : "code",
+               "notnull" : "y",
                "shared" : "n",
-               "type" : "character varying(40960)",
-               "unique" : "n"
+               "type" : "integer(10)",
+               "unique" : "y"
             },
             {
                "default" : "",
                "indexed" : "n",
-               "inherit" : "table1",
-               "name" : "string2",
-               "notnull" : "n",
+               "inherit" : "public.athlete",
+               "name" : "name",
+               "notnull" : "y",
                "shared" : "n",
-               "type" : "character varying(40960)",
+               "type" : "character varying(40)",
                "unique" : "n"
             }
          ],
-         "classname" : "table1",
-         "dbname" : "testdb",
+         "classname" : "public.athlete",
+         "constraint" : [
+            {
+               "attribute" : [ "code" ],
+               "name" : "pk_athlete_code",
+               "type" : "PRIMARY KEY"
+            },
+            {
+               "attribute" : [ "code" ],
+               "name" : "n_athlete_code",
+               "type" : "NOT NULL"
+            }
+         ],
+         "dbname" : "demodb",
          "owner" : "PUBLIC",
          "type" : "user",
          "virtual" : "normal"
@@ -84,3 +96,5 @@ The class interface will get summary database class information.
    "task" : "class"
 }
 ```
+
+> Lists are shortened to 2 entries here.

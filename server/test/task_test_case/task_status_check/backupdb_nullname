@@ -1,0 +1,10 @@
+{"task":"backupdb",
+"token":"",
+"level":"0",
+"volname":"alatestdb_backup_lv0",
+"backupdir":"$CUBRID_DATABASES/alatestdb/backup",
+"removelog":"n",
+"check":"y",
+"mt":"0",
+"zip":"y",
+"safereplication":"n"}

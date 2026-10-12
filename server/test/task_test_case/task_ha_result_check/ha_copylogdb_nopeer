@@ -1,0 +1,4 @@
+{"task":"ha_copylogdb",
+"token":"",
+"dbname":"test",
+"on_off":"on"}

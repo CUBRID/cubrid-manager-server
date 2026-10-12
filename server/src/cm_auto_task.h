@@ -41,7 +41,7 @@ int ts_validate_user (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_server_version (nvplist *req, nvplist *res);
 int ts_check_client_version (nvplist *req, nvplist *res);
 int ts_check_already_connected (nvplist *cli_response, int max_index,
-                                int current_index,
-                                T_CLIENT_INFO *client_info);
+				int current_index,
+				T_CLIENT_INFO *client_info);
 
 #endif /* _CM_AUTO_TASK_H_ */
