@@ -342,7 +342,9 @@ getdbsize_async,sync
   찍히고, 결과와 상세 XML에는 최종 응답만 남는다
 - `uuid`는 받은 문자열 그대로 보낸다. 19자리까지 가능해 double로 바꾸면 값이 깨진다
 - 따라간 작업의 `uuid`는 `$LAST_ASYNC_UUID`에 남는다. 다음 케이스가 끝난 작업을 다시
-  조회할 때 쓴다 (`gettaskstatus_done`)
+  조회할 때 쓴다 (`gettaskstatus_done`, `gettaskstatus_failed`). `gettaskstatus_failed`는
+  `startdb_async_fail`이 실제로 async 작업으로 실행됐는지도 확인한다. 동기로 실패했다면 이 값이
+  그 전 `checkdb_async`의 성공한 작업을 가리키므로 `,failure` 기대와 어긋나 실패한다
 - `-fc`에서는 `uuid`를 `VOLATILE_KEYS`로 가린다
 - `--dump`도 즉시 응답 다음에 최종 응답을 출력한다
 

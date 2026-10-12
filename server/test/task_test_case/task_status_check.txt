@@ -57,6 +57,10 @@ checkdb_async
 // the finished job of checkdb_async, looked up again by its uuid
 gettaskstatus_done
 startdb_async_fail,failure
+// the failed job of startdb_async_fail, looked up again by its uuid. If startdb
+// ignored "async" and failed synchronously, $LAST_ASYNC_UUID still holds the job
+// of checkdb_async, which succeeded, so this case fails as it should.
+gettaskstatus_failed,failure
 // "async" on a task that does not support it is ignored: plain synchronous run
 getdbsize_async,sync
 gettaskstatus_nouuid,failure
