@@ -379,9 +379,6 @@ void write_manager_access_log (const char *protocol_str, const char *msg);
 void write_manager_error_log (const char *protocol_str, const char *msg);
 
 bool ut_child_exited_ok (int exit_code);
-#if defined (ENABLE_UNUSED_FUNCTION)
-int ut_validate_auth (nvplist *req);
-#endif
 
 bool is_valid_filename (const char *filename);
 bool is_invalid_filename (const char *filename);
@@ -399,5 +396,4 @@ bool is_pid_dir (const std::string &name);
 bool get_proc_uid (const std::string &pid, uid_t &uid);
 bool get_proc_comm (const std::string &pid, std::string &comm);
 #endif
-bool setenv_using_putenv_fmt (const std::string &nameValue, int overwrite = 1);
 #endif                /* _CM_SERVER_UTIL_H_ */
