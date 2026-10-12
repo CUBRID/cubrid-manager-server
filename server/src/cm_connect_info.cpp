@@ -42,7 +42,7 @@ int
 dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 {
   FILE *infile;
-  int lfd, retval;
+  int retval;
   int get_len, buf_len;
   char *strbuf;
   char sbuf[512];
@@ -50,10 +50,16 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 
   /* check if ip is an existing ip */
   retval = 0;
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
-      return ERR_TMPFILE_OPEN_FAIL;
+      /*
+       * This function has no way to report a message and its normal
+       * return domain is {0, 1} (not found/found), not an ERR_* code, so
+       * a lock failure is reported the same way an unreadable conlist
+       * already is below
+       */
+      return retval;
     }
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
@@ -62,42 +68,41 @@ dbmt_con_search (const char *ip, const char *port, char *cli_ver)
       strbuf = NULL;
       buf_len = get_len = 0;
       while ((get_len = ut_getline (&strbuf, &buf_len, infile)) != -1)
-	{
-	  /* remove character '\n' */
-	  strbuf[strlen (strbuf) - 1] = '\0';
+        {
+          /* remove character '\n' */
+          strbuf[strlen (strbuf) - 1] = '\0';
 
-	  if (sscanf (strbuf, "%19s %9s", ip_t, port_t) == 2
-	      && uStringEqual (ip, ip_t) && uStringEqual (port, port_t))
-	    {
-	      retval = 1;
-	      sscanf (strbuf, "%*s %*s %*s %*s %14s", cli_ver);
-	      break;
-	    }
-	  FREE_MEM (strbuf);
-	  buf_len = 0;
-	}
+          if (sscanf (strbuf, "%19s %9s", ip_t, port_t) == 2
+              && uStringEqual (ip, ip_t) && uStringEqual (port, port_t))
+            {
+              retval = 1;
+              sscanf (strbuf, "%*s %*s %*s %*s %14s", cli_ver);
+              break;
+            }
+          FREE_MEM (strbuf);
+          buf_len = 0;
+        }
       fclose (infile);
 
       if (strbuf != NULL)
-	{
-	  FREE_MEM (strbuf);
-	}
+        {
+          FREE_MEM (strbuf);
+        }
     }
-  uRemoveLockFile (lfd);
 
   return retval;
 }
 
 int
 dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
-	      const char *user_name)
+              const char *user_name)
 {
   FILE *outfile;
   char strbuf[512];
-  int lock_fd, retval;
+  int retval;
 
-  lock_fd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, strbuf));
-  if (lock_fd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       return -1;
     }
@@ -107,12 +112,11 @@ dbmt_con_add (const char *ip, const char *port, const char *cli_ver,
   if (outfile != NULL)
     {
       time_to_str (time (NULL), "%04d/%02d/%02d %02d:%02d:%02d", strbuf,
-		   TIME_STR_FMT_DATE_TIME);
+                   TIME_STR_FMT_DATE_TIME);
       fprintf (outfile, "%s %s %s %s %s\n", ip, port, strbuf, cli_ver, user_name);
       fclose (outfile);
       retval = 0;
     }
-  uRemoveLockFile (lock_fd);
 
   return retval;
 }
@@ -130,30 +134,29 @@ dbmt_con_delete (const char *ip, const char *port)
   FILE *infile, *outfile;
   char tmpfile[PATH_MAX];
   char conn_list_file[512];
-  int lock_fd, retval;
+  int retval;
 
-  lock_fd =
-	  uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, tmpfile));
-  if (lock_fd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       return -1;
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
   infile = fopen (conn_list_file, "r");
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_DELETE, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_DELETE, PATH_MAX);
   outfile = fopen (tmpfile, "w");
 
   if (infile == NULL || outfile == NULL)
     {
       if (infile != NULL)
-	{
-	  fclose (infile);
-	}
+        {
+          fclose (infile);
+        }
       if (outfile != NULL)
-	{
-	  fclose (outfile);
-	}
+        {
+          fclose (outfile);
+        }
       retval = -1;
     }
   else
@@ -161,48 +164,47 @@ dbmt_con_delete (const char *ip, const char *port)
       strbuf = NULL;
       buf_len = get_len = 0;
       while ((get_len = ut_getline (&strbuf, &buf_len, infile)) != -1)
-	{
-	  ut_trim (strbuf);
-	  sscanf (strbuf, "%19s %9s %15s %15s %15s", ip_t, port_t, c_date,
-		  c_time, version);
+        {
+          ut_trim (strbuf);
+          sscanf (strbuf, "%19s %9s %15s %15s %15s", ip_t, port_t, c_date,
+                  c_time, version);
 
-	  if (!uStringEqual (ip, ip_t) || !uStringEqual (port, port_t))
-	    {
-	      fprintf (outfile, "%s\n", strbuf);
-	    }
-	  FREE_MEM (strbuf);
-	  buf_len = 0;
-	}
+          if (!uStringEqual (ip, ip_t) || !uStringEqual (port, port_t))
+            {
+              fprintf (outfile, "%s\n", strbuf);
+            }
+          FREE_MEM (strbuf);
+          buf_len = 0;
+        }
       fclose (outfile);
       fclose (infile);
 
       if (strbuf != NULL)
-	{
-	  FREE_MEM (strbuf);
-	}
+        {
+          FREE_MEM (strbuf);
+        }
 
       move_file (tmpfile, conn_list_file);
       retval = 0;
     }
-  uRemoveLockFile (lock_fd);
 
   return retval;
 }
 
 int
 dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
-		      const char *port, const char *dbname, char *_dbmt_error)
+                      const char *port, const char *dbname, char *_dbmt_error)
 {
   FILE *infile;
-  int lfd, retval = -1;
+  int retval = -1;
   char ip_t[20], port_t[10];
   char *prev, *next, *tok[2];
   char *strbuf = NULL;
   char sbuf[512];
   int buf_len, get_len;
 
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");
       return retval;
@@ -223,74 +225,74 @@ dbmt_con_read_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
       strbuf[strlen (strbuf) - 1] = '\0';
 
       if (sscanf (strbuf, "%19s %9s", ip_t, port_t) == 2 &&
-	  uStringEqual (ip, ip_t) && uStringEqual (port, port_t))
-	{
-	  /* locate dbinfo_list */
-	  int i = 0;
-	  prev = strbuf;
-	  while (*prev != '\0')
-	    {
-	      if (isspace (*prev))
-		{
-		  ++i;
-		}
-	      ++prev;
-	      if (i == 6)
-		{
-		  break;
-		}
-	    }
-	  if (i == 5)
-	    {
-	      strcpy (_dbmt_error, "No db exists now");
-	      retval = 0;
-	      goto con_read_dbinfo_err;
-	    }
-	  else if (i < 5)
-	    {
-	      strcpy (_dbmt_error, "Conlist format error");
-	      goto con_read_dbinfo_err;
-	    }
+          uStringEqual (ip, ip_t) && uStringEqual (port, port_t))
+        {
+          /* locate dbinfo_list */
+          int i = 0;
+          prev = strbuf;
+          while (*prev != '\0')
+            {
+              if (isspace (*prev))
+                {
+                  ++i;
+                }
+              ++prev;
+              if (i == 6)
+                {
+                  break;
+                }
+            }
+          if (i == 5)
+            {
+              strcpy (_dbmt_error, "No db exists now");
+              retval = 0;
+              goto con_read_dbinfo_err;
+            }
+          else if (i < 5)
+            {
+              strcpy (_dbmt_error, "Conlist format error");
+              goto con_read_dbinfo_err;
+            }
 
-	  /* parse every dbinfo */
-	  while (prev != NULL)
-	    {
-	      next = strchr (prev, ';');
-	      if (next != NULL)
-		{
-		  *next = '\0';
-		  next++;
-		}
+          /* parse every dbinfo */
+          while (prev != NULL)
+            {
+              next = strchr (prev, ';');
+              if (next != NULL)
+                {
+                  *next = '\0';
+                  next++;
+                }
 
-	      if (string_tokenize2 (prev, tok, 2, ':') < 0)
-		{
-		  strcpy (_dbmt_error, "Conlist format error");
-		  goto con_read_dbinfo_err;
-		}
+              if (string_tokenize2 (prev, tok, 2, ':') < 0)
+                {
+                  strcpy (_dbmt_error, "Conlist format error");
+                  goto con_read_dbinfo_err;
+                }
 
-	      if (uStringEqual (dbname, tok[0]))
-		{
-		  strcpy_limit (dbinfo->dbname, tok[0],
-				sizeof (dbinfo->dbname));
-		  prev = tok[1];
-		  if (string_tokenize2 (prev, tok, 2, ',') < 0)
-		    {
-		      strcpy (_dbmt_error, "Conlist format error");
-		      goto con_read_dbinfo_err;
-		    }
-		  strcpy_limit (dbinfo->uid, tok[0], sizeof (dbinfo->uid));
-		  strcpy_limit (dbinfo->passwd, tok[1],
-				sizeof (dbinfo->passwd));
+              if (uStringEqual (dbname, tok[0]))
+                {
+                  strcpy_limit (dbinfo->dbname, tok[0],
+                                sizeof (dbinfo->dbname));
+                  prev = tok[1];
+                  if (string_tokenize2 (prev, tok, 2, ',') < 0)
+                    {
+                      strcpy (_dbmt_error, "Conlist format error");
+                      goto con_read_dbinfo_err;
+                    }
+                  strcpy_limit (dbinfo->uid, tok[0], sizeof (dbinfo->uid));
+                  strcpy_limit (dbinfo->passwd, tok[1],
+                                sizeof (dbinfo->passwd));
 
-		  retval = 1;
-		  break;
-		}
+                  retval = 1;
+                  break;
+                }
 
-	      /* parse the next dbinfo */
-	      prev = next;
-	    }
-	  break;
-	}
+              /* parse the next dbinfo */
+              prev = next;
+            }
+          break;
+        }
       FREE_MEM (strbuf);
       buf_len = 0;
     }
@@ -311,18 +313,16 @@ con_read_dbinfo_err:
       FREE_MEM (strbuf);
     }
 
-  uRemoveLockFile (lfd);
-
   return retval;
 }
 
 int
 dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
-		       const char *port, const char *dbname, int creat_flag,
-		       char *_dbmt_error)
+                       const char *port, const char *dbname, int creat_flag,
+                       char *_dbmt_error)
 {
   FILE *infile, *outfile;
-  int lfd, retval = -1;
+  int retval = -1;
   char tmpfile[PATH_MAX], conn_list_file[512];
   char date[15], time[10];
   char *prev, *next, *tok[2];
@@ -333,30 +333,30 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
   T_DBMT_CON_INFO con_info;
   memset (&con_info, 0, sizeof (T_DBMT_CON_INFO));
 
-  lfd = uCreateLockFile (conf_get_dbmt_file (FID_LOCK_CONN_LIST, sbuf));
-  if (lfd < 0)
+  file_resource_guard guard (*cm_conn_list_mutex (), FID_LOCK_CONN_LIST);
+  if (!guard.ok ())
     {
       strcpy (_dbmt_error, "Open conlist.lock fail");
       return retval;
     }
 
   conf_get_dbmt_file (FID_CONN_LIST, conn_list_file);
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_WRITE_DBINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_util", TS_DBMT_CON_WRITE_DBINFO, PATH_MAX);
 
   infile = fopen (conf_get_dbmt_file (FID_CONN_LIST, sbuf), "r");
   outfile = fopen (tmpfile, "w");
   if (infile == NULL || outfile == NULL)
     {
       if (infile != NULL)
-	{
-	  fclose (infile);
-	  infile = NULL;
-	}
+        {
+          fclose (infile);
+          infile = NULL;
+        }
       if (outfile != NULL)
-	{
-	  fclose (outfile);
-	  outfile = NULL;
-	}
+        {
+          fclose (outfile);
+          outfile = NULL;
+        }
 
       strcpy (_dbmt_error, "Open conlist fail");
       goto con_write_dbinfo_err;
@@ -369,146 +369,146 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
       /* remove character '\next' */
       strbuf[strlen (strbuf) - 1] = '\0';
       if (con_info.con_dbinfo != NULL)
-	{
-	  FREE_MEM (con_info.con_dbinfo);
-	}
+        {
+          FREE_MEM (con_info.con_dbinfo);
+        }
       memset (&con_info, 0, sizeof (con_info));
 
       if (sscanf
-	  (strbuf, "%19s %9s %10s %8s %15s %64s", con_info.cli_ip,
-	   con_info.cli_port, date, time, con_info.cli_ver,
-	   con_info.user_name) == 6
-	  && uStringEqual (ip, con_info.cli_ip)
-	  && uStringEqual (port, con_info.cli_port))
-	{
-	  /* locate dbinfo_list */
-	  int i = 0;
-	  T_DBMT_CON_DBINFO tmp_dbinfo;
-	  prev = strbuf;
-	  while (*prev != '\0')
-	    {
-	      if (isspace (*prev))
-		{
-		  ++i;
-		}
-	      ++prev;
-	      if (i == 6)
-		{
-		  break;
-		}
-	    }
-	  if (i < 6 && creat_flag == 0)
-	    {
-	      strcpy (_dbmt_error, "Conlist format error");
-	      goto con_write_dbinfo_err;
-	    }
+          (strbuf, "%19s %9s %10s %8s %15s %64s", con_info.cli_ip,
+           con_info.cli_port, date, time, con_info.cli_ver,
+           con_info.user_name) == 6
+          && uStringEqual (ip, con_info.cli_ip)
+          && uStringEqual (port, con_info.cli_port))
+        {
+          /* locate dbinfo_list */
+          int i = 0;
+          T_DBMT_CON_DBINFO tmp_dbinfo;
+          prev = strbuf;
+          while (*prev != '\0')
+            {
+              if (isspace (*prev))
+                {
+                  ++i;
+                }
+              ++prev;
+              if (i == 6)
+                {
+                  break;
+                }
+            }
+          if (i < 6 && creat_flag == 0)
+            {
+              strcpy (_dbmt_error, "Conlist format error");
+              goto con_write_dbinfo_err;
+            }
 
-	  /* parse every dbinfo */
-	  while (prev != NULL)
-	    {
-	      next = strchr (prev, ';');
-	      if (next != NULL)
-		{
-		  *next = '\0';
-		  next++;
-		}
+          /* parse every dbinfo */
+          while (prev != NULL)
+            {
+              next = strchr (prev, ';');
+              if (next != NULL)
+                {
+                  *next = '\0';
+                  next++;
+                }
 
-	      memset (&tmp_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
+              memset (&tmp_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
 
-	      if (string_tokenize2 (prev, tok, 2, ':') < 0)
-		{
-		  if (creat_flag == 0)
-		    {
-		      strcpy (_dbmt_error, "Conlist format error");
-		      goto con_write_dbinfo_err;
-		    }
-		  else
-		    {
-		      creat_flag = 0;
-		      /* no db exists, add dbinfo */
-		      tmp_dbinfo = *dbinfo;
-		    }
-		}
-	      else
-		{
-		  if (uStringEqual (dbname, tok[0]))
-		    {
-		      /* db exists, update dbinfo */
-		      creat_flag = 0;
-		      tmp_dbinfo = *dbinfo;
-		    }
-		  else
-		    {
-		      /* just record dbinfo */
-		      strcpy_limit (tmp_dbinfo.dbname, tok[0],
-				    sizeof (tmp_dbinfo.dbname) - 1);
-		      prev = tok[1];
-		      if (string_tokenize2 (prev, tok, 2, ',') < 0)
-			{
-			  strcpy (_dbmt_error, "Conlist format error");
-			  goto con_write_dbinfo_err;
-			}
-		      strcpy_limit (tmp_dbinfo.uid, tok[0],
-				    sizeof (tmp_dbinfo.uid));
-		      strcpy_limit (tmp_dbinfo.passwd, tok[1],
-				    sizeof (tmp_dbinfo.passwd));
-		    }
-		}
+              if (string_tokenize2 (prev, tok, 2, ':') < 0)
+                {
+                  if (creat_flag == 0)
+                    {
+                      strcpy (_dbmt_error, "Conlist format error");
+                      goto con_write_dbinfo_err;
+                    }
+                  else
+                    {
+                      creat_flag = 0;
+                      /* no db exists, add dbinfo */
+                      tmp_dbinfo = *dbinfo;
+                    }
+                }
+              else
+                {
+                  if (uStringEqual (dbname, tok[0]))
+                    {
+                      /* db exists, update dbinfo */
+                      creat_flag = 0;
+                      tmp_dbinfo = *dbinfo;
+                    }
+                  else
+                    {
+                      /* just record dbinfo */
+                      strcpy_limit (tmp_dbinfo.dbname, tok[0],
+                                    sizeof (tmp_dbinfo.dbname) - 1);
+                      prev = tok[1];
+                      if (string_tokenize2 (prev, tok, 2, ',') < 0)
+                        {
+                          strcpy (_dbmt_error, "Conlist format error");
+                          goto con_write_dbinfo_err;
+                        }
+                      strcpy_limit (tmp_dbinfo.uid, tok[0],
+                                    sizeof (tmp_dbinfo.uid));
+                      strcpy_limit (tmp_dbinfo.passwd, tok[1],
+                                    sizeof (tmp_dbinfo.passwd));
+                    }
+                }
 
-	      con_info.con_dbinfo =
-		      (T_DBMT_CON_DBINFO *) increase_capacity (con_info.con_dbinfo,
-			  sizeof (T_DBMT_CON_DBINFO),
-			  con_info.num_con_dbinfo,
-			  con_info.num_con_dbinfo + 1);
-	      if (con_info.con_dbinfo == NULL)
-		{
-		  strcpy (_dbmt_error, "Malloc fail");
-		  goto con_write_dbinfo_err;
-		}
-	      con_info.num_con_dbinfo++;
-	      con_info.con_dbinfo[con_info.num_con_dbinfo - 1] = tmp_dbinfo;
+              con_info.con_dbinfo =
+                (T_DBMT_CON_DBINFO *) increase_capacity (con_info.con_dbinfo,
+                    sizeof (T_DBMT_CON_DBINFO),
+                    con_info.num_con_dbinfo,
+                    con_info.num_con_dbinfo + 1);
+              if (con_info.con_dbinfo == NULL)
+                {
+                  strcpy (_dbmt_error, "Malloc fail");
+                  goto con_write_dbinfo_err;
+                }
+              con_info.num_con_dbinfo++;
+              con_info.con_dbinfo[con_info.num_con_dbinfo - 1] = tmp_dbinfo;
 
-	      /* parse the next dbinfo */
-	      prev = next;
-	    }
-	  /* db not found, create it */
-	  if (creat_flag == 1)
-	    {
-	      con_info.con_dbinfo =
-		      (T_DBMT_CON_DBINFO *) increase_capacity (con_info.con_dbinfo,
-			  sizeof (T_DBMT_CON_DBINFO),
-			  con_info.num_con_dbinfo,
-			  con_info.num_con_dbinfo + 1);
-	      if (con_info.con_dbinfo == NULL)
-		{
-		  strcpy (_dbmt_error, "Malloc fail");
-		  goto con_write_dbinfo_err;
-		}
-	      con_info.num_con_dbinfo++;
-	      con_info.con_dbinfo[con_info.num_con_dbinfo - 1] = *dbinfo;
-	    }
+              /* parse the next dbinfo */
+              prev = next;
+            }
+          /* db not found, create it */
+          if (creat_flag == 1)
+            {
+              con_info.con_dbinfo =
+                (T_DBMT_CON_DBINFO *) increase_capacity (con_info.con_dbinfo,
+                    sizeof (T_DBMT_CON_DBINFO),
+                    con_info.num_con_dbinfo,
+                    con_info.num_con_dbinfo + 1);
+              if (con_info.con_dbinfo == NULL)
+                {
+                  strcpy (_dbmt_error, "Malloc fail");
+                  goto con_write_dbinfo_err;
+                }
+              con_info.num_con_dbinfo++;
+              con_info.con_dbinfo[con_info.num_con_dbinfo - 1] = *dbinfo;
+            }
 
-	  /* update conlist file content */
-	  fprintf (outfile, "%s %s %s %s %s %s ", con_info.cli_ip,
-		   con_info.cli_port, date, time, con_info.cli_ver,
-		   con_info.user_name);
-	  for (i = 0; i < con_info.num_con_dbinfo; i++)
-	    {
-	      fprintf (outfile, "%s:%s,%s", con_info.con_dbinfo[i].dbname,
-		       con_info.con_dbinfo[i].uid, con_info.con_dbinfo[i].passwd);
-	      if (i != (con_info.num_con_dbinfo - 1))
-		{
-		  fprintf (outfile, ";");
-		}
-	    }
-	  fprintf (outfile, "\n");
+          /* update conlist file content */
+          fprintf (outfile, "%s %s %s %s %s %s ", con_info.cli_ip,
+                   con_info.cli_port, date, time, con_info.cli_ver,
+                   con_info.user_name);
+          for (i = 0; i < con_info.num_con_dbinfo; i++)
+            {
+              fprintf (outfile, "%s:%s,%s", con_info.con_dbinfo[i].dbname,
+                       con_info.con_dbinfo[i].uid, con_info.con_dbinfo[i].passwd);
+              if (i != (con_info.num_con_dbinfo - 1))
+                {
+                  fprintf (outfile, ";");
+                }
+            }
+          fprintf (outfile, "\n");
 
-	  retval = 0;
-	}
+          retval = 0;
+        }
       else
-	{
-	  fprintf (outfile, "%s\n", strbuf);
-	}
+        {
+          fprintf (outfile, "%s\n", strbuf);
+        }
       FREE_MEM (strbuf);
       buf_len = 0;
     }
@@ -532,14 +532,12 @@ con_write_dbinfo_err:
     }
   move_file (tmpfile, conn_list_file);
 
-  uRemoveLockFile (lfd);
-
   return retval;
 }
 
 void
 dbmt_con_set_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *dbname,
-		     const char *uid, const char *passwd)
+                     const char *uid, const char *passwd)
 {
   strcpy_limit (dbinfo->dbname, dbname, sizeof (dbinfo->dbname));
   strcpy_limit (dbinfo->uid, uid, sizeof (dbinfo->uid));

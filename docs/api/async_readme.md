@@ -1,0 +1,173 @@
+# Asynchronous Task Execution
+
+Run a supported task in the background instead of waiting for it to finish.
+
+## Overview
+
+Clients can ask CMS to execute certain long-running tasks asynchronously by sending `"async":"yes"` in the request. Instead of blocking until the task finishes, CMS immediately returns a response containing a unique job identifier (`uuid`). The client then polls the [gettaskstatus](gettaskstatus.md) task with that `uuid` to check whether the job is still running and, once finished, whether it succeeded or failed.
+
+If `async` is not specified in the request, it defaults to `"async":"no"` and the task runs synchronously, as usual.
+
+`uuid` is an opaque decimal-digit string, up to 19 digits long, and CMS always sends it as a JSON string (quoted), never as a JSON number. Treat it as an opaque token: store it and send it back to [gettaskstatus](gettaskstatus.md) exactly as received, as a string, rather than converting it to a number. At this size a JS/TS `number` (or any other IEEE-754 `double`) cannot represent every value exactly, so a `uuid` that has been round-tripped through one will typically no longer match anything, and CMS will report `"uuid not found"` or reject it outright as `"invalid uuid"`.
+
+## Async-Capable Tasks
+
+25 tasks currently support `async`:
+
+[addvoldb](addvoldb.md), [backupdb](backupdb.md), [broker_restart](broker_restart.md), [broker_start](broker_start.md), [broker_stop](broker_stop.md), [checkdb](checkdb.md), [compactdb](compactdb.md), [copydb](copydb.md), [createdb](createdb.md), [deletedb](deletedb.md), [ha_reload](ha_reload.md), [ha_start](ha_start.md), [ha_stop](ha_stop.md), [loaddb](loaddb.md), [lockdb](lockdb.md), [optimizedb](optimizedb.md), [renamedb](renamedb.md), [restoredb](restoredb.md), [start_statdump](start_statdump.md), [startbroker](startbroker.md), [startdb](startdb.md), [stop_statdump](stop_statdump.md), [stopbroker](stopbroker.md), [stopdb](stopdb.md), [unloaddb](unloaddb.md)
+
+Each of these tasks accepts the `async` key alongside its own task-specific parameters; see the individual task pages linked above for their full request/response syntax.
+
+Sending `"async":"yes"` on any task not listed above is not an error: CMS silently ignores it and runs the task synchronously, the same as if `async` had been omitted. Whether that synchronous run is also covered by [Timeout Fallback](#timeout-fallback) below depends on how the task is dispatched, not on whether `async` was set - see that section for which tasks are covered and which are not.
+
+## Requesting Async Execution
+
+Add `"async":"yes"` to the request of any task listed above:
+
+```
+{
+  "task":"backupdb",
+  "dbname":"demodb",
+  "async":"yes"
+}
+```
+
+If CMS can start the job, it returns a response right away, without waiting for the task to complete:
+
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "1877908931382247367"
+}
+```
+
+### Request Rejected
+
+CMS rejects the request instead of starting the job when either of these is true:
+
+* the server already has `max_num_async_task` async jobs running (see [Configuration](#configuration) below), or
+* the task is one that must run exclusively against its database (for example `backupdb`, `restoredb`, `copydb`) and another job is already running against that same database.
+
+A rejected request never gets a `uuid`, since the job never started:
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
+   "task" : "startdb"
+}
+```
+
+```
+{
+   "job-status" : "rejected",
+   "note" : "maximum number of concurrent async tasks (8) reached; try again later",
+   "status" : "failure",
+   "task" : "compactdb"
+}
+```
+
+Check `note` for the reason and retry the request later. (This exclusivity check only serializes async job bookkeeping; access to shared credential/connection files such as `cmdb.pass` is separately protected by an in-process mutex, `file_resource_guard`.)
+
+### A Note on Request Latency
+
+The bookkeeping updates that the tasks above perform on `cmdb.pass` and the auto-job config files run off CMS's global request-serialization lock, so they do not delay unrelated requests while waiting on `file_resource_guard` (bounded to ~5 seconds; see above). The same is true of [setautoexecquery](setautoexecquery.md) itself: like every task except [getserverstatus](getserverstatus.md), it is dispatched entirely off that global lock, so a slow `file_resource_guard` wait on `autoexecquery.conf` - for example, contention from another `setautoexecquery` call, or from a `deletedb`/`renamedb`/`copydb`/`updateuser` bookkeeping update racing on the same file - only delays requests waiting on that same lock. It no longer blocks unrelated requests such as a `gettaskstatus` poll.
+
+Only three things run under CMS's global request-serialization lock: token and authority validation, `gettaskstatus` handling, and `getserverstatus` (which reads its counters directly with no locking of its own and relies on the lock being held for that). All three are short, in-memory operations with no file or network I/O, so this lock is never held for long.
+
+This is a deliberate check-then-act gap, not a bug: a task's authority is validated while that lock is held, but the task itself then runs after the lock is released. A permission change (e.g. an `updateuser` call demoting or removing the user) that lands in that window won't be picked up until the *next* request - a request already past the check can still run with the authority it had at check time. The window is narrow and the impact is limited to that one in-flight request, so this is accepted as a reasonable trade-off against serializing every task's execution behind a single global lock.
+
+The auto-job configuration tasks (`getautostart`, `setautostart`, `getautojobconf`, `setautojobconf`, `execautostart`, `automail`) are not yet documented individually, but the same pattern applies to them: they wait on `file_resource_guard` for `autojobs.conf` (bounded to ~5 seconds; see above) and can return a failure response such as `"failed to lock autojobs.conf"` if that wait times out.
+
+These tasks share a second failure mode unrelated to locking: if `autojobs.conf` exists but can't be parsed as JSON, `getautostart`, `setautostart`, `getautojobconf`, and `setautojobconf` all fail with `"autojobs.conf is corrupt"` rather than silently proceeding as if it were empty. A missing `autojobs.conf` is not an error - it's the normal state before any of these tasks have saved anything yet, so `getautostart`/`getautojobconf` return an empty result for it instead of failing. To recover from a corrupt `autojobs.conf`, delete the file; CMS treats its absence as normal and starts a fresh, empty configuration on the next successful save.
+
+## Timeout Fallback
+
+`http_timeout` (see [Configuration](#configuration) below) is not specific to the 25 async-capable tasks above, but it is not universal either: it only covers tasks that CMS dispatches through the legacy, nvplist-based task table (looked up via `ut_get_task_info`). That includes every one of the 25 async-capable tasks above whenever their request just didn't set `"async":"yes"`, plus most other tasks not documented under [Async-Capable Tasks](#async-capable-tasks). It does **not** cover the smaller set of JSON-native "extended" tasks that CMS instead runs inline, synchronously, on the same thread that received the HTTP request - among them `getserverstatus`, `gettaskstatus`, `sendmail`, `automail`, `execautostart`, `setautoexecquery`, `adddbmtuser_new`, `getdberrorlog`, and a handful of other system/utility tasks.
+
+For a task covered by the fallback, every request - including one that never mentioned `async` at all - is run on its own worker thread while CMS waits for it, for up to `http_timeout` seconds, before responding. If the task hasn't finished by then, CMS does not keep waiting: it responds anyway, with a `uuid` and `job-status` just like a running async job, even though `status`/`note` read like a failure:
+
+```
+{
+   "job-status" : "running",
+   "note" : "timeout",
+   "status" : "failure",
+   "uuid" : "1877908931382247367"
+}
+```
+
+`status` is `"failure"` and `note` is `"timeout"` here, but the task itself has not failed - those two fields describe CMS giving up on waiting synchronously, not the task's outcome. The task keeps running in the background exactly like a job that was started with `"async":"yes"`, and `job-status`/`uuid` are what tell you that: poll [gettaskstatus](gettaskstatus.md) with the returned `uuid` the same way you would for one. A client that only checks `status` risks treating a still-running task as a failure.
+
+A task that is *not* covered by the fallback has no such safety net: if it hangs, the HTTP thread blocks until it returns, however long that takes, and the client gets no response - not even a timeout failure - until then. `sendmail`, for example, has no socket timeout of its own, so a request to it blocks indefinitely if the SMTP server it connects to never responds.
+
+Unlike a request that explicitly starts async - which is rejected once `max_num_async_task` are already running (see [Request Rejected](#request-rejected) above) - a timeout fallback is never rejected. CMS tracks how many are currently outstanding with a separate counter, `num_timeout_fallback_jobs` (see [getserverstatus](getserverstatus.md)), but that counter only triggers a one-time log warning once it reaches `max_num_async_task`; it does not cap or reject further fallbacks. A slow task that clients keep retrying past `http_timeout` can accumulate background jobs - and the threads running them - without bound.
+
+## Checking Job Status
+
+Use the returned `uuid` to poll [gettaskstatus](gettaskstatus.md):
+
+```
+{
+  "task": "gettaskstatus",
+  "token": "$TOKEN",
+  "uuid": "1877908931382247367"
+}
+```
+
+`job-status` in the response is one of `running`, `success`, or `error`. (`rejected` is also a possible `job-status` value, but only in the immediate response to the original task request - see [Request Rejected](#request-rejected) above; a rejected request never receives a `uuid`, so it is never something you check with `gettaskstatus`.) See [gettaskstatus](gettaskstatus.md) for the full response syntax and samples.
+
+A `uuid` is only valid for a limited time after the job finishes; see `async_job_ttl_sec` below.
+
+To see the async subsystem's overall state instead of one specific job - how many slots are in use, which databases are currently busy, any long-running jobs - use [getserverstatus](getserverstatus.md).
+
+## Orphan Jobs After a CMS Restart
+
+Job tracking (the `uuid` -> job mapping [gettaskstatus](gettaskstatus.md) looks up) lives in CMS's memory only. It is not written to disk, and CMS does not reconcile or rediscover anything when it starts back up. If CMS is stopped and restarted while an async job is still running, that job becomes untracked - an *orphan job*.
+
+For example:
+
+1. A client sends `createdb` with `"async":"yes"`. Creating this particular database takes about 10 minutes, so CMS returns immediately with `"job-status":"running"` and a `uuid`.
+2. Within those 10 minutes, CMS itself is stopped and restarted (a service restart, an upgrade, an operator running `cubrid manager stop`/`start`, etc.).
+3. The client polls [gettaskstatus](gettaskstatus.md) with the `uuid` from step 1.
+
+The response is `"uuid not found"` - even though the underlying `createdb` process may still be running to completion on the server (stopping CMS does not send it any signal of its own; it only stops CMS itself), or may have already finished successfully or failed, entirely unobserved. `gettaskstatus`'s `"uuid not found"` does not distinguish "this `uuid` was never valid" from "this job was in flight when CMS restarted" - both look identical.
+
+Detecting this reliably means comparing the server's own notion of "which instance am I" at two points in time - never your own clock against `start_time`. `start_time` is the server's local time (see [getserverinfo](getserverinfo.md)), and your client may be on a different host, in a different time zone, or just a few seconds off; comparing "is `start_time` later than when I received the `uuid`" across two different clocks can give the wrong answer in either direction.
+
+Instead: when you send a request you plan to poll later, also call `getserverinfo` once and record its `uuid` field alongside the job's own `uuid` - this is the server's own instance identifier, not yours. Its high bits are this process's own start time in milliseconds, and its low 20 bits are drawn fresh from a random source at every startup, so two restarts collide only if they start in the same millisecond *and* draw the same 20-bit value (roughly 1 in 10^6) - effectively unique in practice, and unlike a value derived purely from the clock, resilient to the system clock being set back to an exact earlier reading (a VM/container snapshot restore, a manual correction). It is *not* in the same number space as a job `uuid`: the two are drawn independently of each other, so any one job's uuid matches it only by chance, never because one is derived from the other - that's harmless either way, since they're different JSON fields. If a later `gettaskstatus` for the job's `uuid` comes back `"uuid not found"`, call `getserverinfo` again: if its `uuid` no longer matches what you recorded, CMS restarted in between, and this is exactly that case. Unlike `pid`, there's nothing else to check alongside it - `getserverinfo`'s `uuid` doesn't depend on a value the OS can reuse, so treat a plain equality check as reliable by itself. (`start_time` and `pid` are still returned for informational/logging purposes, but `uuid` is the field to compare for restart detection.) Check the task's actual result directly (for example, whether the database now exists, for `createdb`) rather than relying on `gettaskstatus` for it. `getserverinfo` requires no more authority than the task you're tracking does - unlike [getserverstatus](getserverstatus.md), which needs admin authority and so isn't usable by every client that can start an async task in the first place (for example, a `createdb` request only needs `AU_DBC`).
+
+Losing job tracking on restart also affects the per-database exclusivity check (see [Request Rejected](#request-rejected) above): it starts empty too, so a new exclusive task against a database an orphan job is still using will not be rejected by CMS. For example, if `backupdb` is running async against `xyz` when CMS restarts, sending `restoredb` against `xyz` afterward is accepted rather than rejected with `"database 'xyz' is busy with another task"` - the restarted CMS has no record that `backupdb` is still running. CUBRID's own volume locking blocks many such conflicts anyway, but when it does, what you get back is a utility-level error, not CMS's clearer busy-database rejection.
+
+## Configuration
+
+The following parameters, configurable in `cm.conf`, control async job behavior:
+
+| **Key** | **Description** | **Minimum** | **Default** | **Maximum** |
+| --- | --- | --- | --- | --- |
+| max_num_async_task | Maximum number of async jobs that can run simultaneously on the server. | 1 | 8 | 12 |
+| async_job_ttl_sec | Number of seconds a completed job's `uuid` remains valid for [gettaskstatus](gettaskstatus.md) lookups, before it is dropped. | 60 (1 minute) | 3600 (1 hour) | 604800 (1 week) |
+| async_long_job_sec | Execution time, in seconds, after which CMS considers an async job to have been running for an excessive amount of time. CMS does not terminate the job when this threshold is exceeded; it only records that the job has run long. | 60 (1 minute) | 86400 (1 day) | 604800 (1 week) |
+
+### Example
+
+`async_job_ttl_sec` and `async_long_job_sec` below are deliberately set above
+their defaults (3600 and 86400) - for a deployment where `gettaskstatus` is
+polled less often, or where individual jobs are expected to legitimately run
+for a day or more, and the "long job" warning threshold should reflect that.
+`max_num_async_task` is left at its default of 8 here.
+
+```
+...
+max_num_async_task=8
+async_job_ttl_sec=86400
+async_long_job_sec=259200
+...
+```
+
+## See Also
+
+* [gettaskstatus](gettaskstatus.md)
+* [getserverstatus](getserverstatus.md)
+* [CUBRID Manager Server API Manual](README.md)

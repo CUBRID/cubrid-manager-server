@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <string.h>
+#include <stdexcept>
 #include <event2/event.h>
 #include <evhttp.h>
 #include <event2/buffer.h>
@@ -68,13 +69,6 @@
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 
-#if _MSC_VER >= 1900
-extern "C" {
-  FILE __iob_func[3] = { *stdin, *stdout, *stderr };
-}
-#endif
-
-//#include "cm_utf8.h"
 using namespace std;
 
 #define DEFAULT_THRD_NUM                      24
@@ -85,8 +79,6 @@ using namespace std;
 static THREAD_FUNC automation_start (void *ud);
 static THREAD_FUNC aj_thread_r (void *aj);
 static void start_auto_thread (void);
-
-T_EMGR_VERSION CLIENT_VERSION = EMGR_MAKE_VER (8, 4);
 
 #ifdef WINDOWS
 T_THREAD auto_task_tid = NULL;
@@ -121,8 +113,14 @@ struct worker_context
 #endif
 };
 
-int cubrid_version_major = -1;
-int cubrid_version_minor = -1;
+/*
+ * When the CMS starts, it gets the currently installed engine version.
+ * if this fails, it sets the default value to 11.4.
+ * This value is used in APIs such as dbspaceinfo.
+ */
+int cubrid_version_major = 11;
+int cubrid_version_minor = 4;
+char cubrid_version_build[CUBRID_VERSION_BUILD_LEN] = "";
 
 int
 bind_socket (int port)
@@ -282,7 +280,25 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
       return evhttp_send_reply (req, HTTP_BADREQUEST, "", NULL);
     }
 
-  cub_cm_request_handler (root, response);
+  try
+    {
+      cub_cm_request_handler (root, response);
+    }
+  catch (const std::exception &e)
+    {
+      LOG_ERROR ("cub_generic_request_handler : unhandled exception while "
+		 "processing request: %s", e.what ());
+      response = Json::Value (Json::objectValue);
+      build_server_header (response, ERR_WITH_MSG, e.what ());
+    }
+  catch (...)
+    {
+      LOG_ERROR ("cub_generic_request_handler : unhandled non-standard "
+		 "exception while processing request.");
+      response = Json::Value (Json::objectValue);
+      build_server_header (response, ERR_WITH_MSG, "internal server error");
+    }
+
   evb = evbuffer_new ();
   if (NULL == evb)
     {
@@ -502,6 +518,13 @@ start_service ()
   thread_setup_SSL ();
 
   SSL_CTX *ctx = init_SSL (sco.szSSLCertificate, sco.szSSLKey);
+  if (ctx == NULL)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+		"CUBRID Manager Server : cannot initialize SSL context");
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      return -1;
+    }
 
   nfd = bind_socket (sco.iCMS_port);
 
@@ -917,10 +940,18 @@ main (int argc, char **argv)
 
   start_auto_thread ();
 
-  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor);
-  LOG_INFO ("started '%s' with Engine Version: %d.%d", argv[0], cubrid_version_major, cubrid_version_minor);
+  find_and_parse_cub_admin_version (cubrid_version_major, cubrid_version_minor, cubrid_version_build,
+				    sizeof (cubrid_version_build));
+  LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor,
+	    cubrid_version_build);
 
-  start_service ();
+  if (start_service () < 0)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+		"CUBRID Manager Server : Fail to start service");
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      exit (1);
+    }
 
   return 0;
 }

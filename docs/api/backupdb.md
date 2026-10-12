@@ -16,6 +16,10 @@ The backupdb interface will create a database backup file.
 | check | y or n, check the consistency of the database before the backup |
 | mt | the number of the threads used by the backup, 0 means the number of the cores |
 | zip | y or n, compress the backup volume |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -25,14 +29,22 @@ The backupdb interface will create a database backup file.
   "token": "cdfb4c5717170c5e237a227a2ceeccc6ae9e10c16754fb85371c0d74fa0d9d577926f07dd201b6aa",
   "dbname": "alatestdb",
   "level": "0",
-  "volname": "alatestdb_backup_lv0",
   "backupdir": "$CUBRID_DATABASES/alatestdb/backup",
+  "volname": "alatestdb_backup_lv0",
   "removelog": "n",
   "check": "y",
   "mt": "0",
-  "zip": "y"
+  "zip": "y",
+  "async":"yes"
 }
 ```
+## additional information about *backupdir* and *volume*
+* The final backup directory is determined by the **backupdir** and **volname** parameters. <br>
+  - If the value of backupdir is **/tmp/backupdir** and the value of volname is **lv0**,
+  - the final database backup directory becomes **/tmp/backupdir/lv0**.
+* If **volname is omitted**, backupdir is used as the database backup directory.
+* The final backup directory name must be used as the **pathname** for the restoredb API.
+* *volname* can be omitted, but *backupdir* cannot.
 
 ## Response JSON Syntax
 
@@ -49,6 +61,26 @@ The backupdb interface will create a database backup file.
    "__EXEC_TIME" : "12 ms",
    "note" : "none",
    "status" : "success",
+   "task" : "backupdb"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "1877908931382247367"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
    "task" : "backupdb"
 }
 ```
