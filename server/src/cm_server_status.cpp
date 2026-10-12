@@ -61,7 +61,7 @@
 #define CMS_PRINT_CMD_STATUS          "status"
 
 static void read_server_status_output (T_SERVER_STATUS_RESULT *res,
-                                       char *out_file);
+				       char *out_file);
 #if defined(WINDOWS)
 static int is_master_start (void);
 #endif
@@ -117,10 +117,10 @@ is_master_start (void)
   do
     {
       if (strcasecmp (pe32.szExeFile, UTIL_MASTER_NAME) == 0)
-        {
-          retval = 0;
-          break;
-        }
+	{
+	  retval = 0;
+	  break;
+	}
     }
   while (Process32Next (h_proc_snap, &pe32));
 
@@ -219,7 +219,9 @@ cmd_cms_result_free (T_SERVER_STATUS_RESULT *res)
   if (res != NULL)
     {
       if (res->result != NULL)
-	free (res->result);
+	{
+	  free (res->result);
+	}
       free (res);
     }
 }
@@ -265,9 +267,9 @@ cms_database_mode (char *dbname, int *ha_mode)
   if (retval != 0)
     {
       if (ha_mode != NULL)
-        {
-          *ha_mode = (retval == 2) ? 1 : 0;
-        }
+	{
+	  *ha_mode = (retval == 2) ? 1 : 0;
+	}
       return DB_SERVICE_MODE_CS;
     }
 
@@ -275,9 +277,9 @@ cms_database_mode (char *dbname, int *ha_mode)
   if (pid > 0)
     {
       if (kill (pid, 0) >= 0)
-        {
-          return DB_SERVICE_MODE_SA;
-        }
+	{
+	  return DB_SERVICE_MODE_SA;
+	}
     }
   return DB_SERVICE_MODE_NONE;
 }
@@ -315,40 +317,40 @@ read_server_status_output (T_SERVER_STATUS_RESULT *res, char *out_file)
       char *tmp_p;
 
       if (sscanf (str_buf, "%63s %63s", tmp_str, db_name) < 2)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       if (strcmp (tmp_str, "@") == 0 || (strcmp (tmp_str, "Server") != 0 && strcmp (tmp_str, "HA-Server") != 0))
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
 
       tmp_p = strchr (db_name, ',');
       if (tmp_p != NULL)
-        {
-          *tmp_p = '\0';
-        }
+	{
+	  *tmp_p = '\0';
+	}
 
       num_info++;
       if (num_info > num_alloc)
-        {
-          num_alloc += 5;
-          T_SERVER_STATUS_INFO *const new_info
-            = (T_SERVER_STATUS_INFO *) realloc (info, sizeof (T_SERVER_STATUS_INFO) * num_alloc);
-          if (new_info == NULL)
-            {
-              /*
-               * realloc () failure doesn't touch the original block
-               * so, everything parsed before realloc fail is valid
-               */
-              num_info--;
-              break;
-            }
-          else
-            {
-              info = new_info;
-            }
-        }
+	{
+	  num_alloc += 5;
+	  T_SERVER_STATUS_INFO *const new_info
+	    = (T_SERVER_STATUS_INFO *) realloc (info, sizeof (T_SERVER_STATUS_INFO) * num_alloc);
+	  if (new_info == NULL)
+	    {
+	      /*
+	       * realloc () failure doesn't touch the original block
+	       * so, everything parsed before realloc fail is valid
+	       */
+	      num_info--;
+	      break;
+	    }
+	  else
+	    {
+	      info = new_info;
+	    }
+	}
       strcpy_limit (info[num_info - 1].db_name, db_name, sizeof (info[num_info - 1].db_name));
       info[num_info - 1].ha_mode = (strcmp (tmp_str, "HA-Server") == 0) ? 1 : 0;
     }

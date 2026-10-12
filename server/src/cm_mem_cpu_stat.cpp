@@ -61,7 +61,7 @@
 #define CMS_PRINT_CMD_SERVER          "server"
 #define CMS_PRINT_CMD_STATUS          "status"
 
-typedef void *(*EXTRACT_FUNC) (FILE *fp, const char *arg1, T_CM_ERROR *arg2);
+typedef void * (*EXTRACT_FUNC) (FILE *fp, const char *arg1, T_CM_ERROR *arg2);
 
 static void *extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf);
 static void assign_db_stat (T_CM_DB_PROC_STAT *db_stat, char *db_name, T_CM_PROC_STAT *stat);
@@ -69,7 +69,7 @@ static void cm_db_proc_stat_free (T_CM_DB_PROC_STAT *stat);
 static void *extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf);
 static uint64_t *get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name);
 static void *cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_arg1,
-                                     T_CM_ERROR *err_buf);
+				     T_CM_ERROR *err_buf);
 static void cms_err_buf_reset (T_CM_ERROR *err_buf);
 static void cms_set_error_null_pointer (T_CM_ERROR *err_buf);
 static void cms_set_error_oom (T_CM_ERROR *err_buf);
@@ -135,7 +135,7 @@ cms_trim (char *str)
     {
       ;
     }
-  *(p + 1) = '\0';
+  * (p + 1) = '\0';
 
   if (s != str)
     {
@@ -185,10 +185,10 @@ cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_
     {
       err_buf->err_code = CM_ERR_SYSTEM_CALL;
       if (read_error_file (errfile, err_buf->err_msg, sizeof (err_buf->err_msg)) == 0
-          || err_buf->err_msg[0] == '\0')
-        {
-          strcpy_limit (err_buf->err_msg, "unknown error", sizeof (err_buf->err_msg));
-        }
+	  || err_buf->err_msg[0] == '\0')
+	{
+	  strcpy_limit (err_buf->err_msg, "unknown error", sizeof (err_buf->err_msg));
+	}
       unlink (outputfile);
       unlink (errfile);
       return NULL;
@@ -201,7 +201,7 @@ cms_get_command_result (const char *argv[], EXTRACT_FUNC func, const char *func_
 
       err_buf->err_code = CM_FILE_OPEN_FAILED;
       snprintf (err_buf->err_msg, sizeof (err_buf->err_msg) - 1, "file (%s) open failed: %s", outputfile,
-               STRERROR_R (errno, errbuf, sizeof (errbuf)));
+		STRERROR_R (errno, errbuf, sizeof (errbuf)));
       unlink (outputfile);
       unlink (errfile);
       return NULL;
@@ -222,7 +222,8 @@ cms_get_db_proc_stat (const char *db_name, T_CM_DB_PROC_STAT *stat, T_CM_ERROR *
   char cmd_name[PATH_MAX];
 
   /* cubrid server status */
-  const char *argv[] = {
+  const char *argv[] =
+  {
     cmd_name,
     CMS_PRINT_CMD_SERVER,
     CMS_PRINT_CMD_STATUS,
@@ -260,7 +261,8 @@ cms_get_db_proc_stat_all (T_CM_ERROR *err_buf)
   char cmd_name[PATH_MAX];
 
   /* cubrid server status */
-  const char *argv[] = {
+  const char *argv[] =
+  {
     cmd_name,
     CMS_PRINT_CMD_SERVER,
     CMS_PRINT_CMD_STATUS,
@@ -294,9 +296,9 @@ cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
   for (i = 0; i < len; i++)
     {
       if (buf[i] == 0)
-        {
-          buf[i] = ';';
-        }
+	{
+	  buf[i] = ';';
+	}
     }
 
   buf[len - 1] = 0;
@@ -305,14 +307,14 @@ cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
   for (token = STRTOK (buf, ";", &saveptr); token != NULL && i < 32; token = STRTOK (NULL, ";", &saveptr))
     {
       if (GetDriveTypeA (token) == DRIVE_FIXED)
-        {
-          ULARGE_INTEGER ul_total, ul_free;
-          GetDiskFreeSpaceExA (token, &ul_free, &ul_total, NULL);
-          total_size[i] = ul_total.QuadPart;
-          free_size[i] = ul_free.QuadPart;
-          strcpy_limit (names[i], token, sizeof (names[i]));
-          i++;
-        }
+	{
+	  ULARGE_INTEGER ul_total, ul_free;
+	  GetDiskFreeSpaceExA (token, &ul_free, &ul_total, NULL);
+	  total_size[i] = ul_total.QuadPart;
+	  free_size[i] = ul_free.QuadPart;
+	  strcpy_limit (names[i], token, sizeof (names[i]));
+	  i++;
+	}
     }
 
   res = (T_CM_DISK_PARTITION_STAT_ALL *) malloc (sizeof (T_CM_DISK_PARTITION_STAT_ALL));
@@ -346,7 +348,8 @@ T_CM_DISK_PARTITION_STAT_ALL *
 cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf)
 {
   /* df -TB 1M */
-  const char *argv[] = {
+  const char *argv[] =
+  {
     "/bin/df",
     "-TB",
     "1M",
@@ -366,7 +369,8 @@ cms_get_db_exec_stat (const char *db_name, T_CM_DB_EXEC_STAT *exec_stat, T_CM_ER
   char cmd_name[PATH_MAX];
 
   /* cubrid statdump dbname */
-  const char *argv[] = {
+  const char *argv[] =
+  {
     cmd_name,
     "statdump",
     db_name,
@@ -408,10 +412,10 @@ extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf)
     {
       db_stat = (T_CM_DB_PROC_STAT *) malloc (sizeof (T_CM_DB_PROC_STAT));
       if (!db_stat)
-        {
-          cms_set_error_oom (err_buf);
-          return NULL;
-        }
+	{
+	  cms_set_error_oom (err_buf);
+	  return NULL;
+	}
     }
   else
     {
@@ -420,12 +424,12 @@ extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf)
       p = (T_CM_DB_PROC_STAT *) malloc (nalloc * sizeof (T_CM_DB_PROC_STAT));
 
       if (all_stat == NULL || p == NULL)
-        {
-          cms_set_error_oom (err_buf);
-          CMS_FREE_MEM (all_stat);
-          CMS_FREE_MEM (p);
-          return NULL;
-        }
+	{
+	  cms_set_error_oom (err_buf);
+	  CMS_FREE_MEM (all_stat);
+	  CMS_FREE_MEM (p);
+	  return NULL;
+	}
       all_stat->db_stats = p;
     }
 
@@ -436,55 +440,61 @@ extract_db_stat (FILE *fp, const char *tdbname, T_CM_ERROR *err_buf)
 
       cms_trim (linebuf);
       if (linebuf[0] == '@')
-        continue;
+	{
+	  continue;
+	}
 
       tok_num = sscanf (linebuf, "%511s %511s %*s %*s %*s %19s", cmd_name, db_name, pid_t);
 
       if (tok_num != 3 || (strcmp (cmd_name, "Server") != 0 && strcmp (cmd_name, "HA-Server") != 0))
-        continue;
+	{
+	  continue;
+	}
 
       /* remove the ")" at the end of the pid. */
       pid_t[strlen (pid_t) - 1] = '\0';
       pid = atoi (pid_t);
 
       if (pid == 0)
-        continue;
+	{
+	  continue;
+	}
 
       if (tdbname != NULL)
-        {
-          if (!strcmp ((char *) tdbname, db_name))
-            {
-              if (cm_get_proc_stat (&pstat, pid) == 0)
-                {
-                  assign_db_stat (db_stat, db_name, &pstat);
-                  return db_stat;
-                }
-              goto not_found;
-            }
-        }
+	{
+	  if (!strcmp ((char *) tdbname, db_name))
+	    {
+	      if (cm_get_proc_stat (&pstat, pid) == 0)
+		{
+		  assign_db_stat (db_stat, db_name, &pstat);
+		  return db_stat;
+		}
+	      goto not_found;
+	    }
+	}
       else
-        {
-          if (nitem >= nalloc)
-            {
-              T_CM_DB_PROC_STAT *db_stats_newptr = NULL;
-              int nalloc_new = nalloc * 2;
-              db_stats_newptr =
-                (T_CM_DB_PROC_STAT *) realloc (all_stat->db_stats, nalloc_new * sizeof (T_CM_DB_PROC_STAT));
-              if (db_stats_newptr == NULL)
-                {
-                  cms_set_error_oom (err_buf);
-                  CMS_FREE_MEM (all_stat->db_stats);
-                  CMS_FREE_MEM (all_stat);
-                  return NULL;
-                }
-              all_stat->db_stats = db_stats_newptr;
-              nalloc = nalloc_new;
-            }
-          if (cm_get_proc_stat (&pstat, pid) == 0)
-            {
-              assign_db_stat (&all_stat->db_stats[nitem++], db_name, &pstat);
-            }
-        }
+	{
+	  if (nitem >= nalloc)
+	    {
+	      T_CM_DB_PROC_STAT *db_stats_newptr = NULL;
+	      int nalloc_new = nalloc * 2;
+	      db_stats_newptr =
+		      (T_CM_DB_PROC_STAT *) realloc (all_stat->db_stats, nalloc_new * sizeof (T_CM_DB_PROC_STAT));
+	      if (db_stats_newptr == NULL)
+		{
+		  cms_set_error_oom (err_buf);
+		  CMS_FREE_MEM (all_stat->db_stats);
+		  CMS_FREE_MEM (all_stat);
+		  return NULL;
+		}
+	      all_stat->db_stats = db_stats_newptr;
+	      nalloc = nalloc_new;
+	    }
+	  if (cm_get_proc_stat (&pstat, pid) == 0)
+	    {
+	      assign_db_stat (&all_stat->db_stats[nitem++], db_name, &pstat);
+	    }
+	}
     }
 
   if (tdbname == NULL)
@@ -537,26 +547,28 @@ extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf)
     {
       sscanf (linebuf, "%*s%511s", type);
       if (strstr (type, "ext") == NULL)
-        continue;
+	{
+	  continue;
+	}
 
       if (nitem >= nalloc)
-        {
-          nalloc *= 2;
-          stat->partitions =
-            (T_CM_DISK_PARTITION_STAT *) realloc (stat->partitions, nalloc * sizeof (T_CM_DISK_PARTITION_STAT));
-        }
+	{
+	  nalloc *= 2;
+	  stat->partitions =
+		  (T_CM_DISK_PARTITION_STAT *) realloc (stat->partitions, nalloc * sizeof (T_CM_DISK_PARTITION_STAT));
+	}
       if (stat->partitions)
-        {
-          p = stat->partitions + nitem;
-          sscanf (linebuf, "%255s%*s%lu%lu%lu", p->name, &p->size, &p->used, &p->avail);
-          nitem++;
-        }
+	{
+	  p = stat->partitions + nitem;
+	  sscanf (linebuf, "%255s%*s%lu%lu%lu", p->name, &p->size, &p->used, &p->avail);
+	  nitem++;
+	}
       else
-        {
-          cm_host_disk_partition_stat_free (stat);
-          cms_set_error_oom (err_buf);
-          return NULL;
-        }
+	{
+	  cm_host_disk_partition_stat_free (stat);
+	  cms_set_error_oom (err_buf);
+	  return NULL;
+	}
     }
   stat->num_stat = nitem;
 
@@ -574,7 +586,8 @@ typedef struct
  * statdump_offset () - `cubrid statdump` output property name -> offsetof
  * (T_CM_DB_EXEC_STAT, ...) lookup table.
  */
-static STATDUMP_PROP statdump_offset[] = {
+static STATDUMP_PROP statdump_offset[] =
+{
   {"Num_file_creates", offsetof (T_CM_DB_EXEC_STAT, file_num_creates)},
   {"Num_file_removes", offsetof (T_CM_DB_EXEC_STAT, file_num_removes)},
   {"Num_file_ioreads", offsetof (T_CM_DB_EXEC_STAT, file_num_ioreads)},
@@ -781,9 +794,9 @@ get_statdump_member_ptr (T_CM_DB_EXEC_STAT *stat, const char *prop_name)
   for (i = 0; i < NELEMS (statdump_offset); i++)
     {
       if (strcmp (statdump_offset[i].prop_name, prop_name) == 0)
-        {
-          return (uint64_t *) ((char *) stat + statdump_offset[i].prop_offset);
-        }
+	{
+	  return (uint64_t *) ((char *) stat + statdump_offset[i].prop_offset);
+	}
     }
   return NULL;
 }
@@ -813,12 +826,14 @@ extract_db_exec_stat (FILE *fp, const char *dbname, T_CM_ERROR *err_buf)
       memset (prop_name, 0, sizeof (prop_name));
       nmatched = sscanf (linebuf, "%99s%*s%" SCNu64, prop_name, &prop_val);
       if (nmatched != 2)
-        {
-          continue;
-        }
+	{
+	  continue;
+	}
       member_ptr = get_statdump_member_ptr (stat, prop_name);
       if (!member_ptr)
-        continue;
+	{
+	  continue;
+	}
       *member_ptr = prop_val;
     }
 
