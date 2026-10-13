@@ -251,6 +251,11 @@ CUBRID_DATABASES = ""
 
 results = []
 
+# Requests sent without "async":"yes" that ran past the server's http_timeout:
+# the server answered "note":"timeout" and kept the task running, and the case
+# was judged by the job's final result. See send_one() and do_one_job().
+timeout_fallbacks = []
+
 # Placeholders whose value is only known once the run has started, see
 # start_kill_targets().
 runtime_vars = {}
@@ -370,6 +375,11 @@ def print_response(response):
 # and was left running in the background ("status":"failure", "note":"timeout").
 # The runner then polls gettaskstatus with that uuid and judges the case by the
 # job's final response, never by the immediate one.
+#
+# The second kind is still worth knowing about: a task that used to answer in
+# a few seconds and now needs more than http_timeout is a regression even when
+# it ends in "success". Such requests are flagged, listed at the end of the run
+# as a warning, and with --strict-timeout counted as failures.
 ASYNC_POLL_SEC = 1.0
 ASYNC_WAIT_SEC = 600
 
@@ -377,6 +387,22 @@ ASYNC_WAIT_SEC = 600
 def is_running_job(data):
     return (isinstance(data, dict) and data.get("job-status") == "running"
             and data.get("uuid") not in (None, ""))
+
+
+def asked_for_async(req):
+    value = req.get("async") if isinstance(req, dict) else None
+    return isinstance(value, str) and value.lower() == "yes"
+
+
+def is_timeout_fallback(req, data):
+    """A synchronous request the server gave up waiting on after http_timeout.
+
+    The immediate response then carries the job's uuid with "note":"timeout";
+    a request that asked for "async":"yes" answers "note":"none" instead, so
+    only the first is a task that took longer than the server allows.
+    """
+    return (not asked_for_async(req) and is_running_job(data)
+            and data.get("note") == "timeout")
 
 
 def follow_job(name, data, token):
@@ -421,6 +447,7 @@ def send_one(name, req, token, expected="success", casefile="",
              must_be_sync=False):
     req["token"] = token
     task = req.get("task", name)
+    started = time.time()
     response = exec_task(cmsip, port, url, json.dumps(req))
     # Tasks that echo a log file back (loadaccesslog) can carry bytes that are
     # not valid UTF-8, because the server writes error messages with an
@@ -442,17 +469,45 @@ def send_one(name, req, token, expected="success", casefile="",
                    expected, body, quiet=file_check)
             return data
     elif is_running_job(data):
+        timed_out = is_timeout_fallback(req, data)
+        uuid = str(data["uuid"])
+        if timed_out:
+            print("    \033[33mwarning: %s ran past http_timeout without "
+                  "\"async\":\"yes\"; %s\033[0m"
+                  % (name, "counted as a failure (--strict-timeout)"
+                     if strict_timeout else "judged by the final result"))
         final, final_body, problem = follow_job(name, data, token)
         if problem:
             record(name, casefile, task, problem[0], problem[1], expected,
                    final_body, quiet=file_check)
+            if timed_out:
+                flag_timeout_fallback(name, uuid, started)
             return {"task": task, "status": "failure"}
         data, body = final, final_body
+        if timed_out:
+            # The final result is recorded as usual. Under --strict-timeout,
+            # do_one_job() turns it into a failure once the case is judged and
+            # prints that verdict instead of this status line.
+            record(name, casefile, task, data.get("status"),
+                   data.get("note", ""), expected, body,
+                   quiet=(file_check or strict_timeout))
+            flag_timeout_fallback(name, uuid, started)
+            return data
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task, data.get("status"), data.get("note", ""),
            expected, body, quiet=file_check)
     return data
+
+
+def flag_timeout_fallback(name, uuid, started):
+    """Mark the result just recorded as a request that outlived http_timeout."""
+    item = results[-1]
+    item["timeout_fallback"] = True
+    timeout_fallbacks.append({"name": name, "file": item.get("file", ""),
+                              "task": item.get("task", name), "uuid": uuid,
+                              "status": item.get("status"),
+                              "elapsed": time.time() - started})
 
 
 case_runs = {}
@@ -502,7 +557,37 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             check_against_answer(name, slot, text, entries)
         elif make_answer:
             write_answer(slot, text)
+    if any(e.get("timeout_fallback") for e in entries):
+        # --file-check replaces the per request results with one verdict of
+        # the comparison; carry the flag over to it so the report keeps it.
+        for item in results[before:]:
+            if not any(item is e for e in entries):
+                item["timeout_fallback"] = True
+        if strict_timeout:
+            fail_timeout_fallback(name, before)
     return data
+
+
+def fail_timeout_fallback(name, before):
+    """--strict-timeout: a case with a request that outlived http_timeout fails.
+
+    This runs after the case has been judged, because --file-check replaces
+    the per request results with a single verdict of the comparison; that
+    verdict is turned into a failure too, so the timeout cannot be hidden by
+    a matching baseline.
+    """
+    note = "ran past http_timeout without \"async\":\"yes\" (--strict-timeout)"
+    for item in results[before:]:
+        if not item.get("timeout_fallback"):
+            continue
+        if item["ok"]:
+            item["ok"] = False
+            item["note"] = note
+        elif note not in item.get("note", ""):
+            item["note"] = "%s; %s" % (note, item.get("note", ""))
+        print("%s [%s] : " % (item["name"], item.get("task", name))
+              + '\033[31mfailed ({0})\033[0m'.format(item["note"]))
+        print("    case file: %s" % item.get("file", ""))
 
 
 def write_answer(taskfile, text):
@@ -1002,6 +1087,9 @@ def write_junit_xml(path, with_response=False):
                       'time="0" classname="CMSERVER_TEST">\n'
                       % (xml_escape(item["name"]), xml_escape(item["file"]),
                          xml_escape(item.get("task", ""))))
+            if item.get("timeout_fallback"):
+                out.write('<properties><property name="timeout_fallback" '
+                          'value="yes"/></properties>\n')
             if not item["ok"]:
                 out.write('<failure message="%s" type=""></failure>\n'
                           % xml_escape(item["note"]))
@@ -1294,6 +1382,7 @@ def init_env():
 
 # Command line:
 #   test_tasks.py [<test set>] [-fc|--file-check] [-ns|--no-sleep]
+#                 [-st|--strict-timeout]
 #   test_tasks.py --dump <case> [<case> ...]
 #
 # <test set> is the list file of the set to run, "task_status_check.txt" by
@@ -1309,7 +1398,11 @@ def init_env():
 # servers whose tasks answer before their work is done; against one that does
 # not, they are only lost time.
 #
-# Both take the CUBRID version the baseline belongs to, "11.4" or "11_4", as a
+# --strict-timeout fails a case whose request, sent without "async":"yes",
+# ran past the server's http_timeout. By default such a case is judged by the
+# job's final result and only listed as a warning at the end of the run.
+#
+# Both -fc and -a take the CUBRID version the baseline belongs to, "11.4" or "11_4", as a
 # bare argument; without one, DEFAULT_VERSION is used. The same request answers
 # differently across engines, so a baseline is only meaningful next to the
 # version it was taken from.
@@ -1325,6 +1418,7 @@ dump_mode = bool(args) and args[0] == "--dump"
 file_check = False
 make_answer = False
 no_sleep = False
+strict_timeout = False
 listarg = DEFAULT_TEST_SET
 VERSION = DEFAULT_VERSION
 
@@ -1337,6 +1431,8 @@ if not dump_mode:
             make_answer = True
         elif arg in ("-ns", "--no-sleep"):
             no_sleep = True
+        elif arg in ("-st", "--strict-timeout"):
+            strict_timeout = True
         elif arg.startswith("-"):
             print("unknown option: %s" % arg)
             sys.exit(2)
@@ -1419,6 +1515,17 @@ nstatus = sum(1 for r in results if r.get("status_only"))
 if nstatus:
     print("\n\033[33m%d request(s) are marked status only in %s.\033[0m"
           % (nstatus, os.path.basename(LIST_FILE)))
+
+if timeout_fallbacks:
+    print("\n\033[33m%d request(s) ran past http_timeout without "
+          "\"async\":\"yes\" and were followed to the end (%s):\033[0m"
+          % (len(timeout_fallbacks),
+             "counted as failures, --strict-timeout" if strict_timeout
+             else "judged by the final result; -st fails them"))
+    for item in timeout_fallbacks:
+        print("  \033[33m%s\033[0m (%s): %s after %.0f s, job %s"
+              % (item["name"], item["file"], item["status"], item["elapsed"],
+                 item["uuid"]))
 
 nfailed = sum(1 for r in results if not r["ok"])
 if nfailed:

@@ -9,6 +9,7 @@
 #   ./run_tests.sh -fc task_result_check.txt    compare against the .answer files
 #   ./run_tests.sh -a task_result_check.txt     regenerate those .answer files
 #   ./run_tests.sh -ns                          ignore the "sleep" lines
+#   ./run_tests.sh -st                          fail cases that ran past http_timeout
 #
 # Baselines are per CUBRID version. Pass the version as a bare argument to pick
 # the directory they live in; without one, 11.4 is used.
@@ -29,7 +30,7 @@ CASE_ROOT=task_test_case
 LOG_DIR=log
 
 usage() {
-    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 clean() {

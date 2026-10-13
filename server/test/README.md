@@ -51,6 +51,9 @@ cd server/test
 # 목록의 sleep 줄 무시 (비동기 처리가 없는 서버용)
 ./run_tests.sh -ns
 
+# "async" 없이 보낸 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
+./run_tests.sh -st
+
 # task_test_case/ 의 모든 세트를 차례로 실행
 ./run_tests.sh --all
 
@@ -340,6 +343,15 @@ getdbsize_async,sync
   `timeout`으로 실패를 기록한다
 - 콘솔에는 `job <uuid> running ... polling gettaskstatus`와 `job <uuid> ended after N s`가
   찍히고, 결과와 상세 XML에는 최종 응답만 남는다
+- `"async":"yes"` 없이 보낸 요청이 `http_timeout`을 넘긴 경우(즉시 응답의 `note`가
+  `timeout`)는 **timeout fallback**으로 따로 표시한다. task가 느려진 회귀는 최종 결과가
+  `success`여도 놓치면 안 되기 때문이다
+  - 그 자리에서 `warning: <case> ran past http_timeout ...` 경고를 찍고, 실행이 끝나면
+    `N request(s) ran past http_timeout ...` 아래에 케이스, 최종 status, 걸린 시간, `uuid`를
+    모아 보여 준다. 상세 XML의 해당 `<testcase>`에는 `timeout_fallback` property가 붙는다
+  - 기본은 경고만 하고 판정은 최종 결과로 한다
+  - **`-st` / `--strict-timeout`** 을 주면 그런 케이스를 실패로 센다. `-fc`에서 결과 파일이
+    기준값과 같아도, `,failure` 케이스여도 실패다
 - `uuid`는 받은 문자열 그대로 보낸다. 19자리까지 가능해 double로 바꾸면 값이 깨진다
 - 따라간 작업의 `uuid`는 `$LAST_ASYNC_UUID`에 남는다. 다음 케이스가 끝난 작업을 다시
   조회할 때 쓴다 (`gettaskstatus_done`, `gettaskstatus_failed`). `gettaskstatus_failed`는
