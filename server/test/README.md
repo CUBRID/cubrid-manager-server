@@ -51,7 +51,7 @@ cd server/test
 # 목록의 sleep 줄 무시 (비동기 처리가 없는 서버용)
 ./run_tests.sh -ns
 
-# "async" 없이 보낸 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
+# 동기로 실행된 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
 ./run_tests.sh -st
 
 # task_test_case/ 의 모든 세트를 차례로 실행
@@ -343,9 +343,12 @@ getdbsize_async,sync
   `timeout`으로 실패를 기록한다
 - 콘솔에는 `job <uuid> running ... polling gettaskstatus`와 `job <uuid> ended after N s`가
   찍히고, 결과와 상세 XML에는 최종 응답만 남는다
-- `"async":"yes"` 없이 보낸 요청이 `http_timeout`을 넘긴 경우(즉시 응답의 `note`가
-  `timeout`)는 **timeout fallback**으로 따로 표시한다. task가 느려진 회귀는 최종 결과가
-  `success`여도 놓치면 안 되기 때문이다
+- 동기로 실행된 요청이 `http_timeout`을 넘긴 경우(즉시 응답의 `note`가 `timeout`)는
+  **timeout fallback**으로 따로 표시한다. task가 느려진 회귀는 최종 결과가 `success`여도
+  놓치면 안 되기 때문이다
+  - 판단은 즉시 응답의 `note`로만 한다. async를 지원하는 task에 `"async":"yes"`를 보내면
+    `note`가 `none`이라 해당되지 않고, 지원하지 않는 task(예: `getdbsize`)에 보낸
+    `"async":"yes"`는 무시되고 동기로 실행되므로 timeout이 나면 해당된다
   - 그 자리에서 `warning: <case> ran past http_timeout ...` 경고를 찍고, 실행이 끝나면
     `N request(s) ran past http_timeout ...` 아래에 케이스, 최종 status, 걸린 시간, `uuid`를
     모아 보여 준다. 상세 XML의 해당 `<testcase>`에는 `timeout_fallback` property가 붙는다

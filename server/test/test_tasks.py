@@ -251,9 +251,9 @@ CUBRID_DATABASES = ""
 
 results = []
 
-# Requests sent without "async":"yes" that ran past the server's http_timeout:
-# the server answered "note":"timeout" and kept the task running, and the case
-# was judged by the job's final result. See send_one() and do_one_job().
+# Requests that ran synchronously past the server's http_timeout: the server
+# answered "note":"timeout" and kept the task running, and the case was judged
+# by the job's final result. See send_one() and do_one_job().
 timeout_fallbacks = []
 
 # Placeholders whose value is only known once the run has started, see
@@ -371,8 +371,9 @@ def print_response(response):
 
 
 # A request answered with "job-status":"running" and a "uuid" has not finished:
-# either it asked for "async":"yes", or it ran past the server's http_timeout
-# and was left running in the background ("status":"failure", "note":"timeout").
+# either it asked for "async":"yes" on a task that supports it ("note":"none"),
+# or it ran synchronously past the server's http_timeout and was left running
+# in the background ("status":"failure", "note":"timeout").
 # The runner then polls gettaskstatus with that uuid and judges the case by the
 # job's final response, never by the immediate one.
 #
@@ -389,20 +390,16 @@ def is_running_job(data):
             and data.get("uuid") not in (None, ""))
 
 
-def asked_for_async(req):
-    value = req.get("async") if isinstance(req, dict) else None
-    return isinstance(value, str) and value.lower() == "yes"
+def is_timeout_fallback(data):
+    """A request that ran synchronously past the server's http_timeout.
 
-
-def is_timeout_fallback(req, data):
-    """A synchronous request the server gave up waiting on after http_timeout.
-
-    The immediate response then carries the job's uuid with "note":"timeout";
-    a request that asked for "async":"yes" answers "note":"none" instead, so
-    only the first is a task that took longer than the server allows.
+    The server tells the two kinds of running job apart by the note alone: a
+    task started with "async":"yes" answers "note":"none" right away, a
+    synchronous run it gave up waiting on answers "note":"timeout". The
+    request is not looked at: "async":"yes" on a task that does not support it
+    is ignored and runs synchronously, and can time out like any other.
     """
-    return (not asked_for_async(req) and is_running_job(data)
-            and data.get("note") == "timeout")
+    return is_running_job(data) and data.get("note") == "timeout"
 
 
 def follow_job(name, data, token):
@@ -469,11 +466,11 @@ def send_one(name, req, token, expected="success", casefile="",
                    expected, body, quiet=file_check)
             return data
     elif is_running_job(data):
-        timed_out = is_timeout_fallback(req, data)
+        timed_out = is_timeout_fallback(data)
         uuid = str(data["uuid"])
         if timed_out:
-            print("    \033[33mwarning: %s ran past http_timeout without "
-                  "\"async\":\"yes\"; %s\033[0m"
+            print("    \033[33mwarning: %s ran past http_timeout "
+                  "(\"note\":\"timeout\"); %s\033[0m"
                   % (name, "counted as a failure (--strict-timeout)"
                      if strict_timeout else "judged by the final result"))
         final, final_body, problem = follow_job(name, data, token)
@@ -576,7 +573,7 @@ def fail_timeout_fallback(name, before):
     verdict is turned into a failure too, so the timeout cannot be hidden by
     a matching baseline.
     """
-    note = "ran past http_timeout without \"async\":\"yes\" (--strict-timeout)"
+    note = "ran past http_timeout (--strict-timeout)"
     for item in results[before:]:
         if not item.get("timeout_fallback"):
             continue
@@ -1398,8 +1395,8 @@ def init_env():
 # servers whose tasks answer before their work is done; against one that does
 # not, they are only lost time.
 #
-# --strict-timeout fails a case whose request, sent without "async":"yes",
-# ran past the server's http_timeout. By default such a case is judged by the
+# --strict-timeout fails a case whose request ran synchronously past the
+# server's http_timeout (an immediate "note":"timeout"). By default such a case is judged by the
 # job's final result and only listed as a warning at the end of the run.
 #
 # Both -fc and -a take the CUBRID version the baseline belongs to, "11.4" or "11_4", as a
@@ -1517,8 +1514,8 @@ if nstatus:
           % (nstatus, os.path.basename(LIST_FILE)))
 
 if timeout_fallbacks:
-    print("\n\033[33m%d request(s) ran past http_timeout without "
-          "\"async\":\"yes\" and were followed to the end (%s):\033[0m"
+    print("\n\033[33m%d request(s) ran past http_timeout "
+          "(\"note\":\"timeout\") and were followed to the end (%s):\033[0m"
           % (len(timeout_fallbacks),
              "counted as failures, --strict-timeout" if strict_timeout
              else "judged by the final result; -st fails them"))
