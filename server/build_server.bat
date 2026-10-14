@@ -116,11 +116,23 @@ if not "%exitcode%" == "0" (
     SET "INSTALL_CHECK_OK="
     IF DEFINED CM_ADMIN_PATH IF DEFINED CUB_MANAGER_PATH SET "INSTALL_CHECK_OK=1"
 
+    SET "MISSING_FILES="
+    FOR %%F IN (cmserver\conf\*.conf cmserver\conf\*.pass) DO (
+        IF NOT EXIST "%INSTALL_DIR%\conf\%%~nxF" SET "MISSING_FILES=!MISSING_FILES! conf\%%~nxF"
+    )
+    FOR %%F IN (cm_ssl_cert.key cm_ssl_cert.crt) DO (
+        IF NOT EXIST "%INSTALL_DIR%\conf\%%F" SET "MISSING_FILES=!MISSING_FILES! conf\%%F"
+    )
+    IF DEFINED MISSING_FILES (
+        echo build_server.bat: diag - missing under "%INSTALL_DIR%":!MISSING_FILES!
+        SET "INSTALL_CHECK_OK="
+    )
+
     IF DEFINED INSTALL_CHECK_OK (
-        echo build_server.bat: warning - devenv exit code %exitcode% ignored, cm_admin.exe and cub_manager.exe were both found in the freshly-wiped output directory.
+        echo build_server.bat: warning - devenv exit code %exitcode% ignored, the executables, configuration and certificate files were all found in the freshly-wiped output directory.
         set exitcode=0
     ) ELSE (
-        echo build_server.bat: devenv exit code %exitcode% and no fresh build output found - real failure.
+        echo build_server.bat: devenv exit code %exitcode% and the fresh build output is missing or incomplete - real failure.
         exit /b %exitcode%
     )
 )
