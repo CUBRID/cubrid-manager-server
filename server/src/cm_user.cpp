@@ -427,6 +427,7 @@ dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
     {
       unlink (tmpfile);
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot write the new cmdb.pass to %s", tmpfile);
+      LOG_ERROR ("dbmt_user_write_auth_locked : %s", _dbmt_error);
       return ERR_WITH_MSG;
     }
 
@@ -436,6 +437,11 @@ dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
       /* the precisions keep the message within DBMT_ERROR_MSG_SIZE (-Wformat-truncation) */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %.1000s; the new content is kept in %.3900s",
 		strbuf, tmpfile);
+      /*
+       * callers such as createdb and copydb replace _dbmt_error with their own
+       * warning, so the error log is where the kept file can be found
+       */
+      LOG_ERROR ("dbmt_user_write_auth_locked : %s", _dbmt_error);
       return ERR_WITH_MSG;
     }
 
