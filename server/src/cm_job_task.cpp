@@ -14620,6 +14620,35 @@ obsolete_version_autoexecquery_conf (const char *conf_line)
     }
 }
 
+/*
+ * dblocation_file_mutex () - serializes the read-modify-write of
+ *   databases.txt in alter_dblocation ().
+ *
+ *   Tasks run outside cm_mutex, so restoredb requests for different
+ *   databases can rewrite the file at the same time. Each one reads the whole
+ *   file, changes its own line and replaces the file, so without this lock
+ *   the last one to finish would drop the change of the other.
+ */
+static mutex_t *
+dblocation_file_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 static int
 alter_dblocation (const char *dbname, const char *new_dbpath)
 {
@@ -14635,6 +14664,9 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
   snprintf (dblocation_info_path, PATH_MAX - 1, "%s/%s",
 	    sco.szCubrid_databases, CUBRID_DATABASE_TXT);
   gen_tempfile_path (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", TS_ALTER_DB_LOC, PATH_MAX);
+
+  /* held from the read of databases.txt until it is replaced */
+  mutex_lock (*dblocation_file_mutex ());
 
   dblocation_info = fopen (dblocation_info_path, "r");
   tmpfile = fopen (tmpfile_path, "w");
@@ -14690,6 +14722,8 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 
       move_file (tmpfile_path, dblocation_info_path);
     }
+
+  mutex_unlock (*dblocation_file_mutex ());
 
   if (!db_existant)
     {
