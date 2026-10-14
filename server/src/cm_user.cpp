@@ -375,6 +375,7 @@ dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   fp = fopen (tmpfile, "w");
   if (fp == NULL)
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", tmpfile);
       return ERR_TMPFILE_OPEN_FAIL;
     }
   for (i = 0; i < dbmt_user->num_dbmt_user; i++)
@@ -410,9 +411,31 @@ dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
       fprintf (fp, "%s%s\n", CUBRID_PASS_CLOSE_TAG,
 	       dbmt_user->user_info[i].user_name);
     }
-  fclose (fp);
 
-  move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf));
+  /*
+   * a short write (e.g. a full disk) must not replace cmdb.pass with a
+   * truncated copy, and a failed replace must reach the caller: tasks that
+   * change a database report it as a warning that cmdb.pass needs a manual
+   * check.
+   */
+  bool write_failed = (ferror (fp) != 0);
+  if (fclose (fp) != 0)
+    {
+      write_failed = true;
+    }
+  if (write_failed)
+    {
+      unlink (tmpfile);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot write the new cmdb.pass to %s", tmpfile);
+      return ERR_WITH_MSG;
+    }
+
+  if (move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf)) != 0)
+    {
+      unlink (tmpfile);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %s", strbuf);
+      return ERR_WITH_MSG;
+    }
 
   return ERR_NO_ERROR;
 }

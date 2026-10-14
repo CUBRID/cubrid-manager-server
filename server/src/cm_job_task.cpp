@@ -3045,6 +3045,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
    */
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+    bool registered = false;
 
     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
       {
@@ -3060,18 +3061,24 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
 	      {
 		if (dbmt_user_add_dbinfo
-		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR)
+		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR
+		    && dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
 		  {
-		    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+		    registered = true;
 		  }
 		break;
 	      }
 	  }
 	dbmt_user_free (&dbmt_user);
       }
-    else
+
+    /*
+     * lock timeout, cmdb.pass could not be read, the user is not in it,
+     * out of memory, or the new cmdb.pass could not be written
+     */
+    if (!registered)
       {
-	cmdb_pass_registration_failed = 1;    /* lock timeout, or the cmdb.pass file could not be read */
+	cmdb_pass_registration_failed = 1;
       }
   }
 
@@ -3317,7 +3324,10 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
       {
 	dbmt_user_db_delete (&dbmt_user, dbname);
-	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
 	dbmt_user_free (&dbmt_user);
       }
     else
@@ -3603,7 +3613,10 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		  }
 	      }
 	  }
-	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
 	dbmt_user_free (&dbmt_user);
       }
     else
@@ -4289,7 +4302,10 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       {
 	dbmt_user_db_delete (&dbmt_user, srcdbname);
       }
-    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+      {
+	cmdb_pass_sync_failed = 1;
+      }
     dbmt_user_free (&dbmt_user);
   }
 
