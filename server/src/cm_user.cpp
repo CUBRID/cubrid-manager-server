@@ -433,7 +433,8 @@ dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error)
   if (move_file (tmpfile, conf_get_dbmt_file (FID_DBMT_CUBRID_PASS, strbuf)) != 0)
     {
       /* keep tmpfile: a failed copy fallback may have truncated cmdb.pass */
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %s; the new content is kept in %s",
+      /* the precisions keep the message within DBMT_ERROR_MSG_SIZE (-Wformat-truncation) */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %.1000s; the new content is kept in %.3900s",
 		strbuf, tmpfile);
       return ERR_WITH_MSG;
     }
