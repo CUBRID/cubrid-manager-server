@@ -10035,6 +10035,56 @@ ts_getstatustemplate (nvplist *cli_request, nvplist *cli_response,
 }
 
 
+/*
+ * analyzecaslog_mutex () - serializes the broker_log_top runs of
+ *   ts_analyzecaslog ().
+ *
+ *   broker_log_top writes its result to fixed names in the current directory
+ *   (log_top.q, log_top.res, or log_top.t with -t), and tasks run outside
+ *   cm_mutex. Two analyzecaslog requests at the same time would overwrite or
+ *   take each other's files, so the lock is held from the run until those
+ *   files are moved to per request temp files.
+ */
+static mutex_t *
+analyzecaslog_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
+/* locks a mutex_t for the lifetime of the scope, on every exit path */
+class mutex_scope
+{
+  public:
+    explicit mutex_scope (mutex_t &m) : m_m (m)
+    {
+      mutex_lock (m_m);
+    }
+    ~mutex_scope (void)
+    {
+      mutex_unlock (m_m);
+    }
+
+  private:
+    mutex_t &m_m;
+
+    mutex_scope (const mutex_scope &);
+    mutex_scope &operator= (const mutex_scope &);
+};
+
 int
 ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 		  char *diag_error)
@@ -10090,30 +10140,48 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
     }
   argv[arg_index++] = NULL;
   gen_tempfile_path (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
 
-  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
-  if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
-    {
-      if (access (diag_err_file, F_OK) == 0)
-	{
-	  unlink (diag_err_file);
-	}
-      return ERR_WITH_MSG;
-    }
+  {
+    /* held until the fixed-name results are moved; see analyzecaslog_mutex () */
+    mutex_scope lock (*analyzecaslog_mutex ());
 
-  if (access (diag_err_file, F_OK) == 0)
-    {
-      unlink (diag_err_file);
-    }
+    retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
+    if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
+      {
+	if (access (diag_err_file, F_OK) == 0)
+	  {
+	    unlink (diag_err_file);
+	  }
+	return ERR_WITH_MSG;
+      }
 
-  if (retval < 0)
-    {
-      if (diag_error)
-	{
-	  strcpy (diag_error, argv[0]);
-	}
-      return ERR_SYSTEM_CALL;
-    }
+    if (access (diag_err_file, F_OK) == 0)
+      {
+	unlink (diag_err_file);
+      }
+
+    if (retval < 0)
+      {
+	if (diag_error)
+	  {
+	    strcpy (diag_error, argv[0]);
+	  }
+	return ERR_SYSTEM_CALL;
+      }
+
+    if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
+      {
+	rename ("./log_top.t", tmpfileT);
+      }
+    else
+      {
+	rename ("./log_top.q", tmpfileQ);
+	rename ("./log_top.res", tmpfileRes);
+      }
+  }
 
   gen_tempfile_path (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", TS_ANALYZECASLOG, PATH_MAX);
   fdAnalyzeResult = fopen (tmpfileanalyzeresult, "w+");
@@ -10123,15 +10191,15 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	{
 	  strcpy (diag_error, "Tmpfile");
 	}
+      unlink (tmpfileT);
+      unlink (tmpfileQ);
+      unlink (tmpfileRes);
       return ERR_FILE_OPEN_FAIL;
     }
 
   if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
     {
       int log_init_flag, log_index;
-
-      gen_tempfile_path (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
-      rename ("./log_top.t", tmpfileT);
 
       fdT = fopen (tmpfileT, "r");
       if (fdT == NULL)
@@ -10209,12 +10277,6 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 #else
       th_id = getpid ();
 #endif
-      gen_tempfile_path (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
-      gen_tempfile_path (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
-
-      rename ("./log_top.q", tmpfileQ);
-      rename ("./log_top.res", tmpfileRes);
-
       fdQ = fopen (tmpfileQ, "r");
       if (fdQ == NULL)
 	{
