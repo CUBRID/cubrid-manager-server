@@ -1386,7 +1386,7 @@ int
 folder_copy (const char *src_folder, const char *dest_folder)
 {
   WIN32_FIND_DATA FileData;
-  HANDLE hSearch;
+  HANDLE hSearch = INVALID_HANDLE_VALUE;
   DWORD dwAttrs;
   char src_dir[PATH_MAX];
   char dest_dir[PATH_MAX];
@@ -1471,9 +1471,18 @@ folder_copy (const char *src_folder, const char *dest_folder)
   return 0;
 
 err_clean_return:
+  /* close the search handle first, so that dest_dir can be removed */
+  if (hSearch != INVALID_HANDLE_VALUE)
+    {
+      FindClose (hSearch);
+      hSearch = INVALID_HANDLE_VALUE;
+    }
   uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
 err_return:
-  FindClose (hSearch);
+  if (hSearch != INVALID_HANDLE_VALUE)
+    {
+      FindClose (hSearch);
+    }
   return -1;
 }
 #else
