@@ -17663,31 +17663,43 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   interval = atoi (interval_str);
 
-  mutex_lock (*_statdumpd_mutex ());
+  /*
+   * statdump_daemon is only touched under mutex_scope: a std::bad_alloc from
+   * the map (or from the string key) must not leave _statdumpd_mutex held,
+   * since getserverstatus waits for it while holding cm_mutex.
+   */
+  bool too_many = false;
+  bool inserted = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  _reap_dead_statdump_entries ();
+    _reap_dead_statdump_entries ();
 
-  if (statdump_daemon.size () >= MAX_STATDUMP_PROC)
+    if (statdump_daemon.size () >= MAX_STATDUMP_PROC)
+      {
+	too_many = true;
+      }
+    else
+      {
+	T_STATDUMP_STAT reserved;
+	reserved.status = STATD_STARTING;
+	reserved.pid = -1;
+	reserved.interval = interval;
+	reserved.started = 0;
+	reserved.worker_pid = -1;
+	reserved.dispatcher_start_time = -1;
+	reserved.worker_start_time = -1;
+	inserted = statdump_daemon.insert (make_pair (string (db_name), reserved)).second;
+      }
+  }
+
+  if (too_many)
     {
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "too many concurrent statdump processes");
       return -1;
     }
 
-  T_STATDUMP_STAT reserved;
-  reserved.status = STATD_STARTING;
-  reserved.pid = -1;
-  reserved.interval = interval;
-  reserved.started = 0;
-  reserved.worker_pid = -1;
-  reserved.dispatcher_start_time = -1;
-  reserved.worker_start_time = -1;
-  pair <map <string, T_STATDUMP_STAT>::iterator, bool> inserted =
-	  statdump_daemon.insert (make_pair (string (db_name), reserved));
-
-  mutex_unlock (*_statdumpd_mutex ());
-
-  if (!inserted.second)
+  if (!inserted)
     {
       nv_update_val (res, "note", "already running");
       return -1;
@@ -17730,41 +17742,48 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   }
 #endif
 
-  mutex_lock (*_statdumpd_mutex ());
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    if (ret_val < 0)
+      {
+	/*
+	 * give the reserved entry back; nobody else could have touched
+	 * it while it was STATD_STARTING
+	 */
+	statdump_daemon.erase (db_name);
+      }
+    else
+      {
+	T_STATDUMP_STAT &entry = statdump_daemon[db_name];
+
+	entry.status = STATD_RUNNING;
+	entry.pid = ret_val;
+	entry.started = time (NULL);
+	entry.dispatcher_start_time = dispatcher_start_time;
+      }
+  }
 
   if (ret_val < 0)
     {
-      /*
-       * give the reserved entry back; nobody else could have touched
-       * it while it was STATD_STARTING
-       */
-      statdump_daemon.erase (db_name);
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "could not execute statdump");
       return -1;
     }
-
-  statdump_daemon[db_name].status = STATD_RUNNING;
-  statdump_daemon[db_name].pid = ret_val;
-  statdump_daemon[db_name].started = time (NULL);
-  statdump_daemon[db_name].dispatcher_start_time = dispatcher_start_time;
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   {
     int worker_pid = _find_statdumpd_worker_pid (ret_val);
     long long worker_start_time = (worker_pid > 0) ? _get_proc_start_time (worker_pid) : -1;
 
-    mutex_lock (*_statdumpd_mutex ());
+    {
+      mutex_scope lock (*_statdumpd_mutex ());
 
-    map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
-    if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
-      {
-	worker_itor->second.worker_pid = worker_pid;
-	worker_itor->second.worker_start_time = worker_start_time;
-      }
-
-    mutex_unlock (*_statdumpd_mutex ());
+      map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
+      if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
+	{
+	  worker_itor->second.worker_pid = worker_pid;
+	  worker_itor->second.worker_start_time = worker_start_time;
+	}
+    }
 
     nv_update_val (res, "note", db_name);
     nv_update_val (res, "status", "success");
@@ -17801,25 +17820,28 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DB_INACTIVE;
     }
 
-  mutex_lock (*_statdumpd_mutex ());
+  bool found = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  map <string, T_STATDUMP_STAT>::iterator itor =
-	  db_name ? statdump_daemon.find (db_name) : statdump_daemon.end ();
-  if (itor == statdump_daemon.end () || itor->second.status != STATD_RUNNING)
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+    if (itor != statdump_daemon.end () && itor->second.status == STATD_RUNNING)
+      {
+	found = true;
+	pid = itor->second.pid;
+	worker_pid = itor->second.worker_pid;
+	dispatcher_start_time = itor->second.dispatcher_start_time;
+	worker_start_time = itor->second.worker_start_time;
+	itor->second.status = STATD_STOPPING;
+      }
+  }
+
+  if (!found)
     {
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "no statdump running");
       nv_update_val (res, "status", "failed");
       return -1;
     }
-
-  pid = itor->second.pid;
-  worker_pid = itor->second.worker_pid;
-  dispatcher_start_time = itor->second.dispatcher_start_time;
-  worker_start_time = itor->second.worker_start_time;
-  itor->second.status = STATD_STOPPING;
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   nv_update_val (res, "note", db_name);
 
@@ -17889,32 +17911,34 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 #endif
 
-  mutex_lock (*_statdumpd_mutex ());
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  itor = statdump_daemon.find (db_name);
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+
+    if (itor != statdump_daemon.end ())
+      {
+	if (ret_val < 0)
+	  {
+	    /*
+	     * kill failed: put the entry back to STATD_RUNNING (instead of
+	     * leaving it stuck in STATD_STOPPING) so a retry can find it
+	     */
+	    itor->second.status = STATD_RUNNING;
+	  }
+	else
+	  {
+	    statdump_daemon.erase (itor);
+	  }
+      }
+  }
 
   if (ret_val < 0)
     {
-      /*
-       * kill failed: put the entry back to STATD_RUNNING (instead of
-       * leaving it stuck in STATD_STOPPING) so a retry can find it
-       */
-      if (itor != statdump_daemon.end ())
-	{
-	  itor->second.status = STATD_RUNNING;
-	}
-      mutex_unlock (*_statdumpd_mutex ());
       nv_add_nvp_int (res, "pid", pid);
       nv_update_val (res, "status", "failed");
       return ret_val;
     }
-
-  if (itor != statdump_daemon.end ())
-    {
-      statdump_daemon.erase (itor);
-    }
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   nv_update_val (res, "status", "success");
   return ret_val;
@@ -17925,7 +17949,12 @@ get_statdump_daemon_list (void)
 {
   vector <T_STATDUMPD_INFO> result;
 
-  mutex_lock (*_statdumpd_mutex ());
+  /*
+   * reserve (), the strings and push_back () can throw std::bad_alloc;
+   * mutex_scope releases _statdumpd_mutex then too. The caller
+   * (getserverstatus) holds cm_mutex while waiting for it.
+   */
+  mutex_scope lock (*_statdumpd_mutex ());
 
   _reap_dead_statdump_entries ();
 
@@ -17965,8 +17994,6 @@ get_statdump_daemon_list (void)
 	}
       result.push_back (info);
     }
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   return result;
 }
