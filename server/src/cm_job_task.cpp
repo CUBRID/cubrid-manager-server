@@ -3162,7 +3162,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"registered in cmdb.pass (lock timeout, file I/O error, or "
 		"an internal update error); the database is NOT currently "
 		"manageable through CMS for user '%s' until cmdb.pass is "
-		"corrected manually",
+		"corrected manually; see the CMS error log for details",
 		dbname, dbmt_user_name);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -3357,7 +3357,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"database '%s' was deleted, but the following bookkeeping "
 		"file(s) could not be updated (lock timeout, file I/O "
 		"error, or an internal update error): %s; manual check "
-		"recommended",
+		"recommended; see the CMS error log for details",
 		dbname, failed_files);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -3640,7 +3640,8 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"bookkeeping file(s) could not be updated (lock timeout, "
 		"file I/O error, or an internal update error): %s; stale "
 		"entries still referencing the old name '%s' may remain "
-		"and should be checked and cleaned up manually",
+		"and should be checked and cleaned up manually; see the CMS "
+		"error log for details",
 		dbname, newdbname, failed_files, dbname);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -4322,7 +4323,7 @@ copydb_finale:
 		"timeout, read failure, or an internal update error); "
 		"the copy itself succeeded, but '%s' may not be "
 		"manageable through CMS until cmdb.pass is corrected "
-		"manually%s",
+		"manually%s; see the CMS error log for details",
 		srcdbname, destdbname, destdbname,
 		move_flag ? " (note: 'move' was requested, so the source "
 		"database's cmdb.pass entry may also still "
