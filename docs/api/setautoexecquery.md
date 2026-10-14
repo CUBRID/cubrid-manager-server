@@ -34,8 +34,8 @@ Set a configuration of a query automation.
   * if *period* is 'DAY', 'date' is 'EVERYDAY' <br>
   (for example 'DAY', 'EVERYDAY 12:30')
 
-  * for repeated execution, specify the time duration in seconds, starting with 'i'.
-  (for example if a query should be executed at every 60 seconds, 'DAY', 'EVERYDAY i60')
+  * for repeated execution, specify the interval in minutes, starting with 'i'.
+  (for example if a query should be executed every minute, 'DAY', 'EVERYDAY i1'; every hour, 'DAY', 'EVERYDAY i60')
 ## Request Sample: ONCE
 
 ```
@@ -82,7 +82,7 @@ Set a configuration of a query automation.
 }
 ```
 
-## Request Sample: execute at every 60 seconds
+## Request Sample: execute every minute
 ```
 {
   "task": "setautoexecquery",
@@ -96,7 +96,7 @@ Set a configuration of a query automation.
           "username": "dba",
           "userpass": "none",
           "period": "DAY",
-          "detail": "EVERYDAY i60",
+          "detail": "EVERYDAY i1",
           "query_string": "select * from db_class;"
         }
       ]
