@@ -303,7 +303,7 @@ static int check_dbpath (char *dir, char *_dbmt_error);
 static int file_to_nvpairs (char *filepath, nvplist *res);
 static int file_to_nvp_by_separator (FILE *fp, nvplist *res, char separator);
 static int obsolete_version_autoexecquery_conf (const char *conf_line);
-static int alter_dblocation (const char *dbname, const char *new_dbpath);
+static int alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error);
 static void print_db_stat_to_res (T_CM_DB_PROC_STAT *db_stat, nvplist *res);
 static int record_ha_topology_to_struct (FILE *infile, int get_all_dbmode,
     char *dblist, char *_dbmt_error, T_HA_SERVER_INFO_ALL **all_info_out);
@@ -6142,7 +6142,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	}
 
-      if ((retval = alter_dblocation (dbname, recovery_path)) != ERR_NO_ERROR)
+      if ((retval = alter_dblocation (dbname, recovery_path, _dbmt_error)) != ERR_NO_ERROR)
 	{
 	  return retval;
 	}
@@ -14728,7 +14728,7 @@ dblocation_file_mutex (void)
 }
 
 static int
-alter_dblocation (const char *dbname, const char *new_dbpath)
+alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error)
 {
   int retval = ERR_NO_ERROR;
   FILE *dblocation_info, *tmpfile;
@@ -14757,7 +14757,10 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
       if (tmpfile != NULL)
 	{
 	  fclose (tmpfile);
+	  unlink (tmpfile_path);
 	}
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		dblocation_info == NULL ? dblocation_info_path : tmpfile_path);
       retval = ERR_FILE_OPEN_FAIL;
     }
   else
@@ -14796,17 +14799,43 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 	}
 
       fclose (dblocation_info);
-      fclose (tmpfile);
 
-      move_file (tmpfile_path, dblocation_info_path);
+      /* a short write (e.g. a full disk) must not replace databases.txt */
+      bool write_failed = (ferror (tmpfile) != 0);
+      if (fclose (tmpfile) != 0)
+	{
+	  write_failed = true;
+	}
+
+      if (write_failed)
+	{
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot write the new %s to %s",
+		    CUBRID_DATABASE_TXT, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
+      else if (!db_existant)
+	{
+	  /* nothing changed: leave databases.txt as it is */
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", dbname);
+	  retval = ERR_DB_NONEXISTANT;
+	}
+      else if (move_file (tmpfile_path, dblocation_info_path) != 0)
+	{
+	  /*
+	   * keep tmpfile_path: across filesystems move_file () falls back to
+	   * file_copy (), which truncates databases.txt first and removes it
+	   * on a failed write, so the temp file may be the only complete copy
+	   */
+	  /* the precisions keep the message within DBMT_ERROR_MSG_SIZE (-Wformat-truncation) */
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %.2400s; the new content is kept in %.2400s",
+		    dblocation_info_path, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
     }
 
   mutex_unlock (*dblocation_file_mutex ());
-
-  if (!db_existant)
-    {
-      retval = ERR_DB_NONEXISTANT;
-    }
 
   return retval;
 }
