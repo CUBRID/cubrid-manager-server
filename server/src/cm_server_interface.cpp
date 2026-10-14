@@ -1634,8 +1634,12 @@ parse_uuid (const Json::Value &v, INT64 &out)
  * cub_check_async_status () - handle a "gettaskstatus"
  *   poll for a job previously started with "async":"yes" (or one that
  *   fell back to async because it ran past sco.iHttpTimeout).
+ *
+ *   return: true if the request was a gettaskstatus; `response` is then the
+ *           final answer to it, whether the lookup succeeded or not.
+ *           false for any other task, which the caller goes on to run.
  */
-int
+static bool
 cub_check_async_status (Json::Value &request, Json::Value &response)
 {
   string task;
@@ -1645,32 +1649,36 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
 
   if (task != "gettaskstatus")
     {
-      return 0;
+      return false;
     }
 
   reap_stale_async_jobs ();
 
   if (!parse_uuid (request["uuid"], uuid))
     {
-      return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
+      build_server_header (response, ERR_WITH_MSG, "invalid uuid");
+      return true;
     }
 
   itor = request_map.find (uuid);
   if (itor == request_map.end ())
     {
-      return build_server_header (response, ERR_WITH_MSG, "uuid not found");
+      build_server_header (response, ERR_WITH_MSG, "uuid not found");
+      return true;
     }
 
   if (request.get ("_ID", "").asString () != itor->second->requester_id)
     {
-      return build_server_header (response, ERR_WITH_MSG, "invalid uuid");
+      build_server_header (response, ERR_WITH_MSG, "invalid uuid");
+      return true;
     }
 
   if (itor->second->status == 0)
     {
       put_uuid (response, itor->second->uuid);
       response["job-status"] = "running";
-      return build_server_header (response, ERR_NO_ERROR, "none");
+      build_server_header (response, ERR_NO_ERROR, "none");
+      return true;
     }
 
   /* NOTE: a finished job is intentionally left in request_map here,
@@ -1685,7 +1693,7 @@ cub_check_async_status (Json::Value &request, Json::Value &response)
   put_uuid (response, itor->second->uuid);
   response["job-status"] = (response["status"].isString () &&
 			    response["status"].asString () == STATUS_SUCCESS) ? "success" : "error";
-  return ERR_NO_ERROR;
+  return true;
 }
 
 /*
