@@ -26,7 +26,7 @@ on:
         default: develop
         required: false
       strict_timeout:
-        description: 'fail cases that ran past http_timeout without "async":"yes"'
+        description: 'fail cases whose request ran past http_timeout ("note":"timeout")'
         type: boolean
         default: false
         required: false
@@ -353,7 +353,7 @@ jobs:
             echo
             tail -n 3 run.log | grep -E 'succeeded|failed' || true
             echo
-            if grep -q 'ran past http_timeout without' run.log; then
+            if grep -q 'request(s) ran past http_timeout' run.log; then
               echo "<details><summary>⚠️ requests that ran past http_timeout</summary>"
               echo
               echo '```'
