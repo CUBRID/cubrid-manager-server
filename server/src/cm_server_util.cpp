@@ -22,6 +22,10 @@
  * cm_server_util.cpp -
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -1389,7 +1393,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
   char search_file[PATH_MAX];
   int retval = 0;
 
-  if (src_dir == NULL || dest_dir == NULL)
+  if (src_folder == NULL || dest_folder == NULL)
     {
       goto err_return;
     }
@@ -1482,7 +1486,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
   struct stat statbuf;
   DIR *dp = NULL;
 
-  if (src_dir == NULL || dest_dir == NULL)
+  if (src_folder == NULL || dest_folder == NULL)
     {
       goto err_return;
     }
