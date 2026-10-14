@@ -100,27 +100,27 @@ int dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_pass_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 void dbmt_user_set_dbinfo (T_DBMT_USER_DBINFO *dbinfo, const char *dbname,
-                           const char *auth, const char *uid, const char *broker_address);
+			   const char *auth, const char *uid, const char *broker_address);
 void dbmt_user_set_authinfo (T_DBMT_USER_AUTHINFO *authinfo,
-                             const char *domain, const char *auth);
+			     const char *domain, const char *auth);
 void dbmt_user_set_userinfo (T_DBMT_USER_INFO *usrinfo,
-                             const char *user_name, const char *user_passwd,
-                             int num_authinfo, T_DBMT_USER_AUTHINFO *authinfo,
-                             int num_dbinfo, T_DBMT_USER_DBINFO *dbinfo);
+			     const char *user_name, const char *user_passwd,
+			     int num_authinfo, T_DBMT_USER_AUTHINFO *authinfo,
+			     int num_dbinfo, T_DBMT_USER_DBINFO *dbinfo);
 int dbmt_user_search (T_DBMT_USER_INFO *user_info, const char *dbname);
 void dbmt_user_db_delete (T_DBMT_USER *dbmt_user, char *dbname);
 int dbmt_user_add_dbinfo (T_DBMT_USER_INFO *usrinfo,
-                          T_DBMT_USER_DBINFO *dbinfo);
+			  T_DBMT_USER_DBINFO *dbinfo);
 
 int dbmt_user_new_token_info (const char *user_id,
-                              const char *user_ip, const char *user_port,
-                              const char *token_enc,
+			      const char *user_ip, const char *user_port,
+			      const char *token_enc,
 #ifdef WINDOWS
-                              HANDLE proc_id,
+			      HANDLE proc_id,
 #else
-                              pid_t proc_id,
+			      pid_t proc_id,
 #endif
-                              time_t login_time);
+			      time_t login_time);
 
 bool dbmt_user_search_token_info (const char *user_id, T_USER_TOKEN_INFO *out);
 bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);

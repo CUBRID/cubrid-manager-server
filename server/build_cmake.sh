@@ -129,9 +129,8 @@ else
   exit 1
 fi
 
-cubrid_include_dir="$cubrid_src/src/cm_common;$cubrid_src/cubrid-cci/src/cci"
-for h in "$cubrid_src/src/cm_common/cm_dep.h" "$cubrid_src/src/cm_common/cm_stat.h" \
-         "$cubrid_src/cubrid-cci/src/cci/cas_cci.h"; do
+cubrid_include_dir="$cubrid_src/src/cm_common"
+for h in "$cubrid_src/src/cm_common/cm_dep.h" "$cubrid_src/src/cm_common/cm_stat.h"; do
   if [ ! -f "$h" ]; then
     echo "$progname: missing header $h" >&2
     exit 1

@@ -137,7 +137,7 @@ class CLog
     {
       char buff[MAX_DATE_TIME_LENGTH] = "unkonwn";
       time_t lt;
-      struct tm ltm;
+      struct tm ltm = {};
       time (&lt);
       tm *t = LOCALTIME_R (&lt, &ltm);
       if (t)
@@ -166,7 +166,7 @@ class CLog
     _get_current_time_year_mon_day_hour_minute_second (char *current_time)
     {
       time_t cur_time;
-      struct tm cur_tm;
+      struct tm cur_tm = {};
       tm *t;
 
       time (&cur_time);

@@ -51,6 +51,9 @@ cd server/test
 # 목록의 sleep 줄 무시 (비동기 처리가 없는 서버용)
 ./run_tests.sh -ns
 
+# 동기로 실행된 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
+./run_tests.sh -st
+
 # task_test_case/ 의 모든 세트를 차례로 실행
 ./run_tests.sh --all
 
@@ -215,6 +218,7 @@ server/test/
 | `$AUTO_QUERY_TIME` | 다음 1분 `YYYY/MM/DD HH:MM` |
 | `$TEST_KILL_PID` | `build_env()`가 띄운 더미 프로세스의 pid (`killprocess`용) |
 | `$TEST_TRANINDEX` | `build_env()`가 demodb에 열어 둔 트랜잭션의 인덱스 (`killtransaction`용) |
+| `$LAST_ASYNC_UUID` | 러너가 마지막으로 따라간 async 작업의 `uuid` (`gettaskstatus` 재조회용, 4.5 참고) |
 
 `$AUTO_*`는 예약 작업(backup/exec query 등)을 “곧 실행되도록” 만들기 위한 것이다.
 `$TEST_*`는 고정 id(pid `99999`, tranindex `2(+)`)로는 어느 호스트에서도 통과할 수 없던
@@ -228,6 +232,8 @@ server/test/
 <name>              # 결과 비교 대상. -fc 에서 <name>.answer 와 대조한다
 <name>,success      # status 만 검사 (success 기대). 기준값을 갖지 않는다
 <name>,failure      # status 만 검사 (failure 기대). 부정 테스트
+<name>,sync         # status 만 검사 (success 기대) + 동기 응답이어야 함
+                    # (uuid / job-status 가 있으면 실패, 4.5 참고)
 sleep <초>          # 다음 케이스 전까지 대기 (예: sleep 10, sleep 20)
                     # 빈 줄은 무시 (가독성용 구분)
 // ...              # '/'로 시작하면 주석/구분 헤더 (실행 안 함)
@@ -253,6 +259,9 @@ sleep 10
 - 무거운 케이스는 그 줄만 올리면 된다 (`sleep 20`)
 - 실패를 기대하는 케이스(`,failure`)에는 붙이지 않는다. 거부된 요청은 아무 작업도
   시작하지 않는다
+
+`uuid`를 돌려준 요청은 러너가 끝날 때까지 기다린다(4.5의 자동 폴링). `sleep` 줄은
+응답에 `uuid`가 없는데도 작업이 뒤에서 이어지는 경우를 위한 것이다.
 
 **`-ns` / `--no-sleep`** — 목록의 `sleep` 줄을 전부 무시한다. 비동기 처리가 들어가지
 않은 서버에는 기다릴 이유가 없고, 대기가 실행 시간의 대부분이기 때문이다. 목록 하나로
@@ -282,6 +291,16 @@ startbroker  startdb  stop_statdump  stopbroker  stopdb  unloaddb
 - **부정 테스트** — `userverify_fail,failure` 처럼 서버가 거부해야 하는 케이스
 - **기준값을 가질 수 없는 케이스** — 응답이 실행과 함께 자라는 것들 (4.5 참고)
 
+**`,sync`** 는 `,success`처럼 status 전용이면서, 응답이 **동기 응답**인지도 본다. 응답에
+`uuid`나 `job-status`가 있으면 status와 상관없이 실패(`async`)로 기록하고, 자동 폴링도 하지
+않는다. async를 지원하지 않는 task에 `"async":"yes"`를 보내면 무시되고 동기로 실행된다는
+것을 확인하는 데 쓴다.
+
+```
+// "async" on a task that does not support it is ignored: plain synchronous run
+getdbsize_async,sync
+```
+
 - `<name>`은 그 세트의 케이스 디렉터리에 있는 파일명과 일치해야 한다
   (`task_test_case/<세트>/<name>`, 확장자 없음).
 - 실행 **순서에 의미가 있다**. 예: `createdb` → `startdb` → … → `deletedb`.
@@ -303,6 +322,48 @@ startbroker  startdb  stop_statdump  stopbroker  stopdb  unloaddb
 
 기본 실행은 **파일을 아무것도 쓰지 않는다.** 기준값 생성은 `-a` / `--answer`를 줘야
 일어난다. 오늘의 응답을 내일의 기준값으로 삼는 일은 명시적으로 요청해야 한다는 원칙이다.
+
+**async 작업의 자동 폴링**
+
+응답이 `"job-status":"running"`과 `uuid`를 담고 있으면 작업이 아직 끝나지 않은 것이다.
+두 가지 경우가 있다.
+
+- 요청에 `"async":"yes"`를 넣은 경우 (`docs/api/async_readme.md`의 25개 task)
+- `"async"` 없이 보냈지만 서버의 `http_timeout`(기본 30초)을 넘긴 경우. 이때 즉시 응답은
+  `"status":"failure"`, `"note":"timeout"`이지만 작업은 뒤에서 계속 돈다
+
+러너는 이 응답으로 판정하지 않는다. 같은 토큰으로 `gettaskstatus`에 그 `uuid`를 보내
+`job-status`가 `running`이 아닐 때까지 폴링하고, **최종 응답**으로 판정한다
+(`send_one()` → `follow_job()`).
+
+- 판정은 최종 응답의 `status`다. `job-status:"error"`인 작업은 `status:"failure"`이므로
+  `,failure` 케이스로 검증할 수 있다
+- `gettaskstatus`가 `uuid not found`를 돌려주면(예: 그사이 CMS 재시작) 그 응답이 최종 응답이다
+- 폴링 간격은 `ASYNC_POLL_SEC`(1초), 최대 대기는 `ASYNC_WAIT_SEC`(600초)다. 넘기면
+  `timeout`으로 실패를 기록한다
+- 콘솔에는 `job <uuid> running ... polling gettaskstatus`와 `job <uuid> ended after N s`가
+  찍히고, 결과와 상세 XML에는 최종 응답만 남는다
+- 동기로 실행된 요청이 `http_timeout`을 넘긴 경우(즉시 응답의 `note`가 `timeout`)는
+  **timeout fallback**으로 따로 표시한다. task가 느려진 회귀는 최종 결과가 `success`여도
+  놓치면 안 되기 때문이다
+  - 판단은 즉시 응답의 `note`로만 한다. async를 지원하는 task에 `"async":"yes"`를 보내면
+    `note`가 `none`이라 해당되지 않고, 지원하지 않는 task(예: `getdbsize`)에 보낸
+    `"async":"yes"`는 무시되고 동기로 실행되므로 timeout이 나면 해당된다
+  - 그 자리에서 `warning: <case> ran past http_timeout ...` 경고를 찍고, 실행이 끝나면
+    `N request(s) ran past http_timeout ...` 아래에 케이스, 최종 status, 걸린 시간, `uuid`를
+    모아 보여 준다. 상세 XML의 해당 `<testcase>`에는 `timeout_fallback` property가 붙는다
+  - 기본은 경고만 하고 판정은 최종 결과로 한다
+  - **`-st` / `--strict-timeout`** 을 주면 그런 케이스를 실패로 센다. `-fc`에서 결과 파일이
+    기준값과 같아도, `,failure` 케이스여도 실패다
+- `uuid`는 받은 문자열 그대로 보낸다. 19자리까지 가능해 double로 바꾸면 값이 깨진다
+- 따라간 작업의 `uuid`는 `$LAST_ASYNC_UUID`에 남는다. 다음 케이스가 끝난 작업을 다시
+  조회할 때 쓴다 (`gettaskstatus_done`, `gettaskstatus_failed`). `gettaskstatus_failed`는
+  `startdb_async_fail`이 실제로 async 작업으로 실행됐는지도 확인한다. 동기로 실패했다면 이 값이
+  그 전 `checkdb_async`의 성공한 작업을 가리키므로 `,failure` 기대와 어긋나 실패한다
+- `-fc`에서는 `uuid`를 `VOLATILE_KEYS`로 가린다
+- `--dump`도 즉시 응답 다음에 최종 응답을 출력한다
+
+`,sync` 케이스는 자동 폴링을 하지 않는다(4.4 참고).
 
 **(2) 결과 파일 검사 (`-fc`, `--file-check`)**
 
@@ -374,7 +435,7 @@ task_test_case/task_result_check/11_4/<case>.result
 
 `VOLATILE_KEYS`는 **키 이름**으로 가린다. 값 전체가 실행마다 바뀌는 것들이다:
 `pid`, `as_pid`, `as_psize`, `as_lat`, `time`, `tran_time`, `tranindex`,
-`cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`.
+`cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`.
 
 `VOLATILE_PATTERNS`는 **모양**으로 가린다. 긴 문자열 안에 박혀 있어서 키 단위로는
 못 거르는 것들이다.

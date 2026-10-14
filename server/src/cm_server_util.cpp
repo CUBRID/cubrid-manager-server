@@ -688,7 +688,7 @@ uRemoveCRLF (char *str)
 char *
 time_to_str (time_t t, const char *fmt, char *buf, int type)
 {
-  struct tm ltm;
+  struct tm ltm = {};
   struct tm *tm_p;
 
   tm_p = LOCALTIME_R (&t, &ltm);
@@ -2085,7 +2085,12 @@ file_copy (char *src_file, char *dest_file)
 {
   char strbuf[1024];
   int src_fd, dest_fd;
-  size_t read_size, write_size;
+  /*
+   * signed: read ()/write () return -1 on error, which an unsigned type
+   * would turn into a huge count that passes the checks below (a full disk
+   * then silently produced a truncated dest_file and a "successful" copy)
+   */
+  int read_size, write_size;
   int mode = 0644;
 
 #if !defined(WINDOWS)
@@ -2117,11 +2122,10 @@ file_copy (char *src_file, char *dest_file)
     }
 #endif
 
-  while ((read_size = read (src_fd, strbuf, sizeof (strbuf))) > 0)
+  while ((read_size = (int) read (src_fd, strbuf, sizeof (strbuf))) > 0)
     {
-      if (read_size > sizeof (strbuf)
-	  || (write_size =
-		      write (dest_fd, strbuf, (unsigned int) read_size)) < read_size)
+      write_size = (int) write (dest_fd, strbuf, (unsigned int) read_size);
+      if (write_size != read_size)
 	{
 	  close (src_fd);
 	  close (dest_fd);
@@ -2131,7 +2135,13 @@ file_copy (char *src_file, char *dest_file)
     }
 
   close (src_fd);
-  close (dest_fd);
+
+  /* a read error, or a write error that only shows up when the file is closed */
+  if (close (dest_fd) != 0 || read_size < 0)
+    {
+      unlink (dest_file);
+      return -1;
+    }
 
   return 0;
 }
@@ -3855,93 +3865,6 @@ ut_get_token_active_time (time_t *active_time)
   return 0;
 }
 
-#if defined (ENABLE_UNUSED_FUNCTION)
-int
-ut_validate_auth (nvplist *req)
-{
-  T_USER_AUTH auth_task = 0;
-  T_USER_AUTH auth_user = 0;
-  T_DBMT_USER dbmt_user;
-  T_DBMT_USER_AUTHINFO *auth_info = NULL;
-  char *task = NULL;
-  char *user_id = NULL;
-  char dbmt_error[DBMT_ERROR_MSG_SIZE];
-  int num_authinfo = 0;
-  int i = 0;            // loop var
-
-  dbmt_error[0] = '\0';
-
-  task = nv_get_val (req, "task");
-  user_id = nv_get_val (req, "_ID");
-
-  if (task == NULL)
-    {
-      return 0;
-    }
-
-  if (!strcmp (task, "login") || !strcmp (task, "getcmsenv"))
-    {
-      return 1;
-    }
-
-  if (user_id == NULL)
-    {
-      return 0;
-    }
-
-  if (ut_get_task_info (task, NULL, NULL, &auth_task) == 0)
-    {
-      // As the task doesn't exist, this failure will be checked in next step.
-      return 1;
-    }
-
-  if (dbmt_user_read (&dbmt_user, dbmt_error) != ERR_NO_ERROR)
-    {
-      return 0;
-    }
-
-  for (i = 0; i < dbmt_user.num_dbmt_user; ++i)
-    {
-      if (!strcmp (dbmt_user.user_info[i].user_name, user_id))
-	{
-	  auth_info = dbmt_user.user_info[i].authinfo;
-	  num_authinfo = dbmt_user.user_info[i].num_authinfo;
-	  break;
-	}
-    }
-
-  for (i = 0; i < num_authinfo; ++i)
-    {
-      if (!strcmp (auth_info[i].domain, "user_auth"))
-	{
-	  auth_user = atoi (auth_info[i].auth);
-	  break;
-	}
-    }
-
-  // assign default authority to old users.
-  if (auth_user == 0)
-    {
-      if (!strcmp (user_id, "admin"))
-	{
-	  auth_user = AU_ADMIN;
-	}
-      else
-	{
-	  auth_user = ALL_AUTHORITY;
-	}
-    }
-
-  if (auth_user == AU_ADMIN)
-    {
-      return 1;
-    }
-
-  return (auth_user & auth_task) ? 1 : 0;
-
-}
-#endif
-
 static int
 get_short_filename (char *ret_name, int ret_name_len,
 		    char *short_filename)
@@ -5265,36 +5188,3 @@ get_proc_comm (const std::string &pid, std::string &comm)
   return true;
 }
 
-bool
-setenv_using_putenv_fmt (const std::string &nameValue, int overwrite)
-{
-  size_t eqPos = nameValue.find ('=');
-
-  if (eqPos == std::string::npos)
-    {
-      return false;
-    }
-
-  std::string name = nameValue.substr (0, eqPos);
-  std::string value = nameValue.substr (eqPos + 1);
-
-  if (name.empty ())
-    {
-      return false;
-    }
-
-#if defined(WINDOWS)
-  errno_t err = _putenv_s (name.c_str (), value.c_str ());
-  if (err != 0)
-    {
-      return false;
-    }
-#else
-  if (setenv (name.c_str (), value.c_str (), overwrite) != 0)
-    {
-      return false;
-    }
-#endif
-
-  return true;
-}

@@ -10,7 +10,7 @@ Compact database.
 | token | token string encrypted. |
 | dbname | database name |
 | verbose | on-off indicating whether to show detailed information |
-| input-class-file | path of a file that lists the classes to compact, one class name per line. cannot be given together with class-names |
+| input-class-file | absolute path of a file on the CMS host that lists the classes to compact, one class name per line. environment variables such as `$CUBRID` are not expanded. cannot be given together with class-names |
 | class-names | a list of class names to compact. cannot be given together with input-class-file |
 | async | default "no", if "yes" run the task in asynchronous mode |
 
@@ -24,7 +24,7 @@ Compact database.
   "task":"compactdb",
   "token":"cdfb4c5717170c5e9c6856b4d1c61ee8132bcc7d82bd609066ed9ece2554c47f7926f07dd201b6aa",
   "dbname":"alatestdb",
-  "input-class-file":"$CUBRID/tmp/alatestdb-input-class-file",
+  "input-class-file":"/home/cubrid/CUBRID/tmp/alatestdb-input-class-file",
   "verbose":"y",
   "async":"yes"
 }

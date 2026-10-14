@@ -64,6 +64,22 @@ There are seven permissions. These permissions can indicate which authorities ar
 
 Some tasks can be run in the background instead of blocking until they finish; see [Asynchronous Task Execution](async_readme.md) for the list of supported tasks, how to request async mode, and the related `cm.conf` settings.
 
+## Paths in Request Samples
+
+Some request samples in the interface documents write a path as `$CUBRID/...` or `$CUBRID_DATABASES/...`. These stand for the CUBRID installation directory and the databases directory of the host where CMS runs; they are notation for the reader. Unless an interface document says otherwise, CMS uses a path in a request as it is, without expanding environment variables, so a client has to send the actual absolute path instead.
+
+For example, when CUBRID is installed in `/home/cubrid/CUBRID`, a sample written as
+
+```
+  "backupdir": "$CUBRID_DATABASES/alatestdb/backup",
+```
+
+is sent as
+
+```
+  "backupdir": "/home/cubrid/CUBRID/databases/alatestdb/backup",
+```
+
 ## CMS Interfaces
 
 CMS Interfaces are composed by JSON and is used for communication between CMS and Cubrid Manager.

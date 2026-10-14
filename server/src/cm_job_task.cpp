@@ -303,7 +303,7 @@ static int check_dbpath (char *dir, char *_dbmt_error);
 static int file_to_nvpairs (char *filepath, nvplist *res);
 static int file_to_nvp_by_separator (FILE *fp, nvplist *res, char separator);
 static int obsolete_version_autoexecquery_conf (const char *conf_line);
-static int alter_dblocation (const char *dbname, const char *new_dbpath);
+static int alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error);
 static void print_db_stat_to_res (T_CM_DB_PROC_STAT *db_stat, nvplist *res);
 static int record_ha_topology_to_struct (FILE *infile, int get_all_dbmode,
     char *dblist, char *_dbmt_error, T_HA_SERVER_INFO_ALL **all_info_out);
@@ -3045,6 +3045,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
    */
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+    bool registered = false;
 
     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
       {
@@ -3060,18 +3061,24 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
 	      {
 		if (dbmt_user_add_dbinfo
-		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR)
+		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR
+		    && dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
 		  {
-		    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+		    registered = true;
 		  }
 		break;
 	      }
 	  }
 	dbmt_user_free (&dbmt_user);
       }
-    else
+
+    /*
+     * lock timeout, cmdb.pass could not be read, the user is not in it,
+     * out of memory, or the new cmdb.pass could not be written
+     */
+    if (!registered)
       {
-	cmdb_pass_registration_failed = 1;    /* lock timeout, or the cmdb.pass file could not be read */
+	cmdb_pass_registration_failed = 1;
       }
   }
 
@@ -3155,7 +3162,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"registered in cmdb.pass (lock timeout, file I/O error, or "
 		"an internal update error); the database is NOT currently "
 		"manageable through CMS for user '%s' until cmdb.pass is "
-		"corrected manually",
+		"corrected manually; see the CMS error log for details",
 		dbname, dbmt_user_name);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -3317,7 +3324,10 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
       {
 	dbmt_user_db_delete (&dbmt_user, dbname);
-	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
 	dbmt_user_free (&dbmt_user);
       }
     else
@@ -3347,7 +3357,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"database '%s' was deleted, but the following bookkeeping "
 		"file(s) could not be updated (lock timeout, file I/O "
 		"error, or an internal update error): %s; manual check "
-		"recommended",
+		"recommended; see the CMS error log for details",
 		dbname, failed_files);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -3603,7 +3613,10 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		  }
 	      }
 	  }
-	dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
 	dbmt_user_free (&dbmt_user);
       }
     else
@@ -3627,7 +3640,8 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		"bookkeeping file(s) could not be updated (lock timeout, "
 		"file I/O error, or an internal update error): %s; stale "
 		"entries still referencing the old name '%s' may remain "
-		"and should be checked and cleaned up manually",
+		"and should be checked and cleaned up manually; see the CMS "
+		"error log for details",
 		dbname, newdbname, failed_files, dbname);
       nv_update_val (res, "note", _dbmt_error);
       ut_error_log (req, _dbmt_error);
@@ -4289,7 +4303,10 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       {
 	dbmt_user_db_delete (&dbmt_user, srcdbname);
       }
-    dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+      {
+	cmdb_pass_sync_failed = 1;
+      }
     dbmt_user_free (&dbmt_user);
   }
 
@@ -4306,7 +4323,7 @@ copydb_finale:
 		"timeout, read failure, or an internal update error); "
 		"the copy itself succeeded, but '%s' may not be "
 		"manageable through CMS until cmdb.pass is corrected "
-		"manually%s",
+		"manually%s; see the CMS error log for details",
 		srcdbname, destdbname, destdbname,
 		move_flag ? " (note: 'move' was requested, so the source "
 		"database's cmdb.pass entry may also still "
@@ -6126,7 +6143,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	}
 
-      if ((retval = alter_dblocation (dbname, recovery_path)) != ERR_NO_ERROR)
+      if ((retval = alter_dblocation (dbname, recovery_path, _dbmt_error)) != ERR_NO_ERROR)
 	{
 	  return retval;
 	}
@@ -10035,6 +10052,56 @@ ts_getstatustemplate (nvplist *cli_request, nvplist *cli_response,
 }
 
 
+/*
+ * analyzecaslog_mutex () - serializes the broker_log_top runs of
+ *   ts_analyzecaslog ().
+ *
+ *   broker_log_top writes its result to fixed names in the current directory
+ *   (log_top.q, log_top.res, or log_top.t with -t), and tasks run outside
+ *   cm_mutex. Two analyzecaslog requests at the same time would overwrite or
+ *   take each other's files, so the lock is held from the run until those
+ *   files are moved to per request temp files.
+ */
+static mutex_t *
+analyzecaslog_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
+/* locks a mutex_t for the lifetime of the scope, on every exit path */
+class mutex_scope
+{
+  public:
+    explicit mutex_scope (mutex_t &m) : m_m (m)
+    {
+      mutex_lock (m_m);
+    }
+    ~mutex_scope (void)
+    {
+      mutex_unlock (m_m);
+    }
+
+  private:
+    mutex_t &m_m;
+
+    mutex_scope (const mutex_scope &);
+    mutex_scope &operator= (const mutex_scope &);
+};
+
 int
 ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 		  char *diag_error)
@@ -10090,30 +10157,48 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
     }
   argv[arg_index++] = NULL;
   gen_tempfile_path (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
 
-  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
-  if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
-    {
-      if (access (diag_err_file, F_OK) == 0)
-	{
-	  unlink (diag_err_file);
-	}
-      return ERR_WITH_MSG;
-    }
+  {
+    /* held until the fixed-name results are moved; see analyzecaslog_mutex () */
+    mutex_scope lock (*analyzecaslog_mutex ());
 
-  if (access (diag_err_file, F_OK) == 0)
-    {
-      unlink (diag_err_file);
-    }
+    retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
+    if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
+      {
+	if (access (diag_err_file, F_OK) == 0)
+	  {
+	    unlink (diag_err_file);
+	  }
+	return ERR_WITH_MSG;
+      }
 
-  if (retval < 0)
-    {
-      if (diag_error)
-	{
-	  strcpy (diag_error, argv[0]);
-	}
-      return ERR_SYSTEM_CALL;
-    }
+    if (access (diag_err_file, F_OK) == 0)
+      {
+	unlink (diag_err_file);
+      }
+
+    if (retval < 0)
+      {
+	if (diag_error)
+	  {
+	    strcpy (diag_error, argv[0]);
+	  }
+	return ERR_SYSTEM_CALL;
+      }
+
+    if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
+      {
+	rename ("./log_top.t", tmpfileT);
+      }
+    else
+      {
+	rename ("./log_top.q", tmpfileQ);
+	rename ("./log_top.res", tmpfileRes);
+      }
+  }
 
   gen_tempfile_path (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", TS_ANALYZECASLOG, PATH_MAX);
   fdAnalyzeResult = fopen (tmpfileanalyzeresult, "w+");
@@ -10123,15 +10208,15 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	{
 	  strcpy (diag_error, "Tmpfile");
 	}
+      unlink (tmpfileT);
+      unlink (tmpfileQ);
+      unlink (tmpfileRes);
       return ERR_FILE_OPEN_FAIL;
     }
 
   if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
     {
       int log_init_flag, log_index;
-
-      gen_tempfile_path (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
-      rename ("./log_top.t", tmpfileT);
 
       fdT = fopen (tmpfileT, "r");
       if (fdT == NULL)
@@ -10209,12 +10294,6 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 #else
       th_id = getpid ();
 #endif
-      gen_tempfile_path (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
-      gen_tempfile_path (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
-
-      rename ("./log_top.q", tmpfileQ);
-      rename ("./log_top.res", tmpfileRes);
-
       fdQ = fopen (tmpfileQ, "r");
       if (fdQ == NULL)
 	{
@@ -14620,8 +14699,37 @@ obsolete_version_autoexecquery_conf (const char *conf_line)
     }
 }
 
+/*
+ * dblocation_file_mutex () - serializes the read-modify-write of
+ *   databases.txt in alter_dblocation ().
+ *
+ *   Tasks run outside cm_mutex, so restoredb requests for different
+ *   databases can rewrite the file at the same time. Each one reads the whole
+ *   file, changes its own line and replaces the file, so without this lock
+ *   the last one to finish would drop the change of the other.
+ */
+static mutex_t *
+dblocation_file_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 static int
-alter_dblocation (const char *dbname, const char *new_dbpath)
+alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error)
 {
   int retval = ERR_NO_ERROR;
   FILE *dblocation_info, *tmpfile;
@@ -14636,6 +14744,9 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 	    sco.szCubrid_databases, CUBRID_DATABASE_TXT);
   gen_tempfile_path (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", TS_ALTER_DB_LOC, PATH_MAX);
 
+  /* held from the read of databases.txt until it is replaced */
+  mutex_lock (*dblocation_file_mutex ());
+
   dblocation_info = fopen (dblocation_info_path, "r");
   tmpfile = fopen (tmpfile_path, "w");
   if (dblocation_info == NULL || tmpfile == NULL)
@@ -14647,7 +14758,10 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
       if (tmpfile != NULL)
 	{
 	  fclose (tmpfile);
+	  unlink (tmpfile_path);
 	}
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		dblocation_info == NULL ? dblocation_info_path : tmpfile_path);
       retval = ERR_FILE_OPEN_FAIL;
     }
   else
@@ -14686,15 +14800,43 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 	}
 
       fclose (dblocation_info);
-      fclose (tmpfile);
 
-      move_file (tmpfile_path, dblocation_info_path);
+      /* a short write (e.g. a full disk) must not replace databases.txt */
+      bool write_failed = (ferror (tmpfile) != 0);
+      if (fclose (tmpfile) != 0)
+	{
+	  write_failed = true;
+	}
+
+      if (write_failed)
+	{
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot write the new %s to %s",
+		    CUBRID_DATABASE_TXT, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
+      else if (!db_existant)
+	{
+	  /* nothing changed: leave databases.txt as it is */
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", dbname);
+	  retval = ERR_DB_NONEXISTANT;
+	}
+      else if (move_file (tmpfile_path, dblocation_info_path) != 0)
+	{
+	  /*
+	   * keep tmpfile_path: across filesystems move_file () falls back to
+	   * file_copy (), which truncates databases.txt first and removes it
+	   * on a failed write, so the temp file may be the only complete copy
+	   */
+	  /* the precisions keep the message within DBMT_ERROR_MSG_SIZE (-Wformat-truncation) */
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %.2400s; the new content is kept in %.2400s",
+		    dblocation_info_path, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
     }
 
-  if (!db_existant)
-    {
-      retval = ERR_DB_NONEXISTANT;
-    }
+  mutex_unlock (*dblocation_file_mutex ());
 
   return retval;
 }
@@ -16278,7 +16420,7 @@ _get_format_time ()
 {
   char *buff = (char *) malloc (sizeof (char) * LINE_MAX);
   time_t lt;
-  struct tm ltm;
+  struct tm ltm = {};
   struct tm *t;
 
   if (buff == NULL)
@@ -17567,31 +17709,43 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   interval = atoi (interval_str);
 
-  mutex_lock (*_statdumpd_mutex ());
+  /*
+   * statdump_daemon is only touched under mutex_scope: a std::bad_alloc from
+   * the map (or from the string key) must not leave _statdumpd_mutex held,
+   * since getserverstatus waits for it while holding cm_mutex.
+   */
+  bool too_many = false;
+  bool inserted = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  _reap_dead_statdump_entries ();
+    _reap_dead_statdump_entries ();
 
-  if (statdump_daemon.size () >= MAX_STATDUMP_PROC)
+    if (statdump_daemon.size () >= MAX_STATDUMP_PROC)
+      {
+	too_many = true;
+      }
+    else
+      {
+	T_STATDUMP_STAT reserved;
+	reserved.status = STATD_STARTING;
+	reserved.pid = -1;
+	reserved.interval = interval;
+	reserved.started = 0;
+	reserved.worker_pid = -1;
+	reserved.dispatcher_start_time = -1;
+	reserved.worker_start_time = -1;
+	inserted = statdump_daemon.insert (make_pair (string (db_name), reserved)).second;
+      }
+  }
+
+  if (too_many)
     {
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "too many concurrent statdump processes");
       return -1;
     }
 
-  T_STATDUMP_STAT reserved;
-  reserved.status = STATD_STARTING;
-  reserved.pid = -1;
-  reserved.interval = interval;
-  reserved.started = 0;
-  reserved.worker_pid = -1;
-  reserved.dispatcher_start_time = -1;
-  reserved.worker_start_time = -1;
-  pair <map <string, T_STATDUMP_STAT>::iterator, bool> inserted =
-	  statdump_daemon.insert (make_pair (string (db_name), reserved));
-
-  mutex_unlock (*_statdumpd_mutex ());
-
-  if (!inserted.second)
+  if (!inserted)
     {
       nv_update_val (res, "note", "already running");
       return -1;
@@ -17634,41 +17788,48 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   }
 #endif
 
-  mutex_lock (*_statdumpd_mutex ());
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    if (ret_val < 0)
+      {
+	/*
+	 * give the reserved entry back; nobody else could have touched
+	 * it while it was STATD_STARTING
+	 */
+	statdump_daemon.erase (db_name);
+      }
+    else
+      {
+	T_STATDUMP_STAT &entry = statdump_daemon[db_name];
+
+	entry.status = STATD_RUNNING;
+	entry.pid = ret_val;
+	entry.started = time (NULL);
+	entry.dispatcher_start_time = dispatcher_start_time;
+      }
+  }
 
   if (ret_val < 0)
     {
-      /*
-       * give the reserved entry back; nobody else could have touched
-       * it while it was STATD_STARTING
-       */
-      statdump_daemon.erase (db_name);
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "could not execute statdump");
       return -1;
     }
-
-  statdump_daemon[db_name].status = STATD_RUNNING;
-  statdump_daemon[db_name].pid = ret_val;
-  statdump_daemon[db_name].started = time (NULL);
-  statdump_daemon[db_name].dispatcher_start_time = dispatcher_start_time;
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   {
     int worker_pid = _find_statdumpd_worker_pid (ret_val);
     long long worker_start_time = (worker_pid > 0) ? _get_proc_start_time (worker_pid) : -1;
 
-    mutex_lock (*_statdumpd_mutex ());
+    {
+      mutex_scope lock (*_statdumpd_mutex ());
 
-    map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
-    if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
-      {
-	worker_itor->second.worker_pid = worker_pid;
-	worker_itor->second.worker_start_time = worker_start_time;
-      }
-
-    mutex_unlock (*_statdumpd_mutex ());
+      map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
+      if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
+	{
+	  worker_itor->second.worker_pid = worker_pid;
+	  worker_itor->second.worker_start_time = worker_start_time;
+	}
+    }
 
     nv_update_val (res, "note", db_name);
     nv_update_val (res, "status", "success");
@@ -17705,25 +17866,28 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DB_INACTIVE;
     }
 
-  mutex_lock (*_statdumpd_mutex ());
+  bool found = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  map <string, T_STATDUMP_STAT>::iterator itor =
-	  db_name ? statdump_daemon.find (db_name) : statdump_daemon.end ();
-  if (itor == statdump_daemon.end () || itor->second.status != STATD_RUNNING)
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+    if (itor != statdump_daemon.end () && itor->second.status == STATD_RUNNING)
+      {
+	found = true;
+	pid = itor->second.pid;
+	worker_pid = itor->second.worker_pid;
+	dispatcher_start_time = itor->second.dispatcher_start_time;
+	worker_start_time = itor->second.worker_start_time;
+	itor->second.status = STATD_STOPPING;
+      }
+  }
+
+  if (!found)
     {
-      mutex_unlock (*_statdumpd_mutex ());
       nv_update_val (res, "note", "no statdump running");
       nv_update_val (res, "status", "failed");
       return -1;
     }
-
-  pid = itor->second.pid;
-  worker_pid = itor->second.worker_pid;
-  dispatcher_start_time = itor->second.dispatcher_start_time;
-  worker_start_time = itor->second.worker_start_time;
-  itor->second.status = STATD_STOPPING;
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   nv_update_val (res, "note", db_name);
 
@@ -17793,32 +17957,34 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 #endif
 
-  mutex_lock (*_statdumpd_mutex ());
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
 
-  itor = statdump_daemon.find (db_name);
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+
+    if (itor != statdump_daemon.end ())
+      {
+	if (ret_val < 0)
+	  {
+	    /*
+	     * kill failed: put the entry back to STATD_RUNNING (instead of
+	     * leaving it stuck in STATD_STOPPING) so a retry can find it
+	     */
+	    itor->second.status = STATD_RUNNING;
+	  }
+	else
+	  {
+	    statdump_daemon.erase (itor);
+	  }
+      }
+  }
 
   if (ret_val < 0)
     {
-      /*
-       * kill failed: put the entry back to STATD_RUNNING (instead of
-       * leaving it stuck in STATD_STOPPING) so a retry can find it
-       */
-      if (itor != statdump_daemon.end ())
-	{
-	  itor->second.status = STATD_RUNNING;
-	}
-      mutex_unlock (*_statdumpd_mutex ());
       nv_add_nvp_int (res, "pid", pid);
       nv_update_val (res, "status", "failed");
       return ret_val;
     }
-
-  if (itor != statdump_daemon.end ())
-    {
-      statdump_daemon.erase (itor);
-    }
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   nv_update_val (res, "status", "success");
   return ret_val;
@@ -17829,7 +17995,12 @@ get_statdump_daemon_list (void)
 {
   vector <T_STATDUMPD_INFO> result;
 
-  mutex_lock (*_statdumpd_mutex ());
+  /*
+   * reserve (), the strings and push_back () can throw std::bad_alloc;
+   * mutex_scope releases _statdumpd_mutex then too. The caller
+   * (getserverstatus) holds cm_mutex while waiting for it.
+   */
+  mutex_scope lock (*_statdumpd_mutex ());
 
   _reap_dead_statdump_entries ();
 
@@ -17869,8 +18040,6 @@ get_statdump_daemon_list (void)
 	}
       result.push_back (info);
     }
-
-  mutex_unlock (*_statdumpd_mutex ());
 
   return result;
 }
