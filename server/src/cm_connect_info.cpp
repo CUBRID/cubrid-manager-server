@@ -375,7 +375,7 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
       memset (&con_info, 0, sizeof (con_info));
 
       if (sscanf
-	  (strbuf, "%19s %9s %10s %8s %15s %64s", con_info.cli_ip,
+	  (strbuf, "%19s %9s %10s %8s %14s %63s", con_info.cli_ip,
 	   con_info.cli_port, date, time, con_info.cli_ver,
 	   con_info.user_name) == 6
 	  && uStringEqual (ip, con_info.cli_ip)

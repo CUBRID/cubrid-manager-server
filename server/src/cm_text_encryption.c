@@ -122,7 +122,8 @@ uDecrypt (int len, const char *src, char *trg)
     }
 
   memset (hexacode, 0, len * 2 + 1);
-  strcpy (hexacode, src);
+  strncpy (hexacode, src, len * 2);
+  hexacode[len * 2] = '\0';
 
   for (i = 0; i < len; ++i)
     {
