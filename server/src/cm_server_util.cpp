@@ -2085,7 +2085,12 @@ file_copy (char *src_file, char *dest_file)
 {
   char strbuf[1024];
   int src_fd, dest_fd;
-  size_t read_size, write_size;
+  /*
+   * signed: read ()/write () return -1 on error, which an unsigned type
+   * would turn into a huge count that passes the checks below (a full disk
+   * then silently produced a truncated dest_file and a "successful" copy)
+   */
+  int read_size, write_size;
   int mode = 0644;
 
 #if !defined(WINDOWS)
@@ -2117,11 +2122,10 @@ file_copy (char *src_file, char *dest_file)
     }
 #endif
 
-  while ((read_size = read (src_fd, strbuf, sizeof (strbuf))) > 0)
+  while ((read_size = (int) read (src_fd, strbuf, sizeof (strbuf))) > 0)
     {
-      if (read_size > sizeof (strbuf)
-	  || (write_size =
-		      write (dest_fd, strbuf, (unsigned int) read_size)) < read_size)
+      write_size = (int) write (dest_fd, strbuf, (unsigned int) read_size);
+      if (write_size != read_size)
 	{
 	  close (src_fd);
 	  close (dest_fd);
@@ -2131,7 +2135,13 @@ file_copy (char *src_file, char *dest_file)
     }
 
   close (src_fd);
-  close (dest_fd);
+
+  /* a read error, or a write error that only shows up when the file is closed */
+  if (close (dest_fd) != 0 || read_size < 0)
+    {
+      unlink (dest_file);
+      return -1;
+    }
 
   return 0;
 }
