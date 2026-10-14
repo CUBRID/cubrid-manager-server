@@ -38,6 +38,46 @@
 #include "cm_config.h"
 #include "cm_connect_info.h"
 
+/*
+ * Copy the next whitespace-separated field of *cursor into buf, truncated to
+ * buf_size - 1 characters, and advance *cursor past the whole field. Unlike
+ * a sscanf "%Ns", a field longer than the buffer does not spill over into the
+ * next conversion. Returns false when no field is left.
+ */
+static bool
+conlist_next_field (const char **cursor, char *buf, size_t buf_size)
+{
+  const char *start = *cursor;
+  const char *end;
+  size_t len;
+
+  while (*start != '\0' && isspace ((unsigned char) *start))
+    {
+      start++;
+    }
+  if (*start == '\0')
+    {
+      return false;
+    }
+
+  end = start;
+  while (*end != '\0' && !isspace ((unsigned char) *end))
+    {
+      end++;
+    }
+
+  len = (size_t) (end - start);
+  if (len > buf_size - 1)
+    {
+      len = buf_size - 1;
+    }
+  memcpy (buf, start, len);
+  buf[len] = '\0';
+
+  *cursor = end;
+  return true;
+}
+
 int
 dbmt_con_search (const char *ip, const char *port, char *cli_ver)
 {
@@ -374,10 +414,13 @@ dbmt_con_write_dbinfo (T_DBMT_CON_DBINFO *dbinfo, const char *ip,
 	}
       memset (&con_info, 0, sizeof (con_info));
 
-      if (sscanf
-	  (strbuf, "%19s %9s %10s %8s %14s %63s", con_info.cli_ip,
-	   con_info.cli_port, date, time, con_info.cli_ver,
-	   con_info.user_name) == 6
+      const char *cursor = strbuf;
+      if (conlist_next_field (&cursor, con_info.cli_ip, sizeof (con_info.cli_ip))
+	  && conlist_next_field (&cursor, con_info.cli_port, sizeof (con_info.cli_port))
+	  && conlist_next_field (&cursor, date, sizeof (date))
+	  && conlist_next_field (&cursor, time, sizeof (time))
+	  && conlist_next_field (&cursor, con_info.cli_ver, sizeof (con_info.cli_ver))
+	  && conlist_next_field (&cursor, con_info.user_name, sizeof (con_info.user_name))
 	  && uStringEqual (ip, con_info.cli_ip)
 	  && uStringEqual (port, con_info.cli_port))
 	{
