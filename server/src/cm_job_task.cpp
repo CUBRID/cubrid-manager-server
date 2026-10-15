@@ -5251,7 +5251,6 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   char dba_user[32] = "dba";
   char *dbuser = NULL;
   char *dbpasswd = NULL;
-  char *skip_index_detail = NULL;
   char *split_schema_files = NULL;
   char *as_dba = NULL;
 
@@ -5277,7 +5276,6 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   lofile = nv_get_val (req, "lofile");
   dbuser = nv_get_val (req, "dbuser");
   dbpasswd = nv_get_val (req, "dbpasswd");
-  skip_index_detail = nv_get_val (req, "skip-index-detail");
   split_schema_files = nv_get_val (req, "split-schema-files");
   as_dba = nv_get_val (req, "as-dba");
 
@@ -5459,10 +5457,6 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (uStringEqual (split_schema_files, "yes"))
     {
       argv[argc++] = "--" UNLOAD_SPLIT_SCHEMA_L;
-    }
-  if (uStringEqual (skip_index_detail, "yes"))
-    {
-      argv[argc++] = "--" UNLOAD_SKIP_IDX_DETAIL_L;
     }
 
   if (ha_mode != 0)
