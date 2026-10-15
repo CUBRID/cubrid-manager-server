@@ -1392,6 +1392,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
   char dest_dir[PATH_MAX];
   char search_file[PATH_MAX];
   int retval = 0;
+  bool dest_created = false;
 
   if (src_folder == NULL || dest_folder == NULL)
     {
@@ -1410,6 +1411,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	{
 	  goto err_return;
 	}
+      dest_created = true;
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1486,7 +1488,14 @@ err_clean_return:
       FindClose (hSearch);
       hSearch = INVALID_HANDLE_VALUE;
     }
-  uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+  /*
+   * remove dest_dir only when this call created it: an existing directory may
+   * hold files that have nothing to do with this copy
+   */
+  if (dest_created)
+    {
+      uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+    }
 err_return:
   if (hSearch != INVALID_HANDLE_VALUE)
     {
@@ -1503,6 +1512,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
   struct dirent *dirp;
   struct stat statbuf;
   DIR *dp = NULL;
+  bool dest_created = false;
 
   if (src_folder == NULL || dest_folder == NULL)
     {
@@ -1520,6 +1530,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	{
 	  goto err_return;
 	}
+      dest_created = true;
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1576,7 +1587,19 @@ folder_copy (const char *src_folder, const char *dest_folder)
   return 0;
 
 err_clean_return:
-  uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+  if (dp != NULL)
+    {
+      closedir (dp);
+      dp = NULL;
+    }
+  /*
+   * remove dest_dir only when this call created it: an existing directory may
+   * hold files that have nothing to do with this copy
+   */
+  if (dest_created)
+    {
+      uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+    }
 err_return:
   if (dp != NULL)
     {
