@@ -1429,7 +1429,11 @@ folder_copy (const char *src_folder, const char *dest_folder)
       goto err_clean_return;
     }
 
-  while (FindNextFile (hSearch, &FileData))
+  /*
+   * FindFirstFile () already returned the first entry, which is not always
+   * ".", so it is handled before FindNextFile () is called
+   */
+  do
     {
       char src_path[PATH_MAX];
       char dest_path[PATH_MAX];
@@ -1438,7 +1442,8 @@ folder_copy (const char *src_folder, const char *dest_folder)
       snprintf (dest_path, PATH_MAX - 1, "%s/%s", dest_dir,
 		FileData.cFileName);
 
-      if (FileData.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY)
+      /* a directory may carry other attributes too (read-only, hidden, ...) */
+      if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
 	  /* ignore folder "." and "..". */
 	  if (strcmp (FileData.cFileName, ".") == 0
@@ -1447,7 +1452,10 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	      continue;
 	    }
 
-	  folder_copy (src_path, dest_path);
+	  if (folder_copy (src_path, dest_path) < 0)
+	    {
+	      goto err_clean_return;
+	    }
 	  continue;
 	}
 
@@ -1464,6 +1472,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	  goto err_clean_return;
 	}
     }
+  while (FindNextFile (hSearch, &FileData));
 
   /* Close the search handle. */
   FindClose (hSearch);
