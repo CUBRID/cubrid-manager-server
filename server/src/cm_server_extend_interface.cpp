@@ -1165,14 +1165,56 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
+/*
+ * auto_mail_mutex () - serializes the automail runs.
+ *
+ *   Tasks run outside cm_mutex, and ext_exec_auto_mail () releases the
+ *   autojobs.conf lock right after reading the schedule, so two automail
+ *   requests at the same time would both see the same next_exec and both
+ *   send the report.
+ */
+static mutex_t *
+auto_mail_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
 
+  /* locks auto_mail_mutex () for the whole run, on every exit path */
+  struct auto_mail_lock
+  {
+    auto_mail_lock (void)
+    {
+      mutex_lock (*auto_mail_mutex ());
+    }
+    ~auto_mail_lock (void)
+    {
+      mutex_unlock (*auto_mail_mutex ());
+    }
+  } run_lock;
+
   /*
-   * Only this one read is guarded here. It used to hold the guard for
-   * the whole call, including ext_exec_mail_report ()'s log-scanning
-   * and ext_send_mail () -> mail.send () SMTP send below
+   * Only this one read takes the autojobs.conf lock. It used to hold that
+   * lock for the whole call, including ext_exec_mail_report ()'s
+   * log-scanning and ext_send_mail () -> mail.send () SMTP send below;
+   * run_lock above keeps two automail runs from sending the same report
    */
   {
     file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
