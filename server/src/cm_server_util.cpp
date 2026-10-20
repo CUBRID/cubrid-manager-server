@@ -22,6 +22,10 @@
  * cm_server_util.cpp -
  */
 
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -1382,14 +1386,15 @@ int
 folder_copy (const char *src_folder, const char *dest_folder)
 {
   WIN32_FIND_DATA FileData;
-  HANDLE hSearch;
+  HANDLE hSearch = INVALID_HANDLE_VALUE;
   DWORD dwAttrs;
   char src_dir[PATH_MAX];
   char dest_dir[PATH_MAX];
   char search_file[PATH_MAX];
   int retval = 0;
+  bool dest_created = false;
 
-  if (src_dir == NULL || dest_dir == NULL)
+  if (src_folder == NULL || dest_folder == NULL)
     {
       goto err_return;
     }
@@ -1406,6 +1411,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	{
 	  goto err_return;
 	}
+      dest_created = true;
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1425,7 +1431,11 @@ folder_copy (const char *src_folder, const char *dest_folder)
       goto err_clean_return;
     }
 
-  while (FindNextFile (hSearch, &FileData))
+  /*
+   * FindFirstFile () already returned the first entry, which is not always
+   * ".", so it is handled before FindNextFile () is called
+   */
+  do
     {
       char src_path[PATH_MAX];
       char dest_path[PATH_MAX];
@@ -1434,7 +1444,8 @@ folder_copy (const char *src_folder, const char *dest_folder)
       snprintf (dest_path, PATH_MAX - 1, "%s/%s", dest_dir,
 		FileData.cFileName);
 
-      if (FileData.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY)
+      /* a directory may carry other attributes too (read-only, hidden, ...) */
+      if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
 	  /* ignore folder "." and "..". */
 	  if (strcmp (FileData.cFileName, ".") == 0
@@ -1443,7 +1454,10 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	      continue;
 	    }
 
-	  folder_copy (src_path, dest_path);
+	  if (folder_copy (src_path, dest_path) < 0)
+	    {
+	      goto err_clean_return;
+	    }
 	  continue;
 	}
 
@@ -1460,6 +1474,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	  goto err_clean_return;
 	}
     }
+  while (FindNextFile (hSearch, &FileData));
 
   /* Close the search handle. */
   FindClose (hSearch);
@@ -1467,9 +1482,25 @@ folder_copy (const char *src_folder, const char *dest_folder)
   return 0;
 
 err_clean_return:
-  uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+  /* close the search handle first, so that dest_dir can be removed */
+  if (hSearch != INVALID_HANDLE_VALUE)
+    {
+      FindClose (hSearch);
+      hSearch = INVALID_HANDLE_VALUE;
+    }
+  /*
+   * remove dest_dir only when this call created it: an existing directory may
+   * hold files that have nothing to do with this copy
+   */
+  if (dest_created)
+    {
+      uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+    }
 err_return:
-  FindClose (hSearch);
+  if (hSearch != INVALID_HANDLE_VALUE)
+    {
+      FindClose (hSearch);
+    }
   return -1;
 }
 #else
@@ -1481,8 +1512,9 @@ folder_copy (const char *src_folder, const char *dest_folder)
   struct dirent *dirp;
   struct stat statbuf;
   DIR *dp = NULL;
+  bool dest_created = false;
 
-  if (src_dir == NULL || dest_dir == NULL)
+  if (src_folder == NULL || dest_folder == NULL)
     {
       goto err_return;
     }
@@ -1498,6 +1530,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	{
 	  goto err_return;
 	}
+      dest_created = true;
     }
 
   if (access (src_dir, F_OK) != 0 || access (dest_dir, F_OK) != 0)
@@ -1554,7 +1587,19 @@ folder_copy (const char *src_folder, const char *dest_folder)
   return 0;
 
 err_clean_return:
-  uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+  if (dp != NULL)
+    {
+      closedir (dp);
+      dp = NULL;
+    }
+  /*
+   * remove dest_dir only when this call created it: an existing directory may
+   * hold files that have nothing to do with this copy
+   */
+  if (dest_created)
+    {
+      uRemoveDir (dest_dir, REMOVE_DIR_FORCED);
+    }
 err_return:
   if (dp != NULL)
     {
