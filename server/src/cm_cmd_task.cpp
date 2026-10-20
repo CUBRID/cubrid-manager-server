@@ -973,7 +973,7 @@ cmd_deldbinfo (int argc, const char *in_argv[])
 
   if (argc != 3)
     {
-      snprintf (error_msg, DBMT_USER_NAME_LEN, "%s", get_msg_by_id (PTN_ARG_NUM_ERR));
+      snprintf (error_msg, DBMT_ERROR_MSG_SIZE, "%s", get_msg_by_id (PTN_ARG_NUM_ERR));
       retval = E_ARG_ERR;
       goto error_clean_return;
     }
