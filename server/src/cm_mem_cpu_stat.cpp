@@ -276,6 +276,24 @@ cms_get_db_proc_stat_all (T_CM_ERROR *err_buf)
 }
 
 /*
+ * cms_db_proc_stat_all_free () - CMS-native counterpart to the engine's
+ * cm_db_proc_stat_all_free (). cms_get_db_proc_stat_all () allocates the
+ * result and its db_stats array with CMS's own malloc (), so they must be
+ * released with CMS's own free () too: on Windows, cub_manager.exe and the
+ * engine's cmdep.dll each statically link their own CRT and so each has its
+ * own private heap (see cmd_cms_result_free ())
+ */
+void
+cms_db_proc_stat_all_free (T_CM_DB_PROC_STAT_ALL *stat)
+{
+  if (stat != NULL)
+    {
+      CMS_FREE_MEM (stat->db_stats);
+      CMS_FREE_MEM (stat);
+    }
+}
+
+/*
  * This function is not used, but it is code that has been ported for the future.
  */
 #if defined (ENABLE_UNUSED_FUNCTION)

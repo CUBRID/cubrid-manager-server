@@ -11090,7 +11090,7 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 	  print_db_stat_to_res ((db_stat_all->db_stats + i), res);
 	}
 
-      cm_db_proc_stat_all_free (db_stat_all);
+      cms_db_proc_stat_all_free (db_stat_all);
       retval = ERR_NO_ERROR;
     }
   else
