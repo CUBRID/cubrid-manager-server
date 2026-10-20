@@ -1172,6 +1172,11 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
  *   autojobs.conf lock right after reading the schedule, so two automail
  *   requests at the same time would both see the same next_exec and both
  *   send the report.
+ *
+ *   It is only ever taken with mutex_trylock (): a run can take as long as
+ *   the SMTP server makes it, and the requests run on the HTTP worker
+ *   threads, so a request that finds a run in progress returns at once
+ *   instead of waiting (that run sends whatever is due).
  */
 static mutex_t *
 auto_mail_mutex (void)
@@ -1197,18 +1202,30 @@ int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
 
-  /* locks auto_mail_mutex () for the whole run, on every exit path */
+  /*
+   * holds auto_mail_mutex () for the whole run, on every exit path, when
+   * mutex_trylock () got it
+   */
   struct auto_mail_lock
   {
-    auto_mail_lock (void)
+    bool locked;
+    auto_mail_lock (void) : locked (mutex_trylock (*auto_mail_mutex ()) ? true : false)
     {
-      mutex_lock (*auto_mail_mutex ());
     }
     ~auto_mail_lock (void)
     {
-      mutex_unlock (*auto_mail_mutex ());
+      if (locked)
+	{
+	  mutex_unlock (*auto_mail_mutex ());
+	}
     }
   } run_lock;
+
+  if (!run_lock.locked)
+    {
+      LOG_INFO ("automail is already running; this request is skipped");
+      return build_server_header (response, ERR_NO_ERROR, "automail is already running");
+    }
 
   /*
    * Only this one read takes the autojobs.conf lock. It used to hold that
