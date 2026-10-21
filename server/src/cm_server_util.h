@@ -194,6 +194,52 @@ mutex_t *cm_auto_conf_mutex (void);
 mutex_t *cm_auto_jobs_mutex (void);
 
 /*
+ * mutex_scope - locks a mutex_t for the lifetime of the scope and unlocks it
+ *   on every exit path.
+ *
+ *   mutex_scope lock (m);                         blocks until m is locked
+ *   mutex_scope lock (m, mutex_scope::try_lock);  does not wait: check
+ *                                                 lock.owns_lock (), m is
+ *                                                 unlocked at the end only
+ *                                                 when it was locked here
+ */
+class mutex_scope
+{
+  public:
+    enum try_lock_tag
+    {
+      try_lock
+    };
+
+    explicit mutex_scope (mutex_t &m) : m_m (m), m_owns (true)
+    {
+      mutex_lock (m_m);
+    }
+    mutex_scope (mutex_t &m, try_lock_tag) : m_m (m), m_owns (mutex_trylock (m_m) ? true : false)
+    {
+    }
+    ~mutex_scope (void)
+    {
+      if (m_owns)
+	{
+	  mutex_unlock (m_m);
+	}
+    }
+
+    bool owns_lock (void) const
+    {
+      return m_owns;
+    }
+
+  private:
+    mutex_t &m_m;
+    bool m_owns;
+
+    mutex_scope (const mutex_scope &);
+    mutex_scope &operator= (const mutex_scope &);
+};
+
+/*
  * file_resource_guard - RAII guard combining one of the in-process
  *   mutexes above with the existing uCreateLockFile ()/uRemoveLockFile ()
  *   cross-process file lock (see the comment above).

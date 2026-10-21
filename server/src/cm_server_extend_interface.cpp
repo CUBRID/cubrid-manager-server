@@ -1202,26 +1202,10 @@ int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
 
-  /*
-   * holds auto_mail_mutex () for the whole run, on every exit path, when
-   * mutex_trylock () got it
-   */
-  struct auto_mail_lock
-  {
-    bool locked;
-    auto_mail_lock (void) : locked (mutex_trylock (*auto_mail_mutex ()) ? true : false)
-    {
-    }
-    ~auto_mail_lock (void)
-    {
-      if (locked)
-	{
-	  mutex_unlock (*auto_mail_mutex ());
-	}
-    }
-  } run_lock;
+  /* held for the whole run, on every exit path, when it could be taken */
+  mutex_scope run_lock (*auto_mail_mutex (), mutex_scope::try_lock);
 
-  if (!run_lock.locked)
+  if (!run_lock.owns_lock ())
     {
       LOG_INFO ("automail is already running; this request is skipped");
       return build_server_header (response, ERR_NO_ERROR, "automail is already running");
