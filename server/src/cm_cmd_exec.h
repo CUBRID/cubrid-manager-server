@@ -315,7 +315,8 @@ T_DB_SERVICE_MODE cms_database_mode (char *dbname, int *ha_mode);
 
 /*
  * cms_get_db_proc_stat () / cms_get_db_proc_stat_all () /
- * cms_get_host_disk_partition_stat () / cms_get_db_exec_stat () -
+ * cms_get_host_disk_partition_stat () / cms_get_db_exec_stat () /
+ * cms_db_proc_stat_all_free () -
  * CMS-native ports of CUBRID engine's cm_common/cm_mem_cpu_stat.c functions
  * of (almost) the same name - see cm_mem_cpu_stat.cpp.
  */
