@@ -540,6 +540,11 @@ assign_db_stat (T_CM_DB_PROC_STAT *db_stat, char *db_name, T_CM_PROC_STAT *stat)
 }
 
 #if defined (ENABLE_UNUSED_FUNCTION)
+/*
+ * This is code for future reference.
+ * If reused, ensure that the memory allocated by CMS is not released
+ * using the engine's cm_host_disk_partition_stat_free().
+ */
 static void *
 extract_host_partition_stat (FILE *fp, const char *arg1, T_CM_ERROR *err_buf)
 {
