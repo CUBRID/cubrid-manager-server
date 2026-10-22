@@ -279,6 +279,7 @@ typedef unsigned int T_USER_AUTH;
 
 enum
 {
+  AU_ANY = 0,			/* authenticated users only; no specific role */
   AU_DBC = 1,
   AU_DBO = 2,
   AU_BRK = 4,

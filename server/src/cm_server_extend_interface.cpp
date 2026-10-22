@@ -3190,7 +3190,7 @@ bool ext_ut_validate_auth (Json::Value &request)
 	}
     }
 
-  if (auth_user == AU_ADMIN)
+  if (auth_user == AU_ADMIN || auth_task == AU_ANY) // AU_ANY tasks require only an authenticated user
     {
       return true;
     }
