@@ -3102,6 +3102,12 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
+  /*
+   * Set the caller identity from the validated token. The client cannot have
+   * supplied these: cub_strip_internal_keys () removed every '_' key from the
+   * request before the server populated it, so this assignment is the single
+   * source of _IP/_PORT/_ID.
+   */
   request["_IP"] = token_content[0];
   request["_PORT"] = token_content[1];
   request["_ID"] = token_content[2];
