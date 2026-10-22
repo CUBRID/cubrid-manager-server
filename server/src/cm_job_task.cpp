@@ -10076,26 +10076,6 @@ analyzecaslog_mutex (void)
   return &h.m;
 }
 
-/* locks a mutex_t for the lifetime of the scope, on every exit path */
-class mutex_scope
-{
-  public:
-    explicit mutex_scope (mutex_t &m) : m_m (m)
-    {
-      mutex_lock (m_m);
-    }
-    ~mutex_scope (void)
-    {
-      mutex_unlock (m_m);
-    }
-
-  private:
-    mutex_t &m_m;
-
-    mutex_scope (const mutex_scope &);
-    mutex_scope &operator= (const mutex_scope &);
-};
-
 int
 ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 		  char *diag_error)
@@ -11090,7 +11070,7 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 	  print_db_stat_to_res ((db_stat_all->db_stats + i), res);
 	}
 
-      cm_db_proc_stat_all_free (db_stat_all);
+      cms_db_proc_stat_all_free (db_stat_all);
       retval = ERR_NO_ERROR;
     }
   else

@@ -315,12 +315,14 @@ T_DB_SERVICE_MODE cms_database_mode (char *dbname, int *ha_mode);
 
 /*
  * cms_get_db_proc_stat () / cms_get_db_proc_stat_all () /
- * cms_get_host_disk_partition_stat () / cms_get_db_exec_stat () -
+ * cms_get_host_disk_partition_stat () / cms_get_db_exec_stat () /
+ * cms_db_proc_stat_all_free () -
  * CMS-native ports of CUBRID engine's cm_common/cm_mem_cpu_stat.c functions
  * of (almost) the same name - see cm_mem_cpu_stat.cpp.
  */
 int cms_get_db_proc_stat (const char *db_name, T_CM_DB_PROC_STAT *stat, T_CM_ERROR *err_buf);
 T_CM_DB_PROC_STAT_ALL *cms_get_db_proc_stat_all (T_CM_ERROR *err_buf);
+void cms_db_proc_stat_all_free (T_CM_DB_PROC_STAT_ALL *stat);
 int cms_get_db_exec_stat (const char *db_name, T_CM_DB_EXEC_STAT *exec_stat, T_CM_ERROR *err_buf);
 #if defined (ENABLE_UNUSED_FUNCTION)
 T_CM_DISK_PARTITION_STAT_ALL *cms_get_host_disk_partition_stat (T_CM_ERROR *err_buf);

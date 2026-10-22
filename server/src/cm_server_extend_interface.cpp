@@ -1165,14 +1165,57 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
+/*
+ * auto_mail_mutex () - serializes the automail runs.
+ *
+ *   Tasks run outside cm_mutex, and ext_exec_auto_mail () releases the
+ *   autojobs.conf lock right after reading the schedule, so two automail
+ *   requests at the same time would both see the same next_exec and both
+ *   send the report.
+ *
+ *   It is only ever taken with mutex_trylock (): a run can take as long as
+ *   the SMTP server makes it, and the requests run on the HTTP worker
+ *   threads, so a request that finds a run in progress returns at once
+ *   instead of waiting (that run sends whatever is due).
+ */
+static mutex_t *
+auto_mail_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
 {
   Json::Value mail_report;
 
+  /* held for the whole run, on every exit path, when it could be taken */
+  mutex_scope run_lock (*auto_mail_mutex (), mutex_scope::try_lock);
+
+  if (!run_lock.owns_lock ())
+    {
+      LOG_INFO ("automail is already running; this request is skipped");
+      return build_server_header (response, ERR_NO_ERROR, "automail is already running");
+    }
+
   /*
-   * Only this one read is guarded here. It used to hold the guard for
-   * the whole call, including ext_exec_mail_report ()'s log-scanning
-   * and ext_send_mail () -> mail.send () SMTP send below
+   * Only this one read takes the autojobs.conf lock. It used to hold that
+   * lock for the whole call, including ext_exec_mail_report ()'s
+   * log-scanning and ext_send_mail () -> mail.send () SMTP send below;
+   * run_lock above keeps two automail runs from sending the same report
    */
   {
     file_resource_guard guard (*cm_auto_jobs_mutex (), FID_LOCK_AUTO_JOBS);
