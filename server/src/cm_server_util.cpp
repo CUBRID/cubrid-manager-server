@@ -95,6 +95,8 @@
 #include "cm_stat.h"
 #include "cm_user.h"
 
+#include <openssl/rand.h>
+
 #include <assert.h>
 
 #ifdef FSERVER_SLAVE
@@ -2763,8 +2765,7 @@ ut_validate_token (nvplist *req)
 
   //int retval;
 
-  char *ip, *port, *id, *tok[3];
-  char *token, token_content[TOKEN_LENGTH + 1];
+  char *token;
 
   if (!strcmp (nv_get_val (req, "task"), "login") ||
       !strcmp (nv_get_val (req, "task"), "getcmsenv"))
@@ -2779,30 +2780,17 @@ ut_validate_token (nvplist *req)
     }
   ut_access_log (req, "task != login or getcmsenv.");
 
-  uDecrypt (TOKEN_LENGTH, token, token_content);
-
-  if (string_tokenize2 (token_content, tok, 3, ':') < 0)
-    {
-      return 0;
-    }
-
-  ip = tok[0];
-  port = tok[1];
-  id = tok[2];
-
-  ut_access_log (req, id);
-
+  /*
+   * The token is opaque: it is valid iff it maps to a live session, and the
+   * caller identity comes from that session, not from the token.
+   */
   if (!dbmt_user_search_token_info_by_token (token, &token_info))
     {
       ut_access_log (req, "can't find registered token.");
       return 0;
     }
 
-  if (strcmp (token_info.token, token))
-    {
-      ut_access_log (req, "tokens aren't equal!");
-      return 0;
-    }
+  ut_access_log (req, token_info.user_id);
 
   ut_get_token_active_time (&active_time);
 
@@ -2816,9 +2804,9 @@ ut_validate_token (nvplist *req)
       return 0;
     }
 
-  nv_add_nvp (req, "_IP", ip);
-  nv_add_nvp (req, "_PORT", port);
-  nv_add_nvp (req, "_ID", id);
+  nv_add_nvp (req, "_IP", token_info.user_ip);
+  nv_add_nvp (req, "_PORT", token_info.user_port);
+  nv_add_nvp (req, "_ID", token_info.user_id);
 
 
   /* check if ip is an existing ip */
@@ -2837,28 +2825,44 @@ char *
 ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
 		   int proc_id, time_t login_time)
 {
-  char sbuf[TOKEN_LENGTH + 1];
-  char token_string[TOKEN_ENC_LENGTH];
-  size_t i, len;
+  /*
+   * The token is an opaque random value, not an encryption of the session
+   * fields (KVE-2026-1828): there is nothing in it to decrypt or forge. The
+   * session (ip/port/id, login time, DB logins) is held server-side in the
+   * session map keyed by this token. TOKEN_LENGTH random bytes are emitted as
+   * a hex string, so the printed length (TOKEN_LENGTH * 2) matches the old
+   * token and existing buffers (TOKEN_ENC_LENGTH) are unchanged.
+   */
+  unsigned char rnd[TOKEN_LENGTH];
+  char *token_string;
+  int i;
 
   if ((client_ip == NULL) || (client_port == NULL) || (dbmt_id == NULL))
     {
       return NULL;
     }
-  memset (sbuf, 0, TOKEN_LENGTH + 1);
-  snprintf (sbuf, TOKEN_LENGTH, "%s:%s:%s:%d:%lu", client_ip, client_port,
-	    dbmt_id, proc_id, login_time);
-  len = strlen (sbuf);
-  /* insert padding to checksum part */
-  for (i = len; i < TOKEN_LENGTH; ++i)
+
+  (void) proc_id;
+  (void) login_time;
+
+  if (RAND_bytes (rnd, sizeof (rnd)) != 1)
     {
-      sbuf[i] = '*';
+      return NULL;
     }
-  sbuf[i] = '\0';
 
-  uEncrypt (TOKEN_LENGTH, sbuf, token_string);
+  token_string = (char *) malloc (TOKEN_ENC_LENGTH);
+  if (token_string == NULL)
+    {
+      return NULL;
+    }
 
-  return strdup (token_string);
+  for (i = 0; i < TOKEN_LENGTH; ++i)
+    {
+      sprintf (token_string + i * 2, "%02x", rnd[i]);
+    }
+  token_string[TOKEN_LENGTH * 2] = '\0';
+
+  return token_string;
 }
 
 void

@@ -93,29 +93,6 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
 static int count_and_get_last_word (string str, char *word);
 static int is_invalid_time (char *str);
 
-static bool
-ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
-{
-  char tmp_token[TOKEN_LENGTH+1];
-  char *tmp_token_content[3];
-
-  uDecrypt (TOKEN_LENGTH, token, tmp_token);
-
-  if (string_tokenize2 (tmp_token, tmp_token_content, 3, ':') < 0)
-    {
-      return false;
-    }
-
-  // ip
-  strcpy (token_content[0], tmp_token_content[0]);
-  // port
-  strcpy (token_content[1], tmp_token_content[1]);
-  // id
-  strcpy (token_content[2], tmp_token_content[2]);
-
-  return true;
-}
-
 int
 build_server_header (Json::Value &response, const int status,
 		     const char *note)
@@ -1638,7 +1615,6 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 {
   char autoexecquery_conf_file[PATH_MAX];
   char tmp_conf_file[PATH_MAX];
-  char token_content[3][TOKEN_LENGTH+1];
   char userpass[PASSWD_ENC_LENGTH];
   char line_buf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
@@ -1655,9 +1631,6 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 
   autoexecquery_conf_file[0] = '\0';
   tmp_conf_file[0] = '\0';
-  token_content[0][0] = '\0';
-  token_content[1][0] = '\0';
-  token_content[2][0] = '\0';
   userpass[0] = '\0';
   line_buf[0] = '\0';
   _dbmt_error[0] = '\0';
@@ -1700,13 +1673,9 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   // dbname
   conf_item[0] = request["dbname"].asString();
 
-  // get manager id from token
-  if (!ext_get_id_from_token (request["token"].asString().c_str(), token_content))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN,
-				  "Request is rejected due to invalid token. Please reconnect.");
-    }
-  conf_item[4] = token_content[2];
+  /* The manager id was set from the session by ext_ut_validate_token (); the
+   * opaque token no longer encodes it. */
+  conf_item[4] = request["_ID"].asString();
 
   while (conf_file.getline (line_buf, sizeof (line_buf)))
     {
@@ -2939,62 +2908,19 @@ static bool _validate_token_active_time (time_t &active_time)
   return true;
 }
 
-/*
- * Splits a decrypted token's plaintext ("client_ip:client_port:client_id:
- * proc_id:login_time" followed by '*' padding, see ut_token_generate () in
- * cm_server_util.cpp) into exactly 5 ':'-delimited fields.
- */
-static bool
-split_token (const char *token_dec, string out[5])
-{
-  istringstream iss (token_dec);
-  int i = 0;
-
-  while (i < 5 && getline (iss, out[i], ':'))
-    {
-      i++;
-    }
-
-  if (i != 5)
-    {
-      return false;
-    }
-
-  if (iss.peek () != char_traits<char>::eof ())
-    {
-      return false;
-    }
-
-  return true;
-}
-
 bool ext_ut_validate_token (const char *token)
 {
   T_USER_TOKEN_INFO token_info;
-  string token_enc;
-  string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   time_t now_time = time (0);
   time_t active_time;
-  char token_dec[TOKEN_LENGTH + 1];
 
   if (strlen (token) >= TOKEN_ENC_LENGTH)
     {
       return false;
     }
 
-  uDecrypt (TOKEN_LENGTH, token, token_dec);
-
-  if (!split_token (token_dec, token_content))
-    {
-      return false;
-    }
-
+  /* The token is opaque: it is valid iff it maps to a live session. */
   if (!dbmt_user_search_token_info_by_token (token, &token_info))
-    {
-      return false;
-    }
-
-  if (strcmp (token_info.token, token) != 0)
     {
       return false;
     }
@@ -3009,10 +2935,6 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
-  /*
-   * re-finds the live node and bumps login_time only if it's still
-   * the same session validated above
-   */
   if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return false;
@@ -3027,10 +2949,8 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   T_USER_TOKEN_INFO token_info;
   string task;
   string token;
-  string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   time_t now_time = time (0);
   time_t active_time;
-  char token_dec[TOKEN_LENGTH+1];
 
   if (request["task"].asString() == "login" || request["task"].asString() == "getcmsenv")
     {
@@ -3066,24 +2986,11 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  uDecrypt (TOKEN_LENGTH, token.c_str(), token_dec);
-
-  if (!split_token (token_dec, token_content))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
-    }
-
+  /* The token is opaque: it is valid iff it maps to a live session. */
   if (!dbmt_user_search_token_info_by_token (token.c_str(), &token_info))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
-
-
-  if (strcmp (token_info.token, token.c_str()))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
-    }
-
 
   if (!_validate_token_active_time (active_time))
     {
@@ -3107,9 +3014,10 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
    * request before the server populated it, so this assignment is the single
    * source of _IP/_PORT/_ID.
    */
-  request["_IP"] = token_content[0];
-  request["_PORT"] = token_content[1];
-  request["_ID"] = token_content[2];
+  /* Identity comes from the session the token maps to, not from the token. */
+  request["_IP"] = token_info.user_ip;
+  request["_PORT"] = token_info.user_port;
+  request["_ID"] = token_info.user_id;
 
   return build_server_header (response, ERR_NO_ERROR, "none");
 }
