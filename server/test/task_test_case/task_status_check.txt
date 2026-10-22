@@ -10,7 +10,7 @@ login_notask,failure
 login_nouser,failure
 login_errpasswd,failure
 setloglevel
-getcmsenv
+getcmsenv,success
 getprocstat
 getsysdiskinfo
 startinfo
