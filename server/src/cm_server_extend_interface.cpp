@@ -61,7 +61,6 @@ using namespace std;
 #define MAX_TIME_LENGTH 10
 
 
-extern T_USER_TOKEN_INFO *user_token_info;
 static T_EXTEND_TASK_INFO ext_task_info[] =
 {
   {"getsysdiskinfo", 0, ext_get_sys_diskinfo, ALL_AUTHORITY},
@@ -2990,7 +2989,7 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
-  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
+  if (!dbmt_user_search_token_info_by_token (token, &token_info))
     {
       return false;
     }
@@ -3014,7 +3013,7 @@ bool ext_ut_validate_token (const char *token)
    * re-finds the live node and bumps login_time only if it's still
    * the same session validated above
    */
-  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token, now_time))
+  if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return false;
     }
@@ -3074,7 +3073,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
+  if (!dbmt_user_search_token_info_by_token (token.c_str(), &token_info))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
@@ -3097,7 +3096,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
     }
 
   /* see the comment in the (const char *token) overload above */
-  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token.c_str(), now_time))
+  if (!dbmt_user_touch_token_login_time_by_token (token.c_str(), now_time))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }

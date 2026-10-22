@@ -59,6 +59,16 @@ typedef struct
 
 typedef struct T_USER_TOKEN_INFO T_USER_TOKEN_INFO;
 
+/*
+ * T_USER_TOKEN_INFO - one CMS session.
+ *
+ * Sessions live only in the in-memory session map keyed by token (see
+ * cm_user.cpp); the same user may hold several sessions at once. DB-login
+ * information supplied through dbmtuserlogin is kept per session in the C++
+ * session object (not in this plain struct), which callers reach through the
+ * dbmt_user_session_* helpers below. This struct is the value copied out to
+ * callers that only need the connection fields.
+ */
 struct T_USER_TOKEN_INFO
 {
   char user_id[DBMT_USER_NAME_LEN];
@@ -72,10 +82,6 @@ struct T_USER_TOKEN_INFO
   time_t login_time;
 
   char token[TOKEN_ENC_LENGTH];
-
-  T_USER_TOKEN_INFO *next;
-  T_USER_TOKEN_INFO *prev;
-
 };
 
 int dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error);
@@ -112,6 +118,13 @@ void dbmt_user_db_delete (T_DBMT_USER *dbmt_user, char *dbname);
 int dbmt_user_add_dbinfo (T_DBMT_USER_INFO *usrinfo,
 			  T_DBMT_USER_DBINFO *dbinfo);
 
+/*
+ * dbmt_user_new_token_info () - add a new session keyed by token_enc.
+ *   Several sessions may exist for the same user_id. Expired sessions are
+ *   purged first; if the user is already at the per-user limit the
+ *   least-recently-used session of that user is evicted to make room.
+ *   return: ERR_NO_ERROR, or ERR_MEM_ALLOC on failure.
+ */
 int dbmt_user_new_token_info (const char *user_id,
 			      const char *user_ip, const char *user_port,
 			      const char *token_enc,
@@ -122,10 +135,30 @@ int dbmt_user_new_token_info (const char *user_id,
 #endif
 			      time_t login_time);
 
-bool dbmt_user_search_token_info (const char *user_id, T_USER_TOKEN_INFO *out);
+/* Look a session up by its token (the only unambiguous key now that a user
+ * may have many sessions). Copies the connection fields into *out. */
 bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
-bool dbmt_user_touch_token_login_time (const char *user_id, const char *token, time_t now_time);
-bool dbmt_user_delete_token_info (const char *user_id);
+
+/* Update last-access time of the session identified by token. */
+bool dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time);
+
+/* Delete one session by its token (e.g. logout). */
 bool dbmt_user_delete_token_info_by_token (const char *token);
+
+/* Delete every session of a user (e.g. the user is deleted). Returns the
+ * number of sessions removed. */
+int dbmt_user_delete_all_sessions_of_user (const char *user_id);
+
+/*
+ * Per-session DB-login store. dbmtuserlogin saves the DB user/password for a
+ * dbname into the caller's own session; request handling later reads it back
+ * for that same session only. Values are held in the C++ session object and
+ * wiped when the session is removed.
+ */
+bool dbmt_user_session_set_dblogin (const char *token, const char *dbname,
+				    const char *dbuser, const char *dbpasswd);
+bool dbmt_user_session_get_dblogin (const char *token, const char *dbname,
+				    char *dbuser, size_t dbuser_size,
+				    char *dbpasswd, size_t dbpasswd_size);
 
 #endif                /* _CM_USER_H_ */

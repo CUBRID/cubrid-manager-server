@@ -2792,7 +2792,7 @@ ut_validate_token (nvplist *req)
 
   ut_access_log (req, id);
 
-  if (!dbmt_user_search_token_info (id, &token_info))
+  if (!dbmt_user_search_token_info_by_token (token, &token_info))
     {
       ut_access_log (req, "can't find registered token.");
       return 0;
@@ -2811,7 +2811,7 @@ ut_validate_token (nvplist *req)
       return 0;
     }
 
-  if (!dbmt_user_touch_token_login_time (id, token, now_time))
+  if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return 0;
     }

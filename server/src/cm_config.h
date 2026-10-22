@@ -614,6 +614,7 @@ typedef struct
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   char szTokenActiveTime[PATH_MAX];
+  char szMaxSessionsPerUser[PATH_MAX];
   int hmtab1, hmtab2, hmtab3, hmtab4;
   char szAccessLog[PATH_MAX];
   char szErrorLog[PATH_MAX];

@@ -157,7 +157,6 @@ using namespace std;
 #endif
 #define MAX_TRIES_FIND_CHILD_PID 20
 
-extern T_USER_TOKEN_INFO *user_token_info;
 
 typedef struct
 {
