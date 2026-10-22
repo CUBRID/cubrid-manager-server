@@ -2568,9 +2568,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   char targetdir[PATH_MAX];
   char extvolfile[COMPOSED_PATH_MAX];
   char createdb_err_file[PATH_MAX];
-  char *ip, *port;
   T_DBMT_USER dbmt_user;
-  T_DBMT_CON_DBINFO con_dbinfo;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[20];
   int argc = 0;
@@ -3081,12 +3079,11 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
   }
 
-  /* add dbinfo to conlist */
-  memset (&con_dbinfo, 0, sizeof (con_dbinfo));
-  dbmt_con_set_dbinfo (&con_dbinfo, dbname, "dba", "");
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
-  dbmt_con_write_dbinfo (&con_dbinfo, ip, port, dbname, 1, _dbmt_error);
+  /*
+   * Store the new database's DB login (user "dba", empty password) in the
+   * caller's session, not in conlist.
+   */
+  dbmt_user_session_set_dblogin (nv_get_val (req, "token"), dbname, "dba", "");
 
   /* restore warn out of space value */
   if (0)
@@ -10923,11 +10920,9 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
 int
 tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  char hexacoded[PASSWD_ENC_LENGTH];
   int ret;
-  T_DBMT_CON_DBINFO con_dbinfo;
   char *dbname, *dbpasswd, *dbuser;
-  char *ip, *port;
+  char *token;
 
   ret = cmd_dbmt_user_login (req, res, _dbmt_error);
   if (ret != ERR_NO_ERROR)
@@ -10935,8 +10930,7 @@ tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
       return ret;
     }
 
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
+  token = nv_get_val (req, "token");
   dbname = nv_get_val (req, "dbname");
   dbpasswd = nv_get_val (req, "dbpasswd");
   dbuser = nv_get_val (req, "dbuser");
@@ -10949,12 +10943,17 @@ tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  /* update dbinfo to conlist */
-  uEncrypt (PASSWD_LENGTH, dbpasswd, hexacoded);
-  memset (&con_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
-  dbmt_con_set_dbinfo (&con_dbinfo, dbname, dbuser, hexacoded);
-  if (dbmt_con_write_dbinfo (&con_dbinfo, ip, port, dbname, 1, _dbmt_error) < 0)
+  /*
+   * Store the DB login in the caller's session, not on disk.
+   * It is keyed by dbname and used only for later requests of this same
+   * session; conlist no longer carries DB credentials.
+   */
+  if (!dbmt_user_session_set_dblogin (token, dbname,
+				      dbuser ? dbuser : "",
+				      dbpasswd ? dbpasswd : ""))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"Failed to store the DB login in the session.");
       return ERR_WITH_MSG;
     }
 

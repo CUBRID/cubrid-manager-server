@@ -336,12 +336,36 @@ ch_process_request (nvplist *req, nvplist *res)
       }
       */
 
-      /* if database name is specified */
+      /*
+       * If a database name is specified, decide the DB login for
+       * this request:
+       * (1) the request's own dbuser/dbpasswd, otherwise
+       * (2) the DB login this session saved with dbmtuserlogin.
+       * If neither is present, keep the empty string -
+       * the engine is still handed _DBID/_DBPASSWD as
+       * before, just empty, so its behavior does not change.
+       */
       if (dbname)
 	{
+	  char *req_dbuser = nv_get_val (req, "dbuser");
+	  char *req_dbpasswd = nv_get_val (req, "dbpasswd");
+
 	  memset (dbid, 0, 32);
 	  memset (dbpasswd, 0, 80);
-	  _ut_get_dbaccess (req, dbid, dbpasswd);
+
+	  if (req_dbuser != NULL && req_dbuser[0] != '\0')
+	    {
+	      strncpy (dbid, req_dbuser, 31);
+	      if (req_dbpasswd != NULL)
+		{
+		  strncpy (dbpasswd, req_dbpasswd, 79);
+		}
+	    }
+	  else
+	    {
+	      _ut_get_dbaccess (req, dbid, dbpasswd);
+	    }
+
 	  nv_add_nvp (req, "_DBID", dbid);
 	  nv_add_nvp (req, "_DBPASSWD", dbpasswd);
 	  nv_add_nvp (req, "_DBNAME", dbname);

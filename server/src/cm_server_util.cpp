@@ -2572,29 +2572,23 @@ make_default_env (void)
 int
 _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd)
 {
-  int retval;
-  char *ip, *port, *dbname;
-  char _dbmt_error[1024];
-  T_DBMT_CON_DBINFO con_dbinfo;
+  char *token, *dbname;
 
   dbid[0] = dbpasswd[0] = '\0';
 
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
+  token = nv_get_val (req, "token");
   dbname = nv_get_val (req, "dbname");
 
-  /* read conlist */
-  memset (&con_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
-  if ((retval =
-	       dbmt_con_read_dbinfo (&con_dbinfo, ip, port, dbname,
-				     _dbmt_error)) <= 0)
+  /*
+   * Read the DB login this session stored with dbmtuserlogin (CBRD-26598).
+   * Only this session's own credentials are used; nothing is read from disk,
+   * and a different session or user cannot supply them.
+   */
+  if (!dbmt_user_session_get_dblogin (token, dbname, dbid, 32,
+				      dbpasswd, PASSWD_LENGTH + 1))
     {
       return 0;
     }
-
-  /* extract db user info */
-  strcpy (dbid, con_dbinfo.uid);
-  uDecrypt (PASSWD_LENGTH, con_dbinfo.passwd, dbpasswd);
 
   return 1;
 }
