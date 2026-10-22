@@ -25,6 +25,11 @@ on:
         description: 'engine branch or tag, or a version like 11.4 for release/11.4'
         default: develop
         required: false
+      strict_timeout:
+        description: 'fail cases whose request ran past http_timeout ("note":"timeout")'
+        type: boolean
+        default: false
+        required: false
 
 concurrency:
   group: cms-api-test-${{ github.event.pull_request.number || github.ref }}
@@ -42,6 +47,9 @@ env:
   ENGINE_REPO: ${{ github.event.inputs.engine_repo || vars.ENGINE_REPO || 'CUBRID/cubrid' }}
   ENGINE_REF: ${{ github.event.inputs.engine_ref || vars.ENGINE_REF || 'develop' }}
   TEST_SET: task_status_check.txt
+  # -st: count requests that outlived http_timeout as failures. Off by default,
+  # where they are only listed as a warning in the summary.
+  TEST_OPTS: ${{ github.event.inputs.strict_timeout == 'true' && '-st' || '' }}
   CMAKE_VERSION: 3.28.3
   NINJA_VERSION: 1.11.1
 
@@ -296,13 +304,13 @@ jobs:
           export PYTHONUNBUFFERED=1
           cd "$WORKSPACE/cubrid/cubridmanager/server/test"
           timeout --signal=INT --kill-after=1m 50m \
-            ./run_tests.sh -ns "$TEST_SET" </dev/null 2>&1 | tee run.log
+            ./run_tests.sh -ns $TEST_OPTS "$TEST_SET" </dev/null 2>&1 | tee run.log
           exit ${PIPESTATUS[0]}
           EOS
           chmod 0755 /tmp/test-as-cubrid.sh
           status=0
           runuser -u cubrid -- env HOME=/home/cubrid PATH="$PATH" \
-            WORKSPACE="$GITHUB_WORKSPACE" TEST_SET="$TEST_SET" \
+            WORKSPACE="$GITHUB_WORKSPACE" TEST_SET="$TEST_SET" TEST_OPTS="$TEST_OPTS" \
             bash /tmp/test-as-cubrid.sh || status=$?
           if [ $status -eq 124 ] || [ $status -eq 137 ]; then
             echo "the suite did not finish in time; the last case in run.log"
@@ -345,6 +353,17 @@ jobs:
             echo
             tail -n 3 run.log | grep -E 'succeeded|failed' || true
             echo
+            if grep -q 'request(s) ran past http_timeout' run.log; then
+              echo "<details><summary>⚠️ requests that ran past http_timeout</summary>"
+              echo
+              echo '```'
+              sed 's/\x1b\[[0-9;]*m//g' run.log \
+                | sed -n '/request(s) ran past http_timeout/,/^$/p' | head -40
+              echo '```'
+              echo
+              echo "</details>"
+              echo
+            fi
             if [ "$status" != "0" ]; then
               echo "<details><summary>failed cases</summary>"
               echo
@@ -357,6 +376,11 @@ jobs:
             echo
           } | tee -a "$GITHUB_STEP_SUMMARY" "$SUMMARY_FILE"
 
+          slow=$(sed 's/\x1b\[[0-9;]*m//g' run.log \
+            | grep -oE '^[0-9]+ request\(s\) ran past http_timeout' | head -1 || true)
+          if [ -n "$slow" ]; then
+            echo "::warning title=CMS API test::$slow (see the summary)"
+          fi
           if [ "$status" = "0" ]; then
             echo "::notice title=CMS API test::$(tail -n 3 run.log \
               | grep -E 'succeeded' | head -1)"

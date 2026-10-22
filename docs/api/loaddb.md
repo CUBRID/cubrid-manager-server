@@ -25,6 +25,10 @@ The loaddb interface will load a database from files.
 | delete_orignal_files | delete original file after load |
 | statisticsuse | y or n, update the statistics after the load |
 | trigger | the full path of the trigger file to be loaded |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -44,7 +48,28 @@ The loaddb interface will load a database from files.
   "index": "none",
   "errorcontrolfile": "none",
   "ignoreclassfile": "none",
-  "delete_orignal_files": "y"
+  "delete_orignal_files": "y",
+  "async":"yes"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "1877908931382247367"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
+   "task" : "loaddb"
 }
 ```
 

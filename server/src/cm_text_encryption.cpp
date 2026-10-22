@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <random>
 
 #include "cm_porting.h"
 #include "cm_text_encryption.h"
@@ -80,13 +81,20 @@ uEncrypt (int len, const char *src, char *trg)
       return;
     }
 
+  /* array_init_random_value () fills the whole malloc'ed buffer (len + 1
+   * bytes) with random padding
+   */
   array_init_random_value (encstr, len + 1);
-  strcpy (encstr, src);
+
+  size_t slen = strlen (src);
+  slen = (slen > (size_t) len) ? (size_t) len : slen;
+  memcpy (encstr, src, slen);
+  encstr[slen] = '\0';
 
   tea_encrypt (key, len, encstr);
   for (i = 0; i < len; ++i)
     {
-      sprintf (strbuf, "%08x", encstr[i]);
+      snprintf (strbuf, sizeof (strbuf), "%08x", encstr[i]);
       trg[i * 2] = strbuf[6];
       trg[i * 2 + 1] = strbuf[7];
     }
@@ -101,7 +109,7 @@ uEncrypt (int len, const char *src, char *trg)
  *    the string of hexadecimal string into its original values.
  *  NOTE
  *    - size of 'src' must be at least twice the 'trg'
- *    - size of 'trg' must be equal to 'len'
+ *    - size of 'trg' must be at least 'len + 1' (trg[len] is set to '\0')
  */
 void
 uDecrypt (int len, const char *src, char *trg)
@@ -109,6 +117,7 @@ uDecrypt (int len, const char *src, char *trg)
   int i;
   char v1, v2;
   char *hexacode = NULL;
+  size_t srclen;
 
   if (src == NULL || src[0] == '\0')
     {
@@ -122,8 +131,11 @@ uDecrypt (int len, const char *src, char *trg)
     }
 
   memset (hexacode, 0, len * 2 + 1);
-  strncpy (hexacode, src, len * 2);
-  hexacode[len * 2] = '\0';
+
+  srclen = strlen (src);
+  srclen = (srclen > (size_t) (len * 2)) ? (size_t) (len * 2) : srclen;
+  memcpy (hexacode, src, srclen);
+  hexacode[srclen] = '\0';
 
   for (i = 0; i < len; ++i)
     {
@@ -138,11 +150,13 @@ uDecrypt (int len, const char *src, char *trg)
   free (hexacode);
 }
 
-/* This function assumes that unsigned_int is 4 bytes int.
-   En/Decryption processes 8 bytes at a time.
-   Although this function encrypts any length of text,
-   parameter text must have space size in multiple of 8 because this
-   function returns encryption in multiple of 8 bytes       */
+/*
+ * This function assumes that unsigned_int is 4 bytes int.
+ * En/Decryption processes 8 bytes at a time.
+ * Although this function encrypts any length of text,
+ *  parameter text must have space size in multiple of 8 because this
+ * function returns encryption in multiple of 8 bytes
+ */
 static void
 tea_encrypt (unsigned int key[], int len, char *text)
 {
@@ -151,26 +165,28 @@ tea_encrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-	{
-	  memset (ulbuf, ' ', sizeof (ulbuf));
-	  memcpy (ulbuf, text, len);
-	  _encrypt (key, ulbuf);
-	  memcpy (text, ulbuf, len);
-	  break;
-	}
+        {
+          memset (ulbuf, ' ', sizeof (ulbuf));
+          memcpy (ulbuf, text, len);
+          _encrypt (key, ulbuf);
+          memcpy (text, ulbuf, len);
+          break;
+        }
       else
-	{
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _encrypt (key, ulbuf);
-	  memcpy (text, ulbuf, sizeof (ulbuf));
-	}
+        {
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _encrypt (key, ulbuf);
+          memcpy (text, ulbuf, sizeof (ulbuf));
+        }
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }
 }
 
-/* text parameter must hold encryption of 8-byte multiple size which was
-   returned from previous tea_encrypt() call */
+/*
+ * text parameter must hold encryption of 8-byte multiple size which was
+ * returned from previous tea_encrypt() call
+ */
 static void
 tea_decrypt (unsigned int key[], int len, char *text)
 {
@@ -179,20 +195,20 @@ tea_decrypt (unsigned int key[], int len, char *text)
   while (len > 0)
     {
       if ((size_t) len < sizeof (ulbuf))
-	{
-	  memset (ulbuf, ' ', sizeof (ulbuf));
-	  /*memcpy(ulbuf,text,len); */
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _decrypt (key, ulbuf);
-	  memcpy (text, ulbuf, len);
-	  break;
-	}
+        {
+          memset (ulbuf, ' ', sizeof (ulbuf));
+          /*memcpy(ulbuf,text,len); */
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _decrypt (key, ulbuf);
+          memcpy (text, ulbuf, len);
+          break;
+        }
       else
-	{
-	  memcpy (ulbuf, text, sizeof (ulbuf));
-	  _decrypt (key, ulbuf);
-	  memcpy (text, ulbuf, sizeof (ulbuf));
-	}
+        {
+          memcpy (ulbuf, text, sizeof (ulbuf));
+          _decrypt (key, ulbuf);
+          memcpy (text, ulbuf, sizeof (ulbuf));
+        }
       len -= sizeof (ulbuf);
       text += sizeof (ulbuf);
     }
@@ -255,18 +271,19 @@ ut_get_hexval (char c)
 static void
 array_init_random_value (char *arr, int arrsize)
 {
+  /*
+   * A thread_local engine sidesteps both problems: each thread gets its
+   * own independent generator, so there is no shared state to race on
+   * and no locking is needed. thread_local's first-use initialization
+   * is itself guaranteed thread-safe by C++11 ("magic statics").
+   */
+  thread_local std::mt19937 engine ((std::random_device ()) ());
+  std::uniform_int_distribution<int> dist (0, 99);
   int i;
-  static unsigned int seed = 0;
-
-  if (seed == 0)
-    {
-      seed = (unsigned int) time (NULL);
-      srand (seed);
-    }
 
   for (i = 0; i < arrsize; i++)
     {
-      arr[i] = rand () % 100;
+      arr[i] = (char) dist (engine);
     }
 }
 

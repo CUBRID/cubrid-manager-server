@@ -1562,12 +1562,12 @@ int mz_inflate (mz_streamp pStream, int flush)
 
       if (status < 0)
 	{
-	  return MZ_DATA_ERROR;  // Stream is corrupted (there could be some uncompressed data left in the output dictionary - oh well).
+	  return MZ_DATA_ERROR;	// Stream is corrupted (there could be some uncompressed data left in the output dictionary - oh well).
 	}
       else if ((status == TINFL_STATUS_NEEDS_MORE_INPUT)
 	       && (!orig_avail_in))
 	{
-	  return MZ_BUF_ERROR;  // Signal caller that we can't make forward progress without supplying more input or by setting flush to MZ_FINISH.
+	  return MZ_BUF_ERROR;	// Signal caller that we can't make forward progress without supplying more input or by setting flush to MZ_FINISH.
 	}
       else if (flush == MZ_FINISH)
 	{
@@ -4582,7 +4582,12 @@ static time_t mz_zip_dos_to_time_t (int dos_time, int dos_date)
 static void mz_zip_time_to_dos_time (time_t time, mz_uint16 *pDOS_time,
 				     mz_uint16 *pDOS_date)
 {
-  struct tm *tm = localtime (&time);
+  struct tm tm_buf;
+#if defined(_MSC_VER) || defined(__MINGW32__) || defined(__MINGW64__)
+  struct tm *tm = (localtime_s (&tm_buf, &time) == 0) ? &tm_buf : NULL;
+#else
+  struct tm *tm = localtime_r (&time, &tm_buf);
+#endif
   if (tm)
     {
       *pDOS_time =

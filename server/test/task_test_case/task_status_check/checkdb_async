@@ -1,0 +1,5 @@
+{"task":"checkdb",
+"token":"",
+"dbname":"alatestdb",
+"repairdb":"n",
+"async":"yes"}

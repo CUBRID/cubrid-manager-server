@@ -121,11 +121,10 @@ if(CMS_STANDALONE)
 else()
   # Public headers of the libraries this links against are not installed yet at build
   # time, so read them off the targets.
-  get_target_property(CMS_CCI_HEADER cascci PUBLIC_HEADER)
   get_target_property(CMS_CMDEP_HEADER cmdep PUBLIC_HEADER)
   get_target_property(CMS_CMSTAT_HEADER cmstat PUBLIC_HEADER)
   set(CMS_CUBRID_INCLUDES "")
-  foreach(header ${CMS_CCI_HEADER} ${CMS_CMDEP_HEADER} ${CMS_CMSTAT_HEADER})
+  foreach(header ${CMS_CMDEP_HEADER} ${CMS_CMSTAT_HEADER})
     get_filename_component(header_dir ${header} DIRECTORY)
     list(APPEND CMS_CUBRID_INCLUDES ${header_dir})
   endforeach()
@@ -174,7 +173,7 @@ endif()
 
 # ---------------------------------------------------------------------------- targets
 set(CM_ADMIN_SOURCES
-  ${CMS_SRC_DIR}/cm_text_encryption.c
+  ${CMS_SRC_DIR}/cm_text_encryption.cpp
   ${CMS_SRC_DIR}/cm_config.cpp
   ${CMS_SRC_DIR}/cm_server_util.cpp
   ${CMS_SRC_DIR}/cm_user.cpp
@@ -182,15 +181,18 @@ set(CM_ADMIN_SOURCES
   ${CMS_SRC_DIR}/cm_cmd_util.cpp
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_cmd_task.cpp
+  ${CMS_SRC_DIR}/cm_server_status.cpp
   )
 
 set(CUB_MANAGER_SOURCES
   ${CMS_SRC_DIR}/cm_server_util.cpp
   ${CMS_SRC_DIR}/cm_autojob.cpp
-  ${CMS_SRC_DIR}/cm_text_encryption.c
+  ${CMS_SRC_DIR}/cm_text_encryption.cpp
   ${CMS_SRC_DIR}/cm_config.cpp
   ${CMS_SRC_DIR}/cm_job_task.cpp
   ${CMS_SRC_DIR}/cm_cmd_exec.cpp
+  ${CMS_SRC_DIR}/cm_server_status.cpp
+  ${CMS_SRC_DIR}/cm_mem_cpu_stat.cpp
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_auto_task.cpp
   ${CMS_SRC_DIR}/cm_httpd.cpp

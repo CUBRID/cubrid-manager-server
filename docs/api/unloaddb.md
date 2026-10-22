@@ -18,7 +18,6 @@ The unloaddb interface will unload a database server.
 | ref | include referenced tables; |
 | classonly | include specified class only |
 | as-dba | extract the same schema file as the DBA |
-| skip-index-detail | skip with option of indexes |
 | split-schema-files | split schema information by object |
 | delimit | use '"' where an identifier begins and ends; default: don't use |
 | estimate | estimated NUMBER of instances; default: auto computed |
@@ -27,6 +26,10 @@ The unloaddb interface will unload a database server.
 | lofile | lo file COUNT per a directory; default: 0 |
 | dbuser | database user id |
 | dbpasswd | the password of the database user |
+| async | default "no", if "yes" run the task in asynchronous mode |
+
+* The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
 
@@ -50,7 +53,28 @@ The unloaddb interface will unload a database server.
   "estimate": "none",
   "prefix": "none",
   "cach": "none",
-  "lofile": "none"
+  "lofile": "none",
+  "async":"yes"
+}
+```
+
+## Response Sample (async mode)
+```
+{
+   "job-status" : "running",
+   "note" : "none",
+   "status" : "success",
+   "uuid" : "1877908931382247367"
+}
+```
+
+## Response Sample (rejected: database busy)
+```
+{
+   "job-status" : "rejected",
+   "note" : "database 'xyz' is busy with another task ('createdb')",
+   "status" : "failure",
+   "task" : "unloaddb"
 }
 ```
 

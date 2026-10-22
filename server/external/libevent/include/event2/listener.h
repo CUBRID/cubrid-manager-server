@@ -88,6 +88,27 @@ typedef void (*evconnlistener_errorcb)(struct evconnlistener *, void *);
  * to use the option before it is actually bound.
  */
 #define LEV_OPT_DEFERRED_ACCEPT		(1u<<6)
+/** Flag: Indicates that we ask to allow multiple servers (processes or
+ * threads) to bind to the same port if they each set the option. 
+ * 
+ * SO_REUSEPORT is what most people would expect SO_REUSEADDR to be, however
+ * SO_REUSEPORT does not imply SO_REUSEADDR.
+ *
+ * This is only available on Linux and kernel 3.9+
+ */
+#define LEV_OPT_REUSEABLE_PORT		(1u<<7)
+/** Flag: Indicates that the listener wants to work only in IPv6 socket.
+ *
+ * According to RFC3493 and most Linux distributions, default value is to
+ * work in IPv4-mapped mode. If there is a requirement to bind same port
+ * on same ip addresses but different handlers for both IPv4 and IPv6,
+ * it is required to set IPV6_V6ONLY socket option to be sure that the
+ * code works as expected without affected by bindv6only sysctl setting in
+ * system.
+ *
+ * This socket option also supported by Windows.
+ */
+#define LEV_OPT_BIND_IPV6ONLY		(1u<<8)
 
 /**
    Allocate a new evconnlistener object to listen for incoming TCP connections

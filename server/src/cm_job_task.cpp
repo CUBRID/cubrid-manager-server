@@ -34,6 +34,7 @@
 #if defined(WINDOWS)
 #include <process.h>
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <io.h>
 #include <tlhelp32.h>
@@ -80,7 +81,14 @@
 #endif
 
 #include <list>
+#include <map>
 #include <string>
+#include <utility>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <algorithm>
 
 #include<assert.h>
 
@@ -142,7 +150,13 @@ using namespace std;
 #define UNLINK(file) unlink(file)
 #endif
 
-extern T_EMGR_VERSION CLIENT_VERSION;
+#if defined (WINDOWS)
+#define UNLINK(file) _unlink(file)
+#else
+#define UNLINK(file) unlink(file)
+#endif
+#define MAX_TRIES_FIND_CHILD_PID 20
+
 extern T_USER_TOKEN_INFO *user_token_info;
 
 typedef struct
@@ -223,9 +237,13 @@ typedef struct
 #define MAX_STATDUMP_PROC 16
 typedef struct
 {
-  int pid;
-  char dbname [DB_NAME_LEN];
+  int pid;         /* the dispatcher pid run_child_env () returned */
   int status;
+  int interval;
+  time_t started;
+  int worker_pid;  /* pid of the dispatcher's own worker child */
+  long long dispatcher_start_time;
+  long long worker_start_time;
 } T_STATDUMP_STAT;
 
 typedef struct
@@ -235,10 +253,14 @@ typedef struct
   int len;
 } TS_SQL_INFO;
 
-static T_STATDUMP_STAT *statdump_daemon = NULL;
+/*
+ * statdump_daemon - one entry per database, dbname is the map key
+ */
+static map <string, T_STATDUMP_STAT> statdump_daemon;
 
-#define	STATD_IDLE	0
+#define	STATD_STARTING	0
 #define	STATD_RUNNING	1
+#define	STATD_STOPPING	2
 
 
 #if defined(WINDOWS)
@@ -281,7 +303,7 @@ static int check_dbpath (char *dir, char *_dbmt_error);
 static int file_to_nvpairs (char *filepath, nvplist *res);
 static int file_to_nvp_by_separator (FILE *fp, nvplist *res, char separator);
 static int obsolete_version_autoexecquery_conf (const char *conf_line);
-static int alter_dblocation (const char *dbname, const char *new_dbpath);
+static int alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error);
 static void print_db_stat_to_res (T_CM_DB_PROC_STAT *db_stat, nvplist *res);
 static int record_ha_topology_to_struct (FILE *infile, int get_all_dbmode,
     char *dblist, char *_dbmt_error, T_HA_SERVER_INFO_ALL **all_info_out);
@@ -337,8 +359,9 @@ static void _write_auto_update_log (char *line_buf, int is_success);
 static char *_get_format_time ();
 static void read_stdout_stderr_as_err (char *tmp_out_file, char *tmp_err_file,
 				       char *_dbmt_error);
-static int _run_child (const char *const argv[], int wait_flag,
-		       char *task_name, char *stdout_file, char *_dbmt_error);
+static int run_child_with_msg (const char *const argv[], int wait_flag,
+			       char *task_name, char *stdout_file, char *_dbmt_error,
+			       const char *envp[] = NULL);
 static int _check_backup_info (const char *conf_item[], int check_backupid,
 			       char *_dbmt_error);
 static int _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -354,9 +377,6 @@ static int _is_exist_default_backup_cert (char *_dbmt_error);
 static int _backup_cert (char *_dbmt_error);
 static int _recover_cert (char *_dbmt_error);
 
-static int find_statdumpd_info (char *dbname);
-static int find_new_statdumpd_info ();
-
 static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
 static int get_next_sqltext (FILE *qfp, char *qry_buf, int offset, int query_file_size);
@@ -364,6 +384,25 @@ static int get_next_sqltext (FILE *qfp, char *qry_buf, int offset, int query_fil
 static void unlink_schema_files (const char *schema_list_file);
 
 static int is_filename_matched (const char *fname, const char *pattern);
+static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
+static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
+static int expand_path (const char *src, char *dst, int dest_len);
+
+static int is_ha_updates_disabled (char *dbname, char *_dbmt_error);
+static int create_input_class_file (nvplist *req, nvplist *res, const char *filename, char *_dbmt_error);
+
+static char *allowed_env[]=
+{
+  "$CUBRID",
+  "$CUBRID_DATABASES"
+};
+static int allowed_env_len = sizeof (allowed_env) / sizeof (char *);
+
+enum allowed_env_num
+{
+  ENV_CUBRID = 0,
+  ENV_CUBRID_DATABASES = 1
+};
 
 static int
 _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
@@ -371,7 +410,7 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
 {
   int retval = ERR_NO_ERROR;
 
-  /* every user can access db_user table. */
+  /* every user can access db_user view. */
   const char *sql_stat = "select 1 from db_root";
 
   if (dbname == NULL)
@@ -394,9 +433,15 @@ _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
   return retval;
 }
 
+/*
+ * run_child_with_msg () - run a child process (via run_child_env ()), read its
+ * error file into _dbmt_error on failure.
+ *
+ * envp (in) : extra "KEY=VALUE" entries that apply only to this child
+ */
 static int
-_run_child (const char *const argv[], int wait_flag, char *task_name,
-	    char *stdout_file, char *_dbmt_error)
+run_child_with_msg (const char *const argv[], int wait_flag, char *task_name,
+		    char *stdout_file, char *_dbmt_error, const char *envp[])
 {
   char tmp_out_file[PATH_MAX];
   char tmp_err_file[PATH_MAX];
@@ -411,17 +456,17 @@ _run_child (const char *const argv[], int wait_flag, char *task_name,
   if (stdout_file == NULL)
     {
       snprintf (buf, PATH_MAX - 1, "%s_out_tmp", task_name);
-      make_temp_filepath (tmp_out_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
+      gen_tempfile_path (tmp_out_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
     }
   else
     {
-      snprintf (tmp_out_file, PATH_MAX, stdout_file);
+      snprintf (tmp_out_file, PATH_MAX, "%s", stdout_file);
     }
   snprintf (buf, PATH_MAX - 1, "%s_err_tmp", task_name);
-  make_temp_filepath (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
+  gen_tempfile_path (tmp_err_file, sco.dbmt_tmp_dir, buf, TS_RUN_CHILD, PATH_MAX);
 
-  if (run_child
-      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, &exit_code) < 0)
+  if (run_child_env
+      (argv, wait_flag, NULL, tmp_out_file, tmp_err_file, &exit_code, envp) < 0)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", argv[0]);
       ret_val = ERR_SYSTEM_CALL;
@@ -817,11 +862,10 @@ ts_delete_user (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  T_DBMT_USER dbmt_user;
   const char *new_db_user_name;
   const char *new_db_user_pass;
   char *db_name;
-  int i, ret;
+  int ret;
 
   new_db_user_name = nv_get_val (req, "username");
   new_db_user_pass = nv_get_val (req, "userpass");
@@ -847,32 +891,29 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
   if (new_db_user_pass)
     {
       char hexacoded[PASSWD_ENC_LENGTH];
-      /* update cmdb.pass dbinfo */
-      if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-	{
-	  int src_dbinfo;
 
-	  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	    {
-	      src_dbinfo =
-		      dbmt_user_search (& (dbmt_user.user_info[i]), db_name);
-	      if (src_dbinfo < 0)
-		{
-		  continue;
-		}
-	      if (strcmp
-		  (dbmt_user.user_info[i].dbinfo[src_dbinfo].uid, new_db_user_name) != 0)
-		{
-		  continue;
-		}
-	    }
-	  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-	  dbmt_user_free (&dbmt_user);
-	}
-
-      /* update db_user's passwd in autoexecquery.conf */
+      /*
+       * update db_user's passwd in autoexecquery.conf
+       *
+       */
       uEncrypt (PASSWD_LENGTH, new_db_user_pass, hexacoded);
-      auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded);
+      if (auto_conf_execquery_update_dbuser (new_db_user_name, new_db_user_name, hexacoded) < 0)
+	{
+	  /*
+	   * The password change itself already succeeded.
+	   * this is a best-effort cache sync failing, not the requested operation.
+	   */
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		    "WARNING: "
+		    "the password for database user '%s' on database '%s' was "
+		    "changed, but updating the cached password in "
+		    "autoexecquery.conf failed (lock timeout, file I/O error, "
+		    "or an internal update error); manual check recommended",
+		    new_db_user_name, db_name);
+	  nv_update_val (res, "note", _dbmt_error);
+	  ut_error_log (req, _dbmt_error);
+	  return ERR_NO_ERROR;
+	}
     }
 #endif
   return ERR_NO_ERROR;
@@ -882,7 +923,36 @@ ts_update_user (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_class_info (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  return cm_ts_class_info (req, res, _dbmt_error);
+  char *dbname;
+  T_DB_SERVICE_MODE db_mode;
+  int ha_mode = 0;
+
+  dbname = nv_get_val (req, "_DBNAME");
+  if (dbname == NULL)
+    {
+      return ERR_PARAM_MISSING;
+    }
+
+  db_mode = cms_database_mode (dbname, &ha_mode);
+  if (db_mode == DB_SERVICE_MODE_SA)
+    {
+      strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
+      return ERR_STANDALONE_MODE;
+    }
+
+  if (db_mode == DB_SERVICE_MODE_NONE)
+    {
+      /*
+       * server not running: spawn cub_jobsa ourselves via run_child_env(),
+       */
+      char *uid = nv_get_val (req, "_DBID");
+      char *passwd = nv_get_val (req, "_DBPASSWD");
+      char *cli_ver_val = nv_get_val (req, "_CLIENT_VERSION");
+
+      return cmd_class_info_sa (dbname, uid, passwd, cli_ver_val, res, _dbmt_error);
+    }
+
+  return cm_ts_class_info (req, res, _dbmt_error);    /* server already running (CS mode): call cm_common libs */
 }
 
 int
@@ -1079,8 +1149,11 @@ ts2_start_unicas (nvplist *in, nvplist *out, char *_dbmt_error)
   argv[argc++] = "start";
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
-  if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
+  /*
+   * ut_child_exited_ok () replaces the previous raw "rc != 0" comparison.
+   */
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || !ut_child_exited_ok (rc))
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
 	{
@@ -1159,7 +1232,6 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       strcpy (_dbmt_error, "broker");
       return ERR_PARAM_MISSING;
     }
-  chdir (sco.szCubrid);
   if (cm_get_broker_conf (&uc_conf, NULL, &error) < 0)
     {
       strcpy (_dbmt_error, error.err_msg);
@@ -1576,9 +1648,9 @@ ts2_start_broker (nvplist *in, nvplist *out, char *_dbmt_error)
   argv[argc++] = bname;
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "broker_start", TS2_STARTBROKER, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &rc) < 0 || rc != 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &rc) < 0 || !ut_child_exited_ok (rc))
     {
       if (read_error_file (cubrid_err_file, _dbmt_error, -1) < 0)
 	{
@@ -1854,96 +1926,110 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
   uEncrypt (PASSWD_LENGTH, passwd_p, dbmt_passwd);
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (!guard.ok ())
+      {
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
+      }
+
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+    num_dbmt_user = dbmt_user.num_dbmt_user;
+    for (i = 0; i < num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    sprintf (_dbmt_error, "%s", dbmt_id);
+	    return ERR_DBMTUSER_EXIST;
+	  }
+      }
+
+    /* set authority info */
+    if ((casauth = nv_get_val (req, "casauth")) == NULL)
+      {
+	casauth = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "unicas", casauth);
+
+    if ((dbcreate = nv_get_val (req, "dbcreate")) == NULL)
+      {
+	dbcreate = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "dbcreate", dbcreate);
+
+    if ((status_monitor = nv_get_val (req, "statusmonitorauth")) == NULL)
+      {
+	status_monitor = "";
+      }
+    authinfo =
+	    (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
+		sizeof (T_DBMT_USER_AUTHINFO),
+		num_authinfo, num_authinfo + 1);
+    if (authinfo == NULL)
+      {
+	dbmt_user_free (&dbmt_user);
+	return ERR_MEM_ALLOC;
+      }
+    num_authinfo++;
+    dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "statusmonitorauth", status_monitor);
+
+    /* set user info */
     {
-      return retval;
-    }
-  num_dbmt_user = dbmt_user.num_dbmt_user;
-  for (i = 0; i < num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+      size_t new_size = sizeof (T_DBMT_USER_INFO) * (num_dbmt_user + 1);
+      T_DBMT_USER_INFO *tmp = (T_DBMT_USER_INFO *)
+			      (dbmt_user.user_info == NULL ? malloc (new_size) : realloc (dbmt_user.user_info, new_size));
+
+      if (tmp == NULL)
 	{
 	  dbmt_user_free (&dbmt_user);
-	  sprintf (_dbmt_error, "%s", dbmt_id);
-	  return ERR_DBMTUSER_EXIST;
+	  if (authinfo != NULL)
+	    {
+	      free (authinfo);
+	    }
+	  return ERR_MEM_ALLOC;
 	}
+      memset (tmp + num_dbmt_user, 0, sizeof (T_DBMT_USER_INFO));
+      dbmt_user.user_info = tmp;
     }
+    num_dbmt_user++;
+    dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user - 1]), dbmt_id,
+			    dbmt_passwd, num_authinfo, authinfo, 0, NULL);
+    dbmt_user.num_dbmt_user = num_dbmt_user;
 
-  /* set authority info */
-  if ((casauth = nv_get_val (req, "casauth")) == NULL)
-    {
-      casauth = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "unicas", casauth);
-
-  if ((dbcreate = nv_get_val (req, "dbcreate")) == NULL)
-    {
-      dbcreate = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "dbcreate", dbcreate);
-
-  if ((status_monitor = nv_get_val (req, "statusmonitorauth")) == NULL)
-    {
-      status_monitor = "";
-    }
-  authinfo =
-	  (T_DBMT_USER_AUTHINFO *) increase_capacity (authinfo,
-	      sizeof (T_DBMT_USER_AUTHINFO),
-	      num_authinfo, num_authinfo + 1);
-  if (authinfo == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      return ERR_MEM_ALLOC;
-    }
-  num_authinfo++;
-  dbmt_user_set_authinfo (& (authinfo[num_authinfo - 1]), "statusmonitorauth", status_monitor);
-
-  /* set user info */
-  dbmt_user.user_info =
-	  (T_DBMT_USER_INFO *) increase_capacity (dbmt_user.user_info,
-	      sizeof (T_DBMT_USER_INFO),
-	      num_dbmt_user, num_dbmt_user + 1);
-  if (dbmt_user.user_info == NULL)
-    {
-      dbmt_user_free (&dbmt_user);
-      if (authinfo != NULL)
-	{
-	  free (authinfo);
-	}
-      return ERR_MEM_ALLOC;
-    }
-  num_dbmt_user++;
-  dbmt_user_set_userinfo (& (dbmt_user.user_info[num_dbmt_user - 1]), dbmt_id,
-			  dbmt_passwd, num_authinfo, authinfo, 0, NULL);
-  dbmt_user.num_dbmt_user = num_dbmt_user;
-
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
-  dbmt_user_write_pass (&dbmt_user, _dbmt_error);
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+    dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -1974,35 +2060,45 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  dbmt_user.user_info[i].user_name[0] = '\0';
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
+      }
 
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
-  dbmt_user_write_pass (&dbmt_user, _dbmt_error);
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    dbmt_user.user_info[i].user_name[0] = '\0';
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	return ERR_FILE_INTEGRITY;
+      }
+
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+    dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2153,154 +2249,171 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 			      "statusmonitorauth", status_monitor);
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      if (usr_dbinfo != NULL)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo != NULL)
-	{
-	  free (usr_authinfo);
-	}
-      return retval;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      if (usr_dbinfo != NULL)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo != NULL)
-	{
-	  free (usr_authinfo);
-	}
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return ERR_TMPFILE_OPEN_FAIL;
+      }
 
-  /* auth info */
-  if (dbmt_user.user_info[usr_index].authinfo == NULL)
-    {
-      dbmt_user.user_info[usr_index].num_authinfo = num_authinfo;
-      dbmt_user.user_info[usr_index].authinfo = usr_authinfo;
-      usr_authinfo = NULL;
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return retval;
+      }
 
-    }
-  else if (usr_authinfo != NULL)
-    {
-      T_DBMT_USER_INFO *current_user_info =
-	      (T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	if (usr_dbinfo != NULL)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo != NULL)
+	  {
+	    free (usr_authinfo);
+	  }
+	return ERR_FILE_INTEGRITY;
+      }
 
-      for (j = 0; j < num_authinfo; j++)
-	{
-	  int find_idx = -1;
-	  for (i = 0; i < current_user_info->num_authinfo; i++)
-	    {
-	      if (strcmp (current_user_info->authinfo[i].domain, usr_authinfo[j].domain) == 0)
-		{
-		  find_idx = i;
-		  break;
-		}
-	    }
-	  if (find_idx == -1)
-	    {
-	      current_user_info->authinfo =
-		      (T_DBMT_USER_AUTHINFO *) increase_capacity (current_user_info->authinfo,
-			  sizeof (T_DBMT_USER_AUTHINFO),
-			  current_user_info->num_authinfo,
-			  current_user_info->num_authinfo + 1);
-	      if (current_user_info->authinfo == NULL)
-		{
-		  if (usr_dbinfo)
-		    {
-		      free (usr_dbinfo);
-		    }
-		  if (usr_authinfo)
-		    {
-		      free (usr_authinfo);
-		    }
-		  return ERR_MEM_ALLOC;
-		}
-	      current_user_info->num_authinfo++;
-	      find_idx = current_user_info->num_authinfo - 1;
-	    }
-	  dbmt_user_set_authinfo (& (current_user_info->authinfo[find_idx]),
-				  usr_authinfo[j].domain, usr_authinfo[j].auth);
-	}
-    }
+    /* auth info */
+    if (dbmt_user.user_info[usr_index].authinfo == NULL)
+      {
+	dbmt_user.user_info[usr_index].num_authinfo = num_authinfo;
+	dbmt_user.user_info[usr_index].authinfo = usr_authinfo;
+	usr_authinfo = NULL;
 
-  /* db info */
-  if (dbmt_user.user_info[usr_index].dbinfo == NULL)
-    {
-      dbmt_user.user_info[usr_index].num_dbinfo = num_dbinfo;
-      dbmt_user.user_info[usr_index].dbinfo = usr_dbinfo;
-      usr_dbinfo = NULL;
+      }
+    else if (usr_authinfo != NULL)
+      {
+	T_DBMT_USER_INFO *current_user_info =
+		(T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
 
-    }
-  else if (usr_dbinfo != NULL)
-    {
-      T_DBMT_USER_INFO *current_user_info =
-	      (T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+	for (j = 0; j < num_authinfo; j++)
+	  {
+	    int find_idx = -1;
+	    for (i = 0; i < current_user_info->num_authinfo; i++)
+	      {
+		if (strcmp (current_user_info->authinfo[i].domain, usr_authinfo[j].domain) == 0)
+		  {
+		    find_idx = i;
+		    break;
+		  }
+	      }
+	    if (find_idx == -1)
+	      {
+		current_user_info->authinfo =
+			(T_DBMT_USER_AUTHINFO *) increase_capacity (current_user_info->authinfo,
+			    sizeof (T_DBMT_USER_AUTHINFO),
+			    current_user_info->num_authinfo,
+			    current_user_info->num_authinfo + 1);
+		if (current_user_info->authinfo == NULL)
+		  {
+		    if (usr_dbinfo)
+		      {
+			free (usr_dbinfo);
+		      }
+		    if (usr_authinfo)
+		      {
+			free (usr_authinfo);
+		      }
+		    return ERR_MEM_ALLOC;
+		  }
+		current_user_info->num_authinfo++;
+		find_idx = current_user_info->num_authinfo - 1;
+	      }
+	    dbmt_user_set_authinfo (& (current_user_info->authinfo[find_idx]),
+				    usr_authinfo[j].domain, usr_authinfo[j].auth);
+	  }
+      }
 
-      for (j = 0; j < num_dbinfo; j++)
-	{
-	  int find_idx = -1;
-	  for (i = 0; i < current_user_info->num_dbinfo; i++)
-	    {
-	      if (strcmp (current_user_info->dbinfo[i].dbname, usr_dbinfo[j].dbname) == 0)
-		{
-		  find_idx = i;
-		  break;
-		}
-	    }
-	  if (find_idx == -1)
-	    {
-	      current_user_info->dbinfo =
-		      (T_DBMT_USER_DBINFO *) increase_capacity (current_user_info->dbinfo,
-			  sizeof (T_DBMT_USER_DBINFO),
-			  current_user_info->num_dbinfo,
-			  current_user_info->num_dbinfo + 1);
-	      if (current_user_info->dbinfo == NULL)
-		{
-		  FREE_MEM (usr_dbinfo);
-		  FREE_MEM (usr_authinfo);
-		  return ERR_MEM_ALLOC;
-		}
-	      current_user_info->num_dbinfo++;
-	      find_idx = current_user_info->num_dbinfo - 1;
-	    }
-	  dbmt_user_set_dbinfo (& (current_user_info->dbinfo[find_idx]),
-				usr_dbinfo[j].dbname, usr_dbinfo[j].auth,
-				usr_dbinfo[j].uid, usr_dbinfo[j].broker_address);
-	}
-    }
+    /* db info */
+    if (dbmt_user.user_info[usr_index].dbinfo == NULL)
+      {
+	dbmt_user.user_info[usr_index].num_dbinfo = num_dbinfo;
+	dbmt_user.user_info[usr_index].dbinfo = usr_dbinfo;
+	usr_dbinfo = NULL;
 
-  retval = dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      if (usr_dbinfo)
-	{
-	  free (usr_dbinfo);
-	}
-      if (usr_authinfo)
-	{
-	  free (usr_authinfo);
-	}
-      return retval;
-    }
+      }
+    else if (usr_dbinfo != NULL)
+      {
+	T_DBMT_USER_INFO *current_user_info =
+		(T_DBMT_USER_INFO *) & (dbmt_user.user_info[usr_index]);
+
+	for (j = 0; j < num_dbinfo; j++)
+	  {
+	    int find_idx = -1;
+	    for (i = 0; i < current_user_info->num_dbinfo; i++)
+	      {
+		if (strcmp (current_user_info->dbinfo[i].dbname, usr_dbinfo[j].dbname) == 0)
+		  {
+		    find_idx = i;
+		    break;
+		  }
+	      }
+	    if (find_idx == -1)
+	      {
+		current_user_info->dbinfo =
+			(T_DBMT_USER_DBINFO *) increase_capacity (current_user_info->dbinfo,
+			    sizeof (T_DBMT_USER_DBINFO),
+			    current_user_info->num_dbinfo,
+			    current_user_info->num_dbinfo + 1);
+		if (current_user_info->dbinfo == NULL)
+		  {
+		    FREE_MEM (usr_dbinfo);
+		    FREE_MEM (usr_authinfo);
+		    return ERR_MEM_ALLOC;
+		  }
+		current_user_info->num_dbinfo++;
+		find_idx = current_user_info->num_dbinfo - 1;
+	      }
+	    dbmt_user_set_dbinfo (& (current_user_info->dbinfo[find_idx]),
+				  usr_dbinfo[j].dbname, usr_dbinfo[j].auth,
+				  usr_dbinfo[j].uid, usr_dbinfo[j].broker_address);
+	  }
+      }
+
+    retval = dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	if (usr_dbinfo)
+	  {
+	    free (usr_dbinfo);
+	  }
+	if (usr_authinfo)
+	  {
+	    free (usr_authinfo);
+	  }
+	return retval;
+      }
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2347,43 +2460,53 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if ((retval = dbmt_user_read (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
-    }
-  usr_index = -1;
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
-	{
-	  if (new_passwd == NULL)
-	    {
-	      dbmt_user.user_info[i].user_passwd[0] = '\0';
-	    }
-	  else
-	    {
-	      char hexacoded[PASSWD_ENC_LENGTH];
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-	      uEncrypt (PASSWD_LENGTH, new_passwd, hexacoded);
-	      strcpy (dbmt_user.user_info[i].user_passwd, hexacoded);
-	    }
-	  usr_index = i;
-	  break;
-	}
-    }
-  if (usr_index < 0)
-    {
-      strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
-      dbmt_user_free (&dbmt_user);
-      return ERR_FILE_INTEGRITY;
-    }
+    if (!guard.ok ())
+      {
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+	return ERR_WITH_MSG;
+      }
 
-  retval = dbmt_user_write_pass (&dbmt_user, _dbmt_error);
-  if (retval != ERR_NO_ERROR)
-    {
-      dbmt_user_free (&dbmt_user);
-      return retval;
-    }
+    if ((retval = dbmt_user_read_locked (&dbmt_user, _dbmt_error)) != ERR_NO_ERROR)
+      {
+	return retval;
+      }
+    usr_index = -1;
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	if (strcmp (dbmt_user.user_info[i].user_name, dbmt_id) == 0)
+	  {
+	    if (new_passwd == NULL)
+	      {
+		dbmt_user.user_info[i].user_passwd[0] = '\0';
+	      }
+	    else
+	      {
+		char hexacoded[PASSWD_ENC_LENGTH];
+
+		uEncrypt (PASSWD_LENGTH, new_passwd, hexacoded);
+		strcpy (dbmt_user.user_info[i].user_passwd, hexacoded);
+	      }
+	    usr_index = i;
+	    break;
+	  }
+      }
+    if (usr_index < 0)
+      {
+	strcpy (_dbmt_error, conf_get_dbmt_file2 (FID_DBMT_CUBRID_PASS, file));
+	dbmt_user_free (&dbmt_user);
+	return ERR_FILE_INTEGRITY;
+      }
+
+    retval = dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
+    if (retval != ERR_NO_ERROR)
+      {
+	dbmt_user_free (&dbmt_user);
+	return retval;
+      }
+  }
 
   /* add dblist */
   retval = ut_get_dblist (res, 0);
@@ -2425,6 +2548,7 @@ int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   int retval = ERR_NO_ERROR;
+  int cmdb_pass_registration_failed = 0;
   char *dbname = NULL;
   char *dbmt_user_name = NULL;
   char *charset = NULL;
@@ -2591,13 +2715,15 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (access (genvolpath, W_OK) < 0)
     {
-      sprintf (_dbmt_error, "%s: %s\n", genvolpath, strerror (errno));
+      char errbuf[CM_STRERROR_BUF_LEN];
+      sprintf (_dbmt_error, "%s: %s\n", genvolpath, STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
     }
 
   if (logvolpath != NULL && access (logvolpath, W_OK) < 0)
     {
-      sprintf (_dbmt_error, "%s: %s\n", genvolpath, strerror (errno));
+      char errbuf[CM_STRERROR_BUF_LEN];
+      sprintf (_dbmt_error, "%s: %s\n", genvolpath, STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
     }
 
@@ -2829,9 +2955,9 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = charset;
   argv[argc++] = NULL;
 
-  make_temp_filepath (createdb_err_file, sco.dbmt_tmp_dir, "createdb_err_file", TS_CREATEDB, PATH_MAX);
+  gen_tempfile_path (createdb_err_file, sco.dbmt_tmp_dir, "createdb_err_file", TS_CREATEDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, NULL, createdb_err_file, NULL);    /* createdb */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, createdb_err_file, NULL);    /* createdb */
 
   if (read_error_file (createdb_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
     {
@@ -2910,30 +3036,51 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_SYSTEM_CALL;
     }
 
-  /* add dbinfo to cmdb.pass */
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
-    {
-      int i;
-      T_DBMT_USER_DBINFO tmp_dbinfo;
+  /*
+   * add dbinfo to cmdb.pass
+   *
+   * NOTE: file_resource_guard::ok () can now return false when the
+   * cross-process lock on cmdb.pass could not be acquired within the
+   * bounded retry window
+   */
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+    bool registered = false;
 
-      memset (&tmp_dbinfo, 0, sizeof (tmp_dbinfo));
-      dbmt_user_set_dbinfo (&tmp_dbinfo, dbname, dbmt_user_name, "dba", "");
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	int i;
+	T_DBMT_USER_DBINFO tmp_dbinfo;
 
-      dbmt_user_db_delete (&dbmt_user, dbname);
-      for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	{
-	  if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
-	    {
-	      if (dbmt_user_add_dbinfo
-		  (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR)
-		{
-		  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-		}
-	      break;
-	    }
-	}
-      dbmt_user_free (&dbmt_user);
-    }
+	memset (&tmp_dbinfo, 0, sizeof (tmp_dbinfo));
+	dbmt_user_set_dbinfo (&tmp_dbinfo, dbname, dbmt_user_name, "dba", "");
+
+	dbmt_user_db_delete (&dbmt_user, dbname);
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    if (strcmp (dbmt_user.user_info[i].user_name, dbmt_user_name) == 0)
+	      {
+		if (dbmt_user_add_dbinfo
+		    (& (dbmt_user.user_info[i]), &tmp_dbinfo) == ERR_NO_ERROR
+		    && dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+		  {
+		    registered = true;
+		  }
+		break;
+	      }
+	  }
+	dbmt_user_free (&dbmt_user);
+      }
+
+    /*
+     * lock timeout, cmdb.pass could not be read, the user is not in it,
+     * out of memory, or the new cmdb.pass could not be written
+     */
+    if (!registered)
+      {
+	cmdb_pass_registration_failed = 1;
+      }
+  }
 
   /* add dbinfo to conlist */
   memset (&con_dbinfo, 0, sizeof (con_dbinfo));
@@ -3003,7 +3150,82 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       unlink (extvolfile);
     }
+
+  if (cmdb_pass_registration_failed)
+    {
+      /*
+       * Warning: the createdb already happened, but may still need manual cleanup.
+       */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"WARNING: "
+		"database '%s' was created on disk, but it could not be "
+		"registered in cmdb.pass (lock timeout, file I/O error, or "
+		"an internal update error); the database is NOT currently "
+		"manageable through CMS for user '%s' until cmdb.pass is "
+		"corrected manually; see the CMS error log for details",
+		dbname, dbmt_user_name);
+      nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
+      return ERR_NO_ERROR;
+    }
   return ERR_NO_ERROR;
+}
+
+/*
+ * BOOKKEEPING_FAILED_* - bits identifying which of the bookkeeping
+ *   files tsDeleteDB ()/tsRenameDB () keep in sync with the database
+ *   itself failed to update, for reporting via
+ *   bookkeeping_failed_files_list () below. Both functions touch the
+ *   same five files (cmdb.pass plus the four auto-job configs), so one
+ *   shared set of bits/names covers both.
+ */
+#define BOOKKEEPING_FAILED_CMDB_PASS       (1 << 0)
+#define BOOKKEEPING_FAILED_ADDVOLDB_CONF   (1 << 1)
+#define BOOKKEEPING_FAILED_BACKUPDB_CONF   (1 << 2)
+#define BOOKKEEPING_FAILED_HISTORY_CONF    (1 << 3)
+#define BOOKKEEPING_FAILED_EXECQUERY_CONF  (1 << 4)
+
+#define BOOKKEEPING_FAILED_LIST_BUF_SIZE 256
+
+/*
+ * bookkeeping_failed_files_list () - writes a comma-separated,
+ *   human-readable list of the bookkeeping files corresponding to the
+ *   BOOKKEEPING_FAILED_* bits set in failed_mask into buf.
+ */
+static void
+bookkeeping_failed_files_list (int failed_mask, char *buf, size_t buf_size)
+{
+  static const struct
+  {
+    int bit;
+    const char *name;
+  } entries[] =
+  {
+    { BOOKKEEPING_FAILED_CMDB_PASS,      "cmdb.pass" },
+    { BOOKKEEPING_FAILED_ADDVOLDB_CONF,  "the auto-job addvoldb config file" },
+    { BOOKKEEPING_FAILED_BACKUPDB_CONF,  "the auto-job backupdb config file" },
+    { BOOKKEEPING_FAILED_HISTORY_CONF,   "the auto-job history config file" },
+    { BOOKKEEPING_FAILED_EXECQUERY_CONF, "the auto-job execquery config file" }
+  };
+  size_t i;
+  int wrote_any = 0;
+
+  if (buf_size == 0)
+    {
+      return;
+    }
+
+  buf[0] = '\0';
+  for (i = 0; i < sizeof (entries) / sizeof (entries[0]); i++)
+    {
+      if (! (failed_mask & entries[i].bit))
+	{
+	  continue;
+	}
+      snprintf (buf + strlen (buf), buf_size - strlen (buf),
+		"%s%s", wrote_any ? ", " : "", entries[i].name);
+      wrote_any = 1;
+    }
 }
 
 int
@@ -3011,6 +3233,7 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int retval = ERR_NO_ERROR;
+  int bookkeeping_failed_mask = 0;
   char *dbname = NULL, *delbackup;
   char cubrid_err_file[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
@@ -3047,13 +3270,13 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = dbname;
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "deletedb_err", TS_DELETEDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "deletedb_err", TS_DELETEDB, PATH_MAX);
 
   /*get dbvolpath and dblogpath. */
   get_dbvoldir (dbvolpath, sizeof (dbvolpath), dbname, cubrid_err_file);
   get_dblogdir (dblogpath, sizeof (dblogpath), dbname, cubrid_err_file);
 
-  retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* deletedb */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, NULL);    /* deletedb */
 
   if (read_error_file (cubrid_err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
     {
@@ -3073,17 +3296,45 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_SYSTEM_CALL;
     }
 
-  auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname);
-  auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname);
-  auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname);
-  auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname);
-
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+  /*
+   * NOTE: each of these four auto_conf_*_delete () calls is a thin macro
+   * around auto_conf_delete () (see cm_config.h), and auto_conf_delete ()
+   * takes its own bounded-retry file_resource_guard lock internally.
+   */
+  if (auto_conf_addvol_delete (FID_AUTO_ADDVOLDB_CONF, dbname) < 0)
     {
-      dbmt_user_db_delete (&dbmt_user, dbname);
-      dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-      dbmt_user_free (&dbmt_user);
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_ADDVOLDB_CONF;
     }
+  if (auto_conf_backup_delete (FID_AUTO_BACKUPDB_CONF, dbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_BACKUPDB_CONF;
+    }
+  if (auto_conf_history_delete (FID_AUTO_HISTORY_CONF, dbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_HISTORY_CONF;
+    }
+  if (auto_conf_execquery_delete (FID_AUTO_EXECQUERY_CONF, dbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_EXECQUERY_CONF;
+    }
+
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	dbmt_user_db_delete (&dbmt_user, dbname);
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
+	dbmt_user_free (&dbmt_user);
+      }
+    else
+      {
+	bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+      }
+  }
 
   /* The following delete sequence can delete folder hierarchy like :
   * <database log folder>/<database vol folder>
@@ -3093,6 +3344,25 @@ tsDeleteDB (nvplist *req, nvplist *res, char *_dbmt_error)
   rmdir (dblogpath);
   rmdir (dbvolpath);
 
+  if (bookkeeping_failed_mask)
+    {
+      char failed_files[BOOKKEEPING_FAILED_LIST_BUF_SIZE];
+
+      /*
+       * Warning: the deletedb already happened, but may still need manual cleanup
+       */
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"WARNING: "
+		"database '%s' was deleted, but the following bookkeeping "
+		"file(s) could not be updated (lock timeout, file I/O "
+		"error, or an internal update error): %s; manual check "
+		"recommended; see the CMS error log for details",
+		dbname, failed_files);
+      nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
+      return ERR_NO_ERROR;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3110,15 +3380,19 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 
   int argc = 0;
   int retval = 0;
+  int bookkeeping_failed_mask = 0;
   T_DB_SERVICE_MODE db_mode;
   T_DBMT_USER dbmt_user;
 
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char tmpfile[PATH_MAX];
+  bool vol_file_does_not_exist = false;
+  char err_buf[DBMT_ERROR_MSG_SIZE];
 
   cmd_name[0] = '\0';
   tmpfile[0] = '\0';
   task_name[0] = '\0';
+  err_buf[0] = '\0';
 
   if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
     {
@@ -3152,7 +3426,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3178,7 +3452,7 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
       char *p;
 
-      make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_RENAMEDB, PATH_MAX);
+      gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_RENAMEDB, PATH_MAX);
       if ((outfile = fopen (tmpfile, "w")) == NULL)
 	{
 	  return ERR_TMPFILE_OPEN_FAIL;
@@ -3186,9 +3460,10 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       for (i = 0; i < req->nvplist_leng; i++)
 	{
 	  nv_lookup (req, i, &n, &v);
-	  if (n == NULL || v == NULL)
+	  if (n == NULL)
 	    {
 	      fclose (outfile);
+	      unlink (tmpfile);
 	      if (v != NULL)
 		{
 		  strcpy (_dbmt_error, v);
@@ -3212,6 +3487,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  else if (flag == 1)
 	    {
+	      if (v == NULL)
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  strcpy (_dbmt_error, "invalid volume parameters");
+		  return ERR_WITH_MSG;
+		}
 #if defined(WINDOWS)
 	      replace_colon (n);
 	      replace_colon (v);
@@ -3235,11 +3517,33 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      n = nt_style_path (n, n_buf);
 	      v = nt_style_path (v, v_buf);
 #endif
+	      if (access (n, F_OK) != 0)
+		{
+		  if (vol_file_does_not_exist)
+		    {
+		      int len = strlen (err_buf);
+		      snprintf (err_buf + len, DBMT_ERROR_MSG_SIZE - len, ", %s", n);
+		    }
+		  else
+		    {
+		      snprintf (err_buf, DBMT_ERROR_MSG_SIZE, "volume files does not exist: %s", n);
+		      vol_file_does_not_exist = true;
+		    }
+		  continue;
+		}
 	      fprintf (outfile, "%d %s %s\n", line++, n, v);
 
 	    }            /* close "else if (flag == 1)" */
 	}            /* close "for" loop */
       fclose (outfile);
+
+      if (vol_file_does_not_exist)
+	{
+	  unlink (tmpfile);
+	  DBMT_ERR_MSG_SET (_dbmt_error, err_buf);
+	  return ERR_WITH_MSG;
+	}
+
       argv[argc++] = "--" RENAME_CONTROL_FILE_L;
       argv[argc++] = tmpfile;
     }                /* close "if (adv_flag != NULL)" */
@@ -3264,34 +3568,85 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = NULL;
 
   strncpy (task_name, "renamedb", TASKNAME_LEN);
-  retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
+  retval = run_child_with_msg (argv, 1, task_name, NULL, _dbmt_error);
+
+  if (tmpfile[0] != '\0')
+    {
+      unlink (tmpfile);
+    }
+
   if (retval != ERR_NO_ERROR)
     {
       return retval;
     }
 
-  auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname);
-  auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname);
-  auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname);
-  auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname);
-
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+  if (auto_conf_addvol_rename (FID_AUTO_ADDVOLDB_CONF, dbname, newdbname) < 0)
     {
-      int i, j;
-      for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-	{
-	  for (j = 0; j < dbmt_user.user_info[i].num_dbinfo; j++)
-	    {
-	      if (strcmp (dbmt_user.user_info[i].dbinfo[j].dbname, dbname) == 0)
-		{
-		  strcpy (dbmt_user.user_info[i].dbinfo[j].dbname, newdbname);
-		}
-	    }
-	}
-      dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-      dbmt_user_free (&dbmt_user);
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_ADDVOLDB_CONF;
+    }
+  if (auto_conf_backup_rename (FID_AUTO_BACKUPDB_CONF, dbname, newdbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_BACKUPDB_CONF;
+    }
+  if (auto_conf_history_rename (FID_AUTO_HISTORY_CONF, dbname, newdbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_HISTORY_CONF;
+    }
+  if (auto_conf_execquery_rename (FID_AUTO_EXECQUERY_CONF, dbname, newdbname) < 0)
+    {
+      bookkeeping_failed_mask |= BOOKKEEPING_FAILED_EXECQUERY_CONF;
     }
 
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
+
+    if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
+      {
+	int i, j;
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    for (j = 0; j < dbmt_user.user_info[i].num_dbinfo; j++)
+	      {
+		if (strcmp (dbmt_user.user_info[i].dbinfo[j].dbname, dbname) == 0)
+		  {
+		    strcpy (dbmt_user.user_info[i].dbinfo[j].dbname, newdbname);
+		  }
+	      }
+	  }
+	if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+	  {
+	    bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+	  }
+	dbmt_user_free (&dbmt_user);
+      }
+    else
+      {
+	bookkeeping_failed_mask |= BOOKKEEPING_FAILED_CMDB_PASS;
+      }
+  }
+
+  if (bookkeeping_failed_mask)
+    {
+      char failed_files[BOOKKEEPING_FAILED_LIST_BUF_SIZE];
+
+      /*
+       * Warning: the renamedb already happened, but may still need manual cleanup
+       * see the API-level decision recorded in docs/api/renamedb.md.
+       */
+      bookkeeping_failed_files_list (bookkeeping_failed_mask, failed_files, sizeof (failed_files));
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"WARNING: "
+		"database '%s' was renamed to '%s', but the following "
+		"bookkeeping file(s) could not be updated (lock timeout, "
+		"file I/O error, or an internal update error): %s; stale "
+		"entries still referencing the old name '%s' may remain "
+		"and should be checked and cleaned up manually; see the CMS "
+		"error log for details",
+		dbname, newdbname, failed_files, dbname);
+      nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
+      return ERR_NO_ERROR;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3309,7 +3664,7 @@ tsStartDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3317,7 +3672,8 @@ tsStartDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (db_mode == DB_SERVICE_MODE_CS)
     {
-      return ERR_NO_ERROR;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "database is already running: %s", dbname);
+      return ERR_WITH_MSG;
     }
 
   retval = cmd_start_server (dbname, err_buf, sizeof (err_buf));
@@ -3341,11 +3697,19 @@ int
 tsStopDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *dbname;
+  T_DB_SERVICE_MODE db_mode;
 
   if ((dbname = nv_get_val (req, "_DBNAME")) == NULL)
     {
       sprintf (_dbmt_error, "%s", "database name");
       return ERR_PARAM_MISSING;
+    }
+
+  db_mode = cms_database_mode (dbname, NULL);
+  if (db_mode != DB_SERVICE_MODE_CS)
+    {
+      sprintf (_dbmt_error, "%s", dbname);
+      return ERR_DB_INACTIVE;
     }
 
   if (cmd_stop_server (dbname, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
@@ -3378,7 +3742,7 @@ tsDbspaceInfo (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3511,7 +3875,7 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3618,9 +3982,9 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  make_temp_filepath (err_file, sco.dbmt_tmp_dir, "runaddvoldb_err_tmp", TS_ADDVOLDB, PATH_MAX);
+  gen_tempfile_path (err_file, sco.dbmt_tmp_dir, "runaddvoldb_err_tmp", TS_ADDVOLDB, PATH_MAX);
 
-  ret = run_child (argv, 1, NULL, NULL, err_file, NULL);    /* addvoldb */
+  ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, err_file, NULL);    /* addvoldb */
   if (read_error_file (err_file, _dbmt_error, DBMT_ERROR_MSG_SIZE) < 0)
     {
       if (access (err_file, F_OK) == 0)
@@ -3663,6 +4027,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
   char conf_dir[PATH_MAX];
   int i = -1;
   int retval = -1;
+  int cmdb_pass_sync_failed = 0;
   char cubrid_err_file[PATH_MAX];
   T_DBMT_USER dbmt_user;
   T_DB_SERVICE_MODE db_mode;
@@ -3716,7 +4081,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = uDatabaseMode (srcdbname, NULL);
+  db_mode = cms_database_mode (srcdbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", srcdbname);
@@ -3745,7 +4110,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 #endif
       char *p;
 
-      make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COPYDB, PATH_MAX);
+      gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COPYDB, PATH_MAX);
       if ((outfile = fopen (tmpfile, "w")) == NULL)
 	{
 	  return ERR_TMPFILE_OPEN_FAIL;
@@ -3839,9 +4204,9 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DIR_CREATE_FAIL;
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "copydb_err_tmp", TS_COPYDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "copydb_err_tmp", TS_COPYDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* copydb */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, NULL);    /* copydb */
   if (adv_flag)
     {
       unlink (tmpfile);
@@ -3896,7 +4261,7 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[1] = UTIL_OPTION_DELETEDB;
       argv[2] = srcdbname;
       argv[3] = NULL;
-      retval = run_child (argv, 1, NULL, NULL, NULL, NULL);    /* deletedb */
+      retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL);    /* deletedb */
       if (retval < 0)
 	{
 	  strcpy (_dbmt_error, argv[0]);
@@ -3905,38 +4270,68 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* cmdb.pass update after delete */
-  if (dbmt_user_read (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
-    {
-      goto copydb_finale;
-    }
+  {
+    file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
-  dbmt_user_db_delete (&dbmt_user, destdbname);
-  for (i = 0; i < dbmt_user.num_dbmt_user; i++)
-    {
-      int dbinfo_idx;
-      T_DBMT_USER_DBINFO tmp_info;
+    if (!guard.ok () || dbmt_user_read_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+      {
+	cmdb_pass_sync_failed = 1;
+	goto copydb_finale;
+      }
 
-      dbinfo_idx = dbmt_user_search (& (dbmt_user.user_info[i]), srcdbname);
-      if (dbinfo_idx < 0)
-	{
-	  continue;
-	}
-      tmp_info = dbmt_user.user_info[i].dbinfo[dbinfo_idx];
-      strcpy (tmp_info.dbname, destdbname);
-      if (dbmt_user_add_dbinfo (& (dbmt_user.user_info[i]), &tmp_info) != ERR_NO_ERROR)
-	{
-	  dbmt_user_free (&dbmt_user);
-	  goto copydb_finale;
-	}
-    }
-  if (move_flag)
-    {
-      dbmt_user_db_delete (&dbmt_user, srcdbname);
-    }
-  dbmt_user_write_auth (&dbmt_user, _dbmt_error);
-  dbmt_user_free (&dbmt_user);
+    dbmt_user_db_delete (&dbmt_user, destdbname);
+    for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+      {
+	int dbinfo_idx;
+	T_DBMT_USER_DBINFO tmp_info;
+
+	dbinfo_idx = dbmt_user_search (& (dbmt_user.user_info[i]), srcdbname);
+	if (dbinfo_idx < 0)
+	  {
+	    continue;
+	  }
+	tmp_info = dbmt_user.user_info[i].dbinfo[dbinfo_idx];
+	strcpy (tmp_info.dbname, destdbname);
+	if (dbmt_user_add_dbinfo (& (dbmt_user.user_info[i]), &tmp_info) != ERR_NO_ERROR)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    cmdb_pass_sync_failed = 1;
+	    goto copydb_finale;
+	  }
+      }
+    if (move_flag)
+      {
+	dbmt_user_db_delete (&dbmt_user, srcdbname);
+      }
+    if (dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error) != ERR_NO_ERROR)
+      {
+	cmdb_pass_sync_failed = 1;
+      }
+    dbmt_user_free (&dbmt_user);
+  }
 
 copydb_finale:
+  if (cmdb_pass_sync_failed)
+    {
+      /*
+       * Warning: the copy already happened, but may still need manual cleanup
+       */
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"WARNING: "
+		"database '%s' was copied to '%s', but cmdb.pass could "
+		"not be updated with the new database's dbinfo (lock "
+		"timeout, read failure, or an internal update error); "
+		"the copy itself succeeded, but '%s' may not be "
+		"manageable through CMS until cmdb.pass is corrected "
+		"manually%s; see the CMS error log for details",
+		srcdbname, destdbname, destdbname,
+		move_flag ? " (note: 'move' was requested, so the source "
+		"database's cmdb.pass entry may also still "
+		"be present and need manual cleanup)" : "");
+      nv_update_val (res, "note", _dbmt_error);
+      ut_error_log (req, _dbmt_error);
+      return ERR_NO_ERROR;
+    }
   return ERR_NO_ERROR;
 }
 
@@ -3968,7 +4363,7 @@ ts_plandump (nvplist *req, nvplist *res, char *_dbmt_error)
   * check the running mode of current database,
   * return error if it is DB_SERVICE_MODE_SA.
   */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -3996,15 +4391,15 @@ ts_plandump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "plandump_err_tmp", TS_PLANDUMP, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "plandump_err_tmp", TS_PLANDUMP, PATH_MAX);
 
   /*
   * create a new tmp file to record the content
   * that returned by plandump.
   */
-  make_temp_filepath (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_PLANDUMP, PATH_MAX);
+  gen_tempfile_path (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_PLANDUMP, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* plandump */
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* plandump */
     {
       strcpy (_dbmt_error, argv[0]);
       retval = ERR_SYSTEM_CALL;
@@ -4065,7 +4460,7 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
   * check the running mode of current database,
   * return error if it is DB_SERVICE_MODE_SA.
   */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4106,15 +4501,15 @@ ts_paramdump (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "paramdump_err_tmp", TS_PARAMDUMP, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "paramdump_err_tmp", TS_PARAMDUMP, PATH_MAX);
 
   /*
   * create a new tmp file to record the content
   * that returned by plandump.
   */
-  make_temp_filepath (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_PARAMDUMP, PATH_MAX);
+  gen_tempfile_path (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_PARAMDUMP, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* paramdump */
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* paramdump */
     {
       strcpy (_dbmt_error, argv[0]);
       retval = ERR_SYSTEM_CALL;
@@ -4160,7 +4555,35 @@ rm_tmpfile:
 int
 ts_optimizedb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  return cm_ts_optimizedb (req, res, _dbmt_error);
+  char *dbname, *classname;
+  T_DB_SERVICE_MODE db_mode;
+  int ha_mode = 0;
+
+  dbname = nv_get_val (req, "_DBNAME");
+  if (dbname == NULL)
+    {
+      strcpy_limit (_dbmt_error, "database name", DBMT_ERROR_MSG_SIZE);
+      return ERR_PARAM_MISSING;
+    }
+
+  db_mode = cms_database_mode (dbname, &ha_mode);
+  if (db_mode == DB_SERVICE_MODE_SA)
+    {
+      strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
+      return ERR_STANDALONE_MODE;
+    }
+
+  classname = nv_get_val (req, "classname");
+
+  if (db_mode == DB_SERVICE_MODE_NONE)
+    {
+      /*
+       * server not running: run the `cubrid optimizedb` using run_child_env ()
+       */
+      return cmd_optimizedb_sa (dbname, classname, _dbmt_error);
+    }
+
+  return cm_ts_optimizedb (req, res, _dbmt_error); /* server already running (CS mode): call cm_common libs */
 }
 
 int
@@ -4199,7 +4622,7 @@ ts_checkdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DB_NONEXISTANT;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4237,7 +4660,7 @@ ts_checkdb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = NULL;
 
   strncpy (task_name, "checkdb", TASKNAME_LEN);
-  retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
+  retval = run_child_with_msg (argv, 1, task_name, NULL, _dbmt_error);
 
   return retval;
 }
@@ -4265,7 +4688,7 @@ ts_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* check the database mode. */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4276,14 +4699,14 @@ ts_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, dbname, sizeof (dbname_at_hostname));
-      retval = cm_get_db_exec_stat (dbname_at_hostname, &exec_stat, &err_buf);
+      retval = cms_get_db_exec_stat (dbname_at_hostname, &exec_stat, &err_buf);
     }
   else
     {
-      retval = cm_get_db_exec_stat (dbname, &exec_stat, &err_buf);
+      retval = cms_get_db_exec_stat (dbname, &exec_stat, &err_buf);
     }
 
-  /* call cm_get_db_exec_stat to get stat infomation. */
+  /* call cms_get_db_exec_stat to get stat infomation. */
   if (retval < 0)
     {
       /* return error with message if the operation is not success. */
@@ -4412,20 +4835,76 @@ statdump_finale:
   return retval;
 }
 
+/*
+ * create_input_class_file () - write the "class-names" values of req to
+ *   filename, one class name per line, so the resulting file can be
+ *   handed to compactdb the same way a user supplied "input-class-file"
+ *   is.
+ *
+ *   req (in)   : client request.
+ *   res (in)   : client response
+ *   filename (in) : path of the temporary file to create.
+ *   _dbmt_error (out) : error message buffer.
+ *
+ *   return : ERR_NO_ERROR on success, an ERR_ code on failure.
+ */
+static int
+create_input_class_file (nvplist *req, nvplist *res, const char *filename, char *_dbmt_error)
+{
+  int i;
+  char *name = NULL;
+  char *value = NULL;
+  int class_cnt = 0;
+  FILE *fp;
+
+  fp = fopen (filename, "w");
+  if (fp == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", filename);
+      return ERR_TMPFILE_OPEN_FAIL;
+    }
+
+  for (i = 0; i < req->nvplist_leng; i++)
+    {
+      nv_lookup (req, i, &name, &value);
+      if ((name != NULL) && (strcmp (name, "class-names") == 0) && (value != NULL) && (value[0] != '\0'))
+	{
+	  fprintf (fp, "%s\n", value);
+	  class_cnt++;
+	}
+    }
+
+  fclose (fp);
+
+  if (class_cnt == 0)
+    {
+      unlink (filename);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "class-names");
+      return ERR_PARAM_MISSING;
+    }
+
+  return ERR_NO_ERROR;
+}
+
 int
 ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char out_file[PATH_MAX];
   char err_file[PATH_MAX];
+  char class_names_file[PATH_MAX];
+  char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
 
   const char *argv[10];
   T_DB_SERVICE_MODE db_mode;
 
+  int ha_mode = 0;
   int exit_code = 0;
   int argc = 0;
   int retval = ERR_NO_ERROR;
   int createtmpfile = 0;
+  char *input_class_file = NULL;
+  char *class_names = NULL;
 
   char *dbname = NULL;
   char *verbose = NULL;
@@ -4433,6 +4912,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
   cmd_name[0] = '\0';
   out_file[0] = '\0';
   err_file[0] = '\0';
+  class_names_file[0] = '\0';
 
   dbname = nv_get_val (req, "dbname");
   if (dbname == NULL)
@@ -4453,7 +4933,7 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4478,21 +4958,77 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
       argv[argc++] = "--" COMPACT_SA_MODE_L;
     }
 
-  argv[argc++] = dbname;
+  if (ha_mode)
+    {
+      if (is_ha_updates_disabled (dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+    }
+
+  input_class_file = nv_get_val (req, "input-class-file");
+  class_names = nv_get_val (req, "class-names");
+
+  if (input_class_file != NULL && class_names != NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Use only one of the two keys: 'input-class-file' or 'class-names'");
+      return ERR_WITH_MSG;
+    }
+
+
+  if (class_names != NULL)
+    {
+      gen_tempfile_path (class_names_file, sco.dbmt_tmp_dir, "compactdb_input_class", TS_COMPACTDB, PATH_MAX);
+
+      retval = create_input_class_file (req, res, class_names_file, _dbmt_error);
+      if (retval == ERR_TMPFILE_OPEN_FAIL)
+	{
+	  return retval;
+	}
+      else if (retval == ERR_NO_ERROR)
+	{
+	  input_class_file = class_names_file;
+	}
+      else
+	{
+	  unlink (class_names_file);
+	  class_names = NULL;
+	}
+
+    }
+
+  if (input_class_file)
+    {
+      if (access (input_class_file, F_OK) < 0)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "input-class_file does not exists: %s", input_class_file);
+	  if (class_names != NULL)
+	    {
+	      unlink (class_names_file);
+	    }
+	  return ERR_WITH_MSG;
+	}
+
+      argv[argc++] = "-" COMPACT_INPUT_CLASS_FILE_S;
+      argv[argc++] = input_class_file;
+    }
+
+  snprintf (dbname_at_hostname, sizeof (dbname_at_hostname), "%s%s", dbname, ha_mode ? "@localhost" : "");
+  argv[argc++] = dbname_at_hostname;
   argv[argc++] = NULL;
 
   if (createtmpfile != 0)
     {
-      make_temp_filepath (out_file, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
+      gen_tempfile_path (out_file, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
     }
   else
     {
-      make_temp_filepath (out_file, sco.dbmt_tmp_dir, "compactdb_out_tmp", TS_COMPACTDB, PATH_MAX);
+      gen_tempfile_path (out_file, sco.dbmt_tmp_dir, "compactdb_out_tmp", TS_COMPACTDB, PATH_MAX);
     }
 
-  make_temp_filepath (err_file, sco.dbmt_tmp_dir, "compactdb_err_tmp", TS_COMPACTDB, PATH_MAX);
+  gen_tempfile_path (err_file, sco.dbmt_tmp_dir, "compactdb_err_tmp", TS_COMPACTDB, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, out_file, err_file, &exit_code) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, out_file, err_file, &exit_code) < 0)
     {
       /* compactdb */
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", argv[0]);
@@ -4527,6 +5063,10 @@ ts_compactdb (nvplist *req, nvplist *res, char *_dbmt_error)
 rm_tmpfile:
   unlink (out_file);
   unlink (err_file);
+  if (class_names != NULL)
+    {
+      unlink (class_names_file);
+    }
   return retval;
 }
 
@@ -4554,7 +5094,7 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4587,7 +5127,6 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       return ERR_WITH_MSG;
     }
-
 
   /* create directory */
   if (access (backupfilepath, F_OK) < 0)
@@ -4645,7 +5184,7 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  make_temp_filepath (inputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPDB, PATH_MAX);
+  gen_tempfile_path (inputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPDB, PATH_MAX);
   inputfile = fopen (inputfilepath, "w");
   if (inputfile)
     {
@@ -4657,9 +5196,9 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_FILE_OPEN_FAIL;
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "backupdb_err_tmp", TS_BACKUPDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "backupdb_err_tmp", TS_BACKUPDB, PATH_MAX);
 
-  if (run_child (argv, 1, inputfilepath, NULL, cubrid_err_file, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, inputfilepath, NULL, cubrid_err_file, NULL) < 0)
     {
       /* backupdb */
       strcpy (_dbmt_error, argv[0]);
@@ -4706,12 +5245,12 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   struct stat statbuf;
   const char *argv[30];
   int argc = 0;
+  bool use_hash_file = false;
   T_DB_SERVICE_MODE db_mode;
   char fullpath[PATH_MAX + 16];	/* holds "<path>/files/" */
   char dba_user[32] = "dba";
   char *dbuser = NULL;
   char *dbpasswd = NULL;
-  char *skip_index_detail = NULL;
   char *split_schema_files = NULL;
   char *as_dba = NULL;
 
@@ -4737,7 +5276,6 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   lofile = nv_get_val (req, "lofile");
   dbuser = nv_get_val (req, "dbuser");
   dbpasswd = nv_get_val (req, "dbpasswd");
-  skip_index_detail = nv_get_val (req, "skip-index-detail");
   split_schema_files = nv_get_val (req, "split-schema-files");
   as_dba = nv_get_val (req, "as-dba");
 
@@ -4747,7 +5285,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -4774,6 +5312,21 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  use_hash_file = (usehash != NULL && strcmp (usehash, "yes") == 0);
+  if (use_hash_file)
+    {
+      if (hashdir == NULL)
+	{
+	  strcpy (_dbmt_error, "hashdir");
+	  return ERR_PARAM_MISSING;
+	}
+
+      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
+    }
+
   if (access (fullpath, F_OK) < 0)
     {
       if (uCreateDir (fullpath) != ERR_NO_ERROR)
@@ -4795,7 +5348,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
   /* makeup upload class list file */
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
   if ((outfile = fopen (tmpfile, "w")) == NULL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -4845,13 +5398,8 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "--" UNLOAD_OUTPUT_PATH_L;
   argv[argc++] = fullpath;
 
-  if ((usehash != NULL) && (strcmp (usehash, "yes") == 0))
+  if (use_hash_file)
     {
-      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
-	{
-	  return ERR_WITH_MSG;
-	}
-
       argv[argc++] = "--" UNLOAD_HASH_FILE_L;
       argv[argc++] = hashdir;
     }
@@ -4910,10 +5458,6 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       argv[argc++] = "--" UNLOAD_SPLIT_SCHEMA_L;
     }
-  if (uStringEqual (skip_index_detail, "yes"))
-    {
-      argv[argc++] = "--" UNLOAD_SKIP_IDX_DETAIL_L;
-    }
 
   if (ha_mode != 0)
     {
@@ -4937,9 +5481,9 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "unloaddb_err_tmp", TS_UNLOADDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "unloaddb_err_tmp", TS_UNLOADDB, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, NULL) < 0)
     {
       /* unloaddb */
       strcpy (_dbmt_error, argv[0]);
@@ -5044,7 +5588,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
+      gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_UNLOADDB, PATH_MAX);
       outfile = fopen (tmpfile, "w");
       if (outfile == NULL)
 	{
@@ -5259,7 +5803,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   no_user_specified_name = nv_get_val (req, "no-user-specified-name");
   schema_file_list = nv_get_val (req, "schema-file-list");
 
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -5271,7 +5815,7 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_DB_ACTIVE;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_LOADDB, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_LOADDB, PATH_MAX);
   cubrid_cmd_name (cmd_name);
 
   argc = 0;
@@ -5381,12 +5925,20 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
+
+  if (file_not_exist (schema, "none", _dbmt_error) || file_not_exist (object, "none", _dbmt_error)
+      || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
+      || file_not_exist (schema_file_list, "none", _dbmt_error) || schema_file_not_exist (schema_file_list, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   argv[argc++] = dbname;
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "loaddb_err_tmp", TS_LOADDB, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, tmpfile, cubrid_err_file, &exit_status);    /* loaddb */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, cubrid_err_file, &exit_status);    /* loaddb */
 
   if (retval < 0)
     {
@@ -5438,7 +5990,12 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (exit_status != 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", (exit_status));
+#if defined (WINDOWS)
+      int exit_code = exit_status;
+#else
+      int exit_code = WIFEXITED (exit_status) ? WEXITSTATUS (exit_status) : exit_status;
+#endif
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "loaddb failed with exit status: %d", exit_code);
       return ERR_WITH_MSG;
     }
 
@@ -5512,7 +6069,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   cubrid_err_file[0] = '\0';
 
   dbname = nv_get_val (req, "dbname");
-  db_mode = uDatabaseMode (dbname, NULL);
+  db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -5580,7 +6137,7 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	}
 
-      if ((retval = alter_dblocation (dbname, recovery_path)) != ERR_NO_ERROR)
+      if ((retval = alter_dblocation (dbname, recovery_path, _dbmt_error)) != ERR_NO_ERROR)
 	{
 	  return retval;
 	}
@@ -5588,9 +6145,9 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = dbname;
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "restoredb_err_tmp", TS_RESTOREDB, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "restoredb_err_tmp", TS_RESTOREDB, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, NULL, cubrid_err_file, &status) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, &status) < 0)
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       if (access (cubrid_err_file, F_OK) == 0)
@@ -5626,17 +6183,18 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[10];
   int argc = 0;
+  int status = EXIT_SUCCESS;
 
   dbname = nv_get_val (req, "dbname");
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPVOLINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_BACKUPVOLINFO, PATH_MAX);
 
-  if (uIsDatabaseActive (dbname))
+  if (cms_is_database_active (dbname))
     {
       sprintf (_dbmt_error, "%s", dbname);
       return ERR_DB_ACTIVE;
     }
 
-  if (uDatabaseMode (dbname, NULL) == DB_SERVICE_MODE_SA)
+  if (cms_database_mode (dbname, NULL) == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
       return ERR_STANDALONE_MODE;
@@ -5670,9 +6228,9 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = NULL;
 
 #if defined(WINDOWS)
-  ret = run_child (argv, 1, NULL, tmpfile, NULL, NULL);    /* restoredb -t */
+  ret = run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, NULL, NULL);    /* restoredb -t */
 #else
-  ret = run_child (argv, 1, "/dev/null", tmpfile, NULL, NULL);    /* restoredb -t */
+  ret = run_child_env (argv, RUN_FOREGROUND, "/dev/null", tmpfile, NULL, &status);    /* restoredb -t */
 #endif
   if (ret < 0)
     {
@@ -5695,7 +6253,15 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
   fclose (infile);
   unlink (tmpfile);
 
-  return ERR_NO_ERROR;
+  if (status == EXIT_SUCCESS)
+    {
+      return ERR_NO_ERROR;
+    }
+  else
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "failed to get backup info");
+      return ERR_WITH_MSG;
+    }
 }
 
 int
@@ -5705,7 +6271,8 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
   char strbuf[COMPOSED_PATH_MAX], dbdir[PATH_MAX];
-  int no_tpage = 0, log_size = 0, baselen;
+  int no_tpage = 0, baselen;
+  long long log_size = 0;
   struct stat statbuf;
   GeneralSpacedbResult *cmd_res;
   T_CUBRID_MODE cubrid_mode;
@@ -5734,7 +6301,7 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   cubrid_mode =
-	  (uDatabaseMode (dbname, &ha_mode) ==
+	  (cms_database_mode (dbname, &ha_mode) ==
 	   DB_SERVICE_MODE_NONE) ? CUBRID_MODE_SA : CUBRID_MODE_CS;
 
   if (ha_mode != 0)
@@ -5796,8 +6363,8 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   closedir (dirp);
 #endif
 
-  snprintf (strbuf, sizeof (strbuf) - 1, "%d",
-	    cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size());
+  snprintf (strbuf, sizeof (strbuf) - 1, "%lld",
+	    (long long) cmd_res->get_cnt_tpage() * cmd_res->get_page_size() + cmd_res->get_log_page_size() + log_size);
   nv_add_nvp (res, "dbsize", strbuf);
 
   return ERR_NO_ERROR;
@@ -5811,12 +6378,13 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   FILE *infile;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[5];
+  int rc = ERR_NO_ERROR;
 
   nv_add_nvp (res, "CUBRID", sco.szCubrid);
   nv_add_nvp (res, "CUBRID_DATABASES", sco.szCubrid_databases);
   nv_add_nvp (res, "CUBRID_DBMT", sco.szCubrid);
   //  nv_add_nvp (res, "CUBRID_CHARSET", getenv ("CUBRID_CHARSET"));
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GETENV, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GETENV, PATH_MAX);
 
   cmd_name[0] = '\0';
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/%s%s", sco.szCubrid,
@@ -5825,7 +6393,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[0] = cmd_name;
   argv[1] = NULL;
 
-  run_child (argv, 1, NULL, tmpfile, NULL, NULL);    /* cubrid_rel */
+  run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, NULL, NULL);    /* cubrid_rel */
 
   if ((infile = fopen (tmpfile, "r")) != NULL)
     {
@@ -5839,9 +6407,10 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   else
     {
       nv_add_nvp (res, "CUBRIDVER", "version information not available");
+      rc = ERR_WITH_MSG;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_BROKER_VERSION, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GET_BROKER_VERSION, PATH_MAX);
   snprintf (cmd_name, sizeof (cmd_name) - 1, "%s/bin/cubrid_broker%s",
 	    sco.szCubrid, DBMT_EXE_EXT);
 
@@ -5849,7 +6418,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[1] = "--version";
   argv[2] = NULL;
 
-  run_child (argv, 1, NULL, tmpfile, NULL, NULL);    /* cubrid_broker --version */
+  run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, NULL, NULL);    /* cubrid_broker --version */
 
   if ((infile = fopen (tmpfile, "r")) != NULL)
     {
@@ -5862,6 +6431,7 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   else
     {
       nv_add_nvp (res, "BROKERVER", "version information not available");
+      rc = ERR_WITH_MSG;
     }
 
   if (sco.hmtab1 == 1)
@@ -5913,7 +6483,12 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "osinfo", "unknown");
 #endif
 
-  return ERR_NO_ERROR;
+  if (rc == ERR_WITH_MSG)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "some CUBRID Environments are not available");
+    }
+
+  return rc;
 }
 
 int
@@ -5930,7 +6505,7 @@ ts_startinfo (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   nv_add_nvp (res, "open", "activelist");
-  cmd_res = cmd_server_status ();
+  cmd_res = cmd_cms_server_status ();
   if (cmd_res != NULL)
     {
       T_SERVER_STATUS_INFO *info = (T_SERVER_STATUS_INFO *) cmd_res->result;
@@ -5949,7 +6524,7 @@ ts_startinfo (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "close", "activelist");
 
   uWriteDBnfo2 (cmd_res);
-  cmd_servstat_result_free (cmd_res);
+  cmd_cms_result_free (cmd_res);
 
   return ERR_NO_ERROR;
 }
@@ -5973,7 +6548,8 @@ ts_kill_process (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (kill (pid, SIGTERM) < 0)
 	{
-	  DBMT_ERR_MSG_SET (_dbmt_error, strerror (errno));
+	  char errbuf[CM_STRERROR_BUF_LEN];
+	  DBMT_ERR_MSG_SET (_dbmt_error, STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
 	}
     }
@@ -6033,6 +6609,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   char conf_value_item[NAME_MAX];
 
   char *token = NULL;
+  char *saveptr;
 
   int i = 0;
   int period_type_exist = 0;
@@ -6071,15 +6648,17 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	}
       else
 	{
+	  char errbuf[CM_STRERROR_BUF_LEN];
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Error : %s : %s",
-		    conf_item[2], strerror (errno));
+		    conf_item[2], STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
 	}
     }
   else if (access (path_item, R_OK | W_OK) < 0)
     {
+      char errbuf[CM_STRERROR_BUF_LEN];
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Error : %s : %s",
-		conf_item[2], strerror (errno));
+		conf_item[2], STRERROR_R (errno, errbuf, sizeof (errbuf)));
       return ERR_WITH_MSG;
     }
   /* check the validation of period_type */
@@ -6104,7 +6683,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   if ((strcmp (conf_item[3], AUTO_BACKUP_PERIOD_TYPE_MONTHLY) == 0))
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  period_date = atoi (token);
@@ -6116,14 +6695,14 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	      return ERR_WITH_MSG;
 	    }
 
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* period_date: Weekly */
   else if (strcmp (conf_item[3], AUTO_BACKUP_PERIOD_TYPE_WEEKLY) == 0)
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  for (i = 0; i < AUTOBACKUP_PERIOD_WEEK_NUM; i++)
@@ -6144,7 +6723,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 	    }
 
 	  period_date_exist = 0;
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* period_date: Daily */
@@ -6168,7 +6747,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
   else
     {
       snprintf (conf_value_item, NAME_MAX, "%s", conf_item[4]);
-      token = strtok (conf_value_item, " ,");
+      token = STRTOK (conf_value_item, " ,", &saveptr);
       while (token != NULL)
 	{
 	  /* convert period_date from YYYY-MM-DD into YYYYMMDD */
@@ -6189,7 +6768,7 @@ _check_backup_info (const char *conf_item[], int check_backupid,
 			conf_item[4], autobackup_conf_entry[4]);
 	      return ERR_WITH_MSG;
 	    }
-	  token = strtok (NULL, " ,");
+	  token = STRTOK (NULL, " ,", &saveptr);
 	}
     }
   /* check time */
@@ -6275,7 +6854,7 @@ ts_backupdb_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (uDatabaseMode (dbname, NULL) == DB_SERVICE_MODE_SA)
+  if (cms_database_mode (dbname, NULL) == DB_SERVICE_MODE_SA)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", dbname);
       return ERR_STANDALONE_MODE;
@@ -6510,6 +7089,17 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
+  /*
+   * autobackupdb.conf is also rewritten by auto_conf_delete ()/
+   * auto_conf_rename ()
+   */
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
+    }
+
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
   if (access (autofilepath, F_OK) < 0)
     {
@@ -6533,7 +7123,7 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       strcpy (_dbmt_error, autofilepath);
       return ERR_FILE_OPEN_FAIL;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SETBACKUPINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SETBACKUPINFO, PATH_MAX);
   if ((outfile = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infile);
@@ -6640,6 +7230,13 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
+    }
+
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
   if ((outfile = fopen (autofilepath, "a")) == NULL)
     {
@@ -6691,13 +7288,20 @@ ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
+    }
+
   conf_get_dbmt_file (FID_AUTO_BACKUPDB_CONF, autofilepath);
   if ((infile = fopen (autofilepath, "r")) == NULL)
     {
       strcpy (_dbmt_error, autofilepath);
       return ERR_FILE_OPEN_FAIL;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_DELETEBACKUPINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_DELETEBACKUPINFO, PATH_MAX);
   if ((outfile = fopen (tmpfile, "w")) == NULL)
     {
       fclose (infile);
@@ -7032,6 +7636,13 @@ ts_set_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
+    }
+
   conf_get_dbmt_file (FID_AUTO_ADDVOLDB_CONF, auto_addvol_conf_file);
   if (access (auto_addvol_conf_file, F_OK) < 0)
     {
@@ -7056,7 +7667,7 @@ ts_set_auto_add_vol (nvplist *req, nvplist *res, char *_dbmt_error)
       strcpy (_dbmt_error, auto_addvol_conf_file);
       return ERR_FILE_OPEN_FAIL;
     }
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SETAUTOADDVOL, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SETAUTOADDVOL, PATH_MAX);
   outfile = fopen (tmpfile, "w");
   if (outfile == NULL)
     {
@@ -7137,7 +7748,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *query_p = NULL;
   int query_file_size;
   TS_SQL_INFO *sql_info = NULL;
-  int has_comma[]= {0, 0, 0, 0, 0, 0, 0, 1, 0};
+  int has_comma[] = {0, 0, 0, 0, 0, 0, 0, 1, 0};
 
   cmd_name[0] = '\0';
   buf[0] = '\0';
@@ -7162,15 +7773,15 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* get database mode. */
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       strncpy (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
       return ERR_STANDALONE_MODE;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GETTRANINFO, PATH_MAX);
-  make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_GETTRANINFO, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_GETTRANINFO, PATH_MAX);
+  gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_GETTRANINFO, PATH_MAX);
 
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
@@ -7201,7 +7812,7 @@ ts_get_tran_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
   argv[argc++] = NULL;
 
-  retval = run_child (argv, 1, NULL, tmpfile, errfile, NULL);    /* tranlist */
+  retval = run_child_env (argv, RUN_FOREGROUND, NULL, tmpfile, errfile, NULL);    /* tranlist */
   if (retval < 0)
     {
       strncpy (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
@@ -7622,7 +8233,7 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
 
   param = nv_get_val (req, "parameter");
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
@@ -7707,7 +8318,7 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = NULL;
 
   strncpy (task_name, "killtran", TASKNAME_LEN);
-  retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
+  retval = run_child_with_msg (argv, 1, task_name, NULL, _dbmt_error);
   if (retval != ERR_NO_ERROR)
     {
       return retval;
@@ -7748,14 +8359,14 @@ ts_lockdb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "dbname");
       return ERR_PARAM_MISSING;
     }
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
       sprintf (_dbmt_error, "%s", dbname);
       return ERR_STANDALONE_MODE;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_1", TS_LOCKDB, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task_1", TS_LOCKDB, PATH_MAX);
 
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
@@ -7778,7 +8389,7 @@ ts_lockdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   strncpy (task_name, "lockdb", TASKNAME_LEN);
 
-  retval = _run_child (argv, 1, task_name, NULL, _dbmt_error);
+  retval = run_child_with_msg (argv, 1, task_name, NULL, _dbmt_error);
   if (retval != ERR_NO_ERROR)
     {
       return retval;
@@ -7791,7 +8402,7 @@ ts_lockdb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* create file that remove line feed at existed outputfile */
-  make_temp_filepath (tmpfile2, sco.dbmt_tmp_dir, "DBMT_task_2", TS_LOCKDB, PATH_MAX);
+  gen_tempfile_path (tmpfile2, sco.dbmt_tmp_dir, "DBMT_task_2", TS_LOCKDB, PATH_MAX);
 
   outfile = fopen (tmpfile2, "w");
   if (outfile == NULL)
@@ -8463,15 +9074,15 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       if (strcmp (task, "addtrigger") == 0)
 	{
-	  make_temp_filepath (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_ADDNEWTRIGGER, PATH_MAX);
+	  gen_tempfile_path (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_ADDNEWTRIGGER, PATH_MAX);
 	}
       else if (strcmp (task, "droptrigger") == 0)
 	{
-	  make_temp_filepath (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_DROPTRIGGER, PATH_MAX);
+	  gen_tempfile_path (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_DROPTRIGGER, PATH_MAX);
 	}
       else if (strcmp (task, "altertrigger") == 0)
 	{
-	  make_temp_filepath (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_ALTERTRIGGER, PATH_MAX);
+	  gen_tempfile_path (input_file, sco.dbmt_tmp_dir, "dbmt_task", TS_ALTERTRIGGER, PATH_MAX);
 	}
     }
 
@@ -8485,7 +9096,7 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
   argc = 0;
   argv[argc++] = cmd_name;
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
   if (ha_mode != 0)
     {
       append_host_to_dbname (dbname_at_hostname, dbname,
@@ -8570,10 +9181,13 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "trigger_operation_err_tmp", TS_GETTRIGGERINFO, PATH_MAX);
-  SET_TRANSACTION_NO_WAIT_MODE_ENV ();
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "trigger_operation_err_tmp", TS_GETTRIGGERINFO, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, NULL, cubrid_err_file, NULL);    /* csql - trigger */
+  {
+    const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
+
+    retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, cubrid_err_file, NULL, extra_envp);    /* csql - trigger */
+  }
   if (strlen (input_file) > 0)
     {
       unlink (input_file);
@@ -8605,7 +9219,35 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_get_triggerinfo (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  return cm_ts_get_triggerinfo (req, res, _dbmt_error);
+  char *dbname;
+  T_DB_SERVICE_MODE db_mode;
+  int ha_mode = 0;
+
+  dbname = nv_get_val (req, "_DBNAME");
+  if (dbname == NULL)
+    {
+      return ERR_PARAM_MISSING;
+    }
+
+  db_mode = cms_database_mode (dbname, &ha_mode);
+  if (db_mode == DB_SERVICE_MODE_SA)
+    {
+      strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
+      return ERR_STANDALONE_MODE;
+    }
+
+  if (db_mode == DB_SERVICE_MODE_NONE)
+    {
+      /*
+       * server not running: spawn cub_sainfo ourselves via run_child_env(),
+       */
+      char *uid = nv_get_val (req, "_DBID");
+      char *passwd = nv_get_val (req, "_DBPASSWD");
+
+      return cmd_get_triggerinfo_sa (dbname, uid, passwd, res, _dbmt_error);
+    }
+
+  return cm_ts_get_triggerinfo (req, res, _dbmt_error); /* server already running (CS mode): call cm_common libs */
 }
 
 int
@@ -8636,6 +9278,13 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  file_resource_guard guard (*cm_auto_conf_mutex (), FID_LOCK_AUTO_CONF);
+  if (!guard.ok ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "internal lock error");
+      return ERR_WITH_MSG;
+    }
+
   conf_get_dbmt_file (FID_AUTO_EXECQUERY_CONF, autoexecquery_conf_file);
   if (access (autoexecquery_conf_file, F_OK) == 0)
     {
@@ -8650,7 +9299,7 @@ ts_set_autoexec_query (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_FILE_OPEN_FAIL;
     }
 
-  make_temp_filepath (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SET_AUTO_EXEC_QRY, PATH_MAX);
+  gen_tempfile_path (tmpfile, sco.dbmt_tmp_dir, "DBMT_task", TS_SET_AUTO_EXEC_QRY, PATH_MAX);
   if ((temp_file = fopen (tmpfile, "w")) == NULL)
     {
       fclose (conf_file);
@@ -9152,7 +9801,7 @@ ts_updatestatustemplate (nvplist *cli_request, nvplist *cli_response,
       return ERR_FILE_OPEN_FAIL;
     }
 
-  make_temp_filepath (tempfilepath, sco.dbmt_tmp_dir, "statustemplate_update", TS_UPDATESTATUSTEMPLATE, PATH_MAX);
+  gen_tempfile_path (tempfilepath, sco.dbmt_tmp_dir, "statustemplate_update", TS_UPDATESTATUSTEMPLATE, PATH_MAX);
   if ((tempfile = fopen (tempfilepath, "w+")) == NULL)
     {
       if (diag_error)
@@ -9397,6 +10046,36 @@ ts_getstatustemplate (nvplist *cli_request, nvplist *cli_response,
 }
 
 
+/*
+ * analyzecaslog_mutex () - serializes the broker_log_top runs of
+ *   ts_analyzecaslog ().
+ *
+ *   broker_log_top writes its result to fixed names in the current directory
+ *   (log_top.q, log_top.res, or log_top.t with -t), and tasks run outside
+ *   cm_mutex. Two analyzecaslog requests at the same time would overwrite or
+ *   take each other's files, so the lock is held from the run until those
+ *   files are moved to per request temp files.
+ */
+static mutex_t *
+analyzecaslog_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 int
 ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 		  char *diag_error)
@@ -9451,33 +10130,51 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	}
     }
   argv[arg_index++] = NULL;
-  make_temp_filepath (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (diag_err_file, sco.dbmt_tmp_dir, "analyzecaslog_err", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
+  gen_tempfile_path (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
 
-  retval = run_child (argv, 1, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
-  if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
-    {
-      if (access (diag_err_file, F_OK) == 0)
-	{
-	  unlink (diag_err_file);
-	}
-      return ERR_WITH_MSG;
-    }
+  {
+    /* held until the fixed-name results are moved; see analyzecaslog_mutex () */
+    mutex_scope lock (*analyzecaslog_mutex ());
 
-  if (access (diag_err_file, F_OK) == 0)
-    {
-      unlink (diag_err_file);
-    }
+    retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, diag_err_file, NULL);    /* broker_log_top */
+    if (read_error_file (diag_err_file, diag_error, DBMT_ERROR_MSG_SIZE) < 0)
+      {
+	if (access (diag_err_file, F_OK) == 0)
+	  {
+	    unlink (diag_err_file);
+	  }
+	return ERR_WITH_MSG;
+      }
 
-  if (retval < 0)
-    {
-      if (diag_error)
-	{
-	  strcpy (diag_error, argv[0]);
-	}
-      return ERR_SYSTEM_CALL;
-    }
+    if (access (diag_err_file, F_OK) == 0)
+      {
+	unlink (diag_err_file);
+      }
 
-  make_temp_filepath (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", TS_ANALYZECASLOG, PATH_MAX);
+    if (retval < 0)
+      {
+	if (diag_error)
+	  {
+	    strcpy (diag_error, argv[0]);
+	  }
+	return ERR_SYSTEM_CALL;
+      }
+
+    if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
+      {
+	rename ("./log_top.t", tmpfileT);
+      }
+    else
+      {
+	rename ("./log_top.q", tmpfileQ);
+	rename ("./log_top.res", tmpfileRes);
+      }
+  }
+
+  gen_tempfile_path (tmpfileanalyzeresult, sco.dbmt_tmp_dir, "analyzelog_res", TS_ANALYZECASLOG, PATH_MAX);
   fdAnalyzeResult = fopen (tmpfileanalyzeresult, "w+");
   if (fdAnalyzeResult == NULL)
     {
@@ -9485,15 +10182,15 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 	{
 	  strcpy (diag_error, "Tmpfile");
 	}
+      unlink (tmpfileT);
+      unlink (tmpfileQ);
+      unlink (tmpfileRes);
       return ERR_FILE_OPEN_FAIL;
     }
 
   if ((option_t != NULL) && (strcmp (option_t, "yes") == 0))
     {
       int log_init_flag, log_index;
-
-      make_temp_filepath (tmpfileT, sco.dbmt_tmp_dir, "log_top_t", TS_ANALYZECASLOG, PATH_MAX);
-      rename ("./log_top.t", tmpfileT);
 
       fdT = fopen (tmpfileT, "r");
       if (fdT == NULL)
@@ -9571,12 +10268,6 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
 #else
       th_id = getpid ();
 #endif
-      make_temp_filepath (tmpfileQ, sco.dbmt_tmp_dir, "log_top_q", TS_ANALYZECASLOG, PATH_MAX);
-      make_temp_filepath (tmpfileRes, sco.dbmt_tmp_dir, "log_top_res", TS_ANALYZECASLOG, PATH_MAX);
-
-      rename ("./log_top.q", tmpfileQ);
-      rename ("./log_top.res", tmpfileRes);
-
       fdQ = fopen (tmpfileQ, "r");
       if (fdQ == NULL)
 	{
@@ -9716,6 +10407,8 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   T_THREAD th_id;
 #endif
   char use_tmplogfile = FALSE;
+  int status = EXIT_SUCCESS;
+  int ret;
 
   brokername = nv_get_val (cli_request, "brokername");
   dbname = nv_get_val (cli_request, "dbname");
@@ -9752,8 +10445,8 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   th_id = getpid ();
 #endif
 
-  make_temp_filepath (resfile, sco.dbmt_tmp_dir, "log_run_res", TS_EXECUTECASRUNNER, PATH_MAX);
-  make_temp_filepath (resfile2, sco.dbmt_tmp_dir, "log_run_res2", TS_EXECUTECASRUNNER, PATH_MAX);
+  gen_tempfile_path (resfile, sco.dbmt_tmp_dir, "log_run_res", TS_EXECUTECASRUNNER, PATH_MAX);
+  gen_tempfile_path (resfile2, sco.dbmt_tmp_dir, "log_run_res2", TS_EXECUTECASRUNNER, PATH_MAX);
 
   /* get right port number with broker name */
   if (cm_get_broker_conf (&uc_conf, NULL, &error) < 0)
@@ -9828,7 +10521,12 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
+  ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, &status);
+  /*
+   * ut_child_exited_ok () replaces the previous raw "status !=
+   * EXIT_SUCCESS" comparison
+   */
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       /* broker_log_converter */
       strcpy (diag_error, argv[0]);
@@ -9866,10 +10564,18 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   argv[++i] = log_converter_res;
   argv[++i] = NULL;
 
-  snprintf (out_msg_file_env, sizeof (out_msg_file_env), "%s", resfile2);
-  PUT_ENV ("CUBRID_MANAGER_OUT_MSG_FILE", out_msg_file_env);
+  {
+    const char *extra_envp[2];
 
-  if (run_child (argv, 1, NULL, NULL, NULL, NULL) < 0)
+    snprintf (out_msg_file_env, sizeof (out_msg_file_env) - 1,
+	      "CUBRID_MANAGER_OUT_MSG_FILE=%s", resfile2);
+    extra_envp[0] = out_msg_file_env;
+    extra_envp[1] = NULL;
+
+    ret = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, &status, extra_envp);
+  }
+
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       /* broker_log_runner */
       return ERR_SYSTEM_CALL;
@@ -10019,7 +10725,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
 
   ret = UNLINK (fullpath_with_filename);
 
-  if (ret != 0)
+  if (ret != 0 && errno != ENOENT)
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "%s",
 		fullpath_with_filename);
@@ -10166,9 +10872,9 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   char *targetid, *dbname, *dbuser, *dbpasswd;
   int isdba = 0;
   char outfile[PATH_MAX];
-  static int cmdid = 0;
-  const char *statement =
-	  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
+  const char *statement = CUBRID_VERS (cubrid_version_major,cubrid_version_minor) < 1105 ?
+			  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g.name}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;" :
+			  "SELECT COUNT( * ) FROM db_user d WHERE {'DBA'} SUBSETEQ (SELECT SET{CURRENT_USER}+COALESCE(SUM(SET{t.g}), SET{}) from db_user u, TABLE(groups) AS t( g ) WHERE u.name = d.name) AND d.name=CURRENT_USER;";
 
   targetid = nv_get_val (in, "targetid");
   dbname = nv_get_val (in, "dbname");
@@ -10190,8 +10896,8 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
   nv_add_nvp (out, "targetid", targetid);
   nv_add_nvp (out, "dbname", dbname);
 
-  snprintf (outfile, sizeof (outfile) - 1, "%s/tmp/DBMT_user_login.%d",
-	    sco.szCubrid, cmdid++);
+  gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_user_login", TS_DBMTUSERLOGIN, PATH_MAX);
+
   errcode =
 	  run_csql_statement (statement, dbname, dbuser, dbpasswd, outfile, _dbmt_error);
   if (errcode != ERR_NO_ERROR)
@@ -10305,7 +11011,9 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (UNLINK (path) != 0)
 	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove: %s", full_path_buf);
+	  char errbuf[CM_STRERROR_BUF_LEN];
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "Cannot remove file '%s' (%s)", path,
+		    STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	  return ERR_WITH_MSG;
 	}
     }                /* end of for */
@@ -10350,7 +11058,7 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
-      if ((db_stat_all = cm_get_db_proc_stat_all (&error)) == NULL)
+      if ((db_stat_all = cms_get_db_proc_stat_all (&error)) == NULL)
 	{
 	  strcpy_limit (_dbmt_error, error.err_msg, DBMT_ERROR_MSG_SIZE);
 	  retval = ERR_WITH_MSG;
@@ -10362,12 +11070,12 @@ ts_get_dbproc_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 	  print_db_stat_to_res ((db_stat_all->db_stats + i), res);
 	}
 
-      cm_db_proc_stat_all_free (db_stat_all);
+      cms_db_proc_stat_all_free (db_stat_all);
       retval = ERR_NO_ERROR;
     }
   else
     {
-      if (cm_get_db_proc_stat (dbname, &db_stat, &error) < 0)
+      if (cms_get_db_proc_stat (dbname, &db_stat, &error) < 0)
 	{
 	  strcpy_limit (_dbmt_error, error.err_msg, DBMT_ERROR_MSG_SIZE);
 	  retval = ERR_WITH_MSG;
@@ -10440,7 +11148,7 @@ cmd_heartbeat_deact (char *_dbmt_error)
   cubrid_err_file[0] = '\0';
   outputfilepath[0] = '\0';
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "heartbeat_deact_err", TS_HEARTBEAT_DEACT, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "heartbeat_deact_err", TS_HEARTBEAT_DEACT, PATH_MAX);
 
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
@@ -10448,9 +11156,9 @@ cmd_heartbeat_deact (char *_dbmt_error)
   argv[argc++] = PRINT_CMD_DEACT;
   argv[argc++] = NULL;
 
-  make_temp_filepath (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_DEACT, PATH_MAX);
+  gen_tempfile_path (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_DEACT, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
     {
       /* heartbeat deact */
       strcpy (_dbmt_error, argv[0]);
@@ -10505,7 +11213,7 @@ cmd_heartbeat_act (char *_dbmt_error)
   outputfilepath[0] = '\0';
   cubrid_err_file[0] = '\0';
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_heartbeat_act_err", TS_HEARTBEAT_ACT, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "cmd_heartbeat_act_err", TS_HEARTBEAT_ACT, PATH_MAX);
 
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
@@ -10513,9 +11221,9 @@ cmd_heartbeat_act (char *_dbmt_error)
   argv[argc++] = PRINT_CMD_ACT;
   argv[argc++] = NULL;
 
-  make_temp_filepath (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_ACT, PATH_MAX);
+  gen_tempfile_path (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_ACT, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
     {
       /* heartbeat act */
       strcpy (_dbmt_error, argv[0]);
@@ -10583,7 +11291,7 @@ run_csql_statement (const char *sql_stat, char *dbname, char *dbuser,
       return ERR_DB_NONEXISTANT;
     }
 
-  db_mode = uDatabaseMode (dbname, &ha_mode);
+  db_mode = cms_database_mode (dbname, &ha_mode);
 
   if (db_mode == DB_SERVICE_MODE_SA)
     {
@@ -10639,10 +11347,12 @@ run_csql_statement (const char *sql_stat, char *dbname, char *dbuser,
 
   argv[argc++] = NULL;
 
-  SET_TRANSACTION_NO_WAIT_MODE_ENV ();
-
   strncpy (task_name, "csql", TASKNAME_LEN);
-  retval = _run_child (argv, 1, task_name, outfilepath, _dbmt_error);
+  {
+    const char *extra_envp[] = TRANSACTION_NO_WAIT_MODE_ENVP;
+
+    retval = run_child_with_msg (argv, 1, task_name, outfilepath, _dbmt_error, extra_envp);
+  }
 
   return retval;
 }
@@ -10703,7 +11413,7 @@ ts_get_standby_server_stat (nvplist *req, nvplist *res, char *_dbmt_error)
 
   memset (&stat, 0, sizeof (stat));
 
-  make_temp_filepath (output_file, sco.dbmt_tmp_dir, "dbmt_task", TS_GET_STANDBY_SERVER_STAT, PATH_MAX);
+  gen_tempfile_path (output_file, sco.dbmt_tmp_dir, "dbmt_task", TS_GET_STANDBY_SERVER_STAT, PATH_MAX);
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
@@ -10849,7 +11559,7 @@ cmd_get_db_mode (T_DB_MODE_INFO *dbmodeinfo, char *dbname, char *_dbmt_error)
 
   strcpy_limit (dbmodeinfo->dbname, dbname, sizeof (dbmodeinfo->dbname));
 
-  dbmode = uDatabaseMode (dbname, &ha_mode);
+  dbmode = cms_database_mode (dbname, &ha_mode);
 
   if (ha_mode == 0)
     {
@@ -10981,15 +11691,15 @@ cmd_changemode (char *dbname, char *modify, char *force,
       return ERR_PARAM_MISSING;
     }
 
-  dbmode = uDatabaseMode (dbname, &ha_mode);
+  dbmode = cms_database_mode (dbname, &ha_mode);
   if (dbmode == DB_SERVICE_MODE_SA)
     {
       strcpy_limit (_dbmt_error, dbname, DBMT_ERROR_MSG_SIZE);
       return ERR_STANDALONE_MODE;
     }
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "changemode_err", TS_CHANGEMODE, PATH_MAX);
-  make_temp_filepath (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_CHANGEMODE, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "changemode_err", TS_CHANGEMODE, PATH_MAX);
+  gen_tempfile_path (tmpfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_CHANGEMODE, PATH_MAX);
 
   cubrid_cmd_name (cmd_name);
   argv[argc++] = cmd_name;
@@ -11019,7 +11729,7 @@ cmd_changemode (char *dbname, char *modify, char *force,
 
   argv[argc++] = NULL;
 
-  if (run_child (argv, 1, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* changemode */
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, tmpfilepath, cubrid_err_file, NULL) < 0)    /* changemode */
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       retval = ERR_SYSTEM_CALL;
@@ -11089,10 +11799,10 @@ ts_role_change (nvplist *req, nvplist *res, char *_dbmt_error)
     NULL,
   };
 
-  make_temp_filepath (cmdfile, sco.dbmt_tmp_dir, "DBMT_task", TS_ROLE_CHANGE, PATH_MAX);
+  gen_tempfile_path (cmdfile, sco.dbmt_tmp_dir, "DBMT_task", TS_ROLE_CHANGE, PATH_MAX);
 
   /* save the process info before heartbeat deact operation. */
-  if (run_child (argv, 1, NULL, cmdfile, NULL, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, cmdfile, NULL, NULL) < 0)
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       return ERR_SYSTEM_CALL;
@@ -11153,7 +11863,7 @@ ts_role_change (nvplist *req, nvplist *res, char *_dbmt_error)
 	      cmd_argv[i] = tok[i];
 	    }
 
-	  if (run_child (cmd_argv, 0, NULL, NULL, NULL, NULL) < 0)
+	  if (run_child_env (cmd_argv, RUN_BACKGROUND, NULL, NULL, NULL, NULL) < 0)
 	    {
 	      retval = ERR_SYSTEM_CALL;
 	      goto error_return;
@@ -11408,7 +12118,7 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
   error_continue = nv_get_val (req, "error_continue");
 
   mode =
-	  (uDatabaseMode (dbname, NULL) ==
+	  (cms_database_mode (dbname, NULL) ==
 	   DB_SERVICE_MODE_NONE ? CUBRID_MODE_SA : CUBRID_MODE_CS);
 
   csql_res = cmd_csql (dbname, uid, passwd, mode, infile, command, error_continue);    /* csql */
@@ -11470,46 +12180,10 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   char *n, *v;
   int retval = ERR_NO_ERROR;
   int i;
-
-  make_temp_filepath (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
-  make_temp_filepath (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
-
-  /* set environment that the script need to run. */
-  for (i = 0; i < req->nvplist_leng; i++)
-    {
-      nv_lookup (req, i, &n, &v);
-      if ((n != NULL) && (strcmp (n, "envvar") == 0))
-	{
-	  bool invalid_env = true;
-
-	  if (v != NULL && strlen (v) != 0)
-	    {
-	      std::string entry = v;
-	      std::string env_name = extract_env_name (entry);
-
-	      if (is_allowed_script_env (env_name))
-		{
-		  invalid_env = false;
-		}
-	    }
-
-	  if (invalid_env)
-	    {
-	      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s",
-			v ? v : "(NULL)");
-	      return ERR_WITH_MSG;
-	    }
-
-	  if (v)
-	    {
-	      if (!setenv_using_putenv_fmt (v))
-		{
-		  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "set environment failed: %s", v);
-		  return ERR_WITH_MSG;
-		}
-	    }
-	}
-    }
+  int status = EXIT_SUCCESS;
+  int ret;
+  int envc = 0;
+  const char **extra_envp = NULL;
 
   if ((script_path = nv_get_val (req, "script_path")) == NULL)
     {
@@ -11517,19 +12191,71 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
+  gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
+
   if (!is_authorized_filename (script_path, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
 
+  /*
+   * validate the environment variables the script needs to run.
+   * they are passed only to the child process through extra_envp;
+   * the environment of the CMS process itself is not changed.
+   */
+  for (i = 0; i < req->nvplist_leng; i++)
+    {
+      nv_lookup (req, i, &n, &v);
+      if ((n == NULL) || (strcmp (n, "envvar") != 0))
+	{
+	  continue;
+	}
+
+      if (v == NULL || strlen (v) == 0 || !is_allowed_script_env (extract_env_name (v)))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "setting this environment variable is not permitted: %s",
+		    v ? v : "(NULL)");
+	  return ERR_WITH_MSG;
+	}
+
+      envc++;
+    }
+
+  if (envc > 0)
+    {
+      extra_envp = (const char **) malloc (sizeof (const char *) * (envc + 1));
+      if (extra_envp == NULL)
+	{
+	  strcpy_limit (_dbmt_error, "malloc", DBMT_ERROR_MSG_SIZE);
+	  return ERR_SYSTEM_CALL;
+	}
+
+      envc = 0;
+      for (i = 0; i < req->nvplist_leng; i++)
+	{
+	  nv_lookup (req, i, &n, &v);
+	  if ((n != NULL) && (v != NULL) && (strcmp (n, "envvar") == 0))
+	    {
+	      extra_envp[envc++] = v;
+	    }
+	}
+      extra_envp[envc] = NULL;
+    }
+
   argv[argc++] = script_path;
   argv[argc++] = NULL;
 
-  /* run *.bat or *.sh. */
-  if (run_child (argv, 1, NULL, outfile, errfile, NULL) < 0)
+  ret = run_child_env (argv, RUN_FOREGROUND, NULL, outfile, errfile, &status, extra_envp);
+  if (ret < 0 || !ut_child_exited_ok (status))
     {
       strcpy_limit (_dbmt_error, argv[0], DBMT_ERROR_MSG_SIZE);
       retval = ERR_SYSTEM_CALL;
+    }
+
+  if (extra_envp != NULL)
+    {
+      free (extra_envp);
     }
 
   unlink (outfile);
@@ -11701,8 +12427,9 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	    }
 	  if ((unlink (fullpath) != 0) && (errno != ENOENT))
 	    {
+	      char errbuf[CM_STRERROR_BUF_LEN];
 	      sprintf (_dbmt_error, "Cannot remove file '%s' (%s)", path,
-		       strerror (errno));
+		       STRERROR_R (errno, errbuf, sizeof (errbuf)));
 	      return ERR_WITH_MSG;
 	    }
 	}            /* end of for */
@@ -11753,8 +12480,6 @@ ts_login (nvplist *req, nvplist *res, char *_dbmt_error)
 int
 ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  T_USER_TOKEN_INFO *removed_node = NULL;
-
   char *token = NULL;
 
   ut_access_log (req, "disconnected");
@@ -11763,14 +12488,14 @@ ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_update_val (res, "note", "");
 
   token = nv_get_val (req, "token");
-  removed_node = dbmt_user_delete_token_info_by_token (token);
 
-  if (removed_node == NULL)
+  /*
+   * unlinks AND frees the node as one step under its own lock now.
+   */
+  if (!dbmt_user_delete_token_info_by_token (token))
     {
       return ERR_INVALID_TOKEN;
     }
-
-  FREE_MEM (removed_node);
 
   return ERR_NO_ERROR;
 }
@@ -11781,6 +12506,8 @@ ts_job_test (nvplist *req, nvplist *res, char *_dbmt_error)
   int i;
   nvplist *cli_response;
   const char *argvs[2];
+  char outfile[] = "outfile.test";
+  char errfile[] = "errfile.test";
 
   cli_response = nv_create (5, NULL, "\n", ":", "\n");
   for (i = ERR_NO_ERROR; i <= ERR_WARNING; i++)
@@ -11792,8 +12519,7 @@ ts_job_test (nvplist *req, nvplist *res, char *_dbmt_error)
   argvs[0] = "ping";
   argvs[1] = NULL;
 
-  ut_run_child ("ping", argvs, 1, "infile.test", "outfile.test",
-		"errfile.test", &i);
+  run_child_env (argvs, RUN_FOREGROUND, "infile.test", outfile, errfile, &i);
   unlink ("outfile.test");
   unlink ("errfile.test");
   return ERR_NO_ERROR;
@@ -11924,10 +12650,10 @@ cmd_heartbeat_list (T_HA_SERVER_INFO_ALL **all_info, int get_all_dbmode,
   argv[argc++] = PRINT_CMD_LIST;
   argv[argc++] = NULL;
 
-  make_temp_filepath (cubrid_err_file, sco.dbmt_tmp_dir, "heartbeat_list_err", TS_HEARTBEAT_LIST, PATH_MAX);
-  make_temp_filepath (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_LIST, PATH_MAX);
+  gen_tempfile_path (cubrid_err_file, sco.dbmt_tmp_dir, "heartbeat_list_err", TS_HEARTBEAT_LIST, PATH_MAX);
+  gen_tempfile_path (outputfilepath, sco.dbmt_tmp_dir, "DBMT_task", TS_HEARTBEAT_LIST, PATH_MAX);
 
-  if (run_child (argv, 1, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, outputfilepath, cubrid_err_file, NULL) < 0)
     {
       /* heartbeat list */
       strcpy (_dbmt_error, argv[0]);
@@ -12115,32 +12841,48 @@ dbinfo_list_free (T_HA_SERVER_INFO_ALL *all_info)
 static char *
 get_ip_from_hostname (char *hostname, char *ipaddr, int ip_len)
 {
-  char *ip = NULL;
-  int i;
-  struct hostent *hostent_p = NULL;
+  char ip[INET_ADDRSTRLEN];
+  char last_ip[INET_ADDRSTRLEN];
+  int found_non_loopback = 0;
+  struct addrinfo hints;
+  struct addrinfo *res = NULL;
+  struct addrinfo *cur;
 
-  hostent_p = gethostbyname (hostname);
+  last_ip[0] = '\0';
 
-  if (hostent_p == NULL)
+  memset (&hints, 0, sizeof (hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  if (getaddrinfo (hostname, NULL, &hints, &res) != 0 || res == NULL)
     {
       ipaddr = NULL;
     }
   else
     {
-      for (i = 0; hostent_p->h_addr_list[i] != NULL; i++)
+      for (cur = res; cur != NULL; cur = cur->ai_next)
 	{
-	  ip = inet_ntoa (* ((struct in_addr *) hostent_p->h_addr_list[i]));
+	  struct sockaddr_in *sin = (struct sockaddr_in *) cur->ai_addr;
+
+	  if (inet_ntop (AF_INET, &sin->sin_addr, ip, sizeof (ip)) == NULL)
+	    {
+	      continue;
+	    }
+	  strcpy_limit (last_ip, ip, sizeof (last_ip));
 
 	  /* ignore the 127.0.0.1 */
 	  if (strcmp (ip, "127.0.0.1") == 0)
 	    {
 	      continue;
 	    }
+	  found_non_loopback = 1;
 	  break;
 	}
-      if (ip)
+      freeaddrinfo (res);
+
+      if (found_non_loopback || last_ip[0] != '\0')
 	{
-	  strcpy_limit (ipaddr, ip, ip_len);
+	  strcpy_limit (ipaddr, found_non_loopback ? ip : last_ip, ip_len);
 	}
     }
 
@@ -13264,6 +14006,11 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 		{
 		  fgets (buf, sizeof (buf), infile);
 		}
+
+	      if (strncmp (buf, "MVCC", 4) == 0)
+		{
+		  fgets (buf, sizeof (buf), infile);
+		}
 	      /* already get  scan_matched value, don't sscanf */
 	      if (scan_matched == 0)
 		scan_matched =
@@ -13926,8 +14673,37 @@ obsolete_version_autoexecquery_conf (const char *conf_line)
     }
 }
 
+/*
+ * dblocation_file_mutex () - serializes the read-modify-write of
+ *   databases.txt in alter_dblocation ().
+ *
+ *   Tasks run outside cm_mutex, so restoredb requests for different
+ *   databases can rewrite the file at the same time. Each one reads the whole
+ *   file, changes its own line and replaces the file, so without this lock
+ *   the last one to finish would drop the change of the other.
+ */
+static mutex_t *
+dblocation_file_mutex (void)
+{
+  struct holder
+  {
+    mutex_t m;
+    holder (void)
+    {
+      mutex_init (m);
+    }
+    ~holder (void)
+    {
+      /* deliberately empty */
+    }
+  };
+  static holder h;
+
+  return &h.m;
+}
+
 static int
-alter_dblocation (const char *dbname, const char *new_dbpath)
+alter_dblocation (const char *dbname, const char *new_dbpath, char *_dbmt_error)
 {
   int retval = ERR_NO_ERROR;
   FILE *dblocation_info, *tmpfile;
@@ -13940,7 +14716,10 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 
   snprintf (dblocation_info_path, PATH_MAX - 1, "%s/%s",
 	    sco.szCubrid_databases, CUBRID_DATABASE_TXT);
-  make_temp_filepath (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", TS_ALTER_DB_LOC, PATH_MAX);
+  gen_tempfile_path (tmpfile_path, sco.dbmt_tmp_dir, "DBMT_util_dblocation", TS_ALTER_DB_LOC, PATH_MAX);
+
+  /* held from the read of databases.txt until it is replaced */
+  mutex_lock (*dblocation_file_mutex ());
 
   dblocation_info = fopen (dblocation_info_path, "r");
   tmpfile = fopen (tmpfile_path, "w");
@@ -13953,7 +14732,10 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
       if (tmpfile != NULL)
 	{
 	  fclose (tmpfile);
+	  unlink (tmpfile_path);
 	}
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		dblocation_info == NULL ? dblocation_info_path : tmpfile_path);
       retval = ERR_FILE_OPEN_FAIL;
     }
   else
@@ -13992,15 +14774,43 @@ alter_dblocation (const char *dbname, const char *new_dbpath)
 	}
 
       fclose (dblocation_info);
-      fclose (tmpfile);
 
-      move_file (tmpfile_path, dblocation_info_path);
+      /* a short write (e.g. a full disk) must not replace databases.txt */
+      bool write_failed = (ferror (tmpfile) != 0);
+      if (fclose (tmpfile) != 0)
+	{
+	  write_failed = true;
+	}
+
+      if (write_failed)
+	{
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot write the new %s to %s",
+		    CUBRID_DATABASE_TXT, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
+      else if (!db_existant)
+	{
+	  /* nothing changed: leave databases.txt as it is */
+	  unlink (tmpfile_path);
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", dbname);
+	  retval = ERR_DB_NONEXISTANT;
+	}
+      else if (move_file (tmpfile_path, dblocation_info_path) != 0)
+	{
+	  /*
+	   * keep tmpfile_path: across filesystems move_file () falls back to
+	   * file_copy (), which truncates databases.txt first and removes it
+	   * on a failed write, so the temp file may be the only complete copy
+	   */
+	  /* the precisions keep the message within DBMT_ERROR_MSG_SIZE (-Wformat-truncation) */
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot replace %.2400s; the new content is kept in %.2400s",
+		    dblocation_info_path, tmpfile_path);
+	  retval = ERR_WITH_MSG;
+	}
     }
 
-  if (!db_existant)
-    {
-      retval = ERR_DB_NONEXISTANT;
-    }
+  mutex_unlock (*dblocation_file_mutex ());
 
   return retval;
 }
@@ -14237,12 +15047,9 @@ ts_get_shard_info (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[6];
-  static int reqid = 0;
 
-  /* not thread safe :( */
-  reqid++;
-  sprintf (stdout_log_file, "%s/cmshardinfo.%d.err", sco.dbmt_tmp_dir, reqid);
-  sprintf (stderr_log_file, "%s/cmshardinfo2.%d.err", sco.dbmt_tmp_dir, reqid);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmshardinfo", TS_GET_SHARD_INFO, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmshardinfo2", TS_GET_SHARD_INFO, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -14258,7 +15065,7 @@ ts_get_shard_info (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "-f";
   argv[argc++] = NULL;
 
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
 
   if (pid < 0)
     {
@@ -14385,17 +15192,15 @@ ts_get_shard_status (nvplist *req, nvplist *res, char *_dbmt_error)
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[6];
   char *sname;
-  static int reqid = 0;
 
   if ((sname = nv_get_val (req, "shardname")) == NULL)
     {
       strcpy (_dbmt_error, "shard name");
       return ERR_PARAM_MISSING;
     }
-  /* not thread safe :( */
-  reqid++;
-  sprintf (stdout_log_file, "%s/cmshardstatus.%d.err", sco.dbmt_tmp_dir, reqid);
-  sprintf (stderr_log_file, "%s/cmshardstatus2.%d.err", sco.dbmt_tmp_dir, reqid);
+
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmshardstatus", TS_GET_SHARD_STATUS, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmshardstatus2", TS_GET_SHARD_STATUS, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -14410,7 +15215,7 @@ ts_get_shard_status (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = sname;
   argv[argc++] = NULL;
 
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
 
   if (pid < 0)
     {
@@ -14525,8 +15330,8 @@ ts_shard_start (nvplist *req, nvplist *res, char *err_buf)
 
   sname = nv_get_val (req, "shardname");
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmshardstart_err", TS_SHARD_START, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmshardstart2_err", TS_SHARD_START, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmshardstart_err", TS_SHARD_START, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmshardstart2_err", TS_SHARD_START, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -14549,7 +15354,7 @@ ts_shard_start (nvplist *req, nvplist *res, char *err_buf)
 
   argv[argc++] = NULL;
 
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
 
   if (pid < 0)
     {
@@ -14589,8 +15394,8 @@ ts_shard_stop (nvplist *req, nvplist *res, char *err_buf)
 
   sname = nv_get_val (req, "shardname");
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmshardstop_err", TS_SHARD_STOP, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmshardstop2_err", TS_SHARD_STOP, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmshardstop_err", TS_SHARD_STOP, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmshardstop2_err", TS_SHARD_STOP, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -14613,7 +15418,7 @@ ts_shard_stop (nvplist *req, nvplist *res, char *err_buf)
 
   argv[argc++] = NULL;
 
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);    /* start shard */
 
   if (pid < 0)
     {
@@ -14748,8 +15553,8 @@ ts_broker_changer (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmbrokerchanger_out", TS_BROKER_CHANGER, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmbrokerchanger_err", TS_BROKER_CHANGER, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmbrokerchanger_out", TS_BROKER_CHANGER, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmbrokerchanger_err", TS_BROKER_CHANGER, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -14772,7 +15577,7 @@ ts_broker_changer (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "broker_changer"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if (pid < 0)
     {
@@ -15136,8 +15941,8 @@ ts_ha_start (nvplist *req, nvplist *res, char *_dbmt_error)
   // dbname is optional.
   dbname = nv_get_val (req, "dbname");
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastart_out", TS_HA_START, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastart_err", TS_HA_START, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastart_out", TS_HA_START, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastart_err", TS_HA_START, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15158,7 +15963,7 @@ ts_ha_start (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat start [dbname]"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if (pid < 0)
     {
@@ -15197,8 +16002,8 @@ ts_ha_stop (nvplist *req, nvplist *res, char *_dbmt_error)
   // dbname is optional.
   dbname = nv_get_val (req, "dbname");
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastop_out", TS_HA_STOP, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15219,7 +16024,7 @@ ts_ha_stop (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat stop [dbname]"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if (pid < 0)
     {
@@ -15253,8 +16058,8 @@ ts_ha_status (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val;
 
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhastatus_out", TS_HA_STATUS, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhastatus_err", TS_HA_STATUS, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhastatus_out", TS_HA_STATUS, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastatus_err", TS_HA_STATUS, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15269,7 +16074,7 @@ ts_ha_status (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat status"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if (pid < 0)
     {
@@ -15319,8 +16124,8 @@ ts_ha_reload (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret_val;
 
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhareload_out", TS_HA_RELOAD, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhareload_err", TS_HA_RELOAD, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhareload_out", TS_HA_RELOAD, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhareload_err", TS_HA_RELOAD, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15335,7 +16140,7 @@ ts_ha_reload (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat reload"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
 
   if (pid < 0)
     {
@@ -15374,6 +16179,7 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   int pid = -1;
   int ret_val = 0;
+  int status = EXIT_SUCCESS;
 
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
@@ -15399,8 +16205,8 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_err", TS_HA_COPYLOGDB, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_err", TS_HA_COPYLOGDB, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15418,7 +16224,11 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat copylogdb <start|stop> dbname peer_node"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+#if defined (WINDOWS)
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
+#else
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, &status);
+#endif
 
   if (pid < 0)
     {
@@ -15435,6 +16245,12 @@ ts_ha_copylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   unlink (stdout_log_file);
   unlink (stderr_log_file);
+
+  if (status != EXIT_SUCCESS)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "heartbeat command failed.");
+      ret_val = ERR_WITH_MSG;
+    }
 
   return ret_val;
 
@@ -15456,6 +16272,7 @@ ts_ha_applylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   int argc = 0;
   int pid = -1;
   int ret_val = 0;
+  int status = EXIT_SUCCESS;
 
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
@@ -15481,8 +16298,8 @@ ts_ha_applylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  make_temp_filepath (stdout_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
-  make_temp_filepath (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_err", TS_HA_COPYLOGDB, PATH_MAX);
+  gen_tempfile_path (stdout_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_out", TS_HA_COPYLOGDB, PATH_MAX);
+  gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhacopylogdb_err", TS_HA_COPYLOGDB, PATH_MAX);
 
   cmd_name[0] = '\0';
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -15500,7 +16317,11 @@ ts_ha_applylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc] = NULL;
 
   // run "cubrid heartbeat applylogdb <start|stop> dbname peer_node"
-  pid = run_child (argv, 1, NULL, stdout_log_file, stderr_log_file, NULL);
+#if defined (WINDOWS)
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, NULL);
+#else
+  pid = run_child_env (argv, RUN_FOREGROUND, NULL, stdout_log_file, stderr_log_file, &status);
+#endif
 
   if (pid < 0)
     {
@@ -15517,6 +16338,12 @@ ts_ha_applylogdb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   unlink (stdout_log_file);
   unlink (stderr_log_file);
+
+  if (status != EXIT_SUCCESS)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "applylogdb failed.");
+      ret_val = ERR_WITH_MSG;
+    }
 
   return ret_val;
 
@@ -15566,20 +16393,25 @@ static char *
 _get_format_time ()
 {
   char *buff = (char *) malloc (sizeof (char) * LINE_MAX);
-#ifdef WINDOWS
-
-#else
   time_t lt;
+  struct tm ltm = {};
+  struct tm *t;
+
+  if (buff == NULL)
+    {
+      return NULL;
+    }
+
+  buff[0] = '\0';
 
   time (&lt);
-  struct tm *t = localtime (&lt);
+  t = LOCALTIME_R (&lt, &ltm);
 
   if (t)
     {
       strftime (buff, LINE_MAX, "%Y%m%d %H:%M:%S", t);
     }
 
-#endif
   return buff;
 }
 
@@ -15587,6 +16419,7 @@ static void
 _write_auto_update_log (char *line_buf, int is_success)
 {
   char *log_time;
+  const char *log_time_str;
 
   char log_path[PATH_MAX];
 
@@ -15595,16 +16428,22 @@ _write_auto_update_log (char *line_buf, int is_success)
   sprintf (log_path, "%s/log/manager/cms.update.log", sco.szCubrid);
 
   fin = fopen (log_path, "a");
+  if (fin == NULL)
+    {
+      return;
+    }
 
   log_time = _get_format_time ();
+  log_time_str = (log_time != NULL) ? log_time : "unknown";
+
   if (is_success)
     {
-      fprintf (fin, "[%s] %s, update to %s.\n", log_time, line_buf,
+      fprintf (fin, "[%s] %s, update to %s.\n", log_time_str, line_buf,
 	       sco.szCMSVersion);
     }
   else
     {
-      fprintf (fin, "[%s] CMS update error: %s\n", log_time, line_buf);
+      fprintf (fin, "[%s] CMS update error: %s\n", log_time_str, line_buf);
     }
 
   free (log_time);
@@ -16383,6 +17222,437 @@ release_src:
   return ret_val;
 }
 
+/*
+ * _statdumpd_mutex () - the lock guarding statdump_daemon (insertion,
+ * lookup, and every field of every entry).
+ */
+static mutex_t *
+_statdumpd_mutex (void)
+{
+  struct statdumpd_mutex_holder
+  {
+    mutex_t m;
+
+    statdumpd_mutex_holder (void)
+    {
+      mutex_init (m);
+    }
+    ~statdumpd_mutex_holder (void)
+    {
+      /*
+       * deliberately empty
+       */
+    }
+  };
+  static statdumpd_mutex_holder holder;
+
+  return &holder.m;
+}
+
+#if defined (WINDOWS)
+/*
+ * _find_statdumpd_worker_pid () - find dispatcher_pid's first child (the
+ * actual "cubrid statdump" worker
+ */
+static int
+_find_statdumpd_worker_pid (int dispatcher_pid)
+{
+  int tries;
+
+  for (tries = 0; tries < MAX_TRIES_FIND_CHILD_PID; tries++)
+    {
+      HANDLE snap = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+      if (snap != INVALID_HANDLE_VALUE)
+	{
+	  PROCESSENTRY32 pe32;
+	  pe32.dwSize = sizeof (pe32);
+	  if (Process32First (snap, &pe32))
+	    {
+	      do
+		{
+		  if ((int) pe32.th32ParentProcessID == dispatcher_pid)
+		    {
+		      int child_pid = (int) pe32.th32ProcessID;
+		      CloseHandle (snap);
+		      return child_pid;
+		    }
+		}
+	      while (Process32Next (snap, &pe32));
+	    }
+	  CloseHandle (snap);
+	}
+      Sleep (100);
+    }
+
+  return -1;
+}
+
+/*
+ * _get_proc_start_time () - pid's process creation time, as a 64-bit
+ *   FILETIME value, or -1 if pid doesn't exist
+ */
+static long long
+_get_proc_start_time (int pid)
+{
+  HANDLE h;
+  FILETIME creation, exit_time, kernel, user;
+  long long start_time = -1;
+
+  h = OpenProcess (PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD) pid);
+  if (h == NULL)
+    {
+      return -1;
+    }
+
+  if (GetProcessTimes (h, &creation, &exit_time, &kernel, &user))
+    {
+      ULARGE_INTEGER uli;
+      uli.LowPart = creation.dwLowDateTime;
+      uli.HighPart = creation.dwHighDateTime;
+      start_time = (long long) uli.QuadPart;
+    }
+
+  CloseHandle (h);
+  return start_time;
+}
+
+/*
+ * _statdump_pid_is_alive () - true if pid is still a live process AND
+ *   (when expected_start_time is >= 0) is still the same process we
+ *   recorded
+ */
+static int
+_statdump_pid_is_alive (int pid, long long expected_start_time)
+{
+  HANDLE h;
+  DWORD exit_code;
+  int alive;
+
+  if (pid <= 0)
+    {
+      return 0;
+    }
+
+  h = OpenProcess (PROCESS_QUERY_LIMITED_INFORMATION, FALSE, (DWORD) pid);
+  if (h == NULL)
+    {
+      return 0;    /* no such process */
+    }
+
+  if (expected_start_time >= 0)
+    {
+      FILETIME creation, exit_time, kernel, user;
+
+      if (GetProcessTimes (h, &creation, &exit_time, &kernel, &user))
+	{
+	  ULARGE_INTEGER uli;
+	  uli.LowPart = creation.dwLowDateTime;
+	  uli.HighPart = creation.dwHighDateTime;
+	  if ((long long) uli.QuadPart != expected_start_time)
+	    {
+	      /* a different process now occupies this pid number */
+	      CloseHandle (h);
+	      return 0;
+	    }
+	}
+    }
+
+  alive = (GetExitCodeProcess (h, &exit_code) && exit_code == STILL_ACTIVE);
+  CloseHandle (h);
+  return alive;
+}
+
+/*
+ * _win_kill_process_tree () - terminate root_pid and every descendant of
+ *   it (recursively), replacing "taskkill /T /F /PID <root_pid>"
+ *
+ *   returns 0 if every process found in the tree was terminated
+ *          -1 if any of them could not be terminated.
+ */
+static int
+_win_kill_process_tree (int root_pid)
+{
+  HANDLE snap;
+  PROCESSENTRY32 pe32;
+  vector <DWORD> pids;
+  size_t i;
+  int ret = 0;
+
+  snap = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+  if (snap == INVALID_HANDLE_VALUE)
+    {
+      return -1;
+    }
+
+  pe32.dwSize = sizeof (pe32);
+  pids.push_back ((DWORD) root_pid);
+
+  /*
+   * one snapshot, scanned once per pid already found (BFS): pids grows
+   * in place as descendants are discovered, so a pid appended by an
+   * earlier iteration is itself scanned for its own children later in
+   * this same loop.
+   */
+  for (i = 0; i < pids.size (); i++)
+    {
+      if (!Process32First (snap, &pe32))
+	{
+	  break;
+	}
+      do
+	{
+	  if (pe32.th32ParentProcessID == pids[i]
+	      && find (pids.begin (), pids.end (), pe32.th32ProcessID) == pids.end ())
+	    {
+	      pids.push_back (pe32.th32ProcessID);
+	    }
+	}
+      while (Process32Next (snap, &pe32));
+    }
+
+  CloseHandle (snap);
+
+  /* terminate descendants before root_pid; harmless either order, but
+   * avoids a brief window where a to-be-killed child looks re-parented */
+  for (i = pids.size (); i > 0; i--)
+    {
+      HANDLE h = OpenProcess (PROCESS_TERMINATE, FALSE, pids[i - 1]);
+      if (h == NULL)
+	{
+	  /* already gone (typical: ERROR_INVALID_PARAMETER) is fine; */
+	  if (GetLastError () != ERROR_INVALID_PARAMETER)
+	    {
+	      ret = -1;
+	    }
+	  continue;
+	}
+      if (!TerminateProcess (h, 1))
+	{
+	  ret = -1;
+	}
+      CloseHandle (h);
+    }
+
+  return ret;
+}
+#else
+static int
+_read_first_child_pid_from_proc_children (int parent_pid)
+{
+  char path[PATH_MAX];
+  FILE *fp;
+  int child_pid = -1;
+
+  snprintf (path, sizeof (path), "/proc/%d/task/%d/children", parent_pid, parent_pid);
+  fp = fopen (path, "r");
+  if (fp == NULL)
+    {
+      return -1;
+    }
+  if (fscanf (fp, "%d", &child_pid) != 1)
+    {
+      child_pid = -1;
+    }
+  fclose (fp);
+  return child_pid;
+}
+
+/*
+ * _find_first_child_pid_by_proc_scan ()
+ * scan /proc/<pid>/stat for every numeric entry directly under /proc
+ * and return the first one whose ppid field is parent_pid.
+ */
+static int
+_find_first_child_pid_by_proc_scan (int parent_pid)
+{
+  DIR *dp;
+  struct dirent *entry;
+  int found_pid = -1;
+
+  dp = opendir ("/proc");
+  if (dp == NULL)
+    {
+      return -1;
+    }
+
+  while (found_pid < 0 && (entry = readdir (dp)) != NULL)
+    {
+      int candidate_pid;
+      char path[PATH_MAX];
+      char buf[SIZE_BUFFER_MAX];
+      FILE *fp;
+
+      if (entry->d_name[0] < '0' || entry->d_name[0] > '9')
+	{
+	  continue;
+	}
+      candidate_pid = atoi (entry->d_name);
+      if (candidate_pid <= 0)
+	{
+	  continue;
+	}
+
+      snprintf (path, sizeof (path), "/proc/%d/stat", candidate_pid);
+      fp = fopen (path, "r");
+      if (fp == NULL)
+	{
+	  continue;
+	}
+
+      if (fgets (buf, sizeof (buf), fp) != NULL)
+	{
+	  char *rparen = strrchr (buf, ')');
+	  if (rparen != NULL)
+	    {
+	      int ppid = -1;
+
+	      if (sscanf (rparen + 2, "%*c %d", &ppid) == 1 && ppid == parent_pid)
+		{
+		  found_pid = candidate_pid;
+		}
+	    }
+	}
+      fclose (fp);
+    }
+
+  closedir (dp);
+  return found_pid;
+}
+
+/*
+ * _find_child_pid () - parent_pid's first child pid, or -1 if it has
+ * none right now.
+ */
+static int
+_find_child_pid (int parent_pid)
+{
+  int child_pid = _read_first_child_pid_from_proc_children (parent_pid);
+
+  if (child_pid <= 0)
+    {
+      child_pid = _find_first_child_pid_by_proc_scan (parent_pid);
+    }
+  return child_pid;
+}
+
+static int
+_find_statdumpd_worker_pid (int dispatcher_pid)
+{
+  int tries;
+
+  for (tries = 0; tries < MAX_TRIES_FIND_CHILD_PID; tries++)
+    {
+      int child_pid = _find_child_pid (dispatcher_pid);
+
+      if (child_pid > 0)
+	{
+	  return child_pid;
+	}
+      usleep (100 * 1000);
+    }
+
+  return -1;
+}
+
+/*
+ * _read_proc_stat_fields () - parse /proc/<pid>/stat and hand back its
+ *   state character and/or starttime.
+ *   returns 0 on success, -1 if the file doesn't exist or couldn't be
+ *   parsed.
+ *
+ *   A thin wrapper over ut_get_proc_stat_fields () (cm_server_util.cpp):
+ *   both fields now come from a single read of the file, rather than
+ *   this function reading state itself and separately calling
+ *   ut_get_proc_start_time () (which used to re-open the file for
+ *   starttime).
+ */
+static int
+_read_proc_stat_fields (int pid, char *state_out, long long *start_time_out)
+{
+  return ut_get_proc_stat_fields ((pid_t) pid, state_out, start_time_out);
+}
+
+/*
+ * _get_proc_start_time () - pid's starttime
+ */
+static long long
+_get_proc_start_time (int pid)
+{
+  long long start_time;
+
+  if (_read_proc_stat_fields (pid, NULL, &start_time) != 0)
+    {
+      return -1;
+    }
+  return start_time;
+}
+
+/*
+ * _statdump_pid_is_alive () - true if pid still exists as a live
+ */
+static int
+_statdump_pid_is_alive (int pid, long long expected_start_time)
+{
+  char state = '\0';
+  long long current_start_time = -1;
+
+  if (pid <= 0)
+    {
+      return 0;
+    }
+
+  if (_read_proc_stat_fields (pid, &state, &current_start_time) == 0)
+    {
+      if (expected_start_time >= 0 && current_start_time != expected_start_time)
+	{
+	  /* a different process now occupies this pid number */
+	  return 0;
+	}
+      return (state != 'Z');
+    }
+
+  /*
+   * /proc/<pid>/stat unreadable
+   */
+  if (kill ((pid_t) pid, 0) == 0)
+    {
+      return 1;
+    }
+  return (errno == EPERM) ? 1 : 0;
+}
+#endif
+
+/*
+ * _reap_dead_statdump_entries () - drop any statdump_daemon entry whose
+ * *worker* process has died out-of-band
+ */
+static void
+_reap_dead_statdump_entries (void)
+{
+  map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.begin ();
+
+  while (itor != statdump_daemon.end ())
+    {
+      if (itor->second.status == STATD_RUNNING)
+	{
+	  bool have_worker = itor->second.worker_pid > 0;
+	  int check_pid = have_worker ? itor->second.worker_pid : itor->second.pid;
+	  long long check_start_time = have_worker
+				       ? itor->second.worker_start_time
+				       : itor->second.dispatcher_start_time;
+
+	  if (!_statdump_pid_is_alive (check_pid, check_start_time))
+	    {
+	      map <string, T_STATDUMP_STAT>::iterator to_erase = itor;
+	      ++itor;
+	      statdump_daemon.erase (to_erase);
+	      continue;
+	    }
+	}
+      ++itor;
+    }
+}
+
 int
 ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -16393,30 +17663,68 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char path [512];
   int argc = 0;
   char note [20];
-  int slot = -1;
-  db_name = nv_get_val (req, "_DBNAME");
+  T_DB_SERVICE_MODE db_mode;
+
+  db_name = nv_get_val (req, "dbname");
+
   interval_str = nv_get_val (req, "interval");
   if (!interval_str || !db_name)
     {
-      nv_update_val (res, "note", "no sufficient arguments");
-      LOG_ERROR ("start_statdump: dbname or interval was not specified");
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "dbname or interval was not specified.");
+      return ERR_WITH_MSG;
+    }
+
+  db_mode = cms_database_mode (db_name, NULL);
+  if (db_mode != DB_SERVICE_MODE_CS)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);
+      return ERR_DB_INACTIVE;
+    }
+
+  interval = atoi (interval_str);
+
+  /*
+   * statdump_daemon is only touched under mutex_scope: a std::bad_alloc from
+   * the map (or from the string key) must not leave _statdumpd_mutex held,
+   * since getserverstatus waits for it while holding cm_mutex.
+   */
+  bool too_many = false;
+  bool inserted = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    _reap_dead_statdump_entries ();
+
+    if (statdump_daemon.size () >= MAX_STATDUMP_PROC)
+      {
+	too_many = true;
+      }
+    else
+      {
+	T_STATDUMP_STAT reserved;
+	reserved.status = STATD_STARTING;
+	reserved.pid = -1;
+	reserved.interval = interval;
+	reserved.started = 0;
+	reserved.worker_pid = -1;
+	reserved.dispatcher_start_time = -1;
+	reserved.worker_start_time = -1;
+	inserted = statdump_daemon.insert (make_pair (string (db_name), reserved)).second;
+      }
+  }
+
+  if (too_many)
+    {
+      nv_update_val (res, "note", "too many concurrent statdump processes");
       return -1;
     }
 
-  if (find_statdumpd_info (db_name) >= 0)
+  if (!inserted)
     {
       nv_update_val (res, "note", "already running");
       return -1;
     }
 
-  slot = find_new_statdumpd_info ();
-  if (slot < 0)
-    {
-      nv_update_val (res, "note", "memory allocation error");
-      return -1;
-    }
-  strcpy (statdump_daemon[slot].dbname, db_name);
-  interval = atoi (interval_str);
   cubrid_cmd_name (path);
 
   argv[argc++] = path;
@@ -16426,11 +17734,55 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = db_name;
   argv[argc++] = NULL;
 
+  long long dispatcher_start_time = -1;
+
 #if defined (WINDOWS)
-  ret_val = run_child (argv, 0, NULL, NULL, NULL, NULL);
+  ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, NULL, NULL, NULL);
+  if (ret_val >= 0)
+    {
+      dispatcher_start_time = _get_proc_start_time (ret_val);
+    }
 #else
-  ret_val = run_child (argv, 0, NULL, "/dev/null", "/dev/null", NULL);
+  {
+    /*
+     * run_child_env ()'s stdout_file/stderr_file are char *, so a
+     * string literal can't be passed directly here.
+     */
+    char devnull_out[] = "/dev/null";
+    char devnull_err[] = "/dev/null";
+
+    /*
+     * Pass dispatcher_start_time through run_child_env ()'s
+     * out_start_time so it is read in the parent before the pid can be
+     * reaped by run_child_env ()'s own background reaper thread, rather
+     * than reading it here after the call returns
+     */
+    ret_val = run_child_env (argv, RUN_BACKGROUND, NULL, devnull_out, devnull_err, NULL, NULL,
+			     &dispatcher_start_time);
+  }
 #endif
+
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    if (ret_val < 0)
+      {
+	/*
+	 * give the reserved entry back; nobody else could have touched
+	 * it while it was STATD_STARTING
+	 */
+	statdump_daemon.erase (db_name);
+      }
+    else
+      {
+	T_STATDUMP_STAT &entry = statdump_daemon[db_name];
+
+	entry.status = STATD_RUNNING;
+	entry.pid = ret_val;
+	entry.started = time (NULL);
+	entry.dispatcher_start_time = dispatcher_start_time;
+      }
+  }
 
   if (ret_val < 0)
     {
@@ -16438,11 +17790,25 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return -1;
     }
 
-  statdump_daemon[slot].status = STATD_RUNNING;
-  statdump_daemon[slot].pid = ret_val;
-  nv_update_val (res, "note", db_name);
-  nv_update_val (res, "status", "success");
-  nv_add_nvp_int (res, "pid", ret_val);
+  {
+    int worker_pid = _find_statdumpd_worker_pid (ret_val);
+    long long worker_start_time = (worker_pid > 0) ? _get_proc_start_time (worker_pid) : -1;
+
+    {
+      mutex_scope lock (*_statdumpd_mutex ());
+
+      map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
+      if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
+	{
+	  worker_itor->second.worker_pid = worker_pid;
+	  worker_itor->second.worker_start_time = worker_start_time;
+	}
+    }
+
+    nv_update_val (res, "note", db_name);
+    nv_update_val (res, "status", "success");
+    nv_add_nvp_int (res, "pid", (worker_pid > 0) ? worker_pid : ret_val);
+  }
 
   return 0;
 }
@@ -16454,12 +17820,43 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   int ret_val = ERR_NO_ERROR;
   char *db_name;
-  int slot;
-  char cmd [1024];
-  int ret;
+  int pid;
+  int worker_pid;
+  long long dispatcher_start_time;
+  long long worker_start_time;
+  T_DB_SERVICE_MODE db_mode;
 
-  db_name = nv_get_val (req, "_DBNAME");
-  if (!db_name || (slot = find_statdumpd_info (db_name)) < 0)
+  db_name = nv_get_val (req, "dbname");
+  if (db_name == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "dbname was not specified.");
+      return ERR_WITH_MSG;
+    }
+
+  db_mode = cms_database_mode (db_name, NULL);
+  if (db_mode != DB_SERVICE_MODE_CS)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);
+      return ERR_DB_INACTIVE;
+    }
+
+  bool found = false;
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+    if (itor != statdump_daemon.end () && itor->second.status == STATD_RUNNING)
+      {
+	found = true;
+	pid = itor->second.pid;
+	worker_pid = itor->second.worker_pid;
+	dispatcher_start_time = itor->second.dispatcher_start_time;
+	worker_start_time = itor->second.worker_start_time;
+	itor->second.status = STATD_STOPPING;
+      }
+  }
+
+  if (!found)
     {
       nv_update_val (res, "note", "no statdump running");
       nv_update_val (res, "status", "failed");
@@ -16469,89 +17866,157 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_update_val (res, "note", db_name);
 
 #if defined (WINDOWS)
-  sprintf (cmd, "taskkill /T /F /PID %d", statdump_daemon[slot].pid);
+  /*
+   * kills pid's whole process tree (worker included) natively
+   */
+  ret_val = _statdump_pid_is_alive (pid, dispatcher_start_time)
+	    ? _win_kill_process_tree (pid) : 0;
 #else
-  sprintf (cmd, "/bin/ps -o pid --ppid %d | grep -v PID | xargs kill", statdump_daemon[slot].pid);
-#endif
+  if (worker_pid > 0)
+    {
+      ret_val = _statdump_pid_is_alive (worker_pid, worker_start_time)
+		? ((kill ((pid_t) worker_pid, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1)
+		: 0;
+    }
+  else if (_statdump_pid_is_alive (pid, dispatcher_start_time))
+    {
+      /*
+       * worker_pid was never discovered
+       */
+      int discovered = _find_child_pid (pid);
 
-  ret_val = system (cmd);
+      if (discovered <= 0)
+	{
+	  ret_val = 0;    /* nothing found to kill */
+	}
+      else
+	{
+	  ret_val = (kill ((pid_t) discovered, SIGTERM) == 0 || errno == ESRCH) ? 0 : -1;
+	}
+    }
+  else
+    {
+      /* dispatcher pid is gone, or already recycled to a different
+       * process: nothing of ours left to signal. */
+      ret_val = 0;
+    }
 
-#if !defined (WINDOWS)
   /*
    * Double check if the process is still running.
    */
   if (ret_val < 0)
     {
-      sprintf (cmd, "/bin/ps -p %d", statdump_daemon[slot].pid);
-      ret = system (cmd);
-      if (ret < 0)
+      int still_running = (kill ((pid_t) pid, 0) == 0);
+      int check_errno = errno;
+
+      if (still_running)
 	{
-	  ret_val = 0;
+	  nv_add_nvp (res, "Linux_error", "process still running");
+	}
+      else if (check_errno == EPERM)
+	{
+	  char errbuf[CM_STRERROR_BUF_LEN];
+	  nv_add_nvp (res, "Linux_error", STRERROR_R (check_errno, errbuf, sizeof (errbuf)));
 	}
       else
 	{
-	  nv_add_nvp (res, "Linux_error", strerror (errno));
+	  /* pid is gone (ESRCH or similar): nothing to worry about */
+	  ret_val = 0;
 	}
+    }
+
+  if (ret_val >= 0 && _statdump_pid_is_alive (pid, dispatcher_start_time))
+    {
+      kill (pid, SIGKILL);
     }
 #endif
 
+  {
+    mutex_scope lock (*_statdumpd_mutex ());
+
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+
+    if (itor != statdump_daemon.end ())
+      {
+	if (ret_val < 0)
+	  {
+	    /*
+	     * kill failed: put the entry back to STATD_RUNNING (instead of
+	     * leaving it stuck in STATD_STOPPING) so a retry can find it
+	     */
+	    itor->second.status = STATD_RUNNING;
+	  }
+	else
+	  {
+	    statdump_daemon.erase (itor);
+	  }
+      }
+  }
+
   if (ret_val < 0)
     {
-      nv_add_nvp_int (res, "pid", statdump_daemon[slot].pid);
+      nv_add_nvp_int (res, "pid", pid);
       nv_update_val (res, "status", "failed");
       return ret_val;
     }
 
-  statdump_daemon[slot].status = STATD_IDLE;
   nv_update_val (res, "status", "success");
   return ret_val;
 }
 
-int
-find_new_statdumpd_info ()
+vector <T_STATDUMPD_INFO>
+get_statdump_daemon_list (void)
 {
-  int i;
-  if (statdump_daemon == NULL)
+  vector <T_STATDUMPD_INFO> result;
+
+  /*
+   * reserve (), the strings and push_back () can throw std::bad_alloc;
+   * mutex_scope releases _statdumpd_mutex then too. The caller
+   * (getserverstatus) holds cm_mutex while waiting for it.
+   */
+  mutex_scope lock (*_statdumpd_mutex ());
+
+  _reap_dead_statdump_entries ();
+
+  result.reserve (statdump_daemon.size ());
+  for (map <string, T_STATDUMP_STAT>::const_iterator itor = statdump_daemon.begin ();
+       itor != statdump_daemon.end (); ++itor)
     {
-      statdump_daemon = (T_STATDUMP_STAT *) calloc (sizeof (T_STATDUMP_STAT), MAX_STATDUMP_PROC);
-      if (statdump_daemon == NULL)
+      T_STATDUMPD_INFO info;
+      info.db_name = itor->first;
+      info.interval = itor->second.interval;
+      info.pid = (itor->second.worker_pid > 0) ? itor->second.worker_pid : itor->second.pid;
+      switch (itor->second.status)
 	{
-	  return -1;
+	case STATD_STARTING:
+	  info.status = "starting";
+	  break;
+	case STATD_RUNNING:
+	  info.status = "running";
+	  break;
+	case STATD_STOPPING:
+	  info.status = "stopping";
+	  break;
+	default:
+	  info.status = "unknown";
+	  break;
+	}
+      if (itor->second.started > 0)
+	{
+	  char started_buf[64];
+	  time_to_str (itor->second.started, "%04d-%02d-%02d %02d:%02d:%02d",
+		       started_buf, TIME_STR_FMT_DATE_TIME);
+	  info.started = started_buf;
 	}
       else
 	{
-	  return 0;
+	  info.started = "";
 	}
+      result.push_back (info);
     }
-  for (i = 0; i < MAX_STATDUMP_PROC; i++)
-    {
-      if (statdump_daemon[i].status == STATD_IDLE)
-	{
-	  return i;
-	}
-    }
-  return -3;
+
+  return result;
 }
-
-int
-find_statdumpd_info (char *dbname)
-{
-  int i;
-
-  if (statdump_daemon == NULL)
-    {
-      return -1;
-    }
-  for (i = 0; i < MAX_STATDUMP_PROC; i++)
-    {
-      if (statdump_daemon[i].status == STATD_RUNNING && strcmp (statdump_daemon[i].dbname, dbname) == 0)
-	{
-	  return i;
-	}
-    }
-  return -1;
-}
-
 
 static int
 _hash_cert (char *hash_value, char *file_path)
@@ -16692,6 +18157,272 @@ is_filename_matched (const char *fname, const char *pattern)
     {
       return 0;
     }
+
+  return 1;
+}
+
+static int
+file_not_exist (char *path, char *skip_code, char *_dbmt_error)
+{
+  char buf[PATH_MAX];
+  char new_path[PATH_MAX];
+  char *p = NULL;
+  int ret = 0;
+  int not_allowed = 1;
+  int i;
+
+
+  if (path == NULL || (skip_code != NULL && strcmp (path, skip_code) == 0))
+    {
+      return 0;
+    }
+
+  if (path[0] != '$')
+    {
+      ret = access (path, F_OK) != 0 ? 1 : 0;
+    }
+  else
+    {
+      snprintf (buf, PATH_MAX, "%s", path);
+      p = strchr (buf, '/');
+
+      if (p)
+	{
+	  *p = '\0';
+	}
+      for (i = 0; i < allowed_env_len; i++)
+	{
+	  if (strcmp (buf, allowed_env[i]) == 0)
+	    {
+	      not_allowed = 0;
+	      break;
+	    }
+	}
+
+      if (not_allowed)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "env variable not allowed: %s", buf);
+	  return 1;
+	}
+
+      char *env_value = getenv (buf + 1);
+      if (env_value == NULL)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", path);
+	  return 1;
+	}
+
+      if (p)
+	{
+	  snprintf (new_path, PATH_MAX, "%s/%s", env_value, p + 1);
+	}
+      else
+	{
+	  snprintf (new_path, PATH_MAX, "%s", env_value);
+	}
+
+      ret = access (new_path, F_OK) != 0 ? 1 : 0;
+    }
+
+  if (ret == 1)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", path);
+    }
+
+  return ret;
+}
+
+static int
+schema_file_not_exist (const char *schema_list_file, char *_dbmt_error)
+{
+  FILE *fp;
+  char *p, filename[PATH_MAX] = { 0, };
+  char path_name[PATH_MAX*2];
+  char path[PATH_MAX];
+  char full_filename[PATH_MAX];
+
+  if (schema_list_file == NULL || strcmp (schema_list_file, "none") == 0)
+    {
+      return 0;
+    }
+
+  if (expand_path (schema_list_file, full_filename, PATH_MAX) || (fp = fopen (full_filename, "r")) == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+      return 1;
+    }
+
+#if defined (WINDOWS)
+  {
+    char drive[_MAX_DRIVE];
+    char dir[PATH_MAX];
+
+    if (_splitpath_s (schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
+      {
+	snprintf (path, PATH_MAX, "%s%s", drive, dir);
+      }
+    else
+      {
+	snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+	fclose (fp);
+	return 1;
+      }
+  }
+#else
+  snprintf (path, PATH_MAX, "%s", schema_list_file);
+  if (dirname (path) == NULL)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", schema_list_file);
+      fclose (fp);
+      return 1;
+    }
+#endif
+
+  while (fgets (filename, PATH_MAX, fp))
+    {
+      p = strchr (filename, '\n');
+      if (p)
+	{
+	  *p = '\0';
+	}
+      snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
+
+      if (file_not_exist (path_name, NULL, _dbmt_error))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", path_name);
+	  fclose (fp);
+	  return 1;
+	}
+    }
+
+  fclose (fp);
+  return 0;
+}
+
+static int
+expand_path (const char *src, char *dst, int dest_len)
+{
+  int i;
+  int env_num = -1;
+  char buf[PATH_MAX];
+  char *p;
+
+  if (src == NULL || dst == NULL || dest_len <= 0)
+    {
+      return 0;
+    }
+
+  if (src[0] == '$')
+    {
+      snprintf (buf, PATH_MAX, "%s", src);
+      p = strchr (buf, '/');
+      if (p)
+	{
+	  *p = '\0';
+	}
+
+      for (i = 0; i < allowed_env_len; i++)
+	{
+	  if (strcmp (buf, allowed_env[i]) == 0)
+	    {
+	      env_num = i;
+	      break;
+	    }
+	}
+
+      if (env_num < 0)
+	{
+	  return 1;
+	}
+
+      if (p)
+	{
+	  *p = '/';
+	}
+      if (p)
+	{
+	  snprintf (dst, dest_len, "%s/%s", env_num == 0 ? sco.szCubrid : sco.szCubrid_databases, p + 1);
+	}
+      else
+	{
+	  snprintf (dst, dest_len, "%s", buf);
+	}
+    }
+  else
+    {
+      snprintf (dst, dest_len, "%s", src);
+    }
+
+  return 0;
+}
+
+#define	NUM_WORDS_EXPECTED 6
+#define	MSG_HA_MASTER_AND_ACTIVE "registered_and_active)"
+
+static int
+is_ha_updates_disabled (char *dbname, char *_dbmt_error)
+{
+  char outfile[PATH_MAX];
+  char cmd_name[PATH_MAX];
+  char *argv [4];
+  int argc = 0;
+  int exit_code = 0;
+
+  snprintf (cmd_name, sizeof (cmd_name), "%s/%s%s", sco.szCubrid, CUBRID_DIR_BIN, "cubrid");
+  gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_task", TS_COMPACTDB, PATH_MAX);
+
+  argv[argc++] = cmd_name;
+  argv[argc++] = "heartbeat";
+  argv[argc++] = "status";
+  argv[argc++] = NULL;
+
+  if (run_child_env (argv, RUN_FOREGROUND, NULL, outfile, NULL, &exit_code) < 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "command failed: cubrid heartbeat status");
+      unlink (outfile);
+      return 1;
+    }
+
+  if (exit_code != 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "HA heartbeat daemon is not running");
+      unlink (outfile);
+      return 1;
+    }
+
+  ifstream file (outfile);
+  if (!file.is_open ())
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "cannot open temporary file: %s", outfile);
+      unlink (outfile);
+      return 1;
+    }
+
+  string line;
+
+  while (getline (file, line))
+    {
+      stringstream ss (line);
+      string word;
+      vector <string> words;
+
+      while (ss >> word)
+	{
+	  words.push_back (word);
+	}
+
+      if (words.size () == NUM_WORDS_EXPECTED && words[0] == "Server" && words[1] == dbname
+	  && words[5] == MSG_HA_MASTER_AND_ACTIVE)
+	{
+	  file.close ();
+	  unlink (outfile);
+	  return 0;
+	}
+    }
+
+  file.close ();
+  unlink (outfile);
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "database updates are disabled: %s", dbname);
 
   return 1;
 }
