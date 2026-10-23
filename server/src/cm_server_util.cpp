@@ -95,7 +95,7 @@
 #include "cm_stat.h"
 #include "cm_user.h"
 
-#include <openssl/rand.h>
+#include "openssl/rand.h"
 
 #include <assert.h>
 
