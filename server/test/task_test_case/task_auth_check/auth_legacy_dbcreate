@@ -45,6 +45,31 @@
   "test_expect": "denied"
  },
  {
+  "task": "adddbmtuser",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "updatedbmtuser",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "updatedbmtuser_new",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
   "task": "logout",
   "token": "$CASE_LOGIN_TOKEN"
  },

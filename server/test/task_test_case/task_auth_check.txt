@@ -8,3 +8,5 @@ auth_legacy_dbcreate,success
 auth_new_mon,success
 auth_mixed_update,success
 auth_deleted_user,success
+auth_setdbmtpasswd,success
+auth_new_admin,success
