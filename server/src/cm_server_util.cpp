@@ -5087,6 +5087,156 @@ is_subpath (const char *allowd_path, const char *path)
   return clean_user.rfind (clean_allowed, 0) == 0;
 }
 
+/*
+ * Protected files.
+ *
+ * These files hold CMS user passwords and authorities, DB passwords or the
+ * TLS private key. No file task may read or write them, whatever the
+ * caller's authority (admin included); the server itself reaches them only
+ * through its own code, never through a path taken from a request.
+ */
+static std::vector<std::string>
+protected_files (void)
+{
+  static const T_DBMT_FILE_ID fids[] =
+  {
+    FID_DBMT_PASS,		/* cm.pass */
+    FID_DBMT_CUBRID_PASS,	/* cmdb.pass */
+    FID_CONN_LIST,		/* conlist */
+    FID_AUTO_JOBS_CONF,		/* autojobs.conf */
+    FID_AUTO_EXECQUERY_CONF	/* autoexecquery.conf */
+  };
+  std::vector<std::string> files;
+  char buf[PATH_MAX];
+
+  for (size_t i = 0; i < sizeof (fids) / sizeof (fids[0]); i++)
+    {
+      buf[0] = '\0';
+      if (conf_get_dbmt_file (fids[i], buf) != NULL && buf[0] != '\0')
+	{
+	  files.push_back (buf);
+	}
+    }
+  if (sco.szSSLKey[0] != '\0')
+    {
+      files.push_back (sco.szSSLKey);
+    }
+  if (sco.szSSLCertificate[0] != '\0')
+    {
+      files.push_back (sco.szSSLCertificate);
+    }
+
+  return files;
+}
+
+/*
+ * resolve_path () - the path with symbolic links resolved, so that a link
+ *   cannot stand in for a protected file or for $CUBRID/bin. A path that does
+ *   not exist yet (a file about to be written) is resolved through its parent
+ *   directory. Returns the path unchanged when it cannot be resolved.
+ */
+static std::string
+resolve_path (const std::string &path)
+{
+#if !defined (WINDOWS)
+  char buf[PATH_MAX];
+
+  if (realpath (path.c_str (), buf) != NULL)
+    {
+      return std::string (buf);
+    }
+
+  size_t pos = path.find_last_of ('/');
+  if (pos != std::string::npos && pos > 0)
+    {
+      std::string parent = path.substr (0, pos);
+      if (realpath (parent.c_str (), buf) != NULL)
+	{
+	  return std::string (buf) + path.substr (pos);
+	}
+    }
+#endif
+  return path;
+}
+
+/* the same path after normalization (is_subpath () both ways) */
+static bool
+is_same_path (const std::string &a, const std::string &b)
+{
+  return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
+}
+
+/* `path` (expanded) is one of the protected files */
+static bool
+is_protected_file (const std::string &path)
+{
+  std::vector<std::string> files = protected_files ();
+  std::string resolved = resolve_path (path);
+
+  for (size_t i = 0; i < files.size (); i++)
+    {
+      if (is_same_path (files[i], path) || is_same_path (resolve_path (files[i]), resolved))
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+/* a protected file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_protected_file (const std::string &dir)
+{
+  std::vector<std::string> files = protected_files ();
+  std::string resolved = resolve_path (dir);
+
+  for (size_t i = 0; i < files.size (); i++)
+    {
+      if (is_subpath (dir.c_str (), files[i].c_str ())
+	  || is_subpath (resolved.c_str (), resolve_path (files[i]).c_str ()))
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+/* `path` (expanded) is $CUBRID/bin or under it */
+static bool
+is_under_cubrid_bin (const std::string &path)
+{
+  std::string bin = std::string (sco.szCubrid) + "/bin";
+
+  return is_subpath (bin.c_str (), path.c_str ())
+	 || is_subpath (resolve_path (bin).c_str (), resolve_path (path).c_str ());
+}
+
+/* $CUBRID/bin is `dir` (expanded) itself, under it, or under one of its
+ * subdirectories after a recursive copy into `dir` */
+static bool
+overlaps_cubrid_bin (const std::string &dir)
+{
+  std::string bin = std::string (sco.szCubrid) + "/bin";
+
+  return is_under_cubrid_bin (dir)
+	 || is_subpath (dir.c_str (), bin.c_str ())
+	 || is_subpath (resolve_path (dir).c_str (), resolve_path (bin).c_str ());
+}
+
+static void
+set_path_error (char *_dbmt_error, const char *reason, const char *path)
+{
+  std::string origin_path = path ? path : "(NULL)";
+
+  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s: %s", reason, origin_path.c_str ());
+}
+
+/*
+ * is_authorized_filename () - the path is under $CUBRID or $CUBRID_DATABASES
+ * and is not a protected file (cm.pass, cmdb.pass, conlist, autojobs.conf,
+ * autoexecquery.conf, the TLS key and certificate). For every file task.
+ */
 bool
 is_authorized_filename (const char *path, char *_dbmt_error)
 {
@@ -5098,19 +5248,81 @@ is_authorized_filename (const char *path, char *_dbmt_error)
       return false;
     }
 
-  if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
+  if (!is_subpath (sco.szCubrid, expanded_path.c_str ())
+      && !is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
     {
-      return true;
+      std::string origin_path = path;
+      std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
+
+      std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
+		allowed_path.c_str (), origin_path.c_str ());
+      return false;
     }
 
-  std::string origin_path = path;
-  std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
+  if (is_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "access to a protected file is not allowed", path);
+      return false;
+    }
 
-  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
-	    allowed_path.c_str (), origin_path.c_str ());
+  return true;
+}
 
-  return false;
+/*
+ * is_authorized_write_filename () - as above, and not under $CUBRID/bin. For
+ * tasks that write a file with content from the request.
+ */
+bool
+is_authorized_write_filename (const char *path, char *_dbmt_error)
+{
+  std::string expanded_path;
+
+  if (!is_authorized_filename (path, _dbmt_error))
+    {
+      return false;
+    }
+
+  /* is_authorized_filename () has already validated and expanded it */
+  (void) is_valid_filename (path, expanded_path);
+  if (is_under_cubrid_bin (expanded_path))
+    {
+      set_path_error (_dbmt_error, "writing under $CUBRID/bin is not allowed", path);
+      return false;
+    }
+
+  return true;
+}
+
+/*
+ * is_authorized_dirname () - as is_authorized_filename (), and no protected
+ * file under the directory; with is_write_target, the directory must also
+ * not overlap $CUBRID/bin. For tasks that copy or delete a directory tree.
+ */
+bool
+is_authorized_dirname (const char *path, bool is_write_target, char *_dbmt_error)
+{
+  std::string expanded_path;
+
+  if (!is_authorized_filename (path, _dbmt_error))
+    {
+      return false;
+    }
+
+  (void) is_valid_filename (path, expanded_path);
+  if (contains_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "the directory contains a protected file", path);
+      return false;
+    }
+
+  if (is_write_target && overlaps_cubrid_bin (expanded_path))
+    {
+      set_path_error (_dbmt_error, "writing under $CUBRID/bin is not allowed", path);
+      return false;
+    }
+
+  return true;
 }
 
 bool

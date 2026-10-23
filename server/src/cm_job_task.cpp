@@ -12051,7 +12051,7 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (src_dir, _dbmt_error) || !is_authorized_filename (dest_dir, _dbmt_error))
+  if (!is_authorized_dirname (src_dir, false, _dbmt_error) || !is_authorized_dirname (dest_dir, true, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12078,7 +12078,7 @@ ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (src_dir, _dbmt_error))
+  if (!is_authorized_dirname (src_dir, false, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12107,7 +12107,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (conf_path, _dbmt_error))
+  if (!is_authorized_write_filename (conf_path, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }

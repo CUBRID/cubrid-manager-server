@@ -1508,7 +1508,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
   confname= request["confname"].asString();
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
-  if (!is_authorized_filename  (conf_path, _dbmt_error))
+  if (!is_authorized_write_filename (conf_path, _dbmt_error))
     {
       return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
     }
