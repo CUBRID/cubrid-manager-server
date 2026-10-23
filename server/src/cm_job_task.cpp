@@ -2099,6 +2099,9 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
     dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
   }
 
+  /* The user is gone: drop every session of it, so its tokens stop working. */
+  dbmt_user_delete_all_sessions_of_user (dbmt_id);
+
   /* add dblist */
   retval = ut_get_dblist (res, 0);
   if (retval != ERR_NO_ERROR)
@@ -2450,7 +2453,7 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int i, retval, usr_index;
-  char *dbmt_id, *new_passwd;
+  char *dbmt_id, *new_passwd, *requester_id;
   char file[PATH_MAX];
 
   if ((dbmt_id = nv_get_val (req, "targetid")) == NULL)
@@ -2470,6 +2473,16 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * _ID is the caller, set from the session; a client cannot supply it
+   * (cub_strip_internal_keys ()).
+   */
+  if ((requester_id = nv_get_val (req, "_ID")) == NULL)
+    {
+      sprintf (_dbmt_error, "%s", "_ID");
+      return ERR_PARAM_MISSING;
+    }
+
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
@@ -2483,6 +2496,33 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       {
 	return retval;
       }
+
+    /*
+     * Every user may change his own password; only a user with AU_ADMIN may
+     * change another user's (admin's included). The task itself is AU_ANY.
+     */
+    if (strcmp (dbmt_id, requester_id) != 0)
+      {
+	unsigned int requester_auth = 0;
+
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    if (strcmp (dbmt_user.user_info[i].user_name, requester_id) == 0)
+	      {
+		requester_auth = dbmt_user_effective_auth (&dbmt_user.user_info[i]);
+		break;
+	      }
+	  }
+
+	if ((requester_auth & AU_ADMIN) == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		      "Only an admin user can change the password of another user.");
+	    return ERR_WITH_MSG;
+	  }
+      }
+
     usr_index = -1;
     for (i = 0; i < dbmt_user.num_dbmt_user; i++)
       {
