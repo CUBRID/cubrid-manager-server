@@ -2821,8 +2821,8 @@ ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
 {
   /*
    * The token is an opaque random value, not an encryption of the session
-   * fields (KVE-2026-1828): there is nothing in it to decrypt or forge. The
-   * session (ip/port/id, login time, DB logins) is held server-side in the
+   * fields: there is nothing in it to decrypt or forge.
+   * The session (ip/port/id, login time, DB logins) is held server-side in the
    * session map keyed by this token. TOKEN_LENGTH random bytes are emitted as
    * a hex string, so the printed length (TOKEN_LENGTH * 2) matches the old
    * token and existing buffers (TOKEN_ENC_LENGTH) are unchanged.
