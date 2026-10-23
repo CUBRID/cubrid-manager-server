@@ -270,6 +270,9 @@ helper_procs = []
 #                                  the runner's own (admin) token
 #   "test_expect": "<verdict>"     expectation of this request only; the key is
 #                                  removed before the request is sent
+#   "test_note": "<text>"          the response note must also contain <text>
+#                                  (removed before sending); tells a refusal
+#                                  apart from any other failure
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -285,8 +288,11 @@ def is_denied(data):
             and str(data.get("note", "")).startswith(DENIED_NOTE))
 
 
-def judged_status(data, expected):
+def judged_status(data, expected, note_text=None):
     """The value compared with `expected` for a response `data`."""
+    if note_text is not None and note_text not in str(data.get("note", "")):
+        # Right status for the wrong reason is not a pass.
+        return "%s (note without %r)" % (data.get("status"), note_text)
     if expected == "denied":
         return "denied" if is_denied(data) else data.get("status")
     if expected == "allowed":
@@ -476,7 +482,7 @@ def follow_job(name, data, token):
 
 
 def send_one(name, req, token, expected="success", casefile="",
-             must_be_sync=False):
+             must_be_sync=False, note_text=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -520,14 +526,15 @@ def send_one(name, req, token, expected="success", casefile="",
             # The final result is recorded as usual. Under --strict-timeout,
             # do_one_job() turns it into a failure once the case is judged and
             # prints that verdict instead of this status line.
-            record(name, casefile, task, judged_status(data, expected),
+            record(name, casefile, task,
+                   judged_status(data, expected, note_text),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
             return data
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
-    record(name, casefile, task, judged_status(data, expected),
+    record(name, casefile, task, judged_status(data, expected, note_text),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -572,10 +579,11 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     requests = request if isinstance(request, list) else [request]
     for index, req in enumerate(requests):
         req_expected = req.pop("test_expect", expected)
+        req_note = req.pop("test_note", None)
         req_token = case_token if req.get("token") == CASE_LOGIN_TOKEN else token
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
-                        must_be_sync)
+                        must_be_sync, req_note)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_token = data["token"]

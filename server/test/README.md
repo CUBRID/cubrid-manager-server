@@ -533,6 +533,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | --- | --- |
 | `"token": "$CASE_LOGIN_TOKEN"` | 케이스 안에서 마지막으로 성공한 `login`의 토큰으로 보낸다. 없으면 러너의 `admin` 토큰 |
 | `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
+| `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
 
 판정 값은 `success`, `failure` 외에 다음을 쓸 수 있다.
 
@@ -556,6 +557,13 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `auth_deleted_user` | 기존 API | 사용자를 지우면 남은 토큰으로 task를 실행할 수 없음 |
 | `auth_setdbmtpasswd` | 기존 API 계정, `_new` API dbc만 yes | 자기 비밀번호는 변경, 다른 사용자 것은 거부, admin은 변경 가능, 변경 후에도 세션 유지, 새 비밀번호로만 로그인 |
 | `auth_new_admin` | `_new` API, `admin:yes` | 사용자 관리 task, `getadminloginfo`, 다른 사용자 비밀번호 변경 가능 |
+| `file_protected_read` | admin | 보호 파일(cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, SSL 키·인증서)을 `viewlog`·`getfiletotallinenum`·`errortrace`·`runsqlstatement`·`readprivatedata`·`getallsysparam`·`copyfolder`(src)로 읽지 못함. `./`, `//`, `..` 변형 포함. 옆의 일반 파일은 읽힘 |
+| `file_protected_write` | admin | `resetlog`·`writeandsaveconf`·`writeprivatedata`·`removelog`·`copyfolder`(dest)로 보호 파일을 쓰지 못함 |
+| `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못함 |
+
+보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.
+`copyfolder`는 존재하지 않는 원본을 주어 회귀해도 아무것도 복사되지 않게 한다. `deletefolder`는
+안전하게 검증할 방법이 없어 넣지 않았다.
 
 케이스가 중간에 멈춰 사용자가 남아도, 다음 실행의 첫 요청(`deletedbmtuser`, `any`)이
 지운다. 사용자 이름은 `authtest_`로 시작한다.
