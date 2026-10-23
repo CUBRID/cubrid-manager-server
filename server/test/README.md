@@ -106,6 +106,8 @@ server/test/
       <case>.answer                     기준 응답 (커밋 대상)
       <case>.result                     -fc 실행 결과 (git 미추적)
     task_result_check/11_5/  11_2/  11_0/  10_2/
+    task_auth_check.txt               세트 3: 권한 검사 (CMS 사용자별, 4.8 참고)
+    task_auth_check/<case>            그 세트의 요청 JSON
   task_test_config/                   케이스가 읽을 픽스처
     test_analyzecaslog.sql.log          analyzecaslog 용 CAS 로그
     tmp_file_for_test/                  getcaslogtopresult / removecasrunnertmpfile 용
@@ -192,6 +194,10 @@ server/test/
 `"token": ""`로 비워 둔다. 과거에는 실행할 때마다 달라지는 만료된 토큰 문자열이
 파일마다 하드코딩돼 있었는데(30가지), 아무 의미가 없어 전부 빈 문자열로 정리했다.
 새 케이스를 만들 때도 `"token": ""`로 두면 된다(키를 생략해도 동작한다).
+
+예외는 `"token": "$CASE_LOGIN_TOKEN"`이다. 이 요청은 같은 케이스에서 마지막으로 성공한
+`login` 요청이 받은 토큰으로 보낸다. 다른 CMS 사용자로 실행해야 하는 권한 검사(4.8)에
+쓴다.
 
 ### 4.3 요청 파일 포맷
 
@@ -508,6 +514,49 @@ python3 test_tasks.py --dump <name> [<name> ...]
   비어 있지 않은 경우를 이미 보여준다.
 - `adddbmtuser` 응답의 **첫 번째** `userlist` — 이 task는 사용자 목록을 두 번 담는데,
   앞쪽이 `dbauth`가 채워지기 전 상태다. 뒤쪽은 채워져 있다.
+
+### 4.8 권한 검사 세트 (`task_auth_check`)
+
+다른 세트는 모두 `admin`으로 실행하므로, task별 필요 권한(`task_info[]`,
+`ext_task_info[]`)과 `ext_ut_validate_auth()`의 사용자 권한 계산은 검증하지 못한다.
+`task_auth_check` 세트는 케이스마다 CMS 사용자를 만들고, 그 사용자로 로그인해 권한
+검사가 거부하는 task와 통과시키는 task를 확인한 뒤 사용자를 지운다.
+
+```sh
+./run_tests.sh task_auth_check.txt
+```
+
+케이스는 요청 배열이고, 목록에는 `,success`(status 전용)로 올린다. 요청마다 다음
+두 key를 쓸 수 있다.
+
+| key | 뜻 |
+| --- | --- |
+| `"token": "$CASE_LOGIN_TOKEN"` | 케이스 안에서 마지막으로 성공한 `login`의 토큰으로 보낸다. 없으면 러너의 `admin` 토큰 |
+| `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
+
+판정 값은 `success`, `failure` 외에 다음을 쓸 수 있다.
+
+| 판정 | 통과 조건 |
+| --- | --- |
+| `denied` | 권한 검사가 거부함 (`status` failure, `note`가 `The user don't have authority to execute the task`로 시작) |
+| `allowed` | 권한 검사가 거부하지 않음. task 자체는 실패해도 된다 |
+| `any` | 판정하지 않음 (실패할 수 있는 사전 정리) |
+
+실제로 실행되면 안 되는 task(`createdb`, `runscript`, `deletebroker` 등)는 **필수
+파라미터를 빼고** 보낸다. 권한 검사가 잘못 통과시켜도 task가 `ERR_PARAM_MISSING`으로
+멈추므로 아무것도 바뀌지 않고, `denied`가 아니므로 케이스는 실패한다. `allowed`도 같은
+방법으로 권한 검사 통과만 확인한다.
+
+| 케이스 | 사용자 | 확인하는 것 |
+| --- | --- | --- |
+| `auth_legacy_none` | 기존 API, 세 권한 모두 none | AU_ANY 조회는 성공, `createdb`·`adddbmtuser`(DBC)·`runscript`·`getadminloginfo`(ADMIN) 거부, 기본 부여된 DBO로 `removestatustemplate` 통과 |
+| `auth_legacy_dbcreate` | 기존 API, `dbcreate=admin` | `createdb` 통과, `getadminloginfo` 거부 |
+| `auth_new_mon` | `_new` API, `mon`만 yes | MON task 통과, DBO·JOB 기본 부여 없음(`deletebroker`·`createdb`·`runsqlstatement`·`readprivatedata` 거부) |
+| `auth_mixed_update` | `_new` API로 만든 뒤 기존 API로 변경 | 변경한 항목만 `user_auth`에 반영, `user_auth=0`이면 AU_ANY task만 실행 |
+| `auth_deleted_user` | 기존 API | 사용자를 지우면 남은 토큰으로 task를 실행할 수 없음 |
+
+케이스가 중간에 멈춰 사용자가 남아도, 다음 실행의 첫 요청(`deletedbmtuser`, `any`)이
+지운다. 사용자 이름은 `authtest_`로 시작한다.
 
 ---
 

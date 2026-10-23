@@ -1,0 +1,81 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_mon",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_mon",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "yes",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_mon",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getbrokersinfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "get_mon_interval",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "removestatustemplate",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "allowed"
+ },
+ {
+  "task": "deletebroker",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "createdb",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "authtest_nodb",
+  "test_expect": "denied"
+ },
+ {
+  "task": "runsqlstatement",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "readprivatedata",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_mon"
+ }
+]
