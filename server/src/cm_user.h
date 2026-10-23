@@ -119,6 +119,32 @@ int dbmt_user_add_dbinfo (T_DBMT_USER_INFO *usrinfo,
 			  T_DBMT_USER_DBINFO *dbinfo);
 
 /*
+ * CMS authority of a user, as checked by ext_ut_validate_auth ().
+ * The values are AU_* bits (T_USER_AUTH, cm_job_task.h).
+ *
+ * dbmt_user_get_user_auth () - true if the user has a user_auth entry
+ *   (written by adddbmtuser_new/updatedbmtuser_new). Its value is stored in
+ *   *auth and is used as it is, even when it is 0.
+ * dbmt_user_legacy_auth_bits () - bits derived from the entries the legacy
+ *   API (adddbmtuser/updatedbmtuser) writes: dbcreate=admin -> AU_DBC,
+ *   unicas=admin -> AU_BRK, statusmonitorauth=admin -> AU_MON. Any other
+ *   value (monitor, none, empty) gives no bit.
+ * dbmt_user_effective_auth () - user_auth if the entry exists; otherwise the
+ *   legacy bits plus AU_DBO | AU_JOB, which the manual's three authorities do
+ *   not cover and legacy accounts have always been allowed. The user named
+ *   "admin" always has AU_ADMIN.
+ * dbmt_user_sync_user_auth () - the legacy API changed the legacy entries
+ *   whose bits are in changed_mask (a subset of AU_DBC | AU_BRK | AU_MON).
+ *   If the user also has a user_auth entry, recompute those bits in it (and
+ *   in the dbc/brk/mon yes/no entries, if present) so the change takes
+ *   effect; other bits are kept. Does nothing for a user without user_auth.
+ */
+bool dbmt_user_get_user_auth (const T_DBMT_USER_INFO *usrinfo, unsigned int *auth);
+unsigned int dbmt_user_legacy_auth_bits (const T_DBMT_USER_INFO *usrinfo);
+unsigned int dbmt_user_effective_auth (const T_DBMT_USER_INFO *usrinfo);
+void dbmt_user_sync_user_auth (T_DBMT_USER_INFO *usrinfo, unsigned int changed_mask);
+
+/*
  * dbmt_user_new_token_info () - add a new session keyed by token_enc.
  *   Several sessions may exist for the same user_id. Expired sessions are
  *   purged first; if the user is already at the per-user limit the

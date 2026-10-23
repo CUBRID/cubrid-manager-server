@@ -2220,7 +2220,7 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
     }
 
-  if ((casauth != NULL) || (dbcreate != NULL))
+  if ((casauth != NULL) || (dbcreate != NULL) || (status_monitor != NULL))
     {
       usr_authinfo =
 	      (T_DBMT_USER_AUTHINFO *) increase_capacity (usr_authinfo,
@@ -2351,6 +2351,17 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 				    usr_authinfo[j].domain, usr_authinfo[j].auth);
 	  }
       }
+
+    /*
+     * The legacy items are merged into authinfo, but an account that also has
+     * a user_auth entry (made or changed by the *_new API) is checked by
+     * user_auth only. Recompute the bits of the changed items in user_auth so
+     * the change takes effect.
+     */
+    dbmt_user_sync_user_auth (&dbmt_user.user_info[usr_index],
+			      (dbcreate != NULL ? AU_DBC : 0)
+			      | (casauth != NULL ? AU_BRK : 0)
+			      | (status_monitor != NULL ? AU_MON : 0));
 
     /* db info */
     if (dbmt_user.user_info[usr_index].dbinfo == NULL)

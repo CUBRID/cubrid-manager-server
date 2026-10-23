@@ -477,6 +477,149 @@ dbmt_user_set_authinfo (T_DBMT_USER_AUTHINFO *authinfo, const char *domain,
   strcpy_limit (authinfo->auth, auth, sizeof (authinfo->auth));
 }
 
+static T_DBMT_USER_AUTHINFO *
+find_authinfo (const T_DBMT_USER_INFO *usrinfo, const char *domain)
+{
+  for (int i = 0; i < usrinfo->num_authinfo; i++)
+    {
+      if (strcmp (usrinfo->authinfo[i].domain, domain) == 0)
+	{
+	  return &usrinfo->authinfo[i];
+	}
+    }
+  return NULL;
+}
+
+static bool
+authinfo_is (const T_DBMT_USER_INFO *usrinfo, const char *domain,
+	     const char *value)
+{
+  T_DBMT_USER_AUTHINFO *ai = find_authinfo (usrinfo, domain);
+
+  return ai != NULL && strcmp (ai->auth, value) == 0;
+}
+
+bool
+dbmt_user_get_user_auth (const T_DBMT_USER_INFO *usrinfo, unsigned int *auth)
+{
+  T_DBMT_USER_AUTHINFO *ai;
+
+  if (usrinfo == NULL)
+    {
+      return false;
+    }
+
+  ai = find_authinfo (usrinfo, "user_auth");
+  if (ai == NULL)
+    {
+      return false;
+    }
+
+  if (auth != NULL)
+    {
+      *auth = (unsigned int) strtoul (ai->auth, NULL, 10);
+    }
+  return true;
+}
+
+unsigned int
+dbmt_user_legacy_auth_bits (const T_DBMT_USER_INFO *usrinfo)
+{
+  unsigned int auth = 0;
+
+  if (usrinfo == NULL)
+    {
+      return 0;
+    }
+
+  if (authinfo_is (usrinfo, "dbcreate", "admin"))
+    {
+      auth |= AU_DBC;
+    }
+  if (authinfo_is (usrinfo, "unicas", "admin"))
+    {
+      auth |= AU_BRK;
+    }
+  if (authinfo_is (usrinfo, "statusmonitorauth", "admin"))
+    {
+      auth |= AU_MON;
+    }
+
+  return auth;
+}
+
+unsigned int
+dbmt_user_effective_auth (const T_DBMT_USER_INFO *usrinfo)
+{
+  unsigned int auth = 0;
+
+  if (usrinfo == NULL)
+    {
+      return 0;
+    }
+
+  if (!dbmt_user_get_user_auth (usrinfo, &auth))
+    {
+      /* legacy account: no user_auth entry */
+      auth = dbmt_user_legacy_auth_bits (usrinfo) | AU_DBO | AU_JOB;
+    }
+
+  if (strcmp (usrinfo->user_name, "admin") == 0)
+    {
+      auth |= AU_ADMIN;
+    }
+
+  return auth;
+}
+
+void
+dbmt_user_sync_user_auth (T_DBMT_USER_INFO *usrinfo, unsigned int changed_mask)
+{
+  static const struct
+  {
+    unsigned int bit;
+    const char *domain;
+  } bit_domains[] =
+  {
+    {AU_DBC, "dbc"},
+    {AU_BRK, "brk"},
+    {AU_MON, "mon"}
+  };
+  T_DBMT_USER_AUTHINFO *ai;
+  unsigned int auth, legacy;
+
+  changed_mask &= (AU_DBC | AU_BRK | AU_MON);
+  if (usrinfo == NULL || changed_mask == 0)
+    {
+      return;
+    }
+
+  ai = find_authinfo (usrinfo, "user_auth");
+  if (ai == NULL)
+    {
+      return;
+    }
+
+  legacy = dbmt_user_legacy_auth_bits (usrinfo);
+  auth = (unsigned int) strtoul (ai->auth, NULL, 10);
+  auth = (auth & ~changed_mask) | (legacy & changed_mask);
+  snprintf (ai->auth, sizeof (ai->auth), "%u", auth);
+
+  for (size_t i = 0; i < sizeof (bit_domains) / sizeof (bit_domains[0]); i++)
+    {
+      if ((changed_mask & bit_domains[i].bit) == 0)
+	{
+	  continue;
+	}
+      ai = find_authinfo (usrinfo, bit_domains[i].domain);
+      if (ai != NULL)
+	{
+	  strcpy_limit (ai->auth, (auth & bit_domains[i].bit) ? "yes" : "no",
+			sizeof (ai->auth));
+	}
+    }
+}
+
 void
 dbmt_user_set_userinfo (T_DBMT_USER_INFO *usrinfo, const char *user_name,
 			const char *user_passwd, int num_authinfo,

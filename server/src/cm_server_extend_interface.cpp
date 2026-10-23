@@ -2768,7 +2768,6 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
       Json::Value dbauth;
       Json::Value json_value;
       string user_auth;
-      ostringstream tmp_oss;
 
       if (dbmt_user.user_info[i].user_name[0] == '\0')
 	{
@@ -2842,9 +2841,9 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
 
       authority_list.append (json_value);
 
-      tmp_oss << AU_ADMIN;
+      /* test the AU_ADMIN bit, not the whole value */
       if (!strcasecmp (dbmt_user.user_info[i].user_name, "admin") ||
-	  user_auth == tmp_oss.str())
+	  (!user_auth.empty () && (strtoul (user_auth.c_str (), NULL, 10) & AU_ADMIN)))
 	{
 	  user["user_auth"] = "admin";
 	}
@@ -3022,18 +3021,29 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, "none");
 }
 
+/*
+ * ext_ut_validate_auth () - check that the caller (_ID, set from the session)
+ *   may run the requested task.
+ *
+ *   The user's authority comes from dbmt_user_effective_auth (): the
+ *   user_auth entry if it exists (even 0), otherwise bits computed from the
+ *   legacy unicas/dbcreate/statusmonitorauth entries plus AU_DBO | AU_JOB.
+ *   There is no "give everything" fallback any more.
+ *
+ *   The user must still exist in cmdb.pass. AU_ADMIN may run every task.
+ *   A task whose required authority is AU_ANY needs only an authenticated
+ *   user; any other task needs at least one of its required bits.
+ */
 bool ext_ut_validate_auth (Json::Value &request)
 {
-  T_USER_AUTH auth_task = 0;
+  T_USER_AUTH auth_task = AU_ANY;
   T_USER_AUTH auth_user = 0;
   T_DBMT_USER dbmt_user;
-  T_DBMT_USER_AUTHINFO *auth_info = NULL;
 
   string task;
   string user_id;
 
   char dbmt_error[DBMT_ERROR_MSG_SIZE];
-  int num_authinfo = 0;
 
   if (request["task"].asString() == "login" || request["task"].asString() == "getcmsenv")
     {
@@ -3065,45 +3075,26 @@ bool ext_ut_validate_auth (Json::Value &request)
     {
       if (strcmp (dbmt_user.user_info[index].user_name, user_id.c_str()) == 0)
 	{
-	  auth_info = dbmt_user.user_info[index].authinfo;
-	  num_authinfo = dbmt_user.user_info[index].num_authinfo;
+	  auth_user = dbmt_user_effective_auth (&dbmt_user.user_info[index]);
 	  matches = true;
-	  break;
-	}
-    }
-
-  // the user doesn't exist
-  if (!matches)
-    {
-      dbmt_user_free (&dbmt_user);
-      return false;
-    }
-
-  for (int index = 0; index < num_authinfo; ++index)
-    {
-      if (!strcmp (auth_info[index].domain, "user_auth"))
-	{
-	  istringstream (string (auth_info[index].auth)) >> auth_user;
 	  break;
 	}
     }
 
   dbmt_user_free (&dbmt_user);
 
-  // assign default authority to old users.
-  if (auth_user == 0)
+  // the user doesn't exist
+  if (!matches)
     {
-      if (user_id == "admin")
-	{
-	  auth_user = AU_ADMIN;
-	}
-      else
-	{
-	  auth_user = ALL_AUTHORITY;
-	}
+      return false;
     }
 
-  if (auth_user == AU_ADMIN || auth_task == AU_ANY) // AU_ANY tasks require only an authenticated user
+  if (auth_user & AU_ADMIN)
+    {
+      return true;
+    }
+
+  if (auth_task == AU_ANY) // AU_ANY tasks require only an authenticated user
     {
       return true;
     }
