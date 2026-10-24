@@ -12062,7 +12062,7 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_dirname (src_dir, false, _dbmt_error) || !is_authorized_dirname (dest_dir, true, _dbmt_error))
+  if (!is_authorized_dirname (src_dir, FOR_READ, _dbmt_error) || !is_authorized_dirname (dest_dir, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12089,7 +12089,11 @@ ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_dirname (src_dir, false, _dbmt_error))
+  /*
+   * the whole tree is deleted: it must not hold a protected file, and must
+   * not be $CUBRID/bin or under it
+   */
+  if (!is_authorized_dirname (src_dir, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }

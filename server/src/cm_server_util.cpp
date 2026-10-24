@@ -5296,11 +5296,11 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
 
 /*
  * is_authorized_dirname () - as is_authorized_filename (), and no protected
- * file under the directory; with is_write_target, the directory must also
- * not overlap $CUBRID/bin. For tasks that copy or delete a directory tree.
+ * file under the directory; with FOR_WRITE, the directory must also not
+ * overlap $CUBRID/bin. For tasks that copy or delete a directory tree.
  */
 bool
-is_authorized_dirname (const char *path, bool is_write_target, char *_dbmt_error)
+is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
 {
   std::string expanded_path;
 
@@ -5316,7 +5316,7 @@ is_authorized_dirname (const char *path, bool is_write_target, char *_dbmt_error
       return false;
     }
 
-  if (is_write_target && overlaps_cubrid_bin (expanded_path))
+  if (access == FOR_WRITE && overlaps_cubrid_bin (expanded_path))
     {
       set_path_error (_dbmt_error, "writing under $CUBRID/bin is not allowed", path);
       return false;
