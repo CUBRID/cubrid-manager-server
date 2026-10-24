@@ -11,6 +11,9 @@ Delete transactions, and return the rest of the transactions information.
 | dbname | database name |
 | type | options from killtransaction command. |
 | parameter | a paramter according to the option in "type" field |
+| dbpasswd | DBA password of the database (optional). Without it, the password of the DB login saved in this session by `dbmtuserlogin` is used |
+
+* `_DBPASSWD`: older clients send the DBA password under this internal name. For compatibility CMS still takes it as `dbpasswd` (a `dbpasswd` in the same request wins). This will be removed in the next release; send `dbpasswd`.
 
 type:
 
