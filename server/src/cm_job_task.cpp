@@ -12062,7 +12062,8 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_dirname (src_dir, FOR_READ, _dbmt_error) || !is_authorized_dirname (dest_dir, FOR_WRITE, _dbmt_error))
+  if (!is_authorized_dirname (src_dir, FOR_READ, _dbmt_error)
+      || !is_authorized_dirname (dest_dir, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
