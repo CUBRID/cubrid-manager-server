@@ -8270,7 +8270,18 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  /*
+   * killtran needs only the DBA password. Take it from the request's own
+   * dbpasswd (CUBRID Admin's _DBPASSWD arrives here as dbpasswd, see
+   * cub_accept_legacy_db_keys ()); without one, fall back to the DB login
+   * the request processing filled in (_DBPASSWD: this session's login, or
+   * empty). The decision there uses dbpasswd only together with dbuser, so
+   * a password sent alone would otherwise be ignored.
+   */
+  if ((dbpasswd = nv_get_val (req, "dbpasswd")) == NULL)
+    {
+      dbpasswd = nv_get_val (req, "_DBPASSWD");
+    }
 
   if ((type = nv_get_val (req, "type")) == NULL)
     {

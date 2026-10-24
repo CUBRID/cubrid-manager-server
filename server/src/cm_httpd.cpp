@@ -240,6 +240,51 @@ cub_strip_internal_keys (Json::Value &node)
     }
 }
 
+/*
+ * cub_accept_legacy_db_keys () - compatibility for clients that still send
+ *   the DB login as internal keys.
+ *
+ * CUBRID Admin sends loaddb with _DBID/_DBPASSWD and killtransaction with
+ * _DBPASSWD. Internal keys are stripped from every request, so take these
+ * over as the public keys dbuser/dbpasswd first; the request processing then
+ * hands them to the task as before. Only top-level string values of these
+ * two tasks are taken, a public key the request already has wins, and
+ * nothing else is accepted: internal keys anywhere else are still dropped.
+ *
+ * TODO: remove in the next release, once CUBRID Admin sends dbuser/dbpasswd.
+ */
+static void
+cub_accept_legacy_db_key (Json::Value &root, const char *legacy_key,
+			  const char *public_key)
+{
+  if (root.isMember (legacy_key) && root[legacy_key].isString ()
+      && !root.isMember (public_key))
+    {
+      root[public_key] = root[legacy_key].asString ();
+    }
+}
+
+static void
+cub_accept_legacy_db_keys (Json::Value &root)
+{
+  if (!root.isObject () || !root.isMember ("task") || !root["task"].isString ())
+    {
+      return;
+    }
+
+  const std::string task = root["task"].asString ();
+
+  if (task == "loaddb")
+    {
+      cub_accept_legacy_db_key (root, "_DBID", "dbuser");
+      cub_accept_legacy_db_key (root, "_DBPASSWD", "dbpasswd");
+    }
+  else if (task == "killtransaction")
+    {
+      cub_accept_legacy_db_key (root, "_DBPASSWD", "dbpasswd");
+    }
+}
+
 void
 cub_add_private_param (struct evhttp_request *req, Json::Value &root)
 {
@@ -311,8 +356,16 @@ cub_generic_request_handler (struct evhttp_request *req, void *arg)
       return;
     }
 
-  /* Drop any '_'-prefixed key the client sent (at any nesting level) before
-   * the server injects its own. After this point every '_' key is server-set. */
+  /*
+   * Take over the DB login keys older clients send for loaddb and
+   * killtransaction before they are dropped below (compatibility).
+   */
+  cub_accept_legacy_db_keys (root);
+
+  /*
+   * Drop any '_'-prefixed key the client sent (at any nesting level) before
+   * the server injects its own. After this point every '_' key is server-set.
+   */
   cub_strip_internal_keys (root);
 
   cub_add_private_param (req, root);
