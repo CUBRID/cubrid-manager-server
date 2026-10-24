@@ -279,6 +279,7 @@ typedef unsigned int T_USER_AUTH;
 
 enum
 {
+  AU_ANY = 0,			/* authenticated users only; no specific role */
   AU_DBC = 1,
   AU_DBO = 2,
   AU_BRK = 4,
@@ -430,7 +431,6 @@ int ts_logout (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_cms_env (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_keepalive (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error);
-int ts_job_test (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_dbs_spaceInfo (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_shard_start (nvplist *req, nvplist *res, char *err_buf);
 int ts_shard_stop (nvplist *req, nvplist *res, char *err_buf);

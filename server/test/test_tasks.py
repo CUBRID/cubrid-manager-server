@@ -261,6 +261,47 @@ timeout_fallbacks = []
 runtime_vars = {}
 helper_procs = []
 
+# Authorization checks (task_auth_check): a request of a case can run as a
+# CMS user the case itself logged in as, and can expect the authority check to
+# refuse or let it through, see do_one_job () and judged_status ().
+#
+#   "token": "$CASE_LOGIN_TOKEN"   send with the token of the last successful
+#                                  "login" request of the same case, instead of
+#                                  the runner's own (admin) token
+#   "test_expect": "<verdict>"     expectation of this request only; the key is
+#                                  removed before the request is sent
+#   "test_note": "<text>"          the response note must also contain <text>
+#                                  (removed before sending); tells a refusal
+#                                  apart from any other failure
+#
+# Besides "success" and "failure", the verdict can be
+#   denied   refused by the authority check (the note below)
+#   allowed  not refused by it; the task itself may still fail, which is how a
+#            case checks a task it must not really run (bad parameters)
+#   any      not judged (setup or cleanup that may legitimately fail)
+CASE_LOGIN_TOKEN = "$CASE_LOGIN_TOKEN"
+DENIED_NOTE = "The user don't have authority to execute the task"
+
+
+def is_denied(data):
+    return (data.get("status") == "failure"
+            and str(data.get("note", "")).startswith(DENIED_NOTE))
+
+
+def judged_status(data, expected, note_text=None):
+    """The value compared with `expected` for a response `data`."""
+    if note_text is not None and note_text not in str(data.get("note", "")):
+        # Right status for the wrong reason is not a pass.
+        return "%s (note without %r)" % (data.get("status"), note_text)
+    if expected == "denied":
+        return "denied" if is_denied(data) else data.get("status")
+    if expected == "allowed":
+        return "denied" if is_denied(data) else "allowed"
+    if expected == "any":
+        return "any"
+    return data.get("status")
+
+
 # The manager server serves cm_port over TLS with a self signed certificate,
 # so the certificate of the host under test is not verified here.
 ssl_context = ssl._create_unverified_context()
@@ -441,7 +482,7 @@ def follow_job(name, data, token):
 
 
 def send_one(name, req, token, expected="success", casefile="",
-             must_be_sync=False):
+             must_be_sync=False, note_text=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -485,15 +526,16 @@ def send_one(name, req, token, expected="success", casefile="",
             # The final result is recorded as usual. Under --strict-timeout,
             # do_one_job() turns it into a failure once the case is judged and
             # prints that verdict instead of this status line.
-            record(name, casefile, task, data.get("status"),
+            record(name, casefile, task,
+                   judged_status(data, expected, note_text),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
             return data
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
-    record(name, casefile, task, data.get("status"), data.get("note", ""),
-           expected, body, quiet=file_check)
+    record(name, casefile, task, judged_status(data, expected, note_text),
+           data.get("note", ""), expected, body, quiet=file_check)
     return data
 
 
@@ -531,13 +573,20 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     """
     before = len(results)
     request = load_task(taskfile)
-    if isinstance(request, list):
-        for index, req in enumerate(request):
-            data = send_one("%s[%d]" % (name, index), req, token, expected,
-                            taskfile, must_be_sync)
-    else:
-        data = send_one(name, request, token, expected, taskfile,
-                        must_be_sync)
+    # Token of the last successful "login" in this case, for the requests
+    # that ask for it with "$CASE_LOGIN_TOKEN" (see CASE_LOGIN_TOKEN).
+    case_token = ""
+    requests = request if isinstance(request, list) else [request]
+    for index, req in enumerate(requests):
+        req_expected = req.pop("test_expect", expected)
+        req_note = req.pop("test_note", None)
+        req_token = case_token if req.get("token") == CASE_LOGIN_TOKEN else token
+        label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
+        data = send_one(label, req, req_token, req_expected, taskfile,
+                        must_be_sync, req_note)
+        if (req.get("task") == "login" and data.get("status") == "success"
+                and data.get("token")):
+            case_token = data["token"]
     # An array case sends several requests; its answer covers all of them, in
     # order, so that the file is the record of the whole case.
     entries = results[before:]

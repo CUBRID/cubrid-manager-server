@@ -1,0 +1,48 @@
+[
+ {
+  "task": "resetlog",
+  "token": "",
+  "path": "$CUBRID/log/manager/conlist",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/log/manager/conlist",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "conlist",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "removelog",
+  "token": "",
+  "files": [
+   {
+    "path": "$CUBRID/log/manager/conlist"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_nosuchdir",
+  "destdir": "$CUBRID/conf",
+  "test_expect": "failure",
+  "test_note": "the directory contains a protected file"
+ }
+]

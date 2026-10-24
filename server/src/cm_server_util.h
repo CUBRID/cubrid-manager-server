@@ -433,6 +433,14 @@ bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 bool is_authorized_filename (const char *path, char *_dbmt_error);
+bool is_authorized_write_filename (const char *path, char *_dbmt_error);
+/* how a file task uses a directory tree, for is_authorized_dirname () */
+typedef enum
+{
+  FOR_READ = 0,			/* the tree is read (copied from) */
+  FOR_WRITE = 1			/* the tree is written (copied into, deleted) */
+} T_DIR_ACCESS;
+bool is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string &name);
 std::string expand_env_path (const std::string &path);

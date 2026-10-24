@@ -1,0 +1,46 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_gone",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_gone",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_gone",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getbrokersinfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_gone"
+ },
+ {
+  "task": "getbrokersinfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "failure"
+ }
+]

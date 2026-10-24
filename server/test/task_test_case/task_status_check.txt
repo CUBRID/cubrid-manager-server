@@ -310,6 +310,12 @@ runscript
 getfiletotallinenum
 keepalive
 
+// session regression: sessions now live in an in-memory map keyed by token
+// (CBRD-27691). Touch the session with keepalive, then confirm the same token
+// still resolves to a live session on the next request.
+keepalive_session
+getcmsenv_after_keepalive
+
 // monitoring statistic 
 get_mon_interval
 set_mon_interval

@@ -157,7 +157,6 @@ using namespace std;
 #endif
 #define MAX_TRIES_FIND_CHILD_PID 20
 
-extern T_USER_TOKEN_INFO *user_token_info;
 
 typedef struct
 {
@@ -2100,6 +2099,9 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
     dbmt_user_write_pass_locked (&dbmt_user, _dbmt_error);
   }
 
+  /* The user is gone: drop every session of it, so its tokens stop working. */
+  dbmt_user_delete_all_sessions_of_user (dbmt_id);
+
   /* add dblist */
   retval = ut_get_dblist (res, 0);
   if (retval != ERR_NO_ERROR)
@@ -2221,7 +2223,7 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 
     }
 
-  if ((casauth != NULL) || (dbcreate != NULL))
+  if ((casauth != NULL) || (dbcreate != NULL) || (status_monitor != NULL))
     {
       usr_authinfo =
 	      (T_DBMT_USER_AUTHINFO *) increase_capacity (usr_authinfo,
@@ -2353,6 +2355,17 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
 	  }
       }
 
+    /*
+     * The legacy items are merged into authinfo, but an account that also has
+     * a user_auth entry (made or changed by the *_new API) is checked by
+     * user_auth only. Recompute the bits of the changed items in user_auth so
+     * the change takes effect.
+     */
+    dbmt_user_sync_user_auth (&dbmt_user.user_info[usr_index],
+			      (dbcreate != NULL ? AU_DBC : 0)
+			      | (casauth != NULL ? AU_BRK : 0)
+			      | (status_monitor != NULL ? AU_MON : 0));
+
     /* db info */
     if (dbmt_user.user_info[usr_index].dbinfo == NULL)
       {
@@ -2440,7 +2453,7 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   T_DBMT_USER dbmt_user;
   int i, retval, usr_index;
-  char *dbmt_id, *new_passwd;
+  char *dbmt_id, *new_passwd, *requester_id;
   char file[PATH_MAX];
 
   if ((dbmt_id = nv_get_val (req, "targetid")) == NULL)
@@ -2460,6 +2473,16 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * _ID is the caller, set from the session; a client cannot supply it
+   * (cub_strip_internal_keys ()).
+   */
+  if ((requester_id = nv_get_val (req, "_ID")) == NULL)
+    {
+      sprintf (_dbmt_error, "%s", "_ID");
+      return ERR_PARAM_MISSING;
+    }
+
   {
     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
 
@@ -2473,6 +2496,33 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       {
 	return retval;
       }
+
+    /*
+     * Every user may change his own password; only a user with AU_ADMIN may
+     * change another user's (admin's included). The task itself is AU_ANY.
+     */
+    if (strcmp (dbmt_id, requester_id) != 0)
+      {
+	unsigned int requester_auth = 0;
+
+	for (i = 0; i < dbmt_user.num_dbmt_user; i++)
+	  {
+	    if (strcmp (dbmt_user.user_info[i].user_name, requester_id) == 0)
+	      {
+		requester_auth = dbmt_user_effective_auth (&dbmt_user.user_info[i]);
+		break;
+	      }
+	  }
+
+	if ((requester_auth & AU_ADMIN) == 0)
+	  {
+	    dbmt_user_free (&dbmt_user);
+	    snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		      "Only an admin user can change the password of another user.");
+	    return ERR_WITH_MSG;
+	  }
+      }
+
     usr_index = -1;
     for (i = 0; i < dbmt_user.num_dbmt_user; i++)
       {
@@ -2569,9 +2619,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
   char targetdir[PATH_MAX];
   char extvolfile[COMPOSED_PATH_MAX];
   char createdb_err_file[PATH_MAX];
-  char *ip, *port;
   T_DBMT_USER dbmt_user;
-  T_DBMT_CON_DBINFO con_dbinfo;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   const char *argv[20];
   int argc = 0;
@@ -3082,12 +3130,11 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       }
   }
 
-  /* add dbinfo to conlist */
-  memset (&con_dbinfo, 0, sizeof (con_dbinfo));
-  dbmt_con_set_dbinfo (&con_dbinfo, dbname, "dba", "");
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
-  dbmt_con_write_dbinfo (&con_dbinfo, ip, port, dbname, 1, _dbmt_error);
+  /*
+   * Store the new database's DB login (user "dba", empty password) in the
+   * caller's session, not in conlist.
+   */
+  dbmt_user_session_set_dblogin (nv_get_val (req, "token"), dbname, "dba", "");
 
   /* restore warn out of space value */
   if (0)
@@ -8223,7 +8270,18 @@ ts_killtran (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  dbpasswd = nv_get_val (req, "_DBPASSWD");
+  /*
+   * killtran needs only the DBA password. Take it from the request's own
+   * dbpasswd (CUBRID Admin's _DBPASSWD arrives here as dbpasswd, see
+   * cub_accept_legacy_db_keys ()); without one, fall back to the DB login
+   * the request processing filled in (_DBPASSWD: this session's login, or
+   * empty). The decision there uses dbpasswd only together with dbuser, so
+   * a password sent alone would otherwise be ignored.
+   */
+  if ((dbpasswd = nv_get_val (req, "dbpasswd")) == NULL)
+    {
+      dbpasswd = nv_get_val (req, "_DBPASSWD");
+    }
 
   if ((type = nv_get_val (req, "type")) == NULL)
     {
@@ -10924,11 +10982,9 @@ cmd_dbmt_user_login (nvplist *in, nvplist *out, char *_dbmt_error)
 int
 tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  char hexacoded[PASSWD_ENC_LENGTH];
   int ret;
-  T_DBMT_CON_DBINFO con_dbinfo;
   char *dbname, *dbpasswd, *dbuser;
-  char *ip, *port;
+  char *token;
 
   ret = cmd_dbmt_user_login (req, res, _dbmt_error);
   if (ret != ERR_NO_ERROR)
@@ -10936,8 +10992,7 @@ tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
       return ret;
     }
 
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
+  token = nv_get_val (req, "token");
   dbname = nv_get_val (req, "dbname");
   dbpasswd = nv_get_val (req, "dbpasswd");
   dbuser = nv_get_val (req, "dbuser");
@@ -10950,12 +11005,17 @@ tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  /* update dbinfo to conlist */
-  uEncrypt (PASSWD_LENGTH, dbpasswd, hexacoded);
-  memset (&con_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
-  dbmt_con_set_dbinfo (&con_dbinfo, dbname, dbuser, hexacoded);
-  if (dbmt_con_write_dbinfo (&con_dbinfo, ip, port, dbname, 1, _dbmt_error) < 0)
+  /*
+   * Store the DB login in the caller's session, not on disk.
+   * It is keyed by dbname and used only for later requests of this same
+   * session; conlist no longer carries DB credentials.
+   */
+  if (!dbmt_user_session_set_dblogin (token, dbname,
+				      dbuser ? dbuser : "",
+				      dbpasswd ? dbpasswd : ""))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
+		"Failed to store the DB login in the session.");
       return ERR_WITH_MSG;
     }
 
@@ -12002,7 +12062,8 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (src_dir, _dbmt_error) || !is_authorized_filename (dest_dir, _dbmt_error))
+  if (!is_authorized_dirname (src_dir, FOR_READ, _dbmt_error)
+      || !is_authorized_dirname (dest_dir, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12029,7 +12090,11 @@ ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (src_dir, _dbmt_error))
+  /*
+   * the whole tree is deleted: it must not hold a protected file, and must
+   * not be $CUBRID/bin or under it
+   */
+  if (!is_authorized_dirname (src_dir, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12058,7 +12123,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (conf_path, _dbmt_error))
+  if (!is_authorized_write_filename (conf_path, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12497,31 +12562,6 @@ ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_INVALID_TOKEN;
     }
 
-  return ERR_NO_ERROR;
-}
-
-int
-ts_job_test (nvplist *req, nvplist *res, char *_dbmt_error)
-{
-  int i;
-  nvplist *cli_response;
-  const char *argvs[2];
-  char outfile[] = "outfile.test";
-  char errfile[] = "errfile.test";
-
-  cli_response = nv_create (5, NULL, "\n", ":", "\n");
-  for (i = ERR_NO_ERROR; i <= ERR_WARNING; i++)
-    {
-      uGenerateStatus (req, cli_response, i, "test error");
-    }
-
-  nv_destroy (cli_response);
-  argvs[0] = "ping";
-  argvs[1] = NULL;
-
-  run_child_env (argvs, RUN_FOREGROUND, "infile.test", outfile, errfile, &i);
-  unlink ("outfile.test");
-  unlink ("errfile.test");
   return ERR_NO_ERROR;
 }
 

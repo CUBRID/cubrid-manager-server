@@ -247,6 +247,7 @@ uReadSystemConfig (void)
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
   strncpy (sco.szTokenActiveTime, "7200", PATH_MAX);
+  strncpy (sco.szMaxSessionsPerUser, "16", PATH_MAX);
   snprintf (sco.szCWMPath, PATH_MAX, "%s%s", sco.szCubrid,
 	    DEFAULT_CWM_PATH_SHORT);
 
@@ -455,6 +456,11 @@ uReadSystemConfig (void)
 	{
 	  ut_trim (ent_val);
 	  snprintf (sco.szTokenActiveTime, PATH_MAX, "%s", ent_val);
+	}
+      else if (strcasecmp (ent_name, "max_sessions_per_user") == 0)
+	{
+	  ut_trim (ent_val);
+	  snprintf (sco.szMaxSessionsPerUser, PATH_MAX, "%s", ent_val);
 	}
     }
   fclose (conf_file);

@@ -1,0 +1,17 @@
+// CMS authority checks (CBRD-27691).
+// Each case creates its own CMS user as admin, logs in as that user
+// ("token":"$CASE_LOGIN_TOKEN"), checks what the authority check refuses
+// ("test_expect":"denied") or lets through ("allowed"/"success"), and
+// deletes the user again. See README.md 4.8.
+auth_legacy_none,success
+auth_legacy_dbcreate,success
+auth_new_mon,success
+auth_mixed_update,success
+auth_deleted_user,success
+auth_setdbmtpasswd,success
+auth_new_admin,success
+
+// Protected files and $CUBRID/bin (run as admin: the limits apply to everyone)
+file_protected_read,success
+file_protected_write,success
+file_cubrid_bin,success

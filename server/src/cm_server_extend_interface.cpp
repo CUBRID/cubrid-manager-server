@@ -61,61 +61,37 @@ using namespace std;
 #define MAX_TIME_LENGTH 10
 
 
-extern T_USER_TOKEN_INFO *user_token_info;
 static T_EXTEND_TASK_INFO ext_task_info[] =
 {
-  {"getsysdiskinfo", 0, ext_get_sys_diskinfo, ALL_AUTHORITY},
-  {"getprocstat", 0, ext_get_proc_info, ALL_AUTHORITY},
+  {"getsysdiskinfo", 0, ext_get_sys_diskinfo, AU_ANY},
+  {"getprocstat", 0, ext_get_proc_info, AU_ANY},
   {"setloglevel", 0, ext_set_log_level, AU_DBC | AU_DBO | AU_MON},
   {"setautostart", 0, ext_set_auto_start, AU_DBC | AU_DBO | AU_JOB},
-  {"getautostart", 0, ext_get_auto_start, ALL_AUTHORITY},
-  {"getautojobconf", 0, ext_get_autojob_conf, ALL_AUTHORITY},
+  {"getautostart", 0, ext_get_auto_start, AU_ANY},
+  {"getautojobconf", 0, ext_get_autojob_conf, AU_ANY},
   {"setautojobconf", 0, ext_set_autojob_conf, AU_DBC | AU_DBO | AU_JOB},
-  {"execautostart", 0, ext_exec_auto_start, ALL_AUTHORITY},
-  {"getdberrorlog", 0, ext_get_db_err_log, ALL_AUTHORITY},
-  {"getbrokerlog", 0, ext_get_broker_start_log, ALL_AUTHORITY},
-  {"sendmail", 0, ext_send_mail, ALL_AUTHORITY},
+  {"execautostart", 0, ext_exec_auto_start, AU_DBC | AU_DBO},
+  {"getdberrorlog", 0, ext_get_db_err_log, AU_ANY},
+  {"getbrokerlog", 0, ext_get_broker_start_log, AU_ANY},
+  {"sendmail", 0, ext_send_mail, AU_DBC | AU_DBO | AU_MON},
   {"automail", 0, ext_exec_auto_mail, AU_DBC | AU_DBO | AU_MON},
-  {"readprivatedata", 0, ext_read_private_data, ALL_AUTHORITY},
+  {"readprivatedata", 0, ext_read_private_data, AU_DBC | AU_DBO | AU_BRK},
   {"writeprivatedata", 0, ext_write_private_data, AU_DBC | AU_DBO | AU_BRK},
   {"setautoexecquery", 0, ext_set_autoexec_query, AU_DBC | AU_DBO | AU_JOB},
-  {"gethaapplyinfo", 0, ext_get_ha_apply_info, ALL_AUTHORITY},
-  {"adddbmtuser_new", 0, ext_add_dbmt_user_new, AU_DBC},
-  {"updatedbmtuser_new", 0, ext_update_dbmt_user_new, AU_DBC | AU_DBO},
+  {"gethaapplyinfo", 0, ext_get_ha_apply_info, AU_ANY},
+  {"adddbmtuser_new", 0, ext_add_dbmt_user_new, AU_ADMIN},
+  {"updatedbmtuser_new", 0, ext_update_dbmt_user_new, AU_ADMIN},
   {"getdbmtuserinfo_new", 0, ext_get_dbmt_user_info_new, AU_DBC | AU_DBO},
-  {"get_mon_interval", 0, ext_get_mon_interval, AU_MON},
+  {"get_mon_interval", 0, ext_get_mon_interval, AU_ANY},
   {"set_mon_interval", 0, ext_set_mon_interval, AU_ADMIN},
-  {"get_mon_statistic", 0, ext_get_mon_statistic, AU_MON},
+  {"get_mon_statistic", 0, ext_get_mon_statistic, AU_ANY},
   {"getserverstatus", 0, ext_get_server_status, AU_ADMIN},
-  {"getserverinfo", 0, ext_get_server_info, ALL_AUTHORITY},
+  {"getserverinfo", 0, ext_get_server_info, AU_ANY},
   {NULL, 0, NULL, 0}
 };
 
 static int count_and_get_last_word (string str, char *word);
 static int is_invalid_time (char *str);
-
-static bool
-ext_get_id_from_token (const char *token, char token_content[][TOKEN_LENGTH+1])
-{
-  char tmp_token[TOKEN_LENGTH+1];
-  char *tmp_token_content[3];
-
-  uDecrypt (TOKEN_LENGTH, token, tmp_token);
-
-  if (string_tokenize2 (tmp_token, tmp_token_content, 3, ':') < 0)
-    {
-      return false;
-    }
-
-  // ip
-  strcpy (token_content[0], tmp_token_content[0]);
-  // port
-  strcpy (token_content[1], tmp_token_content[1]);
-  // id
-  strcpy (token_content[2], tmp_token_content[2]);
-
-  return true;
-}
 
 int
 build_server_header (Json::Value &response, const int status,
@@ -1532,7 +1508,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
   confname= request["confname"].asString();
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
-  if (!is_authorized_filename  (conf_path, _dbmt_error))
+  if (!is_authorized_write_filename (conf_path, _dbmt_error))
     {
       return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
     }
@@ -1639,7 +1615,6 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 {
   char autoexecquery_conf_file[PATH_MAX];
   char tmp_conf_file[PATH_MAX];
-  char token_content[3][TOKEN_LENGTH+1];
   char userpass[PASSWD_ENC_LENGTH];
   char line_buf[MAX_JOB_CONFIG_FILE_LINE_LENGTH];
   char _dbmt_error[DBMT_ERROR_MSG_SIZE];
@@ -1656,9 +1631,6 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
 
   autoexecquery_conf_file[0] = '\0';
   tmp_conf_file[0] = '\0';
-  token_content[0][0] = '\0';
-  token_content[1][0] = '\0';
-  token_content[2][0] = '\0';
   userpass[0] = '\0';
   line_buf[0] = '\0';
   _dbmt_error[0] = '\0';
@@ -1701,13 +1673,9 @@ int ext_set_autoexec_query (Json::Value &request, Json::Value &response)
   // dbname
   conf_item[0] = request["dbname"].asString();
 
-  // get manager id from token
-  if (!ext_get_id_from_token (request["token"].asString().c_str(), token_content))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN,
-				  "Request is rejected due to invalid token. Please reconnect.");
-    }
-  conf_item[4] = token_content[2];
+  /* The manager id was set from the session by ext_ut_validate_token (); the
+   * opaque token no longer encodes it. */
+  conf_item[4] = request["_ID"].asString();
 
   while (conf_file.getline (line_buf, sizeof (line_buf)))
     {
@@ -2800,7 +2768,6 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
       Json::Value dbauth;
       Json::Value json_value;
       string user_auth;
-      ostringstream tmp_oss;
 
       if (dbmt_user.user_info[i].user_name[0] == '\0')
 	{
@@ -2874,9 +2841,9 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
 
       authority_list.append (json_value);
 
-      tmp_oss << AU_ADMIN;
+      /* test the AU_ADMIN bit, not the whole value */
       if (!strcasecmp (dbmt_user.user_info[i].user_name, "admin") ||
-	  user_auth == tmp_oss.str())
+	  (!user_auth.empty () && (strtoul (user_auth.c_str (), NULL, 10) & AU_ADMIN)))
 	{
 	  user["user_auth"] = "admin";
 	}
@@ -2940,62 +2907,19 @@ static bool _validate_token_active_time (time_t &active_time)
   return true;
 }
 
-/*
- * Splits a decrypted token's plaintext ("client_ip:client_port:client_id:
- * proc_id:login_time" followed by '*' padding, see ut_token_generate () in
- * cm_server_util.cpp) into exactly 5 ':'-delimited fields.
- */
-static bool
-split_token (const char *token_dec, string out[5])
-{
-  istringstream iss (token_dec);
-  int i = 0;
-
-  while (i < 5 && getline (iss, out[i], ':'))
-    {
-      i++;
-    }
-
-  if (i != 5)
-    {
-      return false;
-    }
-
-  if (iss.peek () != char_traits<char>::eof ())
-    {
-      return false;
-    }
-
-  return true;
-}
-
 bool ext_ut_validate_token (const char *token)
 {
   T_USER_TOKEN_INFO token_info;
-  string token_enc;
-  string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   time_t now_time = time (0);
   time_t active_time;
-  char token_dec[TOKEN_LENGTH + 1];
 
   if (strlen (token) >= TOKEN_ENC_LENGTH)
     {
       return false;
     }
 
-  uDecrypt (TOKEN_LENGTH, token, token_dec);
-
-  if (!split_token (token_dec, token_content))
-    {
-      return false;
-    }
-
-  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
-    {
-      return false;
-    }
-
-  if (strcmp (token_info.token, token) != 0)
+  /* The token is opaque: it is valid iff it maps to a live session. */
+  if (!dbmt_user_search_token_info_by_token (token, &token_info))
     {
       return false;
     }
@@ -3010,11 +2934,7 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
-  /*
-   * re-finds the live node and bumps login_time only if it's still
-   * the same session validated above
-   */
-  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token, now_time))
+  if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return false;
     }
@@ -3028,10 +2948,8 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   T_USER_TOKEN_INFO token_info;
   string task;
   string token;
-  string token_content[5]; // client_ip, client_port, client_id, proc_id, login_time
   time_t now_time = time (0);
   time_t active_time;
-  char token_dec[TOKEN_LENGTH+1];
 
   if (request["task"].asString() == "login" || request["task"].asString() == "getcmsenv")
     {
@@ -3067,24 +2985,11 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  uDecrypt (TOKEN_LENGTH, token.c_str(), token_dec);
-
-  if (!split_token (token_dec, token_content))
+  /* The token is opaque: it is valid iff it maps to a live session. */
+  if (!dbmt_user_search_token_info_by_token (token.c_str(), &token_info))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
-
-  if (!dbmt_user_search_token_info (token_content[2].c_str(), &token_info))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
-    }
-
-
-  if (strcmp (token_info.token, token.c_str()))
-    {
-      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
-    }
-
 
   if (!_validate_token_active_time (active_time))
     {
@@ -3097,30 +3002,48 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
     }
 
   /* see the comment in the (const char *token) overload above */
-  if (!dbmt_user_touch_token_login_time (token_content[2].c_str(), token.c_str(), now_time))
+  if (!dbmt_user_touch_token_login_time_by_token (token.c_str(), now_time))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  request["_IP"] = token_content[0];
-  request["_PORT"] = token_content[1];
-  request["_ID"] = token_content[2];
+  /*
+   * Set the caller identity from the validated token. The client cannot have
+   * supplied these: cub_strip_internal_keys () removed every '_' key from the
+   * request before the server populated it, so this assignment is the single
+   * source of _IP/_PORT/_ID.
+   */
+  /* Identity comes from the session the token maps to, not from the token. */
+  request["_IP"] = token_info.user_ip;
+  request["_PORT"] = token_info.user_port;
+  request["_ID"] = token_info.user_id;
 
   return build_server_header (response, ERR_NO_ERROR, "none");
 }
 
+/*
+ * ext_ut_validate_auth () - check that the caller (_ID, set from the session)
+ *   may run the requested task.
+ *
+ *   The user's authority comes from dbmt_user_effective_auth (): the
+ *   user_auth entry if it exists (even 0), otherwise bits computed from the
+ *   legacy unicas/dbcreate/statusmonitorauth entries plus AU_DBO | AU_JOB.
+ *   There is no "give everything" fallback any more.
+ *
+ *   The user must still exist in cmdb.pass. AU_ADMIN may run every task.
+ *   A task whose required authority is AU_ANY needs only an authenticated
+ *   user; any other task needs at least one of its required bits.
+ */
 bool ext_ut_validate_auth (Json::Value &request)
 {
-  T_USER_AUTH auth_task = 0;
+  T_USER_AUTH auth_task = AU_ANY;
   T_USER_AUTH auth_user = 0;
   T_DBMT_USER dbmt_user;
-  T_DBMT_USER_AUTHINFO *auth_info = NULL;
 
   string task;
   string user_id;
 
   char dbmt_error[DBMT_ERROR_MSG_SIZE];
-  int num_authinfo = 0;
 
   if (request["task"].asString() == "login" || request["task"].asString() == "getcmsenv")
     {
@@ -3152,45 +3075,26 @@ bool ext_ut_validate_auth (Json::Value &request)
     {
       if (strcmp (dbmt_user.user_info[index].user_name, user_id.c_str()) == 0)
 	{
-	  auth_info = dbmt_user.user_info[index].authinfo;
-	  num_authinfo = dbmt_user.user_info[index].num_authinfo;
+	  auth_user = dbmt_user_effective_auth (&dbmt_user.user_info[index]);
 	  matches = true;
-	  break;
-	}
-    }
-
-  // the user doesn't exist
-  if (!matches)
-    {
-      dbmt_user_free (&dbmt_user);
-      return false;
-    }
-
-  for (int index = 0; index < num_authinfo; ++index)
-    {
-      if (!strcmp (auth_info[index].domain, "user_auth"))
-	{
-	  istringstream (string (auth_info[index].auth)) >> auth_user;
 	  break;
 	}
     }
 
   dbmt_user_free (&dbmt_user);
 
-  // assign default authority to old users.
-  if (auth_user == 0)
+  // the user doesn't exist
+  if (!matches)
     {
-      if (user_id == "admin")
-	{
-	  auth_user = AU_ADMIN;
-	}
-      else
-	{
-	  auth_user = ALL_AUTHORITY;
-	}
+      return false;
     }
 
-  if (auth_user == AU_ADMIN)
+  if (auth_user & AU_ADMIN)
+    {
+      return true;
+    }
+
+  if (auth_task == AU_ANY) // AU_ANY tasks require only an authenticated user
     {
       return true;
     }

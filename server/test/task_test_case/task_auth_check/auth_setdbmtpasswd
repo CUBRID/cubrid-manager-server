@@ -1,0 +1,137 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_pw_a",
+  "test_expect": "any"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_pw_b",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_pw_a",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_pw_b",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "yes",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "no",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_pw_b",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "setdbmtpasswd",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "authtest_pw_b",
+  "newpassword": "authtest1",
+  "test_expect": "success"
+ },
+ {
+  "task": "setdbmtpasswd",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "authtest_pw_a",
+  "newpassword": "authtest1",
+  "test_expect": "failure"
+ },
+ {
+  "task": "login",
+  "id": "authtest_pw_a",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "setdbmtpasswd",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "authtest_pw_a",
+  "newpassword": "authtest1",
+  "test_expect": "success"
+ },
+ {
+  "task": "setdbmtpasswd",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "authtest_pw_b",
+  "newpassword": "authtest1",
+  "test_expect": "failure"
+ },
+ {
+  "task": "setdbmtpasswd",
+  "token": "",
+  "targetid": "authtest_pw_a",
+  "newpassword": "authtest2",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "login",
+  "id": "authtest_pw_a",
+  "password": "authtest1",
+  "clientver": "8.4",
+  "test_expect": "failure"
+ },
+ {
+  "task": "login",
+  "id": "authtest_pw_a",
+  "password": "authtest2",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getbrokersinfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_pw_a"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_pw_b"
+ }
+]
