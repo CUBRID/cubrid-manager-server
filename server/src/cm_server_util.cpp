@@ -4701,6 +4701,28 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
   return ret;
 }
 
+/*
+ * has_stream_name () - Windows: a ':' anywhere but after the drive letter
+ *   names an NTFS alternate data stream (cm.pass:x, cm.pass::$DATA), another
+ *   way to reach a file that a plain path comparison does not catch. No
+ *   valid file name has one. Always false elsewhere.
+ */
+static bool
+has_stream_name (const std::string &path)
+{
+#if defined (WINDOWS)
+  size_t pos = path.find (':');
+
+  if (pos == 1 && std::isalpha ((unsigned char) path[0]))
+    {
+      pos = path.find (':', 2);
+    }
+  return pos != std::string::npos;
+#else
+  return false;
+#endif
+}
+
 bool
 is_valid_filename (const char *filename, std::string &expanded_path)
 {
@@ -4721,6 +4743,11 @@ is_valid_filename (const char *filename, std::string &expanded_path)
     }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  if (has_stream_name (expanded_path))
     {
       return false;
     }
@@ -4749,6 +4776,11 @@ is_valid_filename (const char *filename)
     }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  if (has_stream_name (expanded_path))
     {
       return false;
     }
@@ -5049,16 +5081,105 @@ protected_files (void)
   return files;
 }
 
+#if defined (WINDOWS)
 /*
- * resolve_path () - the path with symbolic links resolved, so that a link
- *   cannot stand in for a protected file or for $CUBRID/bin. A path that does
- *   not exist yet (a file about to be written) is resolved through its parent
- *   directory. Returns the path unchanged when it cannot be resolved.
+ * win_final_path () - the name Windows itself gives the existing file or
+ *   directory `path`: long names instead of 8.3 short names, the real case,
+ *   trailing dots and spaces dropped, and symbolic links and junctions
+ *   resolved. Without the "\\?\" prefix that GetFinalPathNameByHandle adds.
+ */
+static bool
+win_final_path (const std::string &path, std::string &final_path)
+{
+  char buf[PATH_MAX];
+  HANDLE h;
+  DWORD n;
+
+  /* access 0: only query the name; FILE_FLAG_BACKUP_SEMANTICS opens directories */
+  h = CreateFileA (path.c_str (), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+		   OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      return false;
+    }
+  n = GetFinalPathNameByHandleA (h, buf, sizeof (buf), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+  CloseHandle (h);
+  if (n == 0 || n >= sizeof (buf))
+    {
+      return false;
+    }
+
+  final_path = buf;
+  if (final_path.compare (0, 8, "\\\\?\\UNC\\") == 0)
+    {
+      final_path = "\\" + final_path.substr (7);
+    }
+  else if (final_path.compare (0, 4, "\\\\?\\") == 0)
+    {
+      final_path = final_path.substr (4);
+    }
+  return true;
+}
+#endif
+
+/*
+ * resolve_path () - the path the operating system really opens, so that
+ *   another spelling cannot stand in for a protected file or for $CUBRID/bin.
+ *   Linux: symbolic links resolved (realpath).
+ *   Windows: the name the file system gives the file (win_final_path ()), so
+ *   that 8.3 short names (CM~1.PAS), trailing dots or spaces (cm.pass.), case,
+ *   symbolic links and junctions all map to the same path.
+ *   A path that does not exist yet (a file about to be written) is resolved
+ *   through its parent directory. Returns the path unchanged when it cannot be
+ *   resolved.
  */
 static std::string
 resolve_path (const std::string &path)
 {
-#if !defined (WINDOWS)
+#if defined (WINDOWS)
+  char full[PATH_MAX];
+  DWORD n;
+  std::string final_path;
+
+  /* separators, "." and ".." and the trailing dots/spaces of the last part */
+  n = GetFullPathNameA (path.c_str (), sizeof (full), full, NULL);
+  if (n == 0 || n >= sizeof (full))
+    {
+      return path;
+    }
+  std::string normalized = full;
+
+  if (win_final_path (normalized, final_path))
+    {
+      return final_path;
+    }
+
+  size_t pos = normalized.find_last_of ('\\');
+  if (pos != std::string::npos && pos > 0)
+    {
+      std::string parent = normalized.substr (0, pos);
+      std::string last = normalized.substr (pos + 1);
+
+      if (parent.size () == 2 && parent[1] == ':')
+	{
+	  parent += '\\';		/* "C:" is the current directory of C:, not its root */
+	}
+      /* Windows drops them when it creates the file */
+      while (!last.empty () && (last.back () == '.' || last.back () == ' '))
+	{
+	  last.pop_back ();
+	}
+      if (win_final_path (parent, final_path))
+	{
+	  if (final_path.empty () || final_path.back () != '\\')
+	    {
+	      final_path += '\\';
+	    }
+	  return final_path + last;
+	}
+    }
+  return normalized;
+#else
   char buf[PATH_MAX];
 
   if (realpath (path.c_str (), buf) != NULL)
@@ -5075,8 +5196,8 @@ resolve_path (const std::string &path)
 	  return std::string (buf) + path.substr (pos);
 	}
     }
-#endif
   return path;
+#endif
 }
 
 /* the same path after normalization (is_subpath () both ways) */

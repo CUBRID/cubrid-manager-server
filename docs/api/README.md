@@ -108,6 +108,7 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 - These files are never read or written through a task, whatever the user's permission: `conf/cm.pass`, `conf/cmdb.pass`, `log/manager/conlist`, `conf/autojobs.conf`, `conf/autoexecquery.conf`, and the TLS key and certificate of CMS (`conf/cm_ssl_cert.key`, `conf/cm_ssl_cert.crt`). A request for one fails with `access to a protected file is not allowed`.
 - A task that copies or deletes a whole directory (`copyfolder`, `deletefolder`) refuses a directory that holds one of those files (`the directory contains a protected file`).
 - Tasks that write, empty or delete a file (`writeandsaveconf`, `writeprivatedata`, `resetlog`, `removelog`, the destination of `copyfolder`) and `deletefolder` refuse `$CUBRID/bin` and paths under it (`writing under $CUBRID/bin is not allowed`).
+- Both checks compare the file the operating system really opens, so another name for the same file does not get past them: a symbolic link, and on Windows also an 8.3 short name (`CM~1.PAS`), trailing dots or spaces (`cm.pass.`), a different case or a junction. On Windows a path with an alternate data stream (`cm.pass:x`, a `:` anywhere but after the drive letter) is refused as an invalid file name.
 
 ## Asynchronous Task Execution
 
