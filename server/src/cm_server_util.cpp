@@ -1387,6 +1387,33 @@ uRemoveDir (char *dir, int remove_file_in_dir)
 }
 
 #if defined(WINDOWS)
+/*
+ * folder_copy () does not follow links inside the tree. is_authorized_dirname
+ * () checked only the top source and destination directories, so a link
+ * below them must not lead the copy to a protected file (read) or under
+ * $CUBRID/bin (write).
+ *
+ * win_is_link_entry () - the entry found by FindFirstFile ()/FindNextFile ()
+ *   is a symbolic link or a junction. Other reparse points (deduplicated or
+ *   cloud files) are ordinary files and are copied.
+ */
+static bool
+win_is_link_entry (const WIN32_FIND_DATA *data)
+{
+  return (data->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+	 && (data->dwReserved0 == IO_REPARSE_TAG_SYMLINK
+	     || data->dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT);
+}
+
+/* `path` exists and is a reparse point (link, junction, ...) */
+static bool
+win_is_reparse_point (const char *path)
+{
+  DWORD attrs = GetFileAttributes (path);
+
+  return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT);
+}
+
 int
 folder_copy (const char *src_folder, const char *dest_folder)
 {
@@ -1449,15 +1476,25 @@ folder_copy (const char *src_folder, const char *dest_folder)
       snprintf (dest_path, PATH_MAX - 1, "%s/%s", dest_dir,
 		FileData.cFileName);
 
+      if (strcmp (FileData.cFileName, ".") == 0
+	  || strcmp (FileData.cFileName, "..") == 0)
+	{
+	  continue;
+	}
+
+      /*
+       * Do not follow links (see win_is_link_entry ()): a link or junction in
+       * the source fails the copy (creating one needs a privilege CMS may
+       * not have), and nothing is written through one in the destination.
+       */
+      if (win_is_link_entry (&FileData) || win_is_reparse_point (dest_path))
+	{
+	  goto err_clean_return;
+	}
+
       /* a directory may carry other attributes too (read-only, hidden, ...) */
       if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
-	  /* ignore folder "." and "..". */
-	  if (strcmp (FileData.cFileName, ".") == 0
-	      || strcmp (FileData.cFileName, "..") == 0)
-	    {
-	      continue;
-	    }
 
 	  if (folder_copy (src_path, dest_path) < 0)
 	    {
@@ -1558,21 +1595,64 @@ folder_copy (const char *src_folder, const char *dest_folder)
       char src_path[COMPOSED_PATH_MAX];
       char dest_path[COMPOSED_PATH_MAX];
 
+      struct stat dest_stat;
+
+      if (uStringEqual (dirp->d_name, ".")
+	  || uStringEqual (dirp->d_name, ".."))
+	{
+	  continue;
+	}
+
       snprintf (src_path, sizeof (src_path), "%s/%s", src_dir,
 		dirp->d_name);
       snprintf (dest_path, sizeof (dest_path), "%s/%s", dest_dir,
 		dirp->d_name);
 
-      stat (src_path, &statbuf);
-
-      if (S_ISDIR (statbuf.st_mode))
+      /*
+       * Do not follow symbolic links. is_authorized_dirname () checked only
+       * the top source and destination directories, so a link below them
+       * must not lead the copy to a protected file (read) or under
+       * $CUBRID/bin (write): lstat (), not stat (), and never write through
+       * a link that is already in the destination.
+       */
+      if (lstat (src_path, &statbuf) != 0)
 	{
-	  if (uStringEqual (dirp->d_name, ".")
-	      || uStringEqual (dirp->d_name, ".."))
-	    {
-	      continue;
-	    }
+	  goto err_clean_return;
+	}
+      if (lstat (dest_path, &dest_stat) == 0 && S_ISLNK (dest_stat.st_mode))
+	{
+	  goto err_clean_return;
+	}
 
+      if (S_ISLNK (statbuf.st_mode))
+	{
+	  /*
+	   * copy the link itself, as "cp -P" does; its target is not read. A
+	   * later file task on the copy resolves the link and is checked
+	   * against the protected files and $CUBRID/bin as usual.
+	   */
+	  char target[PATH_MAX];
+	  ssize_t len = readlink (src_path, target, sizeof (target) - 1);
+
+	  if (len < 0)
+	    {
+	      goto err_clean_return;
+	    }
+	  target[len] = '\0';
+	  if (lstat (dest_path, &dest_stat) == 0)
+	    {
+	      if (S_ISDIR (dest_stat.st_mode) || unlink (dest_path) != 0)
+		{
+		  goto err_clean_return;
+		}
+	    }
+	  if (symlink (target, dest_path) != 0)
+	    {
+	      goto err_clean_return;
+	    }
+	}
+      else if (S_ISDIR (statbuf.st_mode))
+	{
 	  if (folder_copy (src_path, dest_path) < 0)
 	    {
 	      goto err_clean_return;
