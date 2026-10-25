@@ -45,7 +45,6 @@
 #define DEFAULT_THREAD_NUM       8
 #define DEFAULT_CMS_PORT         8001
 
-#define DEFAULT_ALLOW_MULTI_CON  0    /* no */
 #define DEFAULT_AUTOJOB_TIMEOUT  43200    /* timeout for all autojobs, 12 hours */
 #define MIN_AUTOJOB_TIMEOUT      60    /* min timeout for all autojobs, 60 sec */
 
@@ -236,7 +235,6 @@ uReadSystemConfig (void)
 
   sco.iCMS_port = DEFAULT_CMS_PORT;
   sco.iMonitorInterval = DEFAULT_MONITOR_INTERVAL;
-  sco.iAllow_AdminMultiCon = DEFAULT_ALLOW_MULTI_CON;
   sco.iSupportMonStat = FALSE;
   sco.iHttpTimeout = 30;
   sco.iAsyncJobTtlSec = DEFAULT_ASYNC_JOB_TTL_SEC;
@@ -324,13 +322,16 @@ uReadSystemConfig (void)
       else if (strcasecmp (ent_name, "Allow_UserMultiCon") == 0 ||
 	       strcasecmp (ent_name, "allow_user_multi_connection") == 0)
 	{
-	  if (strcasecmp (ent_val, "yes") == 0)
+	  /*
+	   * No longer used: a user may always hold several sessions, and
+	   * max_sessions_per_user limits them. Say so when it asks for a
+	   * single session, so that the setting is not silently ignored.
+	   */
+	  if (strcasecmp (ent_val, "yes") != 0)
 	    {
-	      sco.iAllow_AdminMultiCon = 1;
-	    }
-	  else
-	    {
-	      sco.iAllow_AdminMultiCon = 0;
+	      ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : allow_user_multi_connection in cm.conf "
+						   "is no longer used. Set max_sessions_per_user=1 to allow one "
+						   "session per user.\n");
 	    }
 	}
       else if (strcasecmp (ent_name, "auto_job_timeout") == 0)

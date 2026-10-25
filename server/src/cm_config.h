@@ -606,7 +606,6 @@ typedef struct
   char szCWMPath[PATH_MAX];
   char szSSLKey[PATH_MAX];
   char szSSLCertificate[PATH_MAX];
-  int iAllow_AdminMultiCon;
   int iAutoJobTimeout;
   int iCMS_port;
   int iSupportMonStat;

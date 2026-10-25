@@ -865,8 +865,8 @@ session_active_time_unlocked (void)
 }
 
 /*
- * session_max_per_user_unlocked () - the configured max_sessions_per_user;
- *   allow_user_multi_connection = NO pins it to 1 (single session per user).
+ * session_max_per_user_unlocked () - the configured max_sessions_per_user
+ *   (1 for one session per user).
  *   An invalid value stops CMS at startup (uCheckSystemConfig ()), so the
  *   clamp to [1, 64] here is only a safeguard.
  */
@@ -879,10 +879,6 @@ session_max_per_user_unlocked (void)
 {
   int n = SESSION_DEFAULT_PER_USER;
 
-  if (sco.iAllow_AdminMultiCon == 0)
-    {
-      return 1;
-    }
   if (sco.szMaxSessionsPerUser[0] != '\0')
     {
       n = atoi (sco.szMaxSessionsPerUser);
