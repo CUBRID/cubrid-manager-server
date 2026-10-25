@@ -2,6 +2,8 @@
 
 The backupvolinfo interface will get database backup volume information.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

@@ -2,6 +2,8 @@
 
 The startbroker interface starts all brokers of databases.
 
+Permissions required to run this task: one of DBC, DBO, BRK
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

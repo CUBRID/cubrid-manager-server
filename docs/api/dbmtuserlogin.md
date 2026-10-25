@@ -2,6 +2,8 @@
 
 The dbmtuserlogin interface will create a session to be accessed by a manager user.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

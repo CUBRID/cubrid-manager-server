@@ -2,6 +2,8 @@
 
 Get the information of tables from a database.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

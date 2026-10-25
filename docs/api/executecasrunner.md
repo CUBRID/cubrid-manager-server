@@ -9,6 +9,8 @@ The statements to be replayed are given in one of two ways. When `executelogfile
 
 The broker port is taken from `cubrid_broker.conf`, using `brokername`.
 
+Permissions required to run this task: one of DBC, DBO, BRK, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

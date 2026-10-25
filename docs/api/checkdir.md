@@ -5,6 +5,8 @@ only the directories that do not exist (or that CMS is not allowed to access) ar
 back in the `noexist` key. A request whose directories all exist returns success without
 any `noexist` key.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

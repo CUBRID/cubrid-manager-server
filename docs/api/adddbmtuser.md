@@ -2,6 +2,8 @@
 
 The adddbmtuser interface will create a new database manager user.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

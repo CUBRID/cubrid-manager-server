@@ -4,6 +4,8 @@ Get the volume information of several databases at once. It returns, for every d
 `dblist`, the same information as [dbspaceinfo](dbspaceinfo.md). A database which cannot be read
 is skipped, it does not make the whole request fail.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

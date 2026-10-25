@@ -2,6 +2,8 @@
 
 Runs `cubrid heartbeat stop` command.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

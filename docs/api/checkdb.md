@@ -2,6 +2,8 @@
 
 Check consistency of database.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

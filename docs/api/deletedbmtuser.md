@@ -2,6 +2,8 @@
 
 The deletedbmtuser interface deletes a specified manager user.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

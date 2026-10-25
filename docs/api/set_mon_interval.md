@@ -2,6 +2,8 @@
 
 Set the monitoring statistic interval
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

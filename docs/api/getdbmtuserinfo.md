@@ -2,6 +2,8 @@
 
 The getdbmtuserinfo interface will fetch CUBRID Manager user information.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

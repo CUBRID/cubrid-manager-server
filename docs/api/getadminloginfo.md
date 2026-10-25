@@ -2,6 +2,8 @@
 
 Get admin login logs.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

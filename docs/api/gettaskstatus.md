@@ -2,6 +2,8 @@
 
 Check the status of a task asynchronously running
 
+Permissions required to run this task: none (only the user who started the job gets its result)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

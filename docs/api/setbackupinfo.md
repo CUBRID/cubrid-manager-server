@@ -2,6 +2,8 @@
 
 Add an auto-backup plan
 
+Permissions required to run this task: one of DBC, DBO, JOB
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

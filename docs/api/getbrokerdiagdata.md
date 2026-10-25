@@ -2,6 +2,8 @@
 
 Get broker status.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

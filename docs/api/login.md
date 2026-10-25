@@ -2,6 +2,8 @@
 
 Create a session by manager user.
 
+Permissions required to run this task: none (no login required)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

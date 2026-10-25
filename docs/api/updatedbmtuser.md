@@ -2,6 +2,8 @@
 
 The updatedbmtuser interface will update DBMT user information.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

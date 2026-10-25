@@ -8,6 +8,8 @@ Every unloaded file is reported with its path and its modification time, separat
 semicolon: `<path>;<YYYY.MM.DD HH:MM>`. A file which has been deleted since it was unloaded is
 not reported.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

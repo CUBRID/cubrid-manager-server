@@ -2,6 +2,8 @@
 
 The backupdb interface will create a database backup file.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

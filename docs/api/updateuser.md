@@ -2,6 +2,8 @@
 
 Update database user information.
 
+Permissions required to run this task: DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

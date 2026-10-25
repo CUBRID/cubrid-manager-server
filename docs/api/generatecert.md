@@ -8,6 +8,8 @@ CMS must be restarted for the new certificate to be used.
 [getcmsenv](getcmsenv.md) reports, in `is_default_cert`, whether the certificate in use is still
 the default one.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

@@ -2,6 +2,8 @@
 
 Get monitoring statistic data.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 Get DB monitoring statistic data(HA monitoring data is included)

@@ -2,6 +2,8 @@
 
 Change active status on broker.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

@@ -2,6 +2,8 @@
 
 Delete database user.
 
+Permissions required to run this task: DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

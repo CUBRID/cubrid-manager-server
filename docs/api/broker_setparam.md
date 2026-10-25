@@ -2,6 +2,8 @@
 
 Update broker.conf file.
 
+Permissions required to run this task: one of DBC, DBO, BRK
+
 ## Request JSON Syntax
 
 | **Key**  | **Description**             |

@@ -2,6 +2,8 @@
 
 The analyzecaslog interface will fetch a top list to parse broker SQL log(s) with the broker_log_top utility.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

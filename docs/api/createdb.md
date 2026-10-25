@@ -2,6 +2,8 @@
 
 Create database.
 
+Permissions required to run this task: DBC
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

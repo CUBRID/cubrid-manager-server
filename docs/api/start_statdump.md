@@ -2,6 +2,8 @@
 
 Activate *background* statdump process to accumulate values per seconds, to stop it use [stop_statdump](stop_statdump.md)
 
+Permissions required to run this task: one of DBC, DBO, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

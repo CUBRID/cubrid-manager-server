@@ -2,6 +2,8 @@
 
 Delete transactions, and return the rest of the transactions information.
 
+Permissions required to run this task: one of DBC, DBO, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
