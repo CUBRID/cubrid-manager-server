@@ -32,6 +32,9 @@
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
 
+#define MIN_MAX_SESSIONS_PER_USER       1       /* max_sessions_per_user: range and default */
+#define MAX_MAX_SESSIONS_PER_USER       64
+#define DEFAULT_MAX_SESSIONS_PER_USER   16
 #define MAX_NUM_ASYNC_TASK_LIMIT        12
 #define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
 

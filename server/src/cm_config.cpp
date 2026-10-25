@@ -137,6 +137,7 @@ sys_config sco;
 
 static int check_file (char *fname, char *pname);
 static int check_path (char *path, char *pname);
+static int check_max_sessions_per_user (void);
 
 void
 sys_config_init (void)
@@ -247,7 +248,7 @@ uReadSystemConfig (void)
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
   strncpy (sco.szTokenActiveTime, "7200", PATH_MAX);
-  strncpy (sco.szMaxSessionsPerUser, "16", PATH_MAX);
+  snprintf (sco.szMaxSessionsPerUser, PATH_MAX, "%d", DEFAULT_MAX_SESSIONS_PER_USER);
   snprintf (sco.szCWMPath, PATH_MAX, "%s%s", sco.szCubrid,
 	    DEFAULT_CWM_PATH_SHORT);
 
@@ -459,6 +460,7 @@ uReadSystemConfig (void)
 	}
       else if (strcasecmp (ent_name, "max_sessions_per_user") == 0)
 	{
+	  /* checked in uCheckSystemConfig () */
 	  ut_trim (ent_val);
 	  snprintf (sco.szMaxSessionsPerUser, PATH_MAX, "%s", ent_val);
 	}
@@ -498,6 +500,11 @@ uCheckSystemConfig (char *progname)
   if (progname == NULL)
     {
       fprintf (stderr, "progname should not be NULL.\n");
+      return -1;
+    }
+
+  if (check_max_sessions_per_user () < 0)
+    {
       return -1;
     }
 
@@ -959,6 +966,37 @@ auto_conf_execquery_delete_by_dbuser (const char *target_db_uid)
 
   if (move_file (tmpfile_path, conf_file_path) < 0)
     {
+      return -1;
+    }
+
+  return 0;
+}
+
+/*
+ * check_max_sessions_per_user () - max_sessions_per_user of cm.conf must be
+ *   an integer from MIN_MAX_SESSIONS_PER_USER to MAX_MAX_SESSIONS_PER_USER.
+ *   Any other value is an error and CMS does not start: it limits the
+ *   sessions of every user, so a typo must not be replaced silently by some
+ *   other limit.
+ */
+static int
+check_max_sessions_per_user (void)
+{
+  char err_buf[DBMT_ERROR_MSG_SIZE];
+  const char *val = sco.szMaxSessionsPerUser;
+  char *end = NULL;
+  long n;
+
+  errno = 0;
+  n = strtol (val, &end, 10);
+  if (val[0] == '\0' || end == NULL || *end != '\0' || errno == ERANGE
+      || n < MIN_MAX_SESSIONS_PER_USER || n > MAX_MAX_SESSIONS_PER_USER)
+    {
+      snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+		"CUBRID Manager Server : invalid max_sessions_per_user in cm.conf (%s). "
+		"It must be an integer from %d to %d.\n",
+		val, MIN_MAX_SESSIONS_PER_USER, MAX_MAX_SESSIONS_PER_USER);
+      ut_record_cubrid_utility_log_stderr (err_buf);
       return -1;
     }
 

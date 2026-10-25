@@ -864,13 +864,14 @@ session_active_time_unlocked (void)
 }
 
 /*
- * session_max_per_user_unlocked () - the configured max_sessions_per_user,
- *   clamped to [1, 64]; 16 when unset/invalid. allow_user_multi_connection =
- *   NO pins it to 1 (single session per user).
+ * session_max_per_user_unlocked () - the configured max_sessions_per_user;
+ *   allow_user_multi_connection = NO pins it to 1 (single session per user).
+ *   An invalid value stops CMS at startup (uCheckSystemConfig ()), so the
+ *   clamp to [1, 64] here is only a safeguard.
  */
-#define SESSION_MIN_PER_USER 1
-#define SESSION_MAX_PER_USER 64
-#define SESSION_DEFAULT_PER_USER 16
+#define SESSION_MIN_PER_USER MIN_MAX_SESSIONS_PER_USER
+#define SESSION_MAX_PER_USER MAX_MAX_SESSIONS_PER_USER
+#define SESSION_DEFAULT_PER_USER DEFAULT_MAX_SESSIONS_PER_USER
 
 static int
 session_max_per_user_unlocked (void)
