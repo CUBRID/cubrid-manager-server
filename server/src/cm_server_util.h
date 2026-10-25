@@ -395,7 +395,8 @@ void _ut_timeval_diff (struct timeval *start, struct timeval *end,
 		       int *res_msec);
 char *ut_token_generate (char *client_ip, char *client_port,
 			 char *dbmt_id, int proc_id, time_t login_time);
-void _accept_connection (nvplist *cli_request, nvplist *cli_response);
+int _accept_connection (nvplist *cli_request, nvplist *cli_response,
+			char *_dbmt_error);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif

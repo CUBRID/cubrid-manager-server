@@ -12535,7 +12535,10 @@ ts_login (nvplist *req, nvplist *res, char *_dbmt_error)
   /* set _ID token for ut_error_log & ut_access_log.  */
   nv_add_nvp (req, "_ID", value);
 
-  _accept_connection (req, res);
+  if ((ret_val = _accept_connection (req, res, _dbmt_error)) != ERR_NO_ERROR)
+    {
+      return ret_val;
+    }
 
   ut_access_log (req, "connected");
 

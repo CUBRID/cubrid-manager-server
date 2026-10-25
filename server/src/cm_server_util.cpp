@@ -2797,11 +2797,20 @@ ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
   return token_string;
 }
 
-void
-_accept_connection (nvplist *cli_request, nvplist *cli_response)
+/*
+ * _accept_connection () - create the session of a successful login.
+ *   The token is generated, the session is registered under it, and only
+ *   then is the token put in the response, so a client never gets a token
+ *   without a session behind it.
+ *   return: ERR_NO_ERROR, or an error code with _dbmt_error set; the login
+ *   then fails.
+ */
+int
+_accept_connection (nvplist *cli_request, nvplist *cli_response, char *_dbmt_error)
 {
   char *pstrbuf;
   char *client_ip, *client_port, *client_id, *client_ver;
+  int retval;
 #ifdef WINDOWS
   HANDLE proc_id = (HANDLE) getpid ();
 #else
@@ -2815,20 +2824,40 @@ _accept_connection (nvplist *cli_request, nvplist *cli_response)
   client_id = nv_get_val (cli_request, "id");
   client_ver = nv_get_val (cli_request, "clientver");
 
-  /* generate token and record new connection to file */
-  pstrbuf =
-	  ut_token_generate (client_ip, client_port, client_id, getpid (),
-			     login_time);
-  nv_add_nvp (cli_response, "token", pstrbuf);
-
-  dbmt_con_add (client_ip, client_port, client_ver, client_id);
+  /*
+   * NULL when RAND_bytes () fails (no entropy), when an argument is missing,
+   * or when memory runs out. Never fall back to a weaker token: refuse the
+   * login.
+   */
+  pstrbuf = ut_token_generate (client_ip, client_port, client_id, getpid (),
+			       login_time);
+  if (pstrbuf == NULL)
+    {
+      ut_error_log (cli_request, "failed to generate a session token.");
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"Failed to create a session. Please try again.");
+      return ERR_WITH_MSG;
+    }
 
   ut_access_log (cli_request, "before add token into token list.");
-  dbmt_user_new_token_info (client_id, client_ip, client_port, pstrbuf,
-			    proc_id, login_time);
+  retval = dbmt_user_new_token_info (client_id, client_ip, client_port, pstrbuf,
+				     proc_id, login_time);
+  if (retval != ERR_NO_ERROR)
+    {
+      ut_error_log (cli_request, "failed to register the session.");
+      free (pstrbuf);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"Failed to create a session. Please try again.");
+      return ERR_WITH_MSG;
+    }
+
+  /* record the new connection to file */
+  dbmt_con_add (client_ip, client_port, client_ver, client_id);
+
+  nv_add_nvp (cli_response, "token", pstrbuf);
 
   free (pstrbuf);
-  return;
+  return ERR_NO_ERROR;
 }
 
 

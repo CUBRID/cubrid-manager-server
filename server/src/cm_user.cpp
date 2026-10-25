@@ -35,6 +35,7 @@
 #include <map>
 #include <string>
 #include <utility>
+#include <new>
 
 #include "cm_porting.h"
 #include "cm_config.h"
@@ -976,7 +977,16 @@ dbmt_user_new_token_info (const char *user_id,
   purge_expired_unlocked (login_time);
   evict_lru_if_over_limit_unlocked (user_id);
 
-  cm_session &sess = g_sessions[token_enc];
+  std::map<std::string, cm_session>::iterator it;
+  try
+    {
+      it = g_sessions.insert (std::make_pair (std::string (token_enc), cm_session ())).first;
+    }
+  catch (const std::bad_alloc &)
+    {
+      return ERR_MEM_ALLOC;
+    }
+  cm_session &sess = it->second;
 
   memset (&sess.info, 0, sizeof (sess.info));
   strncpy (sess.info.user_id, user_id, sizeof (sess.info.user_id) - 1);
