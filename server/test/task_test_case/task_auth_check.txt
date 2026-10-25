@@ -22,6 +22,7 @@ resp_no_mail_password,success
 
 // Internal keys and sessions
 auth_internal_keys,success
+auth_nested_task,success
 session_multi,success
 session_nested_token,success
 // assumes max_sessions_per_user=16 (default)

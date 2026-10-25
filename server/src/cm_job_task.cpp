@@ -9128,7 +9128,7 @@ ts_trigger_operation (nvplist *req, nvplist *res, char *_dbmt_error)
   input_file[0] = '\0';
   cubrid_err_file[0] = '\0';
 
-  task = nv_get_val (req, "task");
+  task = nv_get_val (req, "_TASK");
   if (task != NULL)
     {
       if (strcmp (task, "addtrigger") == 0)

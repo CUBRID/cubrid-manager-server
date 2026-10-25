@@ -101,6 +101,8 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 
 Keys starting with `_` (`_ID`, `_DBID`, `_DBPASSWD`, ...) are reserved for values the server sets. A client must not send them: CMS removes them from a request at every nesting level before processing it. Send the DB login as `dbuser`/`dbpasswd`. (For compatibility, `loaddb` and `killtransaction` still take `_DBID`/`_DBPASSWD` for one more release; see their documents.)
 
+A request is a JSON object, and `task` is a top-level string. CMS runs that task only; a `task` inside a nested object does not change which task runs, and neither does a `token` inside one change the session.
+
 ## File Access
 
 Tasks that take a file or directory path accept only paths under `$CUBRID` and `$CUBRID_DATABASES`, and in addition:

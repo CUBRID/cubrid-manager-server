@@ -306,7 +306,8 @@ ch_process_request (nvplist *req, nvplist *res)
 
   memset (_dbmt_error, 0, sizeof (_dbmt_error));
 
-  task = nv_get_val (req, "task");
+  /* the checked task, see cub_cm_request_handler (); not the nvplist "task" */
+  task = nv_get_val (req, "_TASK");
   dbname = nv_get_val (req, "dbname");
   //charset = nv_get_val (req, "charset");
 
@@ -1871,6 +1872,13 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
   bool want_async = false;
   bool dispatched = false;
   string task_name;
+
+  if (!request["task"].isString ())
+    {
+      build_server_header (response, ERR_PARAM_MISSING, "Parameter(task) missing in the request.");
+      return 1;
+    }
+  request["_TASK"] = request["task"].asString ();
 
   {
     /*

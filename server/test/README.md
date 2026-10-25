@@ -568,6 +568,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `resp_no_user_password` | admin | `getdbmtuserinfo`·`getdbmtuserinfo_new`와 사용자 관리 task 응답에 CMS 사용자 비밀번호(`@passwd`, 평문)가 없음 |
 | `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
 | `auth_internal_keys` | 기존 API, 권한 none | 최상위·중첩 객체·배열 안에 `_ID: admin`을 넣어 보내도 `getadminloginfo`가 거부됨 |
+| `auth_nested_task` | 기존 API, 권한 none | 최상위 `task`(`getcmsenv`, `login`, `keepalive`) 옆 중첩 객체에 `task: deletedbmtuser`를 넣어도 최상위 task만 실행되고 사용자는 지워지지 않음. 문자열이 아닌 `task`는 거부 |
 | `session_multi` | 기존 API | 같은 ID로 두 번 로그인하면 두 토큰 모두 동작, logout은 그 세션만 닫음, 사용자 삭제 시 남은 세션도 닫힘 |
 | `session_nested_token` | 기존 API | 세션 1의 토큰으로 보내는 `logout`의 중첩 객체 `a.token`에 세션 2의 토큰을 넣어도, 닫히는 것은 검증된 세션 1이고 세션 2는 계속 동작 |
 | `session_limit` | 기존 API | 17번 로그인하면 가장 오래 쓰지 않은 첫 세션이 닫히고 나머지는 동작. `max_sessions_per_user`=16(기본)을 전제로 한다 |

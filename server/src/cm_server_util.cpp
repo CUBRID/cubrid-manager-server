@@ -761,7 +761,9 @@ ut_error_log (nvplist *req, const char *errmsg)
   const char *id, *addr, *task;
   char strbuf[512];
 
-  if ((task = nv_get_val (req, "task")) == NULL)
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  if ((task = nv_get_val (req, "_TASK")) == NULL
+      && (task = nv_get_val (req, "task")) == NULL)
     {
       task = "-";
     }
@@ -801,7 +803,9 @@ ut_access_log (nvplist *req, const char *msg)
 
   strbuf[0] = '\0';
 
-  if ((task = nv_get_val (req, "task")) == NULL)
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  if ((task = nv_get_val (req, "_TASK")) == NULL
+      && (task = nv_get_val (req, "task")) == NULL)
     {
       task = "-";
     }
