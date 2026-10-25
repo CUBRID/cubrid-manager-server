@@ -328,15 +328,6 @@ ch_process_request (nvplist *req, nvplist *res)
   if (!is_no_token_cmd (task_code))
     {
       /*
-      if (ut_validate_token (req) == 0)
-      {
-      retval = ERR_INVALID_TOKEN;
-      uGenerateStatus (req, res, retval, _dbmt_error);
-      return 0;
-      }
-      */
-
-      /*
        * If a database name is specified, decide the DB login for
        * this request:
        * (1) the request's own dbuser/dbpasswd, otherwise

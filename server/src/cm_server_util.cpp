@@ -2747,67 +2747,6 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
 }
 
 
-/* validate token and insert id */
-int
-ut_validate_token (nvplist *req)
-{
-  T_USER_TOKEN_INFO token_info;
-
-  time_t active_time = 0;
-  time_t now_time = time (NULL);
-
-  //int retval;
-
-  char *token;
-
-  if (!strcmp (nv_get_val (req, "task"), "login") ||
-      !strcmp (nv_get_val (req, "task"), "getcmsenv"))
-    {
-      ut_access_log (req, "task = login or getcmsenv.");
-      return 1;
-    }
-
-  if ((token = nv_get_val (req, "token")) == NULL)
-    {
-      return 0;
-    }
-  ut_access_log (req, "task != login or getcmsenv.");
-
-  /*
-   * The token is opaque: it is valid iff it maps to a live session, and the
-   * caller identity comes from that session, not from the token.
-   */
-  if (!dbmt_user_search_token_info_by_token (token, &token_info))
-    {
-      ut_access_log (req, "can't find registered token.");
-      return 0;
-    }
-
-  ut_access_log (req, token_info.user_id);
-
-  ut_get_token_active_time (&active_time);
-
-  if (now_time - token_info.login_time > active_time)
-    {
-      return 0;
-    }
-
-  if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
-    {
-      return 0;
-    }
-
-  nv_add_nvp (req, "_IP", token_info.user_ip);
-  nv_add_nvp (req, "_PORT", token_info.user_port);
-  nv_add_nvp (req, "_ID", token_info.user_id);
-
-
-  /* check if ip is an existing ip */
-  //retval = dbmt_con_search (ip, port, cli_ver);
-
-  return 1;
-}
-
 /*
  *   client ip : client port : dbmt id : pserver pid
  *      15            5           8           5      = 33 + 4 = 37
@@ -3856,54 +3795,6 @@ IsValidUserName (const char *pUserName)
 	  return -1;
 	}
     }
-  return 0;
-}
-
-int
-ut_get_token_active_time (time_t *active_time)
-{
-  char file_name[PATH_MAX];
-  char line_buf[LINE_MAX];
-  FILE *in_file = NULL;
-  char *pos = NULL;
-
-  file_name[0] = '\0';
-  line_buf[0] = '\0';
-
-  conf_get_dbmt_file (FID_DBMT_CONF, file_name);
-  in_file = fopen (file_name, "r");
-
-  if (in_file == NULL)
-    {
-      return 1;
-    }
-
-  *active_time = 0;
-  while (fgets (line_buf, LINE_MAX, in_file) != NULL)
-    {
-      if (line_buf[0] == '#')
-	{
-	  continue;
-	}
-
-      if ((pos = strstr (line_buf, "=")) != NULL &&
-	  strstr (line_buf, "token_active_time") != NULL)
-	{
-	  char tmp_str[LINE_MAX];
-	  strcpy (tmp_str, pos + 1);
-
-	  *active_time = atoi (tmp_str);
-
-	  break;
-	}
-    }
-  fclose (in_file);
-
-  if (*active_time == 0)
-    {
-      *active_time = 7200;
-    }
-
   return 0;
 }
 

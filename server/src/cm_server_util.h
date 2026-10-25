@@ -391,7 +391,6 @@ char *nt_style_path (char *path, char *new_path_buf);
 int _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd);
 void uGenerateStatus (nvplist *req, nvplist *res, int retval,
 		      const char *_dbmt_error);
-int ut_validate_token (nvplist *req);
 void _ut_timeval_diff (struct timeval *start, struct timeval *end,
 		       int *res_msec);
 char *ut_token_generate (char *client_ip, char *client_port,
@@ -413,7 +412,6 @@ void env_mutex_lock (void);
 void env_mutex_unlock (void);
 
 int IsValidUserName (const char *pUserName);
-int ut_get_token_active_time (time_t *active_time);
 int remove_extra_subdir (const char *dirpath, const char *pattern,
 			 unsigned int save_num);
 int ut_get_filename (char *fullpath, int with_ext, char *ret_filename);
