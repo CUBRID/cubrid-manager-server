@@ -7589,7 +7589,8 @@ ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (path, _dbmt_error))
+  /* resetlog truncates the file: refuse $CUBRID/bin as for any write */
+  if (!is_authorized_write_filename (path, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -11057,7 +11058,8 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined(WINDOWS)
       path = nt_style_path (path, full_path_buf);
 #endif
-      if (!is_authorized_filename (path, _dbmt_error))
+      /* removelog deletes the file: refuse $CUBRID/bin as for any write */
+      if (!is_authorized_write_filename (path, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}

@@ -5191,7 +5191,8 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 
 /*
  * is_authorized_write_filename () - as above, and not under $CUBRID/bin. For
- * tasks that write a file with content from the request.
+ * tasks that write, truncate or delete a file (writeandsaveconf,
+ * writeprivatedata, resetlog, removelog).
  */
 bool
 is_authorized_write_filename (const char *path, char *_dbmt_error)

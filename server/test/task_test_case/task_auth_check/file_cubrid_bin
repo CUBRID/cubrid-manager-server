@@ -28,6 +28,24 @@
   "test_note": "bin is not allowed"
  },
  {
+  "task": "resetlog",
+  "token": "",
+  "path": "$CUBRID/bin/authtest_nosuchdir/authtest.log",
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "removelog",
+  "token": "",
+  "files": [
+   {
+    "path": "$CUBRID/bin/authtest_nosuchfile.log"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
   "task": "copyfolder",
   "token": "",
   "srcdir": "$CUBRID/tmp/authtest_nosuchdir",
