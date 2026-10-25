@@ -58,7 +58,6 @@ using namespace std;
 #endif
 
 #define MIN_PASSWD_LENGTH 4
-#define MAX_TIME_LENGTH 10
 
 
 static T_EXTEND_TASK_INFO ext_task_info[] =
@@ -2889,41 +2888,6 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
   return ERR_NO_ERROR;
 }
 
-static bool _validate_token_active_time (time_t &active_time)
-{
-  size_t len = 0;
-
-  active_time = 0;
-  len = strlen (sco.szTokenActiveTime);
-
-  if (len > MAX_TIME_LENGTH)
-    {
-      return false;
-    }
-
-  for (size_t i = 0; i < len; ++i)
-    {
-      if (!isdigit (sco.szTokenActiveTime[i]))
-	{
-	  return false;
-	}
-    }
-
-  active_time = atol (sco.szTokenActiveTime);
-
-  if (active_time == 0)
-    {
-      return false;
-    }
-
-  if (active_time == LONG_MAX)
-    {
-      LOG_WARN ("token_active_time in cm.conf maybe more than 2147483647, correct it to 2147483647.");
-    }
-
-  return true;
-}
-
 bool ext_ut_validate_token (const char *token)
 {
   T_USER_TOKEN_INFO token_info;
@@ -2941,10 +2905,7 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
-  if (!_validate_token_active_time (active_time))
-    {
-      active_time = 7200;
-    }
+  active_time = (time_t) sco.iTokenActiveTime;
 
   if (now_time - token_info.login_time > active_time)
     {
@@ -3008,10 +2969,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  if (!_validate_token_active_time (active_time))
-    {
-      active_time = 7200;
-    }
+  active_time = (time_t) sco.iTokenActiveTime;
 
   if (now_time-token_info.login_time > active_time)
     {

@@ -35,6 +35,7 @@
 #define MIN_MAX_SESSIONS_PER_USER       1       /* max_sessions_per_user: range and default */
 #define MAX_MAX_SESSIONS_PER_USER       64
 #define DEFAULT_MAX_SESSIONS_PER_USER   16
+#define DEFAULT_TOKEN_ACTIVE_TIME       7200    /* token_active_time (seconds): default */
 #define MAX_NUM_ASYNC_TASK_LIMIT        12
 #define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
 
@@ -615,7 +616,7 @@ typedef struct
   int iAsyncLongJobSec;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
-  char szTokenActiveTime[PATH_MAX];
+  int iTokenActiveTime;		/* token_active_time (seconds), always > 0 */
   char szMaxSessionsPerUser[PATH_MAX];
   int hmtab1, hmtab2, hmtab3, hmtab4;
   char szAccessLog[PATH_MAX];

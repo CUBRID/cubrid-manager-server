@@ -844,24 +844,13 @@ wipe_session_dblogins (cm_session &sess)
 }
 
 /*
- * session_active_time_unlocked () - the configured token_active_time
- *   (seconds), or the 7200 default when it is unset/invalid.
+ * session_active_time_unlocked () - the token_active_time (seconds) read
+ *   from cm.conf by uReadSystemConfig ().
  */
 static time_t
 session_active_time_unlocked (void)
 {
-  const char *v = sco.szTokenActiveTime;
-  time_t t = 0;
-
-  if (v != NULL)
-    {
-      t = (time_t) atol (v);
-    }
-  if (t <= 0)
-    {
-      t = 7200;
-    }
-  return t;
+  return (time_t) (sco.iTokenActiveTime > 0 ? sco.iTokenActiveTime : DEFAULT_TOKEN_ACTIVE_TIME);
 }
 
 /*

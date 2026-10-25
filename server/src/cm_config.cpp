@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #if defined(WINDOWS)
 #include <process.h>
@@ -137,6 +138,7 @@ sys_config sco;
 static int check_file (char *fname, char *pname);
 static int check_path (char *path, char *pname);
 static int check_max_sessions_per_user (void);
+static int parse_token_active_time (const char *val);
 
 void
 sys_config_init (void)
@@ -245,7 +247,7 @@ uReadSystemConfig (void)
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
-  strncpy (sco.szTokenActiveTime, "7200", PATH_MAX);
+  sco.iTokenActiveTime = DEFAULT_TOKEN_ACTIVE_TIME;
   snprintf (sco.szMaxSessionsPerUser, PATH_MAX, "%d", DEFAULT_MAX_SESSIONS_PER_USER);
   snprintf (sco.szCWMPath, PATH_MAX, "%s%s", sco.szCubrid,
 	    DEFAULT_CWM_PATH_SHORT);
@@ -457,7 +459,7 @@ uReadSystemConfig (void)
 	       strcasecmp (ent_name, "TokenActiveTime") == 0)
 	{
 	  ut_trim (ent_val);
-	  snprintf (sco.szTokenActiveTime, PATH_MAX, "%s", ent_val);
+	  sco.iTokenActiveTime = parse_token_active_time (ent_val);
 	}
       else if (strcasecmp (ent_name, "max_sessions_per_user") == 0)
 	{
@@ -1002,6 +1004,36 @@ check_max_sessions_per_user (void)
     }
 
   return 0;
+}
+
+/*
+ * parse_token_active_time () - token_active_time in seconds.
+ *   It must be an integer from 1 to INT_MAX. Any other value is logged and
+ *   the default (DEFAULT_TOKEN_ACTIVE_TIME) is used, as before, so that an
+ *   existing cm.conf keeps working. This is the only place that interprets
+ *   token_active_time; the session code uses sco.iTokenActiveTime.
+ */
+static int
+parse_token_active_time (const char *val)
+{
+  char err_buf[DBMT_ERROR_MSG_SIZE];
+  char *end = NULL;
+  long n;
+
+  errno = 0;
+  n = strtol (val, &end, 10);
+  if (val[0] == '\0' || end == NULL || *end != '\0' || errno == ERANGE
+      || n < 1 || n > INT_MAX)
+    {
+      snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+		"CUBRID Manager Server : invalid token_active_time in cm.conf (%s). "
+		"It must be an integer from 1 to %d. Using the default %d.\n",
+		val, INT_MAX, DEFAULT_TOKEN_ACTIVE_TIME);
+      ut_record_cubrid_utility_log_stderr (err_buf);
+      return DEFAULT_TOKEN_ACTIVE_TIME;
+    }
+
+  return (int) n;
 }
 
 static int
