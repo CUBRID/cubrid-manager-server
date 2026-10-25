@@ -206,7 +206,7 @@ dispatch_thread (void *arg)
  *   from the request JSON, recursively (nested objects and array elements).
  *
  * Keys beginning with '_' are reserved for values the server injects
- * (_ID, _IP, _PORT, _DBID, _DBPASSWD, _DBNAME, _CLIENTIP, ...). A client must
+ * (_ID, _IP, _PORT, _TOKEN, _DBID, _DBPASSWD, _DBNAME, _CLIENTIP, ...). A client must
  * not be able to supply them. json_to_nv () flattens nested objects into one
  * nvplist and nv_get_val () returns the first match, so stripping only the top
  * level would let a client smuggle an internal key inside a nested object and

@@ -3134,7 +3134,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
    * Store the new database's DB login (user "dba", empty password) in the
    * caller's session, not in conlist.
    */
-  dbmt_user_session_set_dblogin (nv_get_val (req, "token"), dbname, "dba", "");
+  dbmt_user_session_set_dblogin (nv_get_val (req, "_TOKEN"), dbname, "dba", "");
 
   /* restore warn out of space value */
   if (0)
@@ -10992,7 +10992,7 @@ tsDBMTUserLogin (nvplist *req, nvplist *res, char *_dbmt_error)
       return ret;
     }
 
-  token = nv_get_val (req, "token");
+  token = nv_get_val (req, "_TOKEN");
   dbname = nv_get_val (req, "dbname");
   dbpasswd = nv_get_val (req, "dbpasswd");
   dbuser = nv_get_val (req, "dbuser");
@@ -12555,7 +12555,7 @@ ts_logout (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_update_val (res, "status", "success");
   nv_update_val (res, "note", "");
 
-  token = nv_get_val (req, "token");
+  token = nv_get_val (req, "_TOKEN");
 
   /*
    * unlinks AND frees the node as one step under its own lock now.

@@ -271,6 +271,9 @@ helper_procs = []
 #   "token": "$CASE_LOGIN_TOKEN#n" the token of the n-th (1-based) successful
 #                                  "login" of the same case, for cases that
 #                                  hold several sessions at once
+#   The same two values inside a nested object or list of the request are
+#   replaced as well, wherever they appear (for cases that smuggle a second
+#   token in a nested object).
 #   "test_sleep": <seconds>        wait before sending this request (removed
 #                                  before sending)
 #   "test_expect": "<verdict>"     expectation of this request only; the key is
@@ -304,6 +307,30 @@ def case_login_token(value, case_tokens, default):
         n = int(m.group(1))
         return case_tokens[n - 1] if n <= len(case_tokens) else ""
     return default
+
+
+def resolve_nested_tokens(node, case_tokens, top=True):
+    """Replace "$CASE_LOGIN_TOKEN[#n]" values nested in the request.
+
+    The top-level "token" is left to case_login_token (); every other string
+    value equal to one of these forms, at any depth, gets that login token.
+    """
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if top and key == "token":
+                continue
+            if isinstance(value, str) and value.startswith(CASE_LOGIN_TOKEN):
+                node[key] = case_login_token(value, case_tokens, value)
+            else:
+                resolve_nested_tokens(value, case_tokens, False)
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            if isinstance(value, str) and value.startswith(CASE_LOGIN_TOKEN):
+                node[i] = case_login_token(value, case_tokens, value)
+            else:
+                resolve_nested_tokens(value, case_tokens, False)
+
+
 DENIED_NOTE = "The user don't have authority to execute the task"
 
 
@@ -631,6 +658,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         req_no_key = req.pop("test_no_key", None)
         req_sleep = req.pop("test_sleep", None)
         req_token = case_login_token(req.get("token"), case_tokens, token)
+        resolve_nested_tokens(req, case_tokens)
         if req_sleep:
             time.sleep(float(req_sleep))
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name

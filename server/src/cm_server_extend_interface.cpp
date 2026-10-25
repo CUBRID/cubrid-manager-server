@@ -2993,6 +2993,15 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   request["_PORT"] = token_info.user_port;
   request["_ID"] = token_info.user_id;
 
+  /*
+   * The validated token, for the code that looks up this session later
+   * (_ut_get_dbaccess, dbmtuserlogin, createdb, logout). Those must not read
+   * "token" from the nvplist: json_to_nv () flattens nested objects, so a
+   * "token" inside a nested object can come before the top-level one that
+   * was validated here.
+   */
+  request["_TOKEN"] = token;
+
   return build_server_header (response, ERR_NO_ERROR, "none");
 }
 

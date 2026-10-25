@@ -533,6 +533,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | --- | --- |
 | `"token": "$CASE_LOGIN_TOKEN"` | 케이스 안에서 마지막으로 성공한 `login`의 토큰으로 보낸다. 없으면 러너의 `admin` 토큰 |
 | `"token": "$CASE_LOGIN_TOKEN#n"` | 케이스 안에서 n번째(1부터)로 성공한 `login`의 토큰. 한 사용자가 세션 여러 개를 동시에 쓰는 케이스에 쓴다 |
+| 중첩 객체·배열 안의 `"$CASE_LOGIN_TOKEN[#n]"` 값 | 최상위 `token`과 같은 규칙으로 해당 토큰으로 바꿔 보낸다. 중첩 객체에 다른 세션의 토큰을 몰래 넣는 케이스에 쓴다 |
 | `"test_sleep": <초>` | 이 요청을 보내기 전에 기다린다. 러너가 지우고 보낸다 |
 | `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
 | `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
@@ -568,6 +569,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
 | `auth_internal_keys` | 기존 API, 권한 none | 최상위·중첩 객체·배열 안에 `_ID: admin`을 넣어 보내도 `getadminloginfo`가 거부됨 |
 | `session_multi` | 기존 API | 같은 ID로 두 번 로그인하면 두 토큰 모두 동작, logout은 그 세션만 닫음, 사용자 삭제 시 남은 세션도 닫힘 |
+| `session_nested_token` | 기존 API | 세션 1의 토큰으로 보내는 `logout`의 중첩 객체 `a.token`에 세션 2의 토큰을 넣어도, 닫히는 것은 검증된 세션 1이고 세션 2는 계속 동작 |
 | `session_limit` | 기존 API | 17번 로그인하면 가장 오래 쓰지 않은 첫 세션이 닫히고 나머지는 동작. `max_sessions_per_user`=16(기본)을 전제로 한다 |
 
 보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.

@@ -2575,7 +2575,7 @@ _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd)
 
   dbid[0] = dbpasswd[0] = '\0';
 
-  token = nv_get_val (req, "token");
+  token = nv_get_val (req, "_TOKEN");
   dbname = nv_get_val (req, "dbname");
 
   /*
