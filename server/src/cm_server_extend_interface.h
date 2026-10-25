@@ -91,8 +91,7 @@ bool ext_ut_validate_userid (const std::string userid);
 int ext_ut_add_dblist_to_response (Json::Value &res, bool is_add_dbpath =
     false);
 int ext_ut_add_userlist_to_response (Json::Value &response,
-				     const T_DBMT_USER &dbmt_user,
-				     bool is_add_pwd = false);
+				     const T_DBMT_USER &dbmt_user);
 std::string ext_ut_generate_token (const std::string &client_ip,
 				   const std::string &client_id, int proc_id,
 				   time_t login_time);

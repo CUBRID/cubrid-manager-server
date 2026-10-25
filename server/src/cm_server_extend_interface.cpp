@@ -489,8 +489,6 @@ int
 ext_get_autojob_conf (Json::Value &request, Json::Value &response)
 {
   Json::Value root_jobs;
-  char decrypted[PASSWD_LENGTH + 1];
-  string userpasswd;
   string key = request.get ("service", "").asString();
   bool file_existed = false;
 
@@ -511,11 +509,16 @@ ext_get_autojob_conf (Json::Value &request, Json::Value &response)
       response["jobconf"] = Json::Value::null;
       return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
     }
-  if (key == "mail_config")
+
+  if (key == EXT_JOBS_MAIL_CONF && root_jobs.isObject ())
     {
-      userpasswd = root_jobs.get ("password", "").asString();
-      uDecrypt (PASSWD_LENGTH, userpasswd.c_str(), decrypted);
-      root_jobs["password"] = decrypted;
+      root_jobs.removeMember ("password");
+    }
+  else if (key.empty () && root_jobs.isObject () && root_jobs.isMember (EXT_JOBS_MAIL_CONF)
+	   && root_jobs[EXT_JOBS_MAIL_CONF].isObject ())
+    {
+      /* no service: the whole autojobs.conf, mail_config included */
+      root_jobs[EXT_JOBS_MAIL_CONF].removeMember ("password");
     }
 
   response["jobconf"] = root_jobs;
@@ -534,20 +537,9 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
 	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(service) missing in the request"));
 
   keyvalue = request["service"].asString();
-  if (keyvalue == "mail_config")
+  if (keyvalue == EXT_JOBS_MAIL_CONF && request["jobconf"].type() != Json::objectValue)
     {
-      if (request["jobconf"] != Json::Value::null
-	  && request["jobconf"].type() == Json::objectValue
-	  && request["jobconf"]["password"] != Json::Value::null)
-	{
-	  password = request["jobconf"]["password"].asString();
-	  uEncrypt (PASSWD_LENGTH, password.c_str(), encrypted);
-	  request["jobconf"]["password"] = encrypted;
-	}
-      else
-	{
-	  return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
-	}
+      return build_server_header (response, ERR_WITH_MSG, "error mail_config format!");
     }
 
   /*
@@ -577,6 +569,34 @@ ext_set_autojob_conf (Json::Value &request, Json::Value &response)
 	return build_server_header (response, ERR_WITH_MSG, "autojobs.conf is corrupt");
       }
   }
+
+  if (keyvalue == EXT_JOBS_MAIL_CONF)
+    {
+      Json::Value &jobconf = request["jobconf"];
+
+      /*
+       * getautojobconf does not return the mail password, so a client saving
+       * the rest of mail_config has none to send back. A missing or empty
+       * password keeps the stored one (root_jobs, read above under the same
+       * lock); a new one is stored encrypted.
+       */
+      if (jobconf.isMember ("password") && jobconf["password"].isString ()
+	  && !jobconf["password"].asString ().empty ())
+	{
+	  password = jobconf["password"].asString ();
+	  uEncrypt (PASSWD_LENGTH, password.c_str (), encrypted);
+	  jobconf["password"] = encrypted;
+	}
+      else if (root_jobs.isObject () && root_jobs.isMember ("password")
+	       && root_jobs["password"].isString ())
+	{
+	  jobconf["password"] = root_jobs["password"].asString ();
+	}
+      else
+	{
+	  jobconf["password"] = "";
+	}
+    }
 
   if (ext_set_auto_jobs ( keyvalue, request["jobconf"]) == FALSE)
     {
@@ -2757,7 +2777,7 @@ int ext_ut_add_dblist_to_response (Json::Value &response, bool is_add_dbpath)
   return ERR_NO_ERROR;
 }
 
-int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &dbmt_user, bool is_add_pwd)
+int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &dbmt_user)
 {
   Json::Value userlist;
 
@@ -2774,11 +2794,8 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
 	  continue;
 	}
 
+      /* never a password, plain or the stored encrypted form */
       user[ENCRYPT_ARG ("id")] = dbmt_user.user_info[i].user_name;
-      if (is_add_pwd)
-	{
-	  user["passwd"] = dbmt_user.user_info[i].user_passwd;
-	}
 
       json_value.clear();
 

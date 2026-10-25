@@ -280,7 +280,7 @@ static void _ts_gen_spaceinfo (nvplist *res, const char *filename,
 			       const char *dbinstalldir, const char *type, int pagesize);
 
 static void _tsAppendDBMTUserList (nvplist *res, T_DBMT_USER *dbmt_user,
-				   int return_dbmt_pwd, char *_dbmt_error);
+				   char *_dbmt_error);
 static int _ts_lockdb_parse_us (nvplist *res, FILE *infile);
 
 static int get_dbitemdir (char *item_dir, size_t item_dir_size, char *dbname,
@@ -2038,7 +2038,7 @@ tsCreateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
-  _tsAppendDBMTUserList (res, &dbmt_user, 0, _dbmt_error);
+  _tsAppendDBMTUserList (res, &dbmt_user, _dbmt_error);
   dbmt_user_free (&dbmt_user);
 
   return tsUpdateDBMTUser (req, res, _dbmt_error);
@@ -2109,7 +2109,7 @@ tsDeleteDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
-  _tsAppendDBMTUserList (res, &dbmt_user, 0, _dbmt_error);
+  _tsAppendDBMTUserList (res, &dbmt_user, _dbmt_error);
   dbmt_user_free (&dbmt_user);
 
   return ERR_NO_ERROR;
@@ -2435,7 +2435,7 @@ tsUpdateDBMTUser (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
-  _tsAppendDBMTUserList (res, &dbmt_user, 0, _dbmt_error);
+  _tsAppendDBMTUserList (res, &dbmt_user, _dbmt_error);
   dbmt_user_free (&dbmt_user);
   if (usr_dbinfo)
     {
@@ -2565,7 +2565,7 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       return retval;
     }
 
-  _tsAppendDBMTUserList (res, &dbmt_user, 0, _dbmt_error);
+  _tsAppendDBMTUserList (res, &dbmt_user, _dbmt_error);
   dbmt_user_free (&dbmt_user);
 
   return ERR_NO_ERROR;
@@ -2588,7 +2588,7 @@ tsGetDBMTUserInfo (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       return retval;
     }
-  _tsAppendDBMTUserList (res, &dbmt_user, 1, _dbmt_error);
+  _tsAppendDBMTUserList (res, &dbmt_user, _dbmt_error);
   dbmt_user_free (&dbmt_user);
 
   return ERR_NO_ERROR;
@@ -13517,10 +13517,13 @@ _op_get_port_from_config (T_CM_BROKER_CONF *uc_conf, char *broker_name)
   return "0";
 }
 
-/* Read dbmt password file and append user information to nvplist */
+/*
+ * Append the CMS user list to nvplist. It never carries a password: neither
+ * the plain text nor the stored (reversibly encrypted) form.
+ */
 static void
 _tsAppendDBMTUserList (nvplist *res, T_DBMT_USER *dbmt_user,
-		       int return_dbmt_pwd, char *_dbmt_error)
+		       char *_dbmt_error)
 {
   const char *unicas_auth, *dbcreate = NULL;
   int i, j;
@@ -13534,14 +13537,6 @@ _tsAppendDBMTUserList (nvplist *res, T_DBMT_USER *dbmt_user,
 	}
       nv_add_nvp (res, "open", "user");
       nv_add_nvp (res, ENCRYPT_ARG ("id"), dbmt_user->user_info[i].user_name);
-      if (return_dbmt_pwd)
-	{
-	  char decrypted[PASSWD_LENGTH + 1];
-
-	  uDecrypt (PASSWD_LENGTH, dbmt_user->user_info[i].user_passwd,
-		    decrypted);
-	  nv_add_nvp (res, ENCRYPT_ARG ("passwd"), decrypted);
-	}
 
       nv_add_nvp (res, "open", "dbauth");
       unicas_auth = NULL;
