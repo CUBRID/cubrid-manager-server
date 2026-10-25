@@ -19,3 +19,9 @@ file_cubrid_bin,success
 // Passwords are not returned in responses (run as admin)
 resp_no_user_password,success
 resp_no_mail_password,success
+
+// Internal keys and sessions
+auth_internal_keys,success
+session_multi,success
+// assumes max_sessions_per_user=16 (default) and allow_user_multi_connection=YES
+session_limit,success

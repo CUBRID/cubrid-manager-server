@@ -268,6 +268,11 @@ helper_procs = []
 #   "token": "$CASE_LOGIN_TOKEN"   send with the token of the last successful
 #                                  "login" request of the same case, instead of
 #                                  the runner's own (admin) token
+#   "token": "$CASE_LOGIN_TOKEN#n" the token of the n-th (1-based) successful
+#                                  "login" of the same case, for cases that
+#                                  hold several sessions at once
+#   "test_sleep": <seconds>        wait before sending this request (removed
+#                                  before sending)
 #   "test_expect": "<verdict>"     expectation of this request only; the key is
 #                                  removed before the request is sent
 #   "test_note": "<text>"          the response note must also contain <text>
@@ -287,6 +292,18 @@ helper_procs = []
 #            case checks a task it must not really run (bad parameters)
 #   any      not judged (setup or cleanup that may legitimately fail)
 CASE_LOGIN_TOKEN = "$CASE_LOGIN_TOKEN"
+CASE_LOGIN_TOKEN_N = re.compile(r"^\$CASE_LOGIN_TOKEN#([1-9][0-9]*)$")
+
+
+def case_login_token(value, case_tokens, default):
+    """The token a request of a case asks for with its "token" value."""
+    if value == CASE_LOGIN_TOKEN:
+        return case_tokens[-1] if case_tokens else ""
+    m = CASE_LOGIN_TOKEN_N.match(str(value))
+    if m:
+        n = int(m.group(1))
+        return case_tokens[n - 1] if n <= len(case_tokens) else ""
+    return default
 DENIED_NOTE = "The user don't have authority to execute the task"
 
 
@@ -603,22 +620,25 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     """
     before = len(results)
     request = load_task(taskfile)
-    # Token of the last successful "login" in this case, for the requests
-    # that ask for it with "$CASE_LOGIN_TOKEN" (see CASE_LOGIN_TOKEN).
-    case_token = ""
+    # Tokens of the successful "login" requests of this case, in order, for
+    # the requests that ask for one with "$CASE_LOGIN_TOKEN[#n]".
+    case_tokens = []
     requests = request if isinstance(request, list) else [request]
     for index, req in enumerate(requests):
         req_expected = req.pop("test_expect", expected)
         req_note = req.pop("test_note", None)
         req_no_text = req.pop("test_no_text", None)
         req_no_key = req.pop("test_no_key", None)
-        req_token = case_token if req.get("token") == CASE_LOGIN_TOKEN else token
+        req_sleep = req.pop("test_sleep", None)
+        req_token = case_login_token(req.get("token"), case_tokens, token)
+        if req_sleep:
+            time.sleep(float(req_sleep))
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
-            case_token = data["token"]
+            case_tokens.append(data["token"])
     # An array case sends several requests; its answer covers all of them, in
     # order, so that the file is the record of the whole case.
     entries = results[before:]
