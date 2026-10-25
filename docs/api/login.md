@@ -36,7 +36,7 @@ Permissions required to run this task: none (no login required)
 When the login succeeds, `task` is returned as `authenticate`, not as `login`.
 
 * `token` is an opaque random value of 256 hexadecimal characters.
-* Each successful login creates a new session; the same user can hold several. `max_sessions_per_user` in `cm.conf` limits them (default 16); when a login would exceed the limit, the least recently used session of that user is closed. See [Session](README.md#session).
+* Each successful login creates a new session; the same user can hold several. `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed the limit, the least recently used session of that user is closed. See [Session](README.md#session).
 
 ## Response Sample
 

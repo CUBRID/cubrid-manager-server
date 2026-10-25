@@ -23,5 +23,5 @@ resp_no_mail_password,success
 // Internal keys and sessions
 auth_internal_keys,success
 session_multi,success
-// assumes max_sessions_per_user=16 (default) and allow_user_multi_connection=YES
+// assumes max_sessions_per_user=16 (default)
 session_limit,success
