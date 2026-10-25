@@ -92,7 +92,7 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 ## Session
 
 - `login` creates a session and returns its token. Send the token with every following request.
-- A user can hold several sessions at once (one per login). `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed it, the least recently used session of that user is closed. Set it to 1 for one session per user. `allow_user_multi_connection` is no longer used.
+- A user can hold several sessions at once (one per login). `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed it, the least recently used session of that user is closed. Set it to 1 for one session per user.
 - A session expires after `token_active_time` seconds (default 7200) without a request. It must be an integer from 1 to 2147483647; any other value is logged and 7200 is used.
 - `logout` closes only its own session. Deleting a CMS user closes all of its sessions. Changing a password keeps the existing sessions; the new password applies from the next login.
 - The DB login given to `dbmtuserlogin` is kept in that session only, in memory, and is used for later requests of the same session that name the database and give no `dbuser`/`dbpasswd` of their own. Other sessions, other users and the disk never see it.

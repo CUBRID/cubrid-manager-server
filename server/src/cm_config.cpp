@@ -321,21 +321,6 @@ uReadSystemConfig (void)
 	    }
 
 	}
-      else if (strcasecmp (ent_name, "Allow_UserMultiCon") == 0 ||
-	       strcasecmp (ent_name, "allow_user_multi_connection") == 0)
-	{
-	  /*
-	   * No longer used: a user may always hold several sessions, and
-	   * max_sessions_per_user limits them. Say so when it asks for a
-	   * single session, so that the setting is not silently ignored.
-	   */
-	  if (strcasecmp (ent_val, "yes") != 0)
-	    {
-	      ut_record_cubrid_utility_log_stderr ("CUBRID Manager Server : allow_user_multi_connection in cm.conf "
-						   "is no longer used. Set max_sessions_per_user=1 to allow one "
-						   "session per user.\n");
-	    }
-	}
       else if (strcasecmp (ent_name, "auto_job_timeout") == 0)
 	{
 	  int timeout = atoi (ent_val);
