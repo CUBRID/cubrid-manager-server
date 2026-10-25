@@ -557,7 +557,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | --- | --- | --- |
 | `auth_legacy_none` | 기존 API, 세 권한 모두 none | AU_ANY 조회는 성공, `createdb`·`adddbmtuser`(DBC)·`runscript`·`getadminloginfo`(ADMIN) 거부, 기본 부여된 DBO로 `removestatustemplate` 통과 |
 | `auth_legacy_dbcreate` | 기존 API, `dbcreate=admin` | `createdb` 통과, `getadminloginfo`와 사용자 관리 task 5개(AU_ADMIN) 거부 |
-| `auth_new_mon` | `_new` API, `mon`만 yes | MON task 통과, DBO·JOB 기본 부여 없음(`deletebroker`·`createdb`·`runsqlstatement`·`readprivatedata` 거부) |
+| `auth_new_mon` | `_new` API, `mon`만 yes | MON task 통과, DBO·JOB 기본 부여 없음(`deletebroker`·`createdb`·`runsqlstatement`·`readprivatedata` 거부). `plandump`는 되지만 `plandrop: y`는 거부 |
 | `auth_mixed_update` | `_new` API로 만든 뒤 기존 API로 변경 | 변경한 항목만 `user_auth`에 반영, `user_auth=0`이면 AU_ANY task만 실행 |
 | `auth_deleted_user` | 기존 API | 사용자를 지우면 남은 토큰으로 task를 실행할 수 없음 |
 | `auth_setdbmtpasswd` | 기존 API 계정, `_new` API dbc만 yes | 자기 비밀번호는 변경, 다른 사용자 것은 거부, admin은 변경 가능, 변경 후에도 세션 유지, 새 비밀번호로만 로그인 |

@@ -4407,6 +4407,21 @@ ts_plandump (nvplist *req, nvplist *res, char *_dbmt_error)
   plandrop = nv_get_val (req, "plandrop");
 
   /*
+   * Showing the plans is open to any logged-in user (AU_ANY in the task
+   * table), but plandrop:"y" drops the plan cache of the database, which
+   * changes its state: that needs the same authority as the other database
+   * operations (DBC or DBO; ADMIN passes).
+   */
+  if (uStringEqual (plandrop, "y")
+      && !dbmt_user_has_auth (nv_get_val (req, "_ID"), AU_DBC | AU_DBO))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"The user don't have authority to execute the task: plandump with plandrop "
+		"(one of DBC, DBO is required)");
+      return ERR_WITH_MSG;
+    }
+
+  /*
   * check the running mode of current database,
   * return error if it is DB_SERVICE_MODE_SA.
   */

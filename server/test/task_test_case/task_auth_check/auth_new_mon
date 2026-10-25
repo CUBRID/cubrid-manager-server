@@ -70,6 +70,19 @@
   "test_expect": "denied"
  },
  {
+  "task": "plandump",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "demodb",
+  "plandrop": "y",
+  "test_expect": "denied"
+ },
+ {
+  "task": "plandump",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "demodb",
+  "test_expect": "allowed"
+ },
+ {
   "task": "logout",
   "token": "$CASE_LOGIN_TOKEN"
  },

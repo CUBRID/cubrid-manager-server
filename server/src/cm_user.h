@@ -145,6 +145,15 @@ unsigned int dbmt_user_effective_auth (const T_DBMT_USER_INFO *usrinfo);
 void dbmt_user_sync_user_auth (T_DBMT_USER_INFO *usrinfo, unsigned int changed_mask);
 
 /*
+ * dbmt_user_has_auth () - the CMS user user_id (the caller's _ID) has AU_ADMIN
+ *   or one of the bits in `required`, read from cmdb.pass now. For a task that
+ *   the task table opens wider (e.g. AU_ANY) but that has an option needing
+ *   more; the same rule as ext_ut_validate_auth (). False for an unknown user
+ *   or when cmdb.pass cannot be read.
+ */
+bool dbmt_user_has_auth (const char *user_id, unsigned int required);
+
+/*
  * dbmt_user_new_token_info () - add a new session keyed by token_enc.
  *   Several sessions may exist for the same user_id. Expired sessions are
  *   purged first; if the user is already at the per-user limit the

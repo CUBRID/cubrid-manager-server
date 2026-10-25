@@ -549,6 +549,33 @@ dbmt_user_legacy_auth_bits (const T_DBMT_USER_INFO *usrinfo)
   return auth;
 }
 
+bool
+dbmt_user_has_auth (const char *user_id, unsigned int required)
+{
+  T_DBMT_USER dbmt_user;
+  char dbmt_error[DBMT_ERROR_MSG_SIZE];
+  unsigned int auth = 0;
+  bool found = false;
+
+  if (user_id == NULL || dbmt_user_read (&dbmt_user, dbmt_error) != ERR_NO_ERROR)
+    {
+      return false;
+    }
+
+  for (int i = 0; i < dbmt_user.num_dbmt_user; i++)
+    {
+      if (strcmp (dbmt_user.user_info[i].user_name, user_id) == 0)
+	{
+	  auth = dbmt_user_effective_auth (&dbmt_user.user_info[i]);
+	  found = true;
+	  break;
+	}
+    }
+  dbmt_user_free (&dbmt_user);
+
+  return found && ((auth & AU_ADMIN) || (auth & required));
+}
+
 unsigned int
 dbmt_user_effective_auth (const T_DBMT_USER_INFO *usrinfo)
 {
