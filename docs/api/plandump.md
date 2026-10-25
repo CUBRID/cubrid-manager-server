@@ -9,7 +9,7 @@ Permissions required to run this task: none (any logged-in user)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | plandrop | y : drop plans |
 

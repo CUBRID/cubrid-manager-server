@@ -4,12 +4,14 @@ Close a session between manager server and manager client.
 
 Permissions required to run this task: none (any logged-in user)
 
+* Only the session of the given token is closed; other sessions of the same user stay open.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

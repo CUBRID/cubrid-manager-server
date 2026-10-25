@@ -4,12 +4,14 @@ The adddbmtuser interface will create a new database manager user.
 
 Permissions required to run this task: ADMIN
 
+* The new user has no `user_auth` entry: its permissions come from `casauth`, `dbcreate` and `statusmonitorauth` (see [Permissions of a CMS user](README.md#permissions-of-a-cms-user)).
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | targetid | user name |
 | password | user password |
 | dbauth | a list of databases which is taken in charge by this user |

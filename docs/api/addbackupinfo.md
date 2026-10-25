@@ -4,12 +4,14 @@ Add a backup schedule.
 
 Permissions required to run this task: one of DBC, DBO, JOB
 
+* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | backupid | auto-backup plan id |
 | path | the directory the backup volume is created in |

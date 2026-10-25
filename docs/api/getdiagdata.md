@@ -9,7 +9,7 @@ Permissions required to run this task: none (any logged-in user)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | db_name | database name |
 | mon_db | yes or no, collect the monitoring data of the database server |
 | mon_cas | yes or no, collect the monitoring data of the broker |

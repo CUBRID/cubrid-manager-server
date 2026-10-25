@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | a name of the database |
 | targetdir | PATH of output directory |
 | usehash | whether use hash file, (yes/no), if yes, hashdir is valid. |

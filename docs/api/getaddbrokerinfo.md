@@ -9,7 +9,7 @@ Permissions required to run this task: none (any logged-in user)
 | **Key**  | **Description**                |
 | -------- | ------------------------------ |
 | task     | task name                      |
-| token    | token string encrypted.        |
+| token | token returned by login |
 | confname | name of the configuration file |
 
 ## Request Sample

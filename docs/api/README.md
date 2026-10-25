@@ -36,29 +36,78 @@ print (r.read())
 
 The client will receive response in JSON-format. If success, `status` is `success`, otherwise `failure` and `note` will give error reason. The data `token` will be used in following request.
 
+The token is an opaque random value of 256 hexadecimal characters; it carries no information and a client must not interpret it. See [Session](#session).
+
 ```
 {
 	   "note" : "none",
 	   "status" : "success",
  	   "task" : "authenticate",
-	   "token" : "ae873897a0a9a2af8ea817532a4d722b124c446cb75876b9924a258f6351977e7926f07dd201b6aa"
+	   "token" : "3f9a...(256 hexadecimal characters)...c21e"
 }
 ```
 
 ## Interface Permission
 
-There are seven permissions. These permissions can indicate which authorities are needed to perform a task.
+Every task requires one of the permissions below, or only a login. The permission a task requires is written at the top of its document ("Permissions required to run this task") and in the tables under [CMS Interfaces](#cms-interfaces). Both are generated from the task tables of the server source by `tools/gen_task_authority.py`.
 
 | **Permission Name** | **Permission Description** |
 | --- | --- |
-| DBC | Database Creation - Can only create a new database |
-| DBO | Database Operation Authority - Can use database utilities and modify conf files. |
-| BRK | Broker Authority - Can only modify brokers (include shard broker |
-| MON | Monitoring - R/W Configuration |
-| JOB | Automation Authority - Can only use automations |
-| VAR | Show Variable Authority - Can only read cubrid.conf, cubrid_broker.conf, ... etc. |
-| ADMIN | Indicate the authority of admin |
-| ALL_AUTHORITY | This value is equal to "DBC | DBO | BRK | MON | JOB | VAR" |
+| DBC | Database Creation - create, delete, rename and copy databases |
+| DBO | Database Operation - use database utilities and modify configuration files |
+| BRK | Broker - start, stop and configure brokers (including shard brokers) |
+| MON | Monitoring - change monitoring settings and status templates |
+| JOB | Automation - set up automated jobs |
+| VAR | Show Variable - no task requires it at present |
+| ADMIN | Administrator - runs every task, including CMS user management |
+
+- **Several permissions listed** ("one of DBC, DBO"): having any one of them is enough.
+- **none (any logged-in user)**: the task needs only a valid token; read-only tasks are of this kind.
+- **ADMIN**: a user with ADMIN runs every task, whatever the task lists. The user named `admin` always has ADMIN.
+- A user without the permission gets `"status":"failure"` with the note `The user don't have authority to execute the task: <task>`.
+
+### Permissions of a CMS user
+
+The permissions of a CMS user are read from `cmdb.pass` on every request:
+
+- A user created or changed by `adddbmtuser_new`/`updatedbmtuser_new` has a `user_auth` entry, and it is used as it is - even when it holds no permission at all (such a user can run only "any logged-in user" tasks).
+- A user created by `adddbmtuser`/`updatedbmtuser` has no `user_auth` entry. Its permissions come from the three authorities of CUBRID Manager:
+
+| **Entry** | **Value** | **Permission** |
+| --- | --- | --- |
+| dbcreate | admin | DBC |
+| casauth (unicas) | admin | BRK |
+| statusmonitorauth | admin | MON |
+| any of them | monitor, none | (none) |
+| - | - | DBO and JOB are always given |
+
+- When `updatedbmtuser` changes one of the three authorities of a user that also has `user_auth`, the matching permission in `user_auth` is changed with it; the other permissions are kept.
+
+### Rules beyond the permission
+
+- CMS user management (`adddbmtuser`, `updatedbmtuser`, `deletedbmtuser`, `adddbmtuser_new`, `updatedbmtuser_new`) requires ADMIN.
+- `setdbmtpasswd`: every user can change its own password; only ADMIN can change another user's.
+- No response carries a password: neither CMS user passwords (`getdbmtuserinfo`) nor the mail password (`getautojobconf`).
+
+## Session
+
+- `login` creates a session and returns its token. Send the token with every following request.
+- A user can hold several sessions at once (one per login). `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed it, the least recently used session of that user is closed. With `allow_user_multi_connection=NO` the limit is 1.
+- A session expires after `token_active_time` seconds (default 7200) without a request.
+- `logout` closes only its own session. Deleting a CMS user closes all of its sessions. Changing a password keeps the existing sessions; the new password applies from the next login.
+- The DB login given to `dbmtuserlogin` is kept in that session only, in memory, and is used for later requests of the same session that name the database and give no `dbuser`/`dbpasswd` of their own. Other sessions, other users and the disk never see it.
+
+### Reserved keys
+
+Keys starting with `_` (`_ID`, `_DBID`, `_DBPASSWD`, ...) are reserved for values the server sets. A client must not send them: CMS removes them from a request at every nesting level before processing it. Send the DB login as `dbuser`/`dbpasswd`. (For compatibility, `loaddb` and `killtransaction` still take `_DBID`/`_DBPASSWD` for one more release; see their documents.)
+
+## File Access
+
+Tasks that take a file or directory path accept only paths under `$CUBRID` and `$CUBRID_DATABASES`, and in addition:
+
+- These files are never read or written through a task, whatever the user's permission: `conf/cm.pass`, `conf/cmdb.pass`, `log/manager/conlist`, `conf/autojobs.conf`, `conf/autoexecquery.conf`, and the TLS key and certificate of CMS (`conf/cm_ssl_cert.key`, `conf/cm_ssl_cert.crt`). A request for one fails with `access to a protected file is not allowed`.
+- A task that copies or deletes a whole directory (`copyfolder`, `deletefolder`) refuses a directory that holds one of those files (`the directory contains a protected file`).
+- Tasks that write a file with content from the request (`writeandsaveconf`, `writeprivatedata`, the destination of `copyfolder`) and `deletefolder` refuse `$CUBRID/bin` and paths under it (`writing under $CUBRID/bin is not allowed`).
 
 ## Asynchronous Task Execution
 
@@ -83,6 +132,8 @@ is sent as
 ## CMS Interfaces
 
 CMS Interfaces are composed by JSON and is used for communication between CMS and Cubrid Manager.
+
+The Permission column is generated from the task tables (see [Interface Permission](#interface-permission)); where several permissions are listed, any one of them is enough.
 
 ### Broker
 
@@ -276,7 +327,7 @@ document of their own yet.
 | [executecasrunner](executecasrunner.md) | socket, http | DBC, DBO, BRK, MON |
 | [generatecert](generatecert.md) | socket, http | ADMIN |
 | getaccesslogfiles | socket, http | any logged-in user |
-| getautojobconf | http | any logged-in user |
+| [getautojobconf](getautojobconf.md) | http | any logged-in user |
 | getautostart | http | any logged-in user |
 | getbrokerlog | http | any logged-in user |
 | getdberrorlog | http | any logged-in user |
@@ -303,7 +354,7 @@ document of their own yet.
 | runscript | socket, http | ADMIN |
 | runsqlstatement | socket, http | DBC, DBO |
 | sendmail | http | DBC, DBO, MON |
-| setautojobconf | http | DBC, DBO, JOB |
+| [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |
 | setautostart | http | DBC, DBO, JOB |
 | setloglevel | http | DBC, DBO, MON |
 | updateattribute | socket, http | DBC, DBO |

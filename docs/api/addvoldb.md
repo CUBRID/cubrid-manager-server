@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | volname | volume name. Optional, the server names the volume itself when it is omitted |
 | purpose | generic, data, index, temp |

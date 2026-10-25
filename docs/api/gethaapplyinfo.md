@@ -4,12 +4,14 @@ Get copylog and applylog operations information
 
 Permissions required to run this task: none (any logged-in user)
 
+* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | copylogpath | ha_copy log file path |
 | remotehostname | remote host name |

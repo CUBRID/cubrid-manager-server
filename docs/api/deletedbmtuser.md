@@ -4,12 +4,14 @@ The deletedbmtuser interface deletes a specified manager user.
 
 Permissions required to run this task: ADMIN
 
+* All sessions of the deleted user are closed: its tokens stop working at once.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | targetid | the id of the CM user to be deleted |
 
 ## Request Sample

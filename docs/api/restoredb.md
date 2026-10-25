@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | a name of the database |
 | date | restore the database up to its condition at given DATE, DATE is given as follows: dd-mm-yyyy:hh:mm:ss. none is backup time. |
 | level | LEVEL of backup to be restored |

@@ -4,12 +4,14 @@ Get configuration files.
 
 Permissions required to run this task: none (any logged-in user)
 
+* `confname` other than the listed names reads `$CUBRID/conf/<confname>`; a protected file such as `cm.pass` is refused (see [File Access](README.md#file-access)).
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | confname | cubridconf, cmconf, haconf, databases |
 
 ## Request Sample

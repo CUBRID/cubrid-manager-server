@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO, JOB
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | planlist | auto-query plan list |
 | queryplan | auto-query plan |

@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | triggername | the name of the trigger to be dropped |
 

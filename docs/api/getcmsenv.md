@@ -9,7 +9,7 @@ Permissions required to run this task: none (no login required)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 
 ## Request Sample

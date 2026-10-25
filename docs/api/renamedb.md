@@ -9,7 +9,7 @@ Permissions required to run this task: DBC
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | rename | new database name |
 | exvolpath | extend volume path |

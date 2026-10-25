@@ -11,7 +11,7 @@ Get DB monitoring statistic data(HA monitoring data is included)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted |
+| token | token returned by login |
 | metric | the metric of DB. the value should be "db_cpu_kernel", "db_cpu_user", "db_mem_phy", "db_mem_vir", "db_qps", "db_tps", "db_hit_ratio",   "db_fetch_pages", "db_dirty_pages", "db_io_read", "db_io_write", "db_ha_copy_delay_page", "db_ha_copy_delay_estimated",  "db_ha_apply_delay_page", "db_ha_apply_delay_estimated" and "db_freespace" |
 | dtype | data type. daily, weekly, monthly or yearly |
 | dbname | database name |
@@ -21,7 +21,7 @@ Get Broker monitoring statistic data
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted |
+| token | token returned by login |
 | metric | the metric of DB. the value should be "broker_tps", "broker_qps", "broker_long_t", "broker_long_q", "broker_req", "broker_err_q" and "broker_jq" |
 | dtype | data type. daily, weekly, monthly or yearly |
 | bname | broker name |
@@ -31,7 +31,7 @@ Get DB Volume monitoring statistic data
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted |
+| token | token returned by login |
 | metric | the metric of DB. the value should be "vol_freespace" |
 | dtype | data type. daily, weekly, monthly or yearly |
 | dbname | database name |
@@ -42,7 +42,7 @@ Get os monitoring statistics data
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted |
+| token | token returned by login |
 | metric | the metric of DB. the value should be "os_cpu_idle", "os_cpu_iowait", "os_cpu_user", "os_mem_phy_free", "os_mem_swap_free" and "os_disk_free" |
 | dtype | data type. daily, weekly, monthly or yearly |
 

@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO, MON
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | type | options from killtransaction command. |
 | parameter | a paramter according to the option in "type" field |

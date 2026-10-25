@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO, BRK
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | shardname | turn on a shard if a shardname is defined. |
 
 ## Request Sample

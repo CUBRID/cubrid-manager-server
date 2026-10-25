@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | a name of the database |
 | dbuser | database user to load as (optional). Without it, the DB login saved in this session by `dbmtuserlogin` is used |
 | dbpasswd | password of `dbuser` (optional) |

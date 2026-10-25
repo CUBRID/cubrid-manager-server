@@ -9,7 +9,7 @@ Permissions required to run this task: none (only the user who started the job g
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | uuid | uuid from the asynchronous task response |
 
 * an uuid is dropped 3,600 seconds after the job is finished by default,<br>

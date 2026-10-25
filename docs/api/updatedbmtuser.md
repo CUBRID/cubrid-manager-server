@@ -4,12 +4,14 @@ The updatedbmtuser interface will update DBMT user information.
 
 Permissions required to run this task: ADMIN
 
+* If the user also has a `user_auth` entry (made by the _new interfaces), the permission matching each changed authority (`dbcreate`: DBC, `casauth`: BRK, `statusmonitorauth`: MON) is changed in it as well; the other permissions are kept.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | targetid | dbmt user name |
 | casauth  | authorize cas user. |
 | dbcreate | create databases authorization. |

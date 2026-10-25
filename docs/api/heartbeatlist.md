@@ -9,7 +9,7 @@ Permissions required to run this task: none (any logged-in user)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbmodeall | y : all, n : only includes HA-Node, Node excepts Applylogdb, Copylogdb, Server |
 | dblist | database name |
 

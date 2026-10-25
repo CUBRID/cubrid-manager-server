@@ -4,12 +4,14 @@ Update configuration files.
 
 Permissions required to run this task: one of DBC, DBO
 
+* `confname` other than the listed names writes `$CUBRID/conf/<confname>`; a protected file such as `cm.pass` is refused (see [File Access](README.md#file-access)).
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | confname | |
 | confdata | contents of a configuration file |
 

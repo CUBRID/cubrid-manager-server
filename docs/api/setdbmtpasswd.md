@@ -4,12 +4,15 @@ Change a manager user password.
 
 Permissions required to run this task: none (any logged-in user)
 
+* A user without ADMIN can change only its own password (`targetid` must be the logged-in user); a user with ADMIN can change any user's, `admin` included.
+* Existing sessions of the user are kept; the new password applies from the next login.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | targetid | the id of the CM user whose password is changed |
 | newpassword | the new password |
 

@@ -11,7 +11,7 @@ Permissions required to run this task: ADMIN
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

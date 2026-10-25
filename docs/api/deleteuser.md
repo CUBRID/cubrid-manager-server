@@ -9,7 +9,7 @@ Permissions required to run this task: DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | username | database user name |
 

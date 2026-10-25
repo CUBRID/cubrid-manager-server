@@ -15,7 +15,7 @@ Permissions required to run this task: ADMIN
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | cname | country name of the certificate subject, for example KR |
 | stname | state or province name of the certificate subject |
 | loname | locality name of the certificate subject |

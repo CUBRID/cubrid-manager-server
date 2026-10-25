@@ -9,7 +9,7 @@ Permissions required to run this task: none (any logged-in user)
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | start_time | the beginning of the period, in the `YYYY-MM-DD HH:MM:SS` form |
 | end_time | the end of the period, in the `YYYY-MM-DD HH:MM:SS` form |
 

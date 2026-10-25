@@ -9,7 +9,7 @@ Permissions required to run this task: one of DBC, DBO
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | verbose | on-off indicating whether to show detailed information |
 | input-class-file | absolute path of a file on the CMS host that lists the classes to compact, one class name per line. environment variables such as `$CUBRID` are not expanded. cannot be given together with class-names |
