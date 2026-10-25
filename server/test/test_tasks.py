@@ -273,6 +273,13 @@ helper_procs = []
 #   "test_note": "<text>"          the response note must also contain <text>
 #                                  (removed before sending); tells a refusal
 #                                  apart from any other failure
+#   "test_no_text": "<text>"       the raw response must not contain <text>
+#                                  (removed before sending); checks that a
+#                                  value, e.g. a password, is not returned
+#   "test_no_key": "<a.b.c>"       the response must not have this key path
+#                                  (removed before sending); "." separates
+#                                  object keys, and a list on the way is
+#                                  searched in every element
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -288,8 +295,28 @@ def is_denied(data):
             and str(data.get("note", "")).startswith(DENIED_NOTE))
 
 
-def judged_status(data, expected, note_text=None):
+def has_key_path(node, path):
+    """Whether the key path ["a", "b", ...] exists in `node`.
+
+    A list on the way is searched in every element, so that a path like
+    "userlist.user.@passwd" reaches into the lists CMS wraps objects in.
+    """
+    if not path:
+        return True
+    if isinstance(node, list):
+        return any(has_key_path(item, path) for item in node)
+    if isinstance(node, dict) and path[0] in node:
+        return has_key_path(node[path[0]], path[1:])
+    return False
+
+
+def judged_status(data, expected, note_text=None, no_text=None, body="",
+                  no_key=None):
     """The value compared with `expected` for a response `data`."""
+    if no_text is not None and no_text in body:
+        return "%s (response contains %r)" % (data.get("status"), no_text)
+    if no_key is not None and has_key_path(data, no_key.split(".")):
+        return "%s (response has key %r)" % (data.get("status"), no_key)
     if note_text is not None and note_text not in str(data.get("note", "")):
         # Right status for the wrong reason is not a pass.
         return "%s (note without %r)" % (data.get("status"), note_text)
@@ -482,7 +509,7 @@ def follow_job(name, data, token):
 
 
 def send_one(name, req, token, expected="success", casefile="",
-             must_be_sync=False, note_text=None):
+             must_be_sync=False, note_text=None, no_text=None, no_key=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -527,14 +554,17 @@ def send_one(name, req, token, expected="success", casefile="",
             # do_one_job() turns it into a failure once the case is judged and
             # prints that verdict instead of this status line.
             record(name, casefile, task,
-                   judged_status(data, expected, note_text),
+                   judged_status(data, expected, note_text, no_text, body,
+                                 no_key),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
             return data
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
-    record(name, casefile, task, judged_status(data, expected, note_text),
+    record(name, casefile, task,
+           judged_status(data, expected, note_text, no_text, body,
+                         no_key),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -580,10 +610,12 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     for index, req in enumerate(requests):
         req_expected = req.pop("test_expect", expected)
         req_note = req.pop("test_note", None)
+        req_no_text = req.pop("test_no_text", None)
+        req_no_key = req.pop("test_no_key", None)
         req_token = case_token if req.get("token") == CASE_LOGIN_TOKEN else token
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
-                        must_be_sync, req_note)
+                        must_be_sync, req_note, req_no_text, req_no_key)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_token = data["token"]

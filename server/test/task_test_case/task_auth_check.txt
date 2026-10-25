@@ -15,3 +15,7 @@ auth_new_admin,success
 file_protected_read,success
 file_protected_write,success
 file_cubrid_bin,success
+
+// Passwords are not returned in responses (run as admin)
+resp_no_user_password,success
+resp_no_mail_password,success

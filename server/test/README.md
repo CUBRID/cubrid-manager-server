@@ -534,6 +534,8 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"token": "$CASE_LOGIN_TOKEN"` | 케이스 안에서 마지막으로 성공한 `login`의 토큰으로 보낸다. 없으면 러너의 `admin` 토큰 |
 | `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
 | `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
+| `"test_no_text": "<문자열>"` | 응답 원문에 이 문자열이 없어야 통과. 러너가 지우고 보낸다. 비밀번호가 응답에 나오지 않는지 확인할 때 쓴다 |
+| `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
 
 판정 값은 `success`, `failure` 외에 다음을 쓸 수 있다.
 
@@ -560,6 +562,8 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `file_protected_read` | admin | 보호 파일(cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, SSL 키·인증서)을 `viewlog`·`getfiletotallinenum`·`errortrace`·`runsqlstatement`·`readprivatedata`·`getallsysparam`·`copyfolder`(src)로 읽지 못함. `./`, `//`, `..` 변형 포함. 옆의 일반 파일은 읽힘 |
 | `file_protected_write` | admin | `resetlog`·`writeandsaveconf`·`writeprivatedata`·`removelog`·`copyfolder`(dest)로 보호 파일을 쓰지 못함 |
 | `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못함 |
+| `resp_no_user_password` | admin | `getdbmtuserinfo`·`getdbmtuserinfo_new`와 사용자 관리 task 응답에 CMS 사용자 비밀번호(`@passwd`, 평문)가 없음 |
+| `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
 
 보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.
 `copyfolder`는 존재하지 않는 원본을 주어 회귀해도 아무것도 복사되지 않게 한다. `deletefolder`는
