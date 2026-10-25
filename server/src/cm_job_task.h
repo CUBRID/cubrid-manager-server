@@ -289,8 +289,6 @@ enum
   AU_ADMIN = (1u << (sizeof (unsigned) * 8 - 1))
 };
 
-#define ALL_AUTHORITY (AU_DBC | AU_DBO | AU_MON | AU_JOB | AU_BRK | AU_VAR)
-
 typedef struct
 {
   const char *task_str;
