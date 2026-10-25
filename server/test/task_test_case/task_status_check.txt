@@ -312,9 +312,10 @@ keepalive
 
 // session regression: sessions now live in an in-memory map keyed by token
 // (CBRD-27691). Touch the session with keepalive, then confirm the same token
-// still resolves to a live session on the next request.
+// still resolves to a live session on the next request. The second request
+// must need a token (getenv does; getcmsenv and login skip the token check).
 keepalive_session
-getcmsenv_after_keepalive
+getenv_after_keepalive
 
 // monitoring statistic 
 get_mon_interval
