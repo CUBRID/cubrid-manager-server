@@ -66,6 +66,7 @@
 #include "cm_server_interface.h"
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
+#include "cm_user.h"
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 
@@ -600,6 +601,13 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
       start_auto_thread ();
     }
 #endif
+
+  /*
+   * Expired sessions are otherwise removed only when a request uses one or a
+   * new login comes in; drop them here too, every cm_process_monitor_interval
+   * seconds, so that their DB passwords do not stay in memory.
+   */
+  dbmt_user_purge_expired_sessions (time (NULL));
 
   evtimer_add (work_ctx->timer, &auto_task_tv);
 }

@@ -1074,6 +1074,14 @@ dbmt_user_delete_token_info_by_token (const char *token)
   return true;
 }
 
+void
+dbmt_user_purge_expired_sessions (time_t now_time)
+{
+  session_map_guard guard;
+
+  purge_expired_unlocked (now_time);
+}
+
 int
 dbmt_user_delete_all_sessions_of_user (const char *user_id)
 {

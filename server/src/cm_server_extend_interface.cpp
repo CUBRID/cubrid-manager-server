@@ -2909,6 +2909,8 @@ bool ext_ut_validate_token (const char *token)
 
   if (now_time - token_info.login_time > active_time)
     {
+      /* expired: drop the session and its DB logins now */
+      dbmt_user_delete_token_info_by_token (token);
       return false;
     }
 
@@ -2973,6 +2975,8 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 
   if (now_time-token_info.login_time > active_time)
     {
+      /* expired: drop the session and its DB logins now */
+      dbmt_user_delete_token_info_by_token (token.c_str ());
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
