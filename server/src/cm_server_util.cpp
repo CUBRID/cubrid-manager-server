@@ -1391,7 +1391,7 @@ uRemoveDir (char *dir, int remove_file_in_dir)
  * folder_copy () does not follow links inside the tree. is_authorized_dirname
  * () checked only the top source and destination directories, so a link
  * below them must not lead the copy to a protected file (read) or under
- * $CUBRID/bin (write).
+ * a program directory ($CUBRID/bin, lib, java) (write).
  *
  * win_is_link_entry () - the entry found by FindFirstFile ()/FindNextFile ()
  *   is a symbolic link or a junction. Other reparse points (deduplicated or
@@ -1611,9 +1611,9 @@ folder_copy (const char *src_folder, const char *dest_folder)
       /*
        * Do not follow symbolic links. is_authorized_dirname () checked only
        * the top source and destination directories, so a link below them
-       * must not lead the copy to a protected file (read) or under
-       * $CUBRID/bin (write): lstat (), not stat (), and never write through
-       * a link that is already in the destination.
+       * must not lead the copy to a protected file (read) or under a
+       * program directory ($CUBRID/bin, lib, java) (write): lstat (), not
+       * stat (), and never write through a link already in the destination.
        */
       if (lstat (src_path, &statbuf) != 0)
 	{
@@ -1629,7 +1629,7 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	  /*
 	   * copy the link itself, as "cp -P" does; its target is not read. A
 	   * later file task on the copy resolves the link and is checked
-	   * against the protected files and $CUBRID/bin as usual.
+	   * against the protected files and the program directories as usual.
 	   */
 	  char target[PATH_MAX];
 	  ssize_t len = readlink (src_path, target, sizeof (target) - 1);
@@ -5208,7 +5208,8 @@ win_final_path (const std::string &path, std::string &final_path)
 
 /*
  * resolve_path () - the path the operating system really opens, so that
- *   another spelling cannot stand in for a protected file or for $CUBRID/bin.
+ *   another spelling cannot stand in for a protected file or for a program
+ *   directory ($CUBRID/bin, lib, java).
  *   Linux: symbolic links resolved (realpath).
  *   Windows: the name the file system gives the file (win_final_path ()), so
  *   that 8.3 short names (CM~1.PAS), trailing dots or spaces (cm.pass.), case,
@@ -5326,26 +5327,62 @@ contains_protected_file (const std::string &dir)
   return false;
 }
 
-/* `path` (expanded) is $CUBRID/bin or under it */
-static bool
-is_under_cubrid_bin (const std::string &path)
-{
-  std::string bin = std::string (sco.szCubrid) + "/bin";
+/*
+ * Program directories of CUBRID: no file task may write, empty or delete
+ * anything in them. They hold the executables (bin), the shared libraries
+ * (lib) and the jars of the PL server (java); overwriting one, even with
+ * text, can stop the engine or the PL server from starting.
+ */
+static const char *const cubrid_program_dirs[] = { "bin", "lib", "java" };
 
-  return is_subpath (bin.c_str (), path.c_str ())
-	 || is_subpath (resolve_path (bin).c_str (), resolve_path (path).c_str ());
+/* `path` (expanded) is $CUBRID/<dir> or under it */
+static bool
+is_under_cubrid_dir (const std::string &path, const char *dir)
+{
+  std::string top = std::string (sco.szCubrid) + "/" + dir;
+
+  return is_subpath (top.c_str (), path.c_str ())
+	 || is_subpath (resolve_path (top).c_str (), resolve_path (path).c_str ());
 }
 
-/* $CUBRID/bin is `dir` (expanded) itself, under it, or under one of its
- * subdirectories after a recursive copy into `dir` */
-static bool
-overlaps_cubrid_bin (const std::string &dir)
+/*
+ * is_under_cubrid_program_dir () - `path` (expanded) is one of the program
+ *   directories ($CUBRID/bin, lib, java) or under it. Returns that
+ *   directory's name, or NULL.
+ */
+static const char *
+is_under_cubrid_program_dir (const std::string &path)
 {
-  std::string bin = std::string (sco.szCubrid) + "/bin";
+  for (size_t i = 0; i < sizeof (cubrid_program_dirs) / sizeof (cubrid_program_dirs[0]); i++)
+    {
+      if (is_under_cubrid_dir (path, cubrid_program_dirs[i]))
+	{
+	  return cubrid_program_dirs[i];
+	}
+    }
+  return NULL;
+}
 
-  return is_under_cubrid_bin (dir)
-	 || is_subpath (dir.c_str (), bin.c_str ())
-	 || is_subpath (resolve_path (dir).c_str (), resolve_path (bin).c_str ());
+/*
+ * overlaps_cubrid_program_dir () - a program directory is `dir` (expanded)
+ *   itself, under it, or above it (so a recursive copy into or a delete of
+ *   `dir` would reach it). Returns that directory's name, or NULL.
+ */
+static const char *
+overlaps_cubrid_program_dir (const std::string &dir)
+{
+  for (size_t i = 0; i < sizeof (cubrid_program_dirs) / sizeof (cubrid_program_dirs[0]); i++)
+    {
+      std::string top = std::string (sco.szCubrid) + "/" + cubrid_program_dirs[i];
+
+      if (is_under_cubrid_dir (dir, cubrid_program_dirs[i])
+	  || is_subpath (dir.c_str (), top.c_str ())
+	  || is_subpath (resolve_path (dir).c_str (), resolve_path (top).c_str ()))
+	{
+	  return cubrid_program_dirs[i];
+	}
+    }
+  return NULL;
 }
 
 static void
@@ -5355,6 +5392,15 @@ set_path_error (char *_dbmt_error, const char *reason, const char *path)
 
   std::replace (origin_path.begin (), origin_path.end (), '%', '*');
   snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s: %s", reason, origin_path.c_str ());
+}
+
+/* "writing under $CUBRID/<dir> is not allowed: <path>" */
+static void
+set_program_dir_error (char *_dbmt_error, const char *dir, const char *path)
+{
+  std::string reason = std::string ("writing under $CUBRID/") + dir + " is not allowed";
+
+  set_path_error (_dbmt_error, reason.c_str (), path);
 }
 
 /*
@@ -5395,14 +5441,15 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_write_filename () - as above, and not under $CUBRID/bin. For
- * tasks that write, truncate or delete a file (writeandsaveconf,
- * writeprivatedata, resetlog, removelog).
+ * is_authorized_write_filename () - as above, and not under a program
+ * directory ($CUBRID/bin, lib, java). For tasks that write, truncate or
+ * delete a file (writeandsaveconf, writeprivatedata, resetlog, removelog).
  */
 bool
 is_authorized_write_filename (const char *path, char *_dbmt_error)
 {
   std::string expanded_path;
+  const char *program_dir;
 
   if (!is_authorized_filename (path, _dbmt_error))
     {
@@ -5411,9 +5458,9 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
 
   /* is_authorized_filename () has already validated and expanded it */
   (void) is_valid_filename (path, expanded_path);
-  if (is_under_cubrid_bin (expanded_path))
+  if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
     {
-      set_path_error (_dbmt_error, "writing under $CUBRID/bin is not allowed", path);
+      set_program_dir_error (_dbmt_error, program_dir, path);
       return false;
     }
 
@@ -5423,12 +5470,14 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
 /*
  * is_authorized_dirname () - as is_authorized_filename (), and no protected
  * file under the directory; with FOR_WRITE, the directory must also not
- * overlap $CUBRID/bin. For tasks that copy or delete a directory tree.
+ * overlap a program directory ($CUBRID/bin, lib, java). For tasks that copy
+ * or delete a directory tree.
  */
 bool
 is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
 {
   std::string expanded_path;
+  const char *program_dir;
 
   if (!is_authorized_filename (path, _dbmt_error))
     {
@@ -5442,9 +5491,10 @@ is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
       return false;
     }
 
-  if (access == FOR_WRITE && overlaps_cubrid_bin (expanded_path))
+  if (access == FOR_WRITE
+      && (program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
     {
-      set_path_error (_dbmt_error, "writing under $CUBRID/bin is not allowed", path);
+      set_program_dir_error (_dbmt_error, program_dir, path);
       return false;
     }
 

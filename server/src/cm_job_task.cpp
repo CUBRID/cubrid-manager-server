@@ -7604,7 +7604,7 @@ ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  /* resetlog truncates the file: refuse $CUBRID/bin as for any write */
+  /* resetlog truncates the file: refuse $CUBRID/bin, lib, java as for any write */
   if (!is_authorized_write_filename (path, _dbmt_error))
     {
       return ERR_WITH_MSG;
@@ -11073,7 +11073,7 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
 #if defined(WINDOWS)
       path = nt_style_path (path, full_path_buf);
 #endif
-      /* removelog deletes the file: refuse $CUBRID/bin as for any write */
+      /* removelog deletes the file: refuse $CUBRID/bin, lib, java as for any write */
       if (!is_authorized_write_filename (path, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
@@ -12109,7 +12109,7 @@ ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error)
 
   /*
    * the whole tree is deleted: it must not hold a protected file, and must
-   * not be $CUBRID/bin or under it
+   * not overlap $CUBRID/bin, lib or java
    */
   if (!is_authorized_dirname (src_dir, FOR_WRITE, _dbmt_error))
     {
