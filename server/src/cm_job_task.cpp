@@ -2498,7 +2498,7 @@ tsChangeDBMTUserPasswd (nvplist *req, nvplist *res, char *_dbmt_error)
       }
 
     /*
-     * Every user may change his own password; only a user with AU_ADMIN may
+     * Every user may change their own password; only a user with AU_ADMIN may
      * change another user's (admin's included). The task itself is AU_ANY.
      */
     if (strcmp (dbmt_id, requester_id) != 0)
