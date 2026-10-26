@@ -8834,6 +8834,7 @@ tsGetAutoaddvolLog (nvplist *req, nvplist *res, char *_dbmt_error)
   char outcome[512];
   char file[PATH_MAX];
   char *start_time, *end_time;
+  int nfields;
 
   start_time = nv_get_val (req, "start_time");
   end_time = nv_get_val (req, "end_time");
@@ -8845,8 +8846,21 @@ tsGetAutoaddvolLog (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  uRemoveCRLF (strbuf);
 	  /*testdb testdb_x002 data 1024 2012-11-16,10:4:57 success */
-	  sscanf (strbuf, "%511s %511s %511s %511s %511s %511s", dbname,
-		  volname, purpose, page, time, outcome);
+	  volname[0] = purpose[0] = page[0] = time[0] = outcome[0] = '\0';
+	  nfields = sscanf (strbuf, "%511s %511s %511s %511s %511s %511s", dbname,
+			    volname, purpose, page, time, outcome);
+	  if (nfields == 5)
+	    {
+	      strcpy (outcome, time);
+	      strcpy (time, page);
+	      strcpy (page, purpose);
+	      strcpy (purpose, volname);
+	      strcpy (volname, "none");
+	    }
+	  else if (nfields != 6)
+	    {
+	      continue;
+	    }
 	  if (start_time != NULL && strcmp (time, start_time) < 0)
 	    {
 	      continue;

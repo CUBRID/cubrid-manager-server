@@ -1434,6 +1434,35 @@ time_t SpaceDbResultNewFormat::get_my_time (char *dbloca)
   return mytime;
 }
 
+bool SpaceDbResultOldFormat::get_last_volume_name (const char *type, char *buf, size_t buf_size)
+{
+  for (size_t i = volumes.size (); i > 0; i--)
+    {
+      if (uStringEqualIgnoreCase (volumes[i - 1].purpose, type) && volumes[i - 1].vol_name[0] != '\0')
+	{
+	  snprintf (buf, buf_size, "%s", volumes[i - 1].vol_name);
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool SpaceDbResultNewFormat::get_last_volume_name (const char *type, char *buf, size_t buf_size)
+{
+  const char *p;
+
+  for (size_t i = volumes.size (); i > 0; i--)
+    {
+      if (uStringEqual (volumes[i - 1].purpose, "PERMANENT") && volumes[i - 1].volume_name[0] != '\0')
+	{
+	  p = strrchr (volumes[i - 1].volume_name, '/');
+	  snprintf (buf, buf_size, "%s", (p != NULL) ? p + 1 : volumes[i - 1].volume_name);
+	  return true;
+	}
+    }
+  return false;
+}
+
 void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mode, char *dbname_at_hostname)
 {
   double frate;
