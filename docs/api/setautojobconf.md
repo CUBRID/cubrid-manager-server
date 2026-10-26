@@ -18,6 +18,7 @@ Permissions required to run this task: one of DBC, DBO, JOB
 * For `mail_config`, `jobconf` must be an object.
 * `password`: the SMTP password. It is stored encrypted and never returned by `getautojobconf`.
 * When `password` is missing or empty, the saved password is kept, so a client can save the `mail_config` it got from `getautojobconf` (which has no `password`) without losing the password. A password cannot be cleared to empty this way.
+* To use an SMTP server without authentication, save `mail_config` with an empty `username`: authentication is used only when `username` is not empty, so the saved password is then not used.
 
 ## Request Sample
 
