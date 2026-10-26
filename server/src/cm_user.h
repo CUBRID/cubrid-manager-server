@@ -88,20 +88,6 @@ int dbmt_user_read (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 void dbmt_user_free (T_DBMT_USER *dbmt_user);
 int dbmt_user_write_auth (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_pass (T_DBMT_USER *dbmt_user, char *_dbmt_error);
-
-/*
- * dbmt_user_read_locked ()/dbmt_user_write_auth_locked ()/
- * dbmt_user_write_pass_locked () - the caller must already hold
- *   a file_resource_guard on cm_cmdb_pass_mutex () (FID_LOCK_DBMT_PASS) for
- *   the whole read-modify-write sequence, not just for each individual call.
- *   usage:
- *     file_resource_guard guard (*cm_cmdb_pass_mutex (), FID_LOCK_DBMT_PASS);
- *     if (guard.ok () && dbmt_user_read_locked (&dbmt_user, _dbmt_error) == ERR_NO_ERROR)
- *       {
- *         ... modify dbmt_user in memory ...
- *         dbmt_user_write_auth_locked (&dbmt_user, _dbmt_error);
- *       }
- */
 int dbmt_user_read_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_auth_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
 int dbmt_user_write_pass_locked (T_DBMT_USER *dbmt_user, char *_dbmt_error);
@@ -143,23 +129,7 @@ bool dbmt_user_get_user_auth (const T_DBMT_USER_INFO *usrinfo, unsigned int *aut
 unsigned int dbmt_user_legacy_auth_bits (const T_DBMT_USER_INFO *usrinfo);
 unsigned int dbmt_user_effective_auth (const T_DBMT_USER_INFO *usrinfo);
 void dbmt_user_sync_user_auth (T_DBMT_USER_INFO *usrinfo, unsigned int changed_mask);
-
-/*
- * dbmt_user_has_auth () - the CMS user user_id (the caller's _ID) has AU_ADMIN
- *   or one of the bits in `required`, read from cmdb.pass now. For a task that
- *   the task table opens wider (e.g. AU_ANY) but that has an option needing
- *   more; the same rule as ext_ut_validate_auth (). False for an unknown user
- *   or when cmdb.pass cannot be read.
- */
 bool dbmt_user_has_auth (const char *user_id, unsigned int required);
-
-/*
- * dbmt_user_new_token_info () - add a new session keyed by token_enc.
- *   Several sessions may exist for the same user_id. Expired sessions are
- *   purged first; if the user is already at the per-user limit the
- *   least-recently-used session of that user is evicted to make room.
- *   return: ERR_NO_ERROR, or ERR_MEM_ALLOC on failure.
- */
 int dbmt_user_new_token_info (const char *user_id,
 			      const char *user_ip, const char *user_port,
 			      const char *token_enc,
@@ -170,31 +140,12 @@ int dbmt_user_new_token_info (const char *user_id,
 #endif
 			      time_t login_time);
 
-/* Look a session up by its token (the only unambiguous key now that a user
- * may have many sessions). Copies the connection fields into *out. */
 bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
-
-/* Update last-access time of the session identified by token. */
 bool dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time);
-
-/* Delete one session by its token (e.g. logout). */
 bool dbmt_user_delete_token_info_by_token (const char *token);
-
-/* Delete every session of a user (e.g. the user is deleted). Returns the
- * number of sessions removed. */
 int dbmt_user_delete_all_sessions_of_user (const char *user_id);
-
-/* Delete every session that has expired (token_active_time) by now, wiping
- * its DB logins. Called periodically, so that an expired session and its DB
- * passwords do not stay in memory until the next login. */
 void dbmt_user_purge_expired_sessions (time_t now_time);
 
-/*
- * Per-session DB-login store. dbmtuserlogin saves the DB user/password for a
- * dbname into the caller's own session; request handling later reads it back
- * for that same session only. Values are held in the C++ session object and
- * wiped when the session is removed.
- */
 bool dbmt_user_session_set_dblogin (const char *token, const char *dbname,
 				    const char *dbuser, const char *dbpasswd);
 bool dbmt_user_session_get_dblogin (const char *token, const char *dbname,
