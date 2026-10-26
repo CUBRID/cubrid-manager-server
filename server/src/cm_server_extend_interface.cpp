@@ -2983,23 +2983,20 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
     }
 
   /*
-   * Set the caller identity from the validated token. The client cannot have
-   * supplied these: cub_strip_internal_keys () removed every '_' key from the
-   * request before the server populated it, so this assignment is the single
-   * source of _IP/_PORT/_ID.
+   * Put the caller's identity and session into the request as internal keys.
+   * This is their only source: cub_strip_internal_keys () has removed every
+   * '_' key the client sent, at any level.
+   *   _IP, _PORT, _ID  from the session the token maps to (the token itself
+   *                    carries no information)
+   *   _TOKEN           the token validated here. Code that looks up this
+   *                    session later (_ut_get_dbaccess, dbmtuserlogin,
+   *                    createdb, logout) must use _TOKEN, never "token" from
+   *                    the nvplist: json_to_nv () flattens nested objects,
+   *                    so a "token" inside one can come first.
    */
-  /* Identity comes from the session the token maps to, not from the token. */
   request["_IP"] = token_info.user_ip;
   request["_PORT"] = token_info.user_port;
   request["_ID"] = token_info.user_id;
-
-  /*
-   * The validated token, for the code that looks up this session later
-   * (_ut_get_dbaccess, dbmtuserlogin, createdb, logout). Those must not read
-   * "token" from the nvplist: json_to_nv () flattens nested objects, so a
-   * "token" inside a nested object can come before the top-level one that
-   * was validated here.
-   */
   request["_TOKEN"] = token;
 
   return build_server_header (response, ERR_NO_ERROR, "none");
