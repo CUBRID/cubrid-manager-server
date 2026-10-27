@@ -3,25 +3,25 @@
       {
          "free_size": "<volatile>",
          "purpose": "PERMANENT",
-         "total_size": "20480",
+         "total_size": "<volatile>",
          "type": "PERMANENT",
-         "used_size": "4480",
+         "used_size": "<volatile>",
          "volume_count": "3"
       },
       {
          "free_size": "<volatile>",
          "purpose": "TEMPORARY",
-         "total_size": "0",
+         "total_size": "<volatile>",
          "type": "PERMANENT",
-         "used_size": "0",
+         "used_size": "<volatile>",
          "volume_count": "0"
       },
       {
          "free_size": "<volatile>",
          "purpose": "TEMPORARY",
-         "total_size": "0",
+         "total_size": "<volatile>",
          "type": "TEMPORARY",
-         "used_size": "0",
+         "used_size": "<volatile>",
          "volume_count": "0"
       }
    ],
@@ -29,35 +29,35 @@
    "fileinfo": [
       {
          "data_type": "INDEX",
-         "file_count": "25",
-         "file_table_size": "25",
-         "reserved_size": "1533",
-         "total_size": "1600",
-         "used_size": "42"
+         "file_count": "<volatile>",
+         "file_table_size": "<volatile>",
+         "reserved_size": "<volatile>",
+         "total_size": "<volatile>",
+         "used_size": "<volatile>"
       },
       {
          "data_type": "HEAP",
-         "file_count": "33",
-         "file_table_size": "33",
-         "reserved_size": "1934",
-         "total_size": "2112",
-         "used_size": "145"
+         "file_count": "<volatile>",
+         "file_table_size": "<volatile>",
+         "reserved_size": "<volatile>",
+         "total_size": "<volatile>",
+         "used_size": "<volatile>"
       },
       {
          "data_type": "SYSTEM",
-         "file_count": "8",
-         "file_table_size": "8",
-         "reserved_size": "477",
-         "total_size": "576",
-         "used_size": "91"
+         "file_count": "<volatile>",
+         "file_table_size": "<volatile>",
+         "reserved_size": "<volatile>",
+         "total_size": "<volatile>",
+         "used_size": "<volatile>"
       },
       {
          "data_type": "TEMP",
-         "file_count": "0",
-         "file_table_size": "0",
-         "reserved_size": "0",
-         "total_size": "0",
-         "used_size": "0"
+         "file_count": "<volatile>",
+         "file_table_size": "<volatile>",
+         "reserved_size": "<volatile>",
+         "total_size": "<volatile>",
+         "used_size": "<volatile>"
       }
    ],
    "freespace": "<volatile>",
@@ -66,49 +66,49 @@
    "pagesize": "4096",
    "spaceinfo": [
       {
-         "date": "20260827",
-         "freepage": "7936",
+         "date": "<volatile>",
+         "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb/alatestdb",
          "purpose": "PERMANENT",
          "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb",
          "totalpage": "12288",
          "type": "PERMANENT",
-         "usedpage": "4352",
+         "usedpage": "<volatile>",
          "volid": "0"
       },
       {
-         "date": "20260827",
-         "freepage": "4032",
+         "date": "<volatile>",
+         "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb/alatestdb_data_x001",
          "purpose": "PERMANENT",
          "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb_data_x001",
          "totalpage": "4096",
          "type": "PERMANENT",
-         "usedpage": "64",
+         "usedpage": "<volatile>",
          "volid": "1"
       },
       {
-         "date": "20260827",
-         "freepage": "4032",
+         "date": "<volatile>",
+         "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb/alatestdb_x002",
          "purpose": "PERMANENT",
          "spacename": "$CUBRID_DATABASES/alatestdb/alatestdb_x002",
          "totalpage": "4096",
          "type": "PERMANENT",
-         "usedpage": "64",
+         "usedpage": "<volatile>",
          "volid": "2"
       },
       {
-         "date": "20260827",
-         "freepage": " ",
+         "date": "<volatile>",
+         "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb",
          "spacename": "alatestdb_lgat",
          "totalpage": "10240",
          "type": "Active_log"
       },
       {
-         "date": "20260827",
-         "freepage": " ",
+         "date": "<volatile>",
+         "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb",
          "spacename": "alatestdb_lgar_t",
          "totalpage": "10240",

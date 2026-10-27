@@ -210,9 +210,9 @@ resetlog
 
 getcaslogtopresult
 removecasrunnertmpfile
-paramdump
+paramdump,success
 paramdump_nullname,failure
-statdump
+statdump,success
 statdump_nullname,failure
 // start_statdump must stay right before stop_statdump: stop fails with
 // "no statdump running" unless the background process was just started.
