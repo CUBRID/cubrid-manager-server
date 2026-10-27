@@ -8,12 +8,14 @@ CMS must be restarted for the new certificate to be used.
 [getcmsenv](getcmsenv.md) reports, in `is_default_cert`, whether the certificate in use is still
 the default one.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | cname | country name of the certificate subject, for example KR |
 | stname | state or province name of the certificate subject |
 | loname | locality name of the certificate subject |

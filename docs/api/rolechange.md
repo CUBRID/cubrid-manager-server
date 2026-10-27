@@ -2,12 +2,14 @@
 
 Change a role of instance in HA.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

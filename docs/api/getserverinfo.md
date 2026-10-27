@@ -2,12 +2,14 @@
 
 Get this CMS process's own identity: version, start time, pid, uptime, and a restart-unique instance identifier. This is the lightweight counterpart to [getserverstatus](getserverstatus.md): it returns only these fields, flattened directly into the response, without the async-job subsystem internals (`cm-conf`, `async-slot`, `request-map`, `db-running-async`, `statdump-daemon`) that `getserverstatus` requires admin authority for, and without the CUBRID engine version (for that, see `CUBRIDVER` in [getcmsenv](getcmsenv.md), which is available before login). Any authenticated user can call `getserverinfo` regardless of role, so a non-admin client (for example, a DBC-only user issuing `createdb` with `"async":"yes"`) can still perform the restart-detection procedure described in [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) without needing an admin session. Like `getserverstatus`, this does not start a worker thread or an external process - the response is built immediately from in-memory state.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

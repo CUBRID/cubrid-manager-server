@@ -2,6 +2,8 @@
 
 Create a session by manager user.
 
+Permissions required to run this task: none (no login required)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
@@ -33,6 +35,9 @@ Create a session by manager user.
 
 When the login succeeds, `task` is returned as `authenticate`, not as `login`.
 
+* `token` is an opaque random value of 256 hexadecimal characters.
+* Each successful login creates a new session; the same user can hold several. `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed the limit, the least recently used session of that user is closed. See [Session](README.md#session).
+
 ## Response Sample
 
 ```
@@ -40,6 +45,6 @@ When the login succeeds, `task` is returned as `authenticate`, not as `login`.
    "note" : "none",
    "status" : "success",
    "task" : "authenticate",
-   "token" : "ae873897a0a9a2af8ea817532a4d722b124c446cb75876b9924a258f6351977e7926f07dd201b6aa"
+   "token" : "3f9a...(256 hexadecimal characters)...c21e"
 }
 ```

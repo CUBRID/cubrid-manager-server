@@ -2,12 +2,14 @@
 
 Create database user.
 
+Permissions required to run this task: DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | username | database user name |
 | userpass | database user password |

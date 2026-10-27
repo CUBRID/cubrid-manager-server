@@ -3,12 +3,14 @@
 Get the environment of the CUBRID installation which CMS manages: the directories, the version
 of the engine and of the broker, the host monitoring flags and the operating system.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

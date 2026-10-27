@@ -2,12 +2,14 @@
 
 Delete a backup meta data.
 
+Permissions required to run this task: one of DBC, DBO, JOB
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | backupid | the id of the auto-backup plan to be deleted |
 

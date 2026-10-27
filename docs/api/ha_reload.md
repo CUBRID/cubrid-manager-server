@@ -2,12 +2,14 @@
 
 Runs `cubrid heartbeat reload` command.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | async | default "no", if "yes" run the task in asynchronous mode |
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api

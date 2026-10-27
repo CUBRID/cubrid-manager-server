@@ -1,0 +1,95 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_mixed",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_mixed",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "yes",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_mixed",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "removestatustemplate",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "allowed"
+ },
+ {
+  "task": "createdb",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "authtest_nodb",
+  "test_expect": "denied"
+ },
+ {
+  "task": "updatedbmtuser",
+  "token": "",
+  "targetid": "authtest_mixed",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "removestatustemplate",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "createdb",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "authtest_nodb",
+  "test_expect": "denied"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "getbrokersinfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "updatedbmtuser",
+  "token": "",
+  "targetid": "authtest_mixed",
+  "dbcreate": "admin"
+ },
+ {
+  "task": "createdb",
+  "token": "$CASE_LOGIN_TOKEN",
+  "dbname": "authtest_nodb",
+  "test_expect": "allowed"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_mixed"
+ }
+]

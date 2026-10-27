@@ -2,12 +2,14 @@
 
 Related with [start_statdump](start_statdump.md), deactivate the previously started *statdump* process
 
+Permissions required to run this task: one of DBC, DBO, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name to stop statdump process running on the dbname |
 | dbuser | database username |
 | dbpasswd | password of dbuser |

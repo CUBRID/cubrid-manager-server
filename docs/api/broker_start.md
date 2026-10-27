@@ -2,12 +2,14 @@
 
 The broker_start interface will start a specified broker.
 
+Permissions required to run this task: one of DBC, DBO, BRK
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | bname | the name of the broker to be started |
 | async | default "no", if "yes" run the task in asynchronous mode |
 

@@ -2,12 +2,14 @@
 
 The backupdbinfo interface will get database backup information.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 
 ## Request Sample

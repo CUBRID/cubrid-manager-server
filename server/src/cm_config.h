@@ -32,6 +32,10 @@
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
 
+#define MIN_MAX_SESSIONS_PER_USER       1       /* max_sessions_per_user: range and default */
+#define MAX_MAX_SESSIONS_PER_USER       64
+#define DEFAULT_MAX_SESSIONS_PER_USER   16
+#define DEFAULT_TOKEN_ACTIVE_TIME       7200    /* token_active_time (seconds): default */
 #define MAX_NUM_ASYNC_TASK_LIMIT        12
 #define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
 
@@ -603,7 +607,6 @@ typedef struct
   char szCWMPath[PATH_MAX];
   char szSSLKey[PATH_MAX];
   char szSSLCertificate[PATH_MAX];
-  int iAllow_AdminMultiCon;
   int iAutoJobTimeout;
   int iCMS_port;
   int iSupportMonStat;
@@ -613,7 +616,8 @@ typedef struct
   int iAsyncLongJobSec;
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
-  char szTokenActiveTime[PATH_MAX];
+  int iTokenActiveTime;		/* token_active_time (seconds), always > 0 */
+  char szMaxSessionsPerUser[PATH_MAX];
   int hmtab1, hmtab2, hmtab3, hmtab4;
   char szAccessLog[PATH_MAX];
   char szErrorLog[PATH_MAX];

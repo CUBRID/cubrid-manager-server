@@ -1,0 +1,129 @@
+[
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/./cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID//conf//cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/log/../conf/cmdb.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/log/manager/conlist",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/autojobs.conf",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/autoexecquery.conf",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm_ssl_cert.key",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm_ssl_cert.crt",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "getfiletotallinenum",
+  "token": "",
+  "filepath": "$CUBRID/conf/cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "errortrace",
+  "token": "",
+  "logpath": "$CUBRID/conf/cm.pass",
+  "eid": "1",
+  "errtime": "01/01/26 00:00:00.000",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "runsqlstatement",
+  "token": "",
+  "dbname": "demodb",
+  "infile": "$CUBRID/conf/cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "readprivatedata",
+  "token": "",
+  "confname": "../../conf/cm.pass",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "",
+  "confname": "cm.pass",
+  "test_expect": "failure",
+  "test_note": "conf path is not authorized"
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/conf",
+  "destdir": "$CUBRID/tmp/authtest_conf_copy",
+  "test_expect": "failure",
+  "test_note": "the directory contains a protected file"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cubrid.conf",
+  "test_expect": "success"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "",
+  "confname": "cubridconf",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletefolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_conf_copy",
+  "test_expect": "any"
+ }
+]

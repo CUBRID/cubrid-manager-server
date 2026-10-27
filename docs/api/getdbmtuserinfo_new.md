@@ -2,12 +2,16 @@
 
 Get CM/CWM user information
 
+Permissions required to run this task: one of DBC, DBO
+
+* The response carries no password of a CMS user.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

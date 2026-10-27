@@ -2,12 +2,16 @@
 
 Run plandump utility.
 
+Permissions required to run this task: none (any logged-in user)
+
+With `plandrop: "y"`, which drops the plan cache, one of DBC, DBO is also required; without it the request fails with `The user don't have authority to execute the task: plandump with plandrop`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | plandrop | y : drop plans |
 

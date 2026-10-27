@@ -95,6 +95,8 @@
 #include "cm_stat.h"
 #include "cm_user.h"
 
+#include "openssl/rand.h"
+
 #include <assert.h>
 
 #ifdef FSERVER_SLAVE
@@ -246,8 +248,8 @@ namespace
 
 static T_FSERVER_TASK_INFO task_info[] =
 {
-  {"startinfo", TS_STARTINFO, 0, DEF_TASK_FUNC (ts_startinfo), FSVR_SA, ALL_AUTHORITY},
-  {"userinfo", TS_USERINFO, 0, DEF_TASK_FUNC (ts_userinfo), FSVR_CS, ALL_AUTHORITY},
+  {"startinfo", TS_STARTINFO, 0, DEF_TASK_FUNC (ts_startinfo), FSVR_SA, AU_ANY},
+  {"userinfo", TS_USERINFO, 0, DEF_TASK_FUNC (ts_userinfo), FSVR_CS, AU_ANY},
   {"createuser", TS_CREATEUSER, 1, DEF_TASK_FUNC (ts_create_user), FSVR_CS, AU_DBO},
   {"deleteuser", TS_DELETEUSER, 1, DEF_TASK_FUNC (ts_delete_user), FSVR_CS, AU_DBO},
   {"updateuser", TS_UPDATEUSER, 1, DEF_TASK_FUNC (ts_update_user), FSVR_CS, AU_DBO},
@@ -256,75 +258,75 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"renamedb", TS_RENAMEDB, 1, DEF_TASK_FUNC (tsRenameDB), FSVR_SA, AU_DBC},
   {"startdb", TS_STARTDB, 0, DEF_TASK_FUNC (tsStartDB), FSVR_NONE, AU_DBC | AU_DBO},
   {"stopdb", TS_STOPDB, 0, DEF_TASK_FUNC (tsStopDB), FSVR_CS,AU_DBC | AU_DBO},
-  {"dbspaceinfo", TS_DBSPACEINFO, 0, DEF_TASK_FUNC (tsDbspaceInfo), FSVR_SA_CS, ALL_AUTHORITY},
-  {"classinfo", TS_CLASSINFO, 0, DEF_TASK_FUNC (ts_class_info), FSVR_SA_CS, ALL_AUTHORITY},
-  {"class", TS_CLASS, 0, DEF_TASK_FUNC (ts_class), FSVR_CS, ALL_AUTHORITY},
+  {"dbspaceinfo", TS_DBSPACEINFO, 0, DEF_TASK_FUNC (tsDbspaceInfo), FSVR_SA_CS, AU_ANY},
+  {"classinfo", TS_CLASSINFO, 0, DEF_TASK_FUNC (ts_class_info), FSVR_SA_CS, AU_ANY},
+  {"class", TS_CLASS, 0, DEF_TASK_FUNC (ts_class), FSVR_CS, AU_ANY},
   {"setsysparam", TS_SETSYSPARAM, 1, DEF_TASK_FUNC (ts_set_sysparam), FSVR_NONE, AU_DBC | AU_DBO},
-  {"getallsysparam", TS_GETALLSYSPARAM, 0, DEF_TASK_FUNC (ts_get_all_sysparam), FSVR_NONE, ALL_AUTHORITY},
+  {"getallsysparam", TS_GETALLSYSPARAM, 0, DEF_TASK_FUNC (ts_get_all_sysparam), FSVR_NONE, AU_ANY},
   {"addvoldb", TS_ADDVOLDB, 1, DEF_TASK_FUNC (tsRunAddvoldb), FSVR_SA_CS, AU_DBC | AU_DBO},
-  {"getloginfo", TS_GETLOGINFO, 0, DEF_TASK_FUNC (ts_get_log_info), FSVR_NONE, ALL_AUTHORITY},
-  {"viewlog", TS_VIEWLOG, 0, DEF_TASK_FUNC (ts_view_log), FSVR_NONE, ALL_AUTHORITY},
-  {"viewlog2", TS_VIEWLOG, 0, DEF_TASK_FUNC (ts_view_log), FSVR_NONE, ALL_AUTHORITY},
+  {"getloginfo", TS_GETLOGINFO, 0, DEF_TASK_FUNC (ts_get_log_info), FSVR_NONE, AU_ANY},
+  {"viewlog", TS_VIEWLOG, 0, DEF_TASK_FUNC (ts_view_log), FSVR_NONE, AU_ANY},
+  {"viewlog2", TS_VIEWLOG, 0, DEF_TASK_FUNC (ts_view_log), FSVR_NONE, AU_ANY},
   {"resetlog", TS_RESETLOG, 0, DEF_TASK_FUNC (ts_reset_log), FSVR_NONE, AU_DBC | AU_DBO},
-  {"getenv", TS_GETENV, 0, DEF_TASK_FUNC (tsGetEnvironment), FSVR_SA_UC, ALL_AUTHORITY},
-  {"updateattribute", TS_UPDATEATTRIBUTE, 1, DEF_TASK_FUNC (ts_update_attribute), FSVR_CS, ALL_AUTHORITY},
+  {"getenv", TS_GETENV, 0, DEF_TASK_FUNC (tsGetEnvironment), FSVR_SA_UC, AU_ANY},
+  {"updateattribute", TS_UPDATEATTRIBUTE, 1, DEF_TASK_FUNC (ts_update_attribute), FSVR_CS, AU_DBC | AU_DBO},
   {"kill_process", TS_KILL_PROCESS, 1, DEF_TASK_FUNC (ts_kill_process), FSVR_NONE, AU_DBC | AU_DBO},
   {"copydb", TS_COPYDB, 1, DEF_TASK_FUNC (ts_copydb), FSVR_SA, AU_DBC},
   {"optimizedb", TS_OPTIMIZEDB, 1, DEF_TASK_FUNC (ts_optimizedb), FSVR_SA_CS, AU_DBC | AU_DBO},
-  {"plandump", TS_PLANDUMP, 1, DEF_TASK_FUNC (ts_plandump), FSVR_CS, ALL_AUTHORITY},
-  {"paramdump", TS_PARAMDUMP, 1, DEF_TASK_FUNC (ts_paramdump), FSVR_SA_CS, ALL_AUTHORITY},
-  {"statdump", TS_STATDUMP, 0, DEF_TASK_FUNC (ts_statdump), FSVR_CS, ALL_AUTHORITY},
+  {"plandump", TS_PLANDUMP, 1, DEF_TASK_FUNC (ts_plandump), FSVR_CS, AU_ANY},
+  {"paramdump", TS_PARAMDUMP, 1, DEF_TASK_FUNC (ts_paramdump), FSVR_SA_CS, AU_ANY},
+  {"statdump", TS_STATDUMP, 0, DEF_TASK_FUNC (ts_statdump), FSVR_CS, AU_ANY},
   {"checkdb", TS_CHECKDB, 0, DEF_TASK_FUNC (ts_checkdb), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"compactdb", TS_COMPACTDB, 1, DEF_TASK_FUNC (ts_compactdb), FSVR_SA, AU_DBC | AU_DBO},
-  {"backupdbinfo", TS_BACKUPDBINFO, 0, DEF_TASK_FUNC (ts_backupdb_info), FSVR_NONE, ALL_AUTHORITY},
+  {"backupdbinfo", TS_BACKUPDBINFO, 0, DEF_TASK_FUNC (ts_backupdb_info), FSVR_NONE, AU_ANY},
   {"backupdb", TS_BACKUPDB, 0, DEF_TASK_FUNC (ts_backupdb), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"unloaddb", TS_UNLOADDB, 1, DEF_TASK_FUNC (ts_unloaddb), FSVR_SA, AU_DBC | AU_DBO},
-  {"unloadinfo", TS_UNLOADDBINFO, 0, DEF_TASK_FUNC (ts_unloaddb_info), FSVR_NONE, ALL_AUTHORITY},
+  {"unloadinfo", TS_UNLOADDBINFO, 0, DEF_TASK_FUNC (ts_unloaddb_info), FSVR_NONE, AU_ANY},
   {"loaddb", TS_LOADDB, 1, DEF_TASK_FUNC (ts_loaddb), FSVR_SA, AU_DBC | AU_DBO},
-  {"gettransactioninfo", TS_GETTRANINFO, 0, DEF_TASK_FUNC (ts_get_tran_info), FSVR_CS, ALL_AUTHORITY},
+  {"gettransactioninfo", TS_GETTRANINFO, 0, DEF_TASK_FUNC (ts_get_tran_info), FSVR_CS, AU_ANY},
   {"killtransaction", TS_KILLTRAN, 1, DEF_TASK_FUNC (ts_killtran), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
-  {"lockdb", TS_LOCKDB, 0, DEF_TASK_FUNC (ts_lockdb), FSVR_CS, ALL_AUTHORITY},
-  {"getbackuplist", TS_GETBACKUPLIST, 0, DEF_TASK_FUNC (ts_get_backup_list), FSVR_NONE, ALL_AUTHORITY},
+  {"lockdb", TS_LOCKDB, 0, DEF_TASK_FUNC (ts_lockdb), FSVR_CS, AU_ANY},
+  {"getbackuplist", TS_GETBACKUPLIST, 0, DEF_TASK_FUNC (ts_get_backup_list), FSVR_NONE, AU_ANY},
   {"restoredb", TS_RESTOREDB, 1, DEF_TASK_FUNC (ts_restoredb), FSVR_SA, AU_DBC | AU_DBO},
-  {"backupvolinfo", TS_BACKUPVOLINFO, 0, DEF_TASK_FUNC (ts_backup_vol_info), FSVR_SA, ALL_AUTHORITY},
-  {"getdbsize", TS_GETDBSIZE, 0, DEF_TASK_FUNC (ts_get_dbsize), FSVR_SA_CS, ALL_AUTHORITY},
-  {"getbackupinfo", TS_GETBACKUPINFO, 0, DEF_TASK_FUNC (ts_get_backup_info), FSVR_NONE, ALL_AUTHORITY},
+  {"backupvolinfo", TS_BACKUPVOLINFO, 0, DEF_TASK_FUNC (ts_backup_vol_info), FSVR_SA, AU_ANY},
+  {"getdbsize", TS_GETDBSIZE, 0, DEF_TASK_FUNC (ts_get_dbsize), FSVR_SA_CS, AU_ANY},
+  {"getbackupinfo", TS_GETBACKUPINFO, 0, DEF_TASK_FUNC (ts_get_backup_info), FSVR_NONE, AU_ANY},
   {"addbackupinfo", TS_ADDBACKUPINFO, 1, DEF_TASK_FUNC (ts_add_backup_info), FSVR_NONE, AU_DBC | AU_DBO | AU_JOB},
   {
     "deletebackupinfo", TS_DELETEBACKUPINFO, 1, DEF_TASK_FUNC (ts_delete_backup_info),
     FSVR_NONE, AU_DBC | AU_DBO | AU_JOB
   },
   {"setbackupinfo", TS_SETBACKUPINFO, 0, DEF_TASK_FUNC (ts_set_backup_info), FSVR_NONE, AU_DBC | AU_DBO | AU_JOB},
-  {"getautoaddvol", TS_GETAUTOADDVOL, 0, DEF_TASK_FUNC (ts_get_auto_add_vol), FSVR_NONE, ALL_AUTHORITY},
+  {"getautoaddvol", TS_GETAUTOADDVOL, 0, DEF_TASK_FUNC (ts_get_auto_add_vol), FSVR_NONE, AU_ANY},
   {"setautoaddvol", TS_SETAUTOADDVOL, 1, DEF_TASK_FUNC (ts_set_auto_add_vol), FSVR_NONE, AU_DBC | AU_DBO},
-  {"checkdir", TS_CHECKDIR, 0, DEF_TASK_FUNC (ts_check_dir), FSVR_NONE, ALL_AUTHORITY},
+  {"checkdir", TS_CHECKDIR, 0, DEF_TASK_FUNC (ts_check_dir), FSVR_NONE, AU_ANY},
   {
     "getautobackupdberrlog", TS_AUTOBACKUPDBERRLOG, 0, DEF_TASK_FUNC (ts_get_autobackupdb_error_log),
-    FSVR_NONE, ALL_AUTHORITY
+    FSVR_NONE, AU_ANY
   },
   {
     "getautoexecqueryerrlog", TS_AUTOEXECQUERYERRLOG, 0, DEF_TASK_FUNC (ts_get_autoexecquery_error_log),
-    FSVR_NONE, ALL_AUTHORITY
+    FSVR_NONE, AU_ANY
   },
   {
     "getdbmtuserinfo", TS_GETDBMTUSERINFO, 0, DEF_TASK_FUNC (tsGetDBMTUserInfo),
-    FSVR_NONE, ALL_AUTHORITY
+    FSVR_NONE, AU_ANY
   },
-  {"deletedbmtuser", TS_DELETEDBMTUSER, 1, DEF_TASK_FUNC (tsDeleteDBMTUser), FSVR_NONE, AU_DBC},
-  {"updatedbmtuser", TS_UPDATEDBMTUSER, 1, DEF_TASK_FUNC (tsUpdateDBMTUser), FSVR_NONE, AU_DBC},
-  {"setdbmtpasswd", TS_SETDBMTPASSWD, 1,DEF_TASK_FUNC (tsChangeDBMTUserPasswd), FSVR_NONE, ALL_AUTHORITY ^ AU_DBC},
-  {"adddbmtuser", TS_ADDDBMTUSER, 1, DEF_TASK_FUNC (tsCreateDBMTUser), FSVR_NONE, AU_DBC},
-  {"getaddvolstatus", TS_GETADDVOLSTATUS, 0, DEF_TASK_FUNC (ts_get_addvol_status), FSVR_NONE, ALL_AUTHORITY},
-  {"getautoaddvollog", TS_GETAUTOADDVOLLOG, 0, DEF_TASK_FUNC (tsGetAutoaddvolLog), FSVR_UC, ALL_AUTHORITY},
-  {"getinitbrokersinfo", TS2_GETINITUNICASINFO, 0, DEF_TASK_FUNC (ts2_get_unicas_info), FSVR_UC, ALL_AUTHORITY},
-  {"getbrokersinfo", TS2_GETUNICASINFO, 0, DEF_TASK_FUNC (ts2_get_unicas_info), FSVR_UC, ALL_AUTHORITY},
+  {"deletedbmtuser", TS_DELETEDBMTUSER, 1, DEF_TASK_FUNC (tsDeleteDBMTUser), FSVR_NONE, AU_ADMIN},
+  {"updatedbmtuser", TS_UPDATEDBMTUSER, 1, DEF_TASK_FUNC (tsUpdateDBMTUser), FSVR_NONE, AU_ADMIN},
+  {"setdbmtpasswd", TS_SETDBMTPASSWD, 1,DEF_TASK_FUNC (tsChangeDBMTUserPasswd), FSVR_NONE, AU_ANY},
+  {"adddbmtuser", TS_ADDDBMTUSER, 1, DEF_TASK_FUNC (tsCreateDBMTUser), FSVR_NONE, AU_ADMIN},
+  {"getaddvolstatus", TS_GETADDVOLSTATUS, 0, DEF_TASK_FUNC (ts_get_addvol_status), FSVR_NONE, AU_ANY},
+  {"getautoaddvollog", TS_GETAUTOADDVOLLOG, 0, DEF_TASK_FUNC (tsGetAutoaddvolLog), FSVR_UC, AU_ANY},
+  {"getinitbrokersinfo", TS2_GETINITUNICASINFO, 0, DEF_TASK_FUNC (ts2_get_unicas_info), FSVR_UC, AU_ANY},
+  {"getbrokersinfo", TS2_GETUNICASINFO, 0, DEF_TASK_FUNC (ts2_get_unicas_info), FSVR_UC, AU_ANY},
   {"startbroker", TS2_STARTUNICAS, 0, DEF_TASK_FUNC (ts2_start_unicas), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
   {"stopbroker", TS2_STOPUNICAS, 0, DEF_TASK_FUNC (ts2_stop_unicas), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
-  {"getadminloginfo", TS2_GETADMINLOGINFO, 0, DEF_TASK_FUNC (ts2_get_admin_log_info), FSVR_UC, ALL_AUTHORITY},
-  {"getlogfileinfo", TS2_GETLOGFILEINFO, 0, DEF_TASK_FUNC (ts2_get_logfile_info), FSVR_UC, ALL_AUTHORITY},
-  {"getaddbrokerinfo", TS2_GETADDBROKERINFO, 0, DEF_TASK_FUNC (ts2_get_add_broker_info), FSVR_UC, ALL_AUTHORITY},
+  {"getadminloginfo", TS2_GETADMINLOGINFO, 0, DEF_TASK_FUNC (ts2_get_admin_log_info), FSVR_UC, AU_ADMIN},
+  {"getlogfileinfo", TS2_GETLOGFILEINFO, 0, DEF_TASK_FUNC (ts2_get_logfile_info), FSVR_UC, AU_ANY},
+  {"getaddbrokerinfo", TS2_GETADDBROKERINFO, 0, DEF_TASK_FUNC (ts2_get_add_broker_info), FSVR_UC, AU_ANY},
   {"deletebroker", TS2_DELETEBROKER, 1, DEF_TASK_FUNC (ts2_delete_broker), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
-  {"getbrokerstatus", TS2_GETBROKERSTATUS, 0, DEF_TASK_FUNC (ts2_get_broker_status), FSVR_UC, ALL_AUTHORITY},
+  {"getbrokerstatus", TS2_GETBROKERSTATUS, 0, DEF_TASK_FUNC (ts2_get_broker_status), FSVR_UC, AU_ANY},
   {"broker_setparam", TS2_SETBROKERCONF, 1, DEF_TASK_FUNC (ts2_set_broker_conf), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
   {"broker_start", TS2_STARTBROKER, 0, DEF_TASK_FUNC (ts2_start_broker), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
   {"broker_stop", TS2_STOPBROKER, 0, DEF_TASK_FUNC (ts2_stop_broker), FSVR_UC, AU_DBC | AU_DBO | AU_BRK},
@@ -332,21 +334,21 @@ static T_FSERVER_TASK_INFO task_info[] =
     "broker_restart", TS2_RESTARTBROKERAS, 0, DEF_TASK_FUNC (ts2_restart_broker_as),
     FSVR_UC, AU_DBC | AU_DBO | AU_BRK
   },
-  {"checkfile", TS_CHECKFILE, 0, DEF_TASK_FUNC (ts_check_file), FSVR_NONE, ALL_AUTHORITY},
-  {"loadaccesslog", TS_LOADACCESSLOG, 0, DEF_TASK_FUNC (ts_load_access_log), FSVR_NONE, ALL_AUTHORITY},
-  {"getaccesslogfiles", TS_GETACCESSLOGFILES, 0, DEF_TASK_FUNC (ts_get_access_log_files), FSVR_NONE, ALL_AUTHORITY},
-  {"geterrorlogfiles", TS_GETERRORLOGFILES, 0, DEF_TASK_FUNC (ts_get_error_log_files), FSVR_NONE, ALL_AUTHORITY},
+  {"checkfile", TS_CHECKFILE, 0, DEF_TASK_FUNC (ts_check_file), FSVR_NONE, AU_ANY},
+  {"loadaccesslog", TS_LOADACCESSLOG, 0, DEF_TASK_FUNC (ts_load_access_log), FSVR_NONE, AU_ANY},
+  {"getaccesslogfiles", TS_GETACCESSLOGFILES, 0, DEF_TASK_FUNC (ts_get_access_log_files), FSVR_NONE, AU_ANY},
+  {"geterrorlogfiles", TS_GETERRORLOGFILES, 0, DEF_TASK_FUNC (ts_get_error_log_files), FSVR_NONE, AU_ANY},
   {"addtrigger", TS_ADDNEWTRIGGER, 1, DEF_TASK_FUNC (ts_trigger_operation), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"altertrigger", TS_ALTERTRIGGER, 1, DEF_TASK_FUNC (ts_trigger_operation), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"droptrigger", TS_DROPTRIGGER, 1, DEF_TASK_FUNC (ts_trigger_operation), FSVR_SA_CS, AU_DBC | AU_DBO},
-  {"gettriggerinfo", TS_GETTRIGGERINFO, 0, DEF_TASK_FUNC (ts_get_triggerinfo), FSVR_SA_CS, ALL_AUTHORITY},
-  {"getautoexecquery", TS_GETAUTOEXECQUERY, 0, DEF_TASK_FUNC (ts_get_autoexec_query), FSVR_SA_CS, ALL_AUTHORITY},
+  {"gettriggerinfo", TS_GETTRIGGERINFO, 0, DEF_TASK_FUNC (ts_get_triggerinfo), FSVR_SA_CS, AU_ANY},
+  {"getautoexecquery", TS_GETAUTOEXECQUERY, 0, DEF_TASK_FUNC (ts_get_autoexec_query), FSVR_SA_CS, AU_ANY},
   {
     "setautoexecquery", TS_SETAUTOEXECQUERY, 1, DEF_TASK_FUNC (ts_set_autoexec_query),
     FSVR_SA_CS, AU_DBC | AU_DBO | AU_JOB
   },
-  {"getdiagdata", TS_GET_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_diagdata), FSVR_NONE, ALL_AUTHORITY},
-  {"getbrokerdiagdata", TS_GET_BROKER_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_broker_diagdata), FSVR_NONE, ALL_AUTHORITY},
+  {"getdiagdata", TS_GET_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_diagdata), FSVR_NONE, AU_ANY},
+  {"getbrokerdiagdata", TS_GET_BROKER_DIAGDATA, 0, DEF_TASK_FUNC (ts_get_broker_diagdata), FSVR_NONE, AU_ANY},
   {
     "addstatustemplate", TS_ADDSTATUSTEMPLATE, 0, DEF_TASK_FUNC (ts_addstatustemplate),
     FSVR_NONE, AU_DBC | AU_DBO | AU_MON
@@ -359,8 +361,8 @@ static T_FSERVER_TASK_INFO task_info[] =
     "removestatustemplate", TS_REMOVESTATUSTEMPLATE, 0, DEF_TASK_FUNC (ts_removestatustemplate),
     FSVR_NONE, AU_DBC | AU_DBO | AU_MON
   },
-  {"getstatustemplate", TS_GETSTATUSTEMPLATE, 0, DEF_TASK_FUNC (ts_getstatustemplate), FSVR_NONE, ALL_AUTHORITY},
-  {"analyzecaslog", TS_ANALYZECASLOG, 0, DEF_TASK_FUNC (ts_analyzecaslog), FSVR_NONE, ALL_AUTHORITY},
+  {"getstatustemplate", TS_GETSTATUSTEMPLATE, 0, DEF_TASK_FUNC (ts_getstatustemplate), FSVR_NONE, AU_ANY},
+  {"analyzecaslog", TS_ANALYZECASLOG, 0, DEF_TASK_FUNC (ts_analyzecaslog), FSVR_NONE, AU_ANY},
   {
     "executecasrunner", TS_EXECUTECASRUNNER, 0, DEF_TASK_FUNC (ts_executecasrunner),
     FSVR_NONE, AU_DBC | AU_DBO | AU_BRK | AU_MON
@@ -369,57 +371,56 @@ static T_FSERVER_TASK_INFO task_info[] =
     "removecasrunnertmpfile", TS_REMOVECASRUNNERTMPFILE, 0, DEF_TASK_FUNC (ts_removecasrunnertmpfile),
     FSVR_NONE, AU_DBC | AU_DBO | AU_BRK | AU_MON
   },
-  {"getcaslogtopresult", TS_GETCASLOGTOPRESULT, 0, DEF_TASK_FUNC (ts_getcaslogtopresult), FSVR_NONE, ALL_AUTHORITY},
-  {"dbmtuserlogin", TS_DBMTUSERLOGIN, 0, DEF_TASK_FUNC (tsDBMTUserLogin), FSVR_NONE, ALL_AUTHORITY},
-  {"removelog", TS_REMOVE_LOG, 0, DEF_TASK_FUNC (ts_remove_log), FSVR_NONE, ALL_AUTHORITY},
-  {"getdbprocstat", TS_GETDBPROCSTAT, 0, DEF_TASK_FUNC (ts_get_dbproc_stat), FSVR_SA_CS, ALL_AUTHORITY},
-  {"gethoststat", TS_GETHOSTSTAT, 0, DEF_TASK_FUNC (ts_get_host_stat), FSVR_SA_CS, ALL_AUTHORITY},
-  {"heartbeatlist", TS_HEARTBEAT_LIST, 0, DEF_TASK_FUNC (ts_heartbeat_list), FSVR_SA_CS, ALL_AUTHORITY},
+  {"getcaslogtopresult", TS_GETCASLOGTOPRESULT, 0, DEF_TASK_FUNC (ts_getcaslogtopresult), FSVR_NONE, AU_ANY},
+  {"dbmtuserlogin", TS_DBMTUSERLOGIN, 0, DEF_TASK_FUNC (tsDBMTUserLogin), FSVR_NONE, AU_ANY},
+  {"removelog", TS_REMOVE_LOG, 0, DEF_TASK_FUNC (ts_remove_log), FSVR_NONE, AU_DBC | AU_DBO},
+  {"getdbprocstat", TS_GETDBPROCSTAT, 0, DEF_TASK_FUNC (ts_get_dbproc_stat), FSVR_SA_CS, AU_ANY},
+  {"gethoststat", TS_GETHOSTSTAT, 0, DEF_TASK_FUNC (ts_get_host_stat), FSVR_SA_CS, AU_ANY},
+  {"heartbeatlist", TS_HEARTBEAT_LIST, 0, DEF_TASK_FUNC (ts_heartbeat_list), FSVR_SA_CS, AU_ANY},
   {"changemode", TS_CHANGEMODE, 0, DEF_TASK_FUNC (ts_changemode), FSVR_CS, AU_DBC | AU_DBO},
-  {"getdbmode", TS_GETDBMODE, 0, DEF_TASK_FUNC (ts_get_db_mode), FSVR_SA_CS, ALL_AUTHORITY},
+  {"getdbmode", TS_GETDBMODE, 0, DEF_TASK_FUNC (ts_get_db_mode), FSVR_SA_CS, AU_ANY},
   {
     "getstandbyserverstat", TS_GET_STANDBY_SERVER_STAT, 0, DEF_TASK_FUNC (ts_get_standby_server_stat),
-    FSVR_SA_CS, ALL_AUTHORITY
+    FSVR_SA_CS, AU_ANY
   },
   {"rolechange", TS_ROLE_CHANGE, 0, DEF_TASK_FUNC (ts_role_change), FSVR_CS, AU_DBC | AU_DBO},
-  {"userverify", TS_USER_VERIFY, 0, DEF_TASK_FUNC (ts_user_verify), FSVR_SA_CS, ALL_AUTHORITY},
-  {"runsqlstatement", TS_RUN_SQL_STATEMENT, 0, DEF_TASK_FUNC (ts_run_sql_statement), FSVR_SA_CS, ALL_AUTHORITY},
+  {"userverify", TS_USER_VERIFY, 0, DEF_TASK_FUNC (ts_user_verify), FSVR_SA_CS, AU_ANY},
+  {"runsqlstatement", TS_RUN_SQL_STATEMENT, 0, DEF_TASK_FUNC (ts_run_sql_statement), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"writeandsaveconf", TS_WRITE_AND_SAVE_CONF, 0, DEF_TASK_FUNC (ts_write_and_save_conf), FSVR_SA_CS, AU_DBC | AU_DBO},
-  {"getfiletotallinenum", TS_GET_FILE_TOTAL_LINE_NUM, 0, DEF_TASK_FUNC (ts_get_file_total_line_num), FSVR_SA_CS, ALL_AUTHORITY},
-  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, ALL_AUTHORITY},
+  {"getfiletotallinenum", TS_GET_FILE_TOTAL_LINE_NUM, 0, DEF_TASK_FUNC (ts_get_file_total_line_num), FSVR_SA_CS, AU_ANY},
+  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, AU_ADMIN},
   {"copyfolder", TS_COPY_FOLDER, 0, DEF_TASK_FUNC (ts_copy_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"deletefolder", TS_DELETE_FOLDER, 0, DEF_TASK_FUNC (ts_delete_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {
     "getfolderswithkeyword", TS_GET_FOLDERS_WITH_KEYWORD, 0,DEF_TASK_FUNC (ts_get_folders_with_keyword),
-    FSVR_SA_CS, ALL_AUTHORITY
+    FSVR_SA_CS, AU_ANY
   },
-  {"getenvvarbyname", TS_GET_ENVVAR_BY_NAME, 0, DEF_TASK_FUNC (ts_get_envvar_by_name), FSVR_SA_CS, ALL_AUTHORITY},
-  {"errortrace", TS_ERROR_TRACE, 0, DEF_TASK_FUNC (ts_error_trace), FSVR_SA_CS, ALL_AUTHORITY},
-  {"login", TS_LOGIN, 0, DEF_TASK_FUNC (ts_login), FSVR_SA_CS, ALL_AUTHORITY},
-  {"logout", TS_LOGOUT, 0, DEF_TASK_FUNC (ts_logout), FSVR_SA_CS, ALL_AUTHORITY},
-  {"getcmsenv", TS_GET_CMS_ENV, 0, DEF_TASK_FUNC (ts_get_cms_env), FSVR_SA_CS, ALL_AUTHORITY},
-  {"keepalive", TS_KEEPALIVE, 0, DEF_TASK_FUNC (ts_keepalive), FSVR_CS, ALL_AUTHORITY},
+  {"getenvvarbyname", TS_GET_ENVVAR_BY_NAME, 0, DEF_TASK_FUNC (ts_get_envvar_by_name), FSVR_SA_CS, AU_ANY},
+  {"errortrace", TS_ERROR_TRACE, 0, DEF_TASK_FUNC (ts_error_trace), FSVR_SA_CS, AU_ANY},
+  {"login", TS_LOGIN, 0, DEF_TASK_FUNC (ts_login), FSVR_SA_CS, AU_ANY},
+  {"logout", TS_LOGOUT, 0, DEF_TASK_FUNC (ts_logout), FSVR_SA_CS, AU_ANY},
+  {"getcmsenv", TS_GET_CMS_ENV, 0, DEF_TASK_FUNC (ts_get_cms_env), FSVR_SA_CS, AU_ANY},
+  {"keepalive", TS_KEEPALIVE, 0, DEF_TASK_FUNC (ts_keepalive), FSVR_CS, AU_ANY},
   {"removefiles", TS_REMOVE_FILES, 0, DEF_TASK_FUNC (ts_remove_files), FSVR_NONE, AU_DBC | AU_DBO},
-  {"#jobtest", TS_JOB_TEST, 0, DEF_TASK_FUNC (ts_job_test), FSVR_NONE, ALL_AUTHORITY},
-  {"dbspace", TS_DB_SPACE_INFO, 0, DEF_TASK_FUNC (ts_dbs_spaceInfo), FSVR_NONE, ALL_AUTHORITY},
+  {"dbspace", TS_DB_SPACE_INFO, 0, DEF_TASK_FUNC (ts_dbs_spaceInfo), FSVR_NONE, AU_ANY},
   {"shard_start", TS_SHARD_START, 0, DEF_TASK_FUNC (ts_shard_start), FSVR_NONE, AU_DBC | AU_DBO | AU_BRK},
   {"shard_stop", TS_SHARD_STOP, 0, DEF_TASK_FUNC (ts_shard_stop), FSVR_NONE, AU_DBC | AU_DBO | AU_BRK},
-  {"getshardinfo", TS_GET_SHARD_INFO, 0, DEF_TASK_FUNC (ts_get_shard_info), FSVR_NONE, ALL_AUTHORITY},
-  {"getshardstatus", TS_GET_SHARD_STATUS, 0, DEF_TASK_FUNC (ts_get_shard_status), FSVR_NONE, ALL_AUTHORITY},
+  {"getshardinfo", TS_GET_SHARD_INFO, 0, DEF_TASK_FUNC (ts_get_shard_info), FSVR_NONE, AU_ANY},
+  {"getshardstatus", TS_GET_SHARD_STATUS, 0, DEF_TASK_FUNC (ts_get_shard_status), FSVR_NONE, AU_ANY},
   {"broker_changer", TS_BROKER_CHANGER, 0, DEF_TASK_FUNC (ts_broker_changer), FSVR_NONE, AU_DBC | AU_DBO | AU_BRK},
   {"ha_start", TS_HA_START, 0, DEF_TASK_FUNC (ts_ha_start), FSVR_NONE, AU_DBC | AU_DBO},
   {"ha_stop", TS_HA_STOP, 0, DEF_TASK_FUNC (ts_ha_stop), FSVR_NONE, AU_DBC | AU_DBO},
-  {"ha_status", TS_HA_STATUS, 0, DEF_TASK_FUNC (ts_ha_status), FSVR_NONE, ALL_AUTHORITY},
+  {"ha_status", TS_HA_STATUS, 0, DEF_TASK_FUNC (ts_ha_status), FSVR_NONE, AU_ANY},
   {"ha_copylogdb", TS_HA_COPYLOGDB, 0, DEF_TASK_FUNC (ts_ha_copylogdb), FSVR_NONE, AU_DBC | AU_DBO},
   {"ha_applylogdb", TS_HA_APPLYLOGDB, 0, DEF_TASK_FUNC (ts_ha_applylogdb), FSVR_NONE, AU_DBC | AU_DBO},
   {"ha_reload", TS_HA_RELOAD, 0, DEF_TASK_FUNC (ts_ha_reload), FSVR_NONE, AU_DBC | AU_DBO},
-  {"list_dir", TS_LIST_DIR, 0, DEF_TASK_FUNC (ts_list_dir), FSVR_NONE, ALL_AUTHORITY},
+  {"list_dir", TS_LIST_DIR, 0, DEF_TASK_FUNC (ts_list_dir), FSVR_NONE, AU_ANY},
   {"autoupdate", TS_AUTO_UPDATE, 0, DEF_TASK_FUNC (ts_auto_update), FSVR_NONE, AU_ADMIN},
   {"isupdatesuccess", TS_IS_UPDATE_SUCCESS, 0, DEF_TASK_FUNC (ts_is_update_success), FSVR_NONE, AU_ADMIN},
-  {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, ALL_AUTHORITY},
-  {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, ALL_AUTHORITY},
-  {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, ALL_AUTHORITY},
-  {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, ALL_AUTHORITY},
+  {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, AU_ANY},
+  {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, AU_ADMIN},
+  {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
+  {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}
 };
 
@@ -760,7 +761,9 @@ ut_error_log (nvplist *req, const char *errmsg)
   const char *id, *addr, *task;
   char strbuf[512];
 
-  if ((task = nv_get_val (req, "task")) == NULL)
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  if ((task = nv_get_val (req, "_TASK")) == NULL
+      && (task = nv_get_val (req, "task")) == NULL)
     {
       task = "-";
     }
@@ -800,7 +803,9 @@ ut_access_log (nvplist *req, const char *msg)
 
   strbuf[0] = '\0';
 
-  if ((task = nv_get_val (req, "task")) == NULL)
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  if ((task = nv_get_val (req, "_TASK")) == NULL
+      && (task = nv_get_val (req, "task")) == NULL)
     {
       task = "-";
     }
@@ -1382,6 +1387,33 @@ uRemoveDir (char *dir, int remove_file_in_dir)
 }
 
 #if defined(WINDOWS)
+/*
+ * folder_copy () does not follow links inside the tree. is_authorized_dirname
+ * () checked only the top source and destination directories, so a link
+ * below them must not lead the copy to a protected file (read) or under
+ * a program directory ($CUBRID/bin, lib, java) (write).
+ *
+ * win_is_link_entry () - the entry found by FindFirstFile ()/FindNextFile ()
+ *   is a symbolic link or a junction. Other reparse points (deduplicated or
+ *   cloud files) are ordinary files and are copied.
+ */
+static bool
+win_is_link_entry (const WIN32_FIND_DATA *data)
+{
+  return (data->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+	 && (data->dwReserved0 == IO_REPARSE_TAG_SYMLINK
+	     || data->dwReserved0 == IO_REPARSE_TAG_MOUNT_POINT);
+}
+
+/* `path` exists and is a reparse point (link, junction, ...) */
+static bool
+win_is_reparse_point (const char *path)
+{
+  DWORD attrs = GetFileAttributes (path);
+
+  return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT);
+}
+
 int
 folder_copy (const char *src_folder, const char *dest_folder)
 {
@@ -1444,15 +1476,25 @@ folder_copy (const char *src_folder, const char *dest_folder)
       snprintf (dest_path, PATH_MAX - 1, "%s/%s", dest_dir,
 		FileData.cFileName);
 
+      if (strcmp (FileData.cFileName, ".") == 0
+	  || strcmp (FileData.cFileName, "..") == 0)
+	{
+	  continue;
+	}
+
+      /*
+       * Do not follow links (see win_is_link_entry ()): a link or junction in
+       * the source fails the copy (creating one needs a privilege CMS may
+       * not have), and nothing is written through one in the destination.
+       */
+      if (win_is_link_entry (&FileData) || win_is_reparse_point (dest_path))
+	{
+	  goto err_clean_return;
+	}
+
       /* a directory may carry other attributes too (read-only, hidden, ...) */
       if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
-	  /* ignore folder "." and "..". */
-	  if (strcmp (FileData.cFileName, ".") == 0
-	      || strcmp (FileData.cFileName, "..") == 0)
-	    {
-	      continue;
-	    }
 
 	  if (folder_copy (src_path, dest_path) < 0)
 	    {
@@ -1553,21 +1595,64 @@ folder_copy (const char *src_folder, const char *dest_folder)
       char src_path[COMPOSED_PATH_MAX];
       char dest_path[COMPOSED_PATH_MAX];
 
+      struct stat dest_stat;
+
+      if (uStringEqual (dirp->d_name, ".")
+	  || uStringEqual (dirp->d_name, ".."))
+	{
+	  continue;
+	}
+
       snprintf (src_path, sizeof (src_path), "%s/%s", src_dir,
 		dirp->d_name);
       snprintf (dest_path, sizeof (dest_path), "%s/%s", dest_dir,
 		dirp->d_name);
 
-      stat (src_path, &statbuf);
-
-      if (S_ISDIR (statbuf.st_mode))
+      /*
+       * Do not follow symbolic links. is_authorized_dirname () checked only
+       * the top source and destination directories, so a link below them
+       * must not lead the copy to a protected file (read) or under a
+       * program directory ($CUBRID/bin, lib, java) (write): lstat (), not
+       * stat (), and never write through a link already in the destination.
+       */
+      if (lstat (src_path, &statbuf) != 0)
 	{
-	  if (uStringEqual (dirp->d_name, ".")
-	      || uStringEqual (dirp->d_name, ".."))
-	    {
-	      continue;
-	    }
+	  goto err_clean_return;
+	}
+      if (lstat (dest_path, &dest_stat) == 0 && S_ISLNK (dest_stat.st_mode))
+	{
+	  goto err_clean_return;
+	}
 
+      if (S_ISLNK (statbuf.st_mode))
+	{
+	  /*
+	   * copy the link itself, as "cp -P" does; its target is not read. A
+	   * later file task on the copy resolves the link and is checked
+	   * against the protected files and the program directories as usual.
+	   */
+	  char target[PATH_MAX];
+	  ssize_t len = readlink (src_path, target, sizeof (target) - 1);
+
+	  if (len < 0)
+	    {
+	      goto err_clean_return;
+	    }
+	  target[len] = '\0';
+	  if (lstat (dest_path, &dest_stat) == 0)
+	    {
+	      if (S_ISDIR (dest_stat.st_mode) || unlink (dest_path) != 0)
+		{
+		  goto err_clean_return;
+		}
+	    }
+	  if (symlink (target, dest_path) != 0)
+	    {
+	      goto err_clean_return;
+	    }
+	}
+      else if (S_ISDIR (statbuf.st_mode))
+	{
 	  if (folder_copy (src_path, dest_path) < 0)
 	    {
 	      goto err_clean_return;
@@ -2570,29 +2655,23 @@ make_default_env (void)
 int
 _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd)
 {
-  int retval;
-  char *ip, *port, *dbname;
-  char _dbmt_error[1024];
-  T_DBMT_CON_DBINFO con_dbinfo;
+  char *token, *dbname;
 
   dbid[0] = dbpasswd[0] = '\0';
 
-  ip = nv_get_val (req, "_IP");
-  port = nv_get_val (req, "_PORT");
+  token = nv_get_val (req, "_TOKEN");
   dbname = nv_get_val (req, "dbname");
 
-  /* read conlist */
-  memset (&con_dbinfo, 0, sizeof (T_DBMT_CON_DBINFO));
-  if ((retval =
-	       dbmt_con_read_dbinfo (&con_dbinfo, ip, port, dbname,
-				     _dbmt_error)) <= 0)
+  /*
+   * Read the DB login this session stored with dbmtuserlogin (CBRD-26598).
+   * Only this session's own credentials are used; nothing is read from disk,
+   * and a different session or user cannot supply them.
+   */
+  if (!dbmt_user_session_get_dblogin (token, dbname, dbid, 32,
+				      dbpasswd, PASSWD_LENGTH + 1))
     {
       return 0;
     }
-
-  /* extract db user info */
-  strcpy (dbid, con_dbinfo.uid);
-  uDecrypt (PASSWD_LENGTH, con_dbinfo.passwd, dbpasswd);
 
   return 1;
 }
@@ -2752,81 +2831,6 @@ uGenerateStatus (nvplist *req, nvplist *res, int retval,
 }
 
 
-/* validate token and insert id */
-int
-ut_validate_token (nvplist *req)
-{
-  T_USER_TOKEN_INFO token_info;
-
-  time_t active_time = 0;
-  time_t now_time = time (NULL);
-
-  //int retval;
-
-  char *ip, *port, *id, *tok[3];
-  char *token, token_content[TOKEN_LENGTH + 1];
-
-  if (!strcmp (nv_get_val (req, "task"), "login") ||
-      !strcmp (nv_get_val (req, "task"), "getcmsenv"))
-    {
-      ut_access_log (req, "task = login or getcmsenv.");
-      return 1;
-    }
-
-  if ((token = nv_get_val (req, "token")) == NULL)
-    {
-      return 0;
-    }
-  ut_access_log (req, "task != login or getcmsenv.");
-
-  uDecrypt (TOKEN_LENGTH, token, token_content);
-
-  if (string_tokenize2 (token_content, tok, 3, ':') < 0)
-    {
-      return 0;
-    }
-
-  ip = tok[0];
-  port = tok[1];
-  id = tok[2];
-
-  ut_access_log (req, id);
-
-  if (!dbmt_user_search_token_info (id, &token_info))
-    {
-      ut_access_log (req, "can't find registered token.");
-      return 0;
-    }
-
-  if (strcmp (token_info.token, token))
-    {
-      ut_access_log (req, "tokens aren't equal!");
-      return 0;
-    }
-
-  ut_get_token_active_time (&active_time);
-
-  if (now_time - token_info.login_time > active_time)
-    {
-      return 0;
-    }
-
-  if (!dbmt_user_touch_token_login_time (id, token, now_time))
-    {
-      return 0;
-    }
-
-  nv_add_nvp (req, "_IP", ip);
-  nv_add_nvp (req, "_PORT", port);
-  nv_add_nvp (req, "_ID", id);
-
-
-  /* check if ip is an existing ip */
-  //retval = dbmt_con_search (ip, port, cli_ver);
-
-  return 1;
-}
-
 /*
  *   client ip : client port : dbmt id : pserver pid
  *      15            5           8           5      = 33 + 4 = 37
@@ -2837,35 +2841,60 @@ char *
 ut_token_generate (char *client_ip, char *client_port, char *dbmt_id,
 		   int proc_id, time_t login_time)
 {
-  char sbuf[TOKEN_LENGTH + 1];
-  char token_string[TOKEN_ENC_LENGTH];
-  size_t i, len;
+  /*
+   * The token is an opaque random value, not an encryption of the session
+   * fields: there is nothing in it to decrypt or forge.
+   * The session (ip/port/id, login time, DB logins) is held server-side in the
+   * session map keyed by this token. TOKEN_LENGTH random bytes are emitted as
+   * a hex string, so the printed length (TOKEN_LENGTH * 2) matches the old
+   * token and existing buffers (TOKEN_ENC_LENGTH) are unchanged.
+   */
+  unsigned char rnd[TOKEN_LENGTH];
+  char *token_string;
+  int i;
 
   if ((client_ip == NULL) || (client_port == NULL) || (dbmt_id == NULL))
     {
       return NULL;
     }
-  memset (sbuf, 0, TOKEN_LENGTH + 1);
-  snprintf (sbuf, TOKEN_LENGTH, "%s:%s:%s:%d:%lu", client_ip, client_port,
-	    dbmt_id, proc_id, login_time);
-  len = strlen (sbuf);
-  /* insert padding to checksum part */
-  for (i = len; i < TOKEN_LENGTH; ++i)
+
+  (void) proc_id;
+  (void) login_time;
+
+  if (RAND_bytes (rnd, sizeof (rnd)) != 1)
     {
-      sbuf[i] = '*';
+      return NULL;
     }
-  sbuf[i] = '\0';
 
-  uEncrypt (TOKEN_LENGTH, sbuf, token_string);
+  token_string = (char *) malloc (TOKEN_ENC_LENGTH);
+  if (token_string == NULL)
+    {
+      return NULL;
+    }
 
-  return strdup (token_string);
+  for (i = 0; i < TOKEN_LENGTH; ++i)
+    {
+      sprintf (token_string + i * 2, "%02x", rnd[i]);
+    }
+  token_string[TOKEN_LENGTH * 2] = '\0';
+
+  return token_string;
 }
 
-void
-_accept_connection (nvplist *cli_request, nvplist *cli_response)
+/*
+ * _accept_connection () - create the session of a successful login.
+ *   The token is generated, the session is registered under it, and only
+ *   then is the token put in the response, so a client never gets a token
+ *   without a session behind it.
+ *   return: ERR_NO_ERROR, or an error code with _dbmt_error set; the login
+ *   then fails.
+ */
+int
+_accept_connection (nvplist *cli_request, nvplist *cli_response, char *_dbmt_error)
 {
   char *pstrbuf;
   char *client_ip, *client_port, *client_id, *client_ver;
+  int retval;
 #ifdef WINDOWS
   HANDLE proc_id = (HANDLE) getpid ();
 #else
@@ -2879,20 +2908,40 @@ _accept_connection (nvplist *cli_request, nvplist *cli_response)
   client_id = nv_get_val (cli_request, "id");
   client_ver = nv_get_val (cli_request, "clientver");
 
-  /* generate token and record new connection to file */
-  pstrbuf =
-	  ut_token_generate (client_ip, client_port, client_id, getpid (),
-			     login_time);
-  nv_add_nvp (cli_response, "token", pstrbuf);
-
-  dbmt_con_add (client_ip, client_port, client_ver, client_id);
+  /*
+   * NULL when RAND_bytes () fails (no entropy), when an argument is missing,
+   * or when memory runs out. Never fall back to a weaker token: refuse the
+   * login.
+   */
+  pstrbuf = ut_token_generate (client_ip, client_port, client_id, getpid (),
+			       login_time);
+  if (pstrbuf == NULL)
+    {
+      ut_error_log (cli_request, "failed to generate a session token.");
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"Failed to create a session. Please try again.");
+      return ERR_WITH_MSG;
+    }
 
   ut_access_log (cli_request, "before add token into token list.");
-  dbmt_user_new_token_info (client_id, client_ip, client_port, pstrbuf,
-			    proc_id, login_time);
+  retval = dbmt_user_new_token_info (client_id, client_ip, client_port, pstrbuf,
+				     proc_id, login_time);
+  if (retval != ERR_NO_ERROR)
+    {
+      ut_error_log (cli_request, "failed to register the session.");
+      free (pstrbuf);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"Failed to create a session. Please try again.");
+      return ERR_WITH_MSG;
+    }
+
+  /* record the new connection to file */
+  dbmt_con_add (client_ip, client_port, client_ver, client_id);
+
+  nv_add_nvp (cli_response, "token", pstrbuf);
 
   free (pstrbuf);
-  return;
+  return ERR_NO_ERROR;
 }
 
 
@@ -3862,54 +3911,6 @@ IsValidUserName (const char *pUserName)
   return 0;
 }
 
-int
-ut_get_token_active_time (time_t *active_time)
-{
-  char file_name[PATH_MAX];
-  char line_buf[LINE_MAX];
-  FILE *in_file = NULL;
-  char *pos = NULL;
-
-  file_name[0] = '\0';
-  line_buf[0] = '\0';
-
-  conf_get_dbmt_file (FID_DBMT_CONF, file_name);
-  in_file = fopen (file_name, "r");
-
-  if (in_file == NULL)
-    {
-      return 1;
-    }
-
-  *active_time = 0;
-  while (fgets (line_buf, LINE_MAX, in_file) != NULL)
-    {
-      if (line_buf[0] == '#')
-	{
-	  continue;
-	}
-
-      if ((pos = strstr (line_buf, "=")) != NULL &&
-	  strstr (line_buf, "token_active_time") != NULL)
-	{
-	  char tmp_str[LINE_MAX];
-	  strcpy (tmp_str, pos + 1);
-
-	  *active_time = atoi (tmp_str);
-
-	  break;
-	}
-    }
-  fclose (in_file);
-
-  if (*active_time == 0)
-    {
-      *active_time = 7200;
-    }
-
-  return 0;
-}
-
 static int
 get_short_filename (char *ret_name, int ret_name_len,
 		    char *short_filename)
@@ -4784,6 +4785,28 @@ is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
   return ret;
 }
 
+/*
+ * has_stream_name () - Windows: a ':' anywhere but after the drive letter
+ *   names an NTFS alternate data stream (cm.pass:x, cm.pass::$DATA), another
+ *   way to reach a file that a plain path comparison does not catch. No
+ *   valid file name has one. Always false elsewhere.
+ */
+static bool
+has_stream_name (const std::string &path)
+{
+#if defined (WINDOWS)
+  size_t pos = path.find (':');
+
+  if (pos == 1 && std::isalpha ((unsigned char) path[0]))
+    {
+      pos = path.find (':', 2);
+    }
+  return pos != std::string::npos;
+#else
+  return false;
+#endif
+}
+
 bool
 is_valid_filename (const char *filename, std::string &expanded_path)
 {
@@ -4804,6 +4827,11 @@ is_valid_filename (const char *filename, std::string &expanded_path)
     }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  if (has_stream_name (expanded_path))
     {
       return false;
     }
@@ -4832,6 +4860,11 @@ is_valid_filename (const char *filename)
     }
 
   if (expanded_path.find_first_of (FORBIDDEN_CHARS) != std::string::npos)
+    {
+      return false;
+    }
+
+  if (has_stream_name (expanded_path))
     {
       return false;
     }
@@ -5090,6 +5123,291 @@ is_subpath (const char *allowd_path, const char *path)
   return clean_user.rfind (clean_allowed, 0) == 0;
 }
 
+/*
+ * Protected files.
+ *
+ * These files hold CMS user passwords and authorities, DB passwords or the
+ * TLS private key. No file task may read or write them, whatever the
+ * caller's authority (admin included); the server itself reaches them only
+ * through its own code, never through a path taken from a request.
+ */
+static std::vector<std::string>
+protected_files (void)
+{
+  static const T_DBMT_FILE_ID fids[] =
+  {
+    FID_DBMT_PASS,		/* cm.pass */
+    FID_DBMT_CUBRID_PASS,	/* cmdb.pass */
+    FID_CONN_LIST,		/* conlist */
+    FID_AUTO_JOBS_CONF,		/* autojobs.conf */
+    FID_AUTO_EXECQUERY_CONF	/* autoexecquery.conf */
+  };
+  std::vector<std::string> files;
+  char buf[PATH_MAX];
+
+  for (size_t i = 0; i < sizeof (fids) / sizeof (fids[0]); i++)
+    {
+      buf[0] = '\0';
+      if (conf_get_dbmt_file (fids[i], buf) != NULL && buf[0] != '\0')
+	{
+	  files.push_back (buf);
+	}
+    }
+  if (sco.szSSLKey[0] != '\0')
+    {
+      files.push_back (sco.szSSLKey);
+    }
+  if (sco.szSSLCertificate[0] != '\0')
+    {
+      files.push_back (sco.szSSLCertificate);
+    }
+
+  return files;
+}
+
+#if defined (WINDOWS)
+/*
+ * win_final_path () - the name Windows itself gives the existing file or
+ *   directory `path`: long names instead of 8.3 short names, the real case,
+ *   trailing dots and spaces dropped, and symbolic links and junctions
+ *   resolved. Without the "\\?\" prefix that GetFinalPathNameByHandle adds.
+ */
+static bool
+win_final_path (const std::string &path, std::string &final_path)
+{
+  char buf[PATH_MAX];
+  HANDLE h;
+  DWORD n;
+
+  /* access 0: only query the name; FILE_FLAG_BACKUP_SEMANTICS opens directories */
+  h = CreateFileA (path.c_str (), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+		   OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      return false;
+    }
+  n = GetFinalPathNameByHandleA (h, buf, sizeof (buf), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+  CloseHandle (h);
+  if (n == 0 || n >= sizeof (buf))
+    {
+      return false;
+    }
+
+  final_path = buf;
+  if (final_path.compare (0, 8, "\\\\?\\UNC\\") == 0)
+    {
+      final_path = "\\" + final_path.substr (7);
+    }
+  else if (final_path.compare (0, 4, "\\\\?\\") == 0)
+    {
+      final_path = final_path.substr (4);
+    }
+  return true;
+}
+#endif
+
+/*
+ * resolve_path () - the path the operating system really opens, so that
+ *   another spelling cannot stand in for a protected file or for a program
+ *   directory ($CUBRID/bin, lib, java).
+ *   Linux: symbolic links resolved (realpath).
+ *   Windows: the name the file system gives the file (win_final_path ()), so
+ *   that 8.3 short names (CM~1.PAS), trailing dots or spaces (cm.pass.), case,
+ *   symbolic links and junctions all map to the same path.
+ *   A path that does not exist yet (a file about to be written) is resolved
+ *   through its parent directory. Returns the path unchanged when it cannot be
+ *   resolved.
+ */
+static std::string
+resolve_path (const std::string &path)
+{
+#if defined (WINDOWS)
+  char full[PATH_MAX];
+  DWORD n;
+  std::string final_path;
+
+  /* separators, "." and ".." and the trailing dots/spaces of the last part */
+  n = GetFullPathNameA (path.c_str (), sizeof (full), full, NULL);
+  if (n == 0 || n >= sizeof (full))
+    {
+      return path;
+    }
+  std::string normalized = full;
+
+  if (win_final_path (normalized, final_path))
+    {
+      return final_path;
+    }
+
+  size_t pos = normalized.find_last_of ('\\');
+  if (pos != std::string::npos && pos > 0)
+    {
+      std::string parent = normalized.substr (0, pos);
+      std::string last = normalized.substr (pos + 1);
+
+      if (parent.size () == 2 && parent[1] == ':')
+	{
+	  parent += '\\';		/* "C:" is the current directory of C:, not its root */
+	}
+      /* Windows drops them when it creates the file */
+      while (!last.empty () && (last.back () == '.' || last.back () == ' '))
+	{
+	  last.pop_back ();
+	}
+      if (win_final_path (parent, final_path))
+	{
+	  if (final_path.empty () || final_path.back () != '\\')
+	    {
+	      final_path += '\\';
+	    }
+	  return final_path + last;
+	}
+    }
+  return normalized;
+#else
+  char buf[PATH_MAX];
+
+  if (realpath (path.c_str (), buf) != NULL)
+    {
+      return std::string (buf);
+    }
+
+  size_t pos = path.find_last_of ('/');
+  if (pos != std::string::npos && pos > 0)
+    {
+      std::string parent = path.substr (0, pos);
+      if (realpath (parent.c_str (), buf) != NULL)
+	{
+	  return std::string (buf) + path.substr (pos);
+	}
+    }
+  return path;
+#endif
+}
+
+/* the same path after normalization (is_subpath () both ways) */
+static bool
+is_same_path (const std::string &a, const std::string &b)
+{
+  return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
+}
+
+/* `path` (expanded) is one of the protected files */
+static bool
+is_protected_file (const std::string &path)
+{
+  std::vector<std::string> files = protected_files ();
+  std::string resolved = resolve_path (path);
+
+  for (size_t i = 0; i < files.size (); i++)
+    {
+      if (is_same_path (files[i], path) || is_same_path (resolve_path (files[i]), resolved))
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+/* a protected file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_protected_file (const std::string &dir)
+{
+  std::vector<std::string> files = protected_files ();
+  std::string resolved = resolve_path (dir);
+
+  for (size_t i = 0; i < files.size (); i++)
+    {
+      if (is_subpath (dir.c_str (), files[i].c_str ())
+	  || is_subpath (resolved.c_str (), resolve_path (files[i]).c_str ()))
+	{
+	  return true;
+	}
+    }
+  return false;
+}
+
+/*
+ * Program directories of CUBRID: no file task may write, empty or delete
+ * anything in them. They hold the executables (bin), the shared libraries
+ * (lib) and the jars of the PL server (java); overwriting one, even with
+ * text, can stop the engine or the PL server from starting.
+ */
+static const char *const cubrid_program_dirs[] = { "bin", "lib", "java" };
+
+/* `path` (expanded) is $CUBRID/<dir> or under it */
+static bool
+is_under_cubrid_dir (const std::string &path, const char *dir)
+{
+  std::string top = std::string (sco.szCubrid) + "/" + dir;
+
+  return is_subpath (top.c_str (), path.c_str ())
+	 || is_subpath (resolve_path (top).c_str (), resolve_path (path).c_str ());
+}
+
+/*
+ * is_under_cubrid_program_dir () - `path` (expanded) is one of the program
+ *   directories ($CUBRID/bin, lib, java) or under it. Returns that
+ *   directory's name, or NULL.
+ */
+static const char *
+is_under_cubrid_program_dir (const std::string &path)
+{
+  for (size_t i = 0; i < sizeof (cubrid_program_dirs) / sizeof (cubrid_program_dirs[0]); i++)
+    {
+      if (is_under_cubrid_dir (path, cubrid_program_dirs[i]))
+	{
+	  return cubrid_program_dirs[i];
+	}
+    }
+  return NULL;
+}
+
+/*
+ * overlaps_cubrid_program_dir () - a program directory is `dir` (expanded)
+ *   itself, under it, or above it (so a recursive copy into or a delete of
+ *   `dir` would reach it). Returns that directory's name, or NULL.
+ */
+static const char *
+overlaps_cubrid_program_dir (const std::string &dir)
+{
+  for (size_t i = 0; i < sizeof (cubrid_program_dirs) / sizeof (cubrid_program_dirs[0]); i++)
+    {
+      std::string top = std::string (sco.szCubrid) + "/" + cubrid_program_dirs[i];
+
+      if (is_under_cubrid_dir (dir, cubrid_program_dirs[i])
+	  || is_subpath (dir.c_str (), top.c_str ())
+	  || is_subpath (resolve_path (dir).c_str (), resolve_path (top).c_str ()))
+	{
+	  return cubrid_program_dirs[i];
+	}
+    }
+  return NULL;
+}
+
+static void
+set_path_error (char *_dbmt_error, const char *reason, const char *path)
+{
+  std::string origin_path = path ? path : "(NULL)";
+
+  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s: %s", reason, origin_path.c_str ());
+}
+
+/* "writing under $CUBRID/<dir> is not allowed: <path>" */
+static void
+set_program_dir_error (char *_dbmt_error, const char *dir, const char *path)
+{
+  std::string reason = std::string ("writing under $CUBRID/") + dir + " is not allowed";
+
+  set_path_error (_dbmt_error, reason.c_str (), path);
+}
+
+/*
+ * is_authorized_filename () - the path is under $CUBRID or $CUBRID_DATABASES
+ * and is not a protected file (cm.pass, cmdb.pass, conlist, autojobs.conf,
+ * autoexecquery.conf, the TLS key and certificate). For every file task.
+ */
 bool
 is_authorized_filename (const char *path, char *_dbmt_error)
 {
@@ -5101,19 +5419,86 @@ is_authorized_filename (const char *path, char *_dbmt_error)
       return false;
     }
 
-  if (is_subpath (sco.szCubrid, expanded_path.c_str ()) || is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
+  if (!is_subpath (sco.szCubrid, expanded_path.c_str ())
+      && !is_subpath (sco.szCubrid_databases, expanded_path.c_str ()))
     {
-      return true;
+      std::string origin_path = path;
+      std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
+
+      std::replace (origin_path.begin (), origin_path.end (), '%', '*');
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
+		allowed_path.c_str (), origin_path.c_str ());
+      return false;
     }
 
-  std::string origin_path = path;
-  std::string allowed_path = std::string (sco.szCubrid) + ", " + sco.szCubrid_databases;
+  if (is_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "access to a protected file is not allowed", path);
+      return false;
+    }
 
-  std::replace (origin_path.begin (), origin_path.end (), '%', '*');
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is not authorized (allowed paths are %s): %s",
-	    allowed_path.c_str (), origin_path.c_str ());
+  return true;
+}
 
-  return false;
+/*
+ * is_authorized_write_filename () - as above, and not under a program
+ * directory ($CUBRID/bin, lib, java). For tasks that write, truncate or
+ * delete a file (writeandsaveconf, writeprivatedata, resetlog, removelog).
+ */
+bool
+is_authorized_write_filename (const char *path, char *_dbmt_error)
+{
+  std::string expanded_path;
+  const char *program_dir;
+
+  if (!is_authorized_filename (path, _dbmt_error))
+    {
+      return false;
+    }
+
+  /* is_authorized_filename () has already validated and expanded it */
+  (void) is_valid_filename (path, expanded_path);
+  if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
+    {
+      set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  return true;
+}
+
+/*
+ * is_authorized_dirname () - as is_authorized_filename (), and no protected
+ * file under the directory; with FOR_WRITE, the directory must also not
+ * overlap a program directory ($CUBRID/bin, lib, java). For tasks that copy
+ * or delete a directory tree.
+ */
+bool
+is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
+{
+  std::string expanded_path;
+  const char *program_dir;
+
+  if (!is_authorized_filename (path, _dbmt_error))
+    {
+      return false;
+    }
+
+  (void) is_valid_filename (path, expanded_path);
+  if (contains_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "the directory contains a protected file", path);
+      return false;
+    }
+
+  if (access == FOR_WRITE
+      && (program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
+    {
+      set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  return true;
 }
 
 bool

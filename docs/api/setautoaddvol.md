@@ -2,12 +2,14 @@
 
 Set auto addvol option.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | data | ON or OFF, enable the automatic extension of the data volume |
 | data_warn_outofspace | the free space ratio which triggers the extension of the data volume |

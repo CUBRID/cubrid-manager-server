@@ -2,13 +2,17 @@
 
 The loaddb interface will load a database from files.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | a name of the database |
+| dbuser | database user to load as (optional). Without it, the DB login saved in this session by `dbmtuserlogin` is used |
+| dbpasswd | password of `dbuser` (optional) |
 | checkoption | check syntax for data file or not |
 | period | insertion COUNT for periodic commit |
 | user | load databases user name |
@@ -27,6 +31,7 @@ The loaddb interface will load a database from files.
 | trigger | the full path of the trigger file to be loaded |
 | async | default "no", if "yes" run the task in asynchronous mode |
 
+* `_DBID`/`_DBPASSWD`: older clients send the DB login under these internal names. For compatibility CMS still takes them as `dbuser`/`dbpasswd` (a `dbuser`/`dbpasswd` in the same request wins). This will be removed in the next release; send `dbuser`/`dbpasswd`.
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 

@@ -42,6 +42,7 @@ cm_admin_SOURCES = \
 	$(DBMT_DIR)/cm_cmd_task.cpp \
 	$(DBMT_DIR)/cm_server_status.cpp
 cm_admin_CFLAGS = -D_FILE_OFFSET_BITS=64
+cm_admin_CPPFLAGS = $(AM_CPPFLAGS) @EXTERNAL_INC@
 cm_admin_LDFLAGS =  @CMDEP_LIB@ -D_FILE_OFFSET_BITS=64
 
 cub_manager_SOURCES = \

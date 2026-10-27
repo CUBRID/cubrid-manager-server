@@ -2,12 +2,14 @@
 
 Get the CUBRID Manager server environment variables.
 
+Permissions required to run this task: none (no login required)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 
 ## Request Sample

@@ -2,12 +2,14 @@
 
 Runs `cubrid heartbeat list` command.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbmodeall | y : all, n : only includes HA-Node, Node excepts Applylogdb, Copylogdb, Server |
 | dblist | database name |
 

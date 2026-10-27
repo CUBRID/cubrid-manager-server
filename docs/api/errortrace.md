@@ -3,12 +3,16 @@
 Get the error block which matches the given error id and error time from a CUBRID error log file.
 A block is returned only when it contains both `EID = <eid>` and `<errtime> (`.
 
+Permissions required to run this task: none (any logged-in user)
+
+* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | logpath | the full path of the error log file |
 | eid | error id to be traced |
 | errtime | the time the error occurred |

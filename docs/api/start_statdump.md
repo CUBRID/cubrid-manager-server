@@ -2,12 +2,14 @@
 
 Activate *background* statdump process to accumulate values per seconds, to stop it use [stop_statdump](stop_statdump.md)
 
+Permissions required to run this task: one of DBC, DBO, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name to activate statdump|
 | dbuser | database username |
 | dbpasswd | password of dbuser |

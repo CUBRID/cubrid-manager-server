@@ -2,12 +2,14 @@
 
 The backupvolinfo interface will get database backup volume information.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | level | backup level, 0, 1 or 2 |
 | pathname | the full path of the backup volume |

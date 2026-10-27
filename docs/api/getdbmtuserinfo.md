@@ -2,12 +2,16 @@
 
 The getdbmtuserinfo interface will fetch CUBRID Manager user information.
 
+Permissions required to run this task: none (any logged-in user)
+
+* The response carries no password of a CMS user, neither in plain text nor in its stored form. Earlier versions returned every user's password as `@passwd`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 
@@ -74,7 +78,6 @@ userlist is composed of `user` objects with following structure
          "user" : [
             {
                "@id" : "admin",
-               "@passwd" : "admin",
                "casauth" : "admin",
                "dbauth" : [
                   {

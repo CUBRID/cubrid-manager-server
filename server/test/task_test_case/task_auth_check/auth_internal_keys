@@ -1,0 +1,70 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_keys",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_keys",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_keys",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getadminloginfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getadminloginfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "_ID": "admin",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getadminloginfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "filter": {
+   "_ID": "admin"
+  },
+  "test_expect": "denied"
+ },
+ {
+  "task": "getadminloginfo",
+  "token": "$CASE_LOGIN_TOKEN",
+  "items": [
+   {
+    "_ID": "admin"
+   }
+  ],
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_keys"
+ }
+]

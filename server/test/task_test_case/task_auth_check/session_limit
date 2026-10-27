@@ -1,0 +1,148 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_limit",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_limit",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4",
+  "test_sleep": 1.1
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_limit",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "failure"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#17",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_limit"
+ }
+]

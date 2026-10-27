@@ -2,12 +2,14 @@
 
 The deletebroker interface deletes a specified database broker.
 
+Permissions required to run this task: one of DBC, DBO, BRK
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | bname | the name of the broker to be deleted |
 
 ## Request Sample

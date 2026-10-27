@@ -2,12 +2,14 @@
 
 Get broker configurations from a cubrid_broker.conf file.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key**  | **Description**                |
 | -------- | ------------------------------ |
 | task     | task name                      |
-| token    | token string encrypted.        |
+| token | token returned by login |
 | confname | name of the configuration file |
 
 ## Request Sample
