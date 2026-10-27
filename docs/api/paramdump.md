@@ -2,12 +2,14 @@
 
 Run a paramdump utility.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | both | "y" to retrieve parameters from both process of client and server, "n" to retrieve parameters from only server process |
 

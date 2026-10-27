@@ -16,7 +16,6 @@
          "user": [
             {
                "@id": "admin",
-               "@passwd": "admin",
                "casauth": "admin",
                "dbauth": [
                   {

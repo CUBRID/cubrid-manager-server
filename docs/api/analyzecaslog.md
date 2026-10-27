@@ -2,12 +2,16 @@
 
 The analyzecaslog interface will fetch a top list to parse broker SQL log(s) with the broker_log_top utility.
 
+Permissions required to run this task: none (any logged-in user)
+
+* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | logfilelist | the list of the broker SQL log files to be analyzed. Every element is an object which holds a `logfile` key |
 | logfile | the full path of a broker SQL log file |
 | option_t | yes or no, analyze the log by transaction |

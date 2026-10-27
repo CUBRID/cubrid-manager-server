@@ -17,6 +17,7 @@
 #   ./run_tests.sh -fc 11.4 task_result_check.txt
 #   ./run_tests.sh --all                        run every set in task_test_case/
 #   ./run_tests.sh --clean                      drop log/ and the .result files
+#   ./run_tests.sh --check-docs                 check that docs/api match the task tables
 #
 # Anything else is passed through to test_tasks.py, so --dump works too:
 #   ./run_tests.sh --dump getbrokersinfo checkfile
@@ -30,7 +31,7 @@ CASE_ROOT=task_test_case
 LOG_DIR=log
 
 usage() {
-    sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 clean() {
@@ -47,6 +48,10 @@ fi
 case "${1:-}" in
     -h|--help)  usage; exit 0 ;;
     --clean)    clean; exit 0 ;;
+    --check-docs)
+        # The required authority in docs/api is generated from the task
+        # tables; fail when a document no longer matches them.
+        exec "$PYTHON" ../../docs/api/tools/gen_task_authority.py --check ;;
 esac
 
 mkdir -p "$LOG_DIR"

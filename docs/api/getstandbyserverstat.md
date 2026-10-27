@@ -2,6 +2,8 @@
 
 Returns insert_counter, update_counter, delete_counter, commit_counter, fail_counter and replication delay on replica database.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |

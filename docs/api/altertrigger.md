@@ -2,12 +2,14 @@
 
 Alter a trigger.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | triggername | the name of the trigger to be altered |
 | status | ACTIVE or INACTIVE |

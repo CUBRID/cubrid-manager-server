@@ -1,0 +1,74 @@
+[
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/bin/authtest_cms_bin.sh",
+  "confdata": [
+   "#!/bin/sh"
+  ],
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../bin/authtest_cms_bin.sh",
+  "confdata": [
+   "#!/bin/sh"
+  ],
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_nosuchdir",
+  "destdir": "$CUBRID/bin/authtest_copy",
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "resetlog",
+  "token": "",
+  "path": "$CUBRID/bin/authtest_nosuchdir/authtest.log",
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "removelog",
+  "token": "",
+  "files": [
+   {
+    "path": "$CUBRID/bin/authtest_nosuchfile.log"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "bin is not allowed"
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_nosuchdir",
+  "destdir": "$CUBRID",
+  "test_expect": "failure"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/tmp/authtest_conf.txt",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "success"
+ },
+ {
+  "task": "removelog",
+  "token": "",
+  "files": [
+   {
+    "path": "$CUBRID/tmp/authtest_conf.txt"
+   }
+  ],
+  "test_expect": "any"
+ }
+]

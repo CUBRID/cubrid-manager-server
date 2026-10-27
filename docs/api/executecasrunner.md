@@ -9,12 +9,16 @@ The statements to be replayed are given in one of two ways. When `executelogfile
 
 The broker port is taken from `cubrid_broker.conf`, using `brokername`.
 
+Permissions required to run this task: one of DBC, DBO, BRK, MON
+
+* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | brokername | broker name, it is used to find the port of the broker |
 | dbname | database name |
 | username | database user id |

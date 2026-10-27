@@ -4,12 +4,14 @@ Get an instant health snapshot of the async-job subsystem: how many async jobs a
 
 This task requires admin authority (`AU_ADMIN`). If you only need this process's identity (`server-information`) - for example, to run the restart-detection procedure in [Orphan Jobs After a CMS Restart](async_readme.md#orphan-jobs-after-a-cms-restart) - use [getserverinfo](getserverinfo.md) instead, which any authenticated user can call.
 
+Permissions required to run this task: ADMIN
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

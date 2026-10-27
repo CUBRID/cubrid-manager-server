@@ -2,13 +2,15 @@
 
 Get information about all databases and their active status.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 
 ## Request Sample

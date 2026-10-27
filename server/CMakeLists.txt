@@ -208,8 +208,10 @@ add_executable(cm_admin ${CM_ADMIN_SOURCES})
 target_compile_definitions(cm_admin PRIVATE
   ${CMS_SYS_DEFS} ${CMS_COMMON_DEFS} ${CMS_VERSION_DEFS} _FILE_OFFSET_BITS=64)
 target_compile_options(cm_admin PRIVATE ${CMS_WARN_FLAGS})
-target_include_directories(cm_admin PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${CMS_SRC_DIR} ${CMS_CUBRID_INCLUDES})
-target_link_libraries(cm_admin PRIVATE ${CMS_CUBRID_LIBS} Threads::Threads)
+target_include_directories(cm_admin PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR} ${CMS_SRC_DIR} ${CMS_CUBRID_INCLUDES} ${CMS_OPENSSL_INCLUDES})
+target_link_libraries(cm_admin PRIVATE
+  ${CMS_CUBRID_LIBS} ${CMS_OPENSSL_LIBS} Threads::Threads ${CMAKE_DL_LIBS})
 
 add_executable(cub_manager ${CUB_MANAGER_SOURCES})
 target_compile_definitions(cub_manager PRIVATE
@@ -232,6 +234,7 @@ target_link_libraries(cub_manager PRIVATE
 target_link_options(cub_manager PRIVATE -no-pie)
 
 if(NOT CMS_STANDALONE)
+  add_dependencies(cm_admin ${LIBOPENSSL_TARGET})
   add_dependencies(cub_manager ${LIBOPENSSL_TARGET})
 endif()
 

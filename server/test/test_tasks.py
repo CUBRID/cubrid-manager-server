@@ -263,6 +263,118 @@ timeout_fallbacks = []
 runtime_vars = {}
 helper_procs = []
 
+# Authorization checks (task_auth_check): a request of a case can run as a
+# CMS user the case itself logged in as, and can expect the authority check to
+# refuse or let it through, see do_one_job () and judged_status ().
+#
+#   "token": "$CASE_LOGIN_TOKEN"   send with the token of the last successful
+#                                  "login" request of the same case, instead of
+#                                  the runner's own (admin) token
+#   "token": "$CASE_LOGIN_TOKEN#n" the token of the n-th (1-based) successful
+#                                  "login" of the same case, for cases that
+#                                  hold several sessions at once
+#   The same two values inside a nested object or list of the request are
+#   replaced as well, wherever they appear (for cases that smuggle a second
+#   token in a nested object).
+#   "test_sleep": <seconds>        wait before sending this request (removed
+#                                  before sending)
+#   "test_expect": "<verdict>"     expectation of this request only; the key is
+#                                  removed before the request is sent
+#   "test_note": "<text>"          the response note must also contain <text>
+#                                  (removed before sending); tells a refusal
+#                                  apart from any other failure
+#   "test_no_text": "<text>"       the raw response must not contain <text>
+#                                  (removed before sending); checks that a
+#                                  value, e.g. a password, is not returned
+#   "test_no_key": "<a.b.c>"       the response must not have this key path
+#                                  (removed before sending); "." separates
+#                                  object keys, and a list on the way is
+#                                  searched in every element
+#
+# Besides "success" and "failure", the verdict can be
+#   denied   refused by the authority check (the note below)
+#   allowed  not refused by it; the task itself may still fail, which is how a
+#            case checks a task it must not really run (bad parameters)
+#   any      not judged (setup or cleanup that may legitimately fail)
+CASE_LOGIN_TOKEN = "$CASE_LOGIN_TOKEN"
+CASE_LOGIN_TOKEN_N = re.compile(r"^\$CASE_LOGIN_TOKEN#([1-9][0-9]*)$")
+
+
+def case_login_token(value, case_tokens, default):
+    """The token a request of a case asks for with its "token" value."""
+    if value == CASE_LOGIN_TOKEN:
+        return case_tokens[-1] if case_tokens else ""
+    m = CASE_LOGIN_TOKEN_N.match(str(value))
+    if m:
+        n = int(m.group(1))
+        return case_tokens[n - 1] if n <= len(case_tokens) else ""
+    return default
+
+
+def resolve_nested_tokens(node, case_tokens, top=True):
+    """Replace "$CASE_LOGIN_TOKEN[#n]" values nested in the request.
+
+    The top-level "token" is left to case_login_token (); every other string
+    value equal to one of these forms, at any depth, gets that login token.
+    """
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if top and key == "token":
+                continue
+            if isinstance(value, str) and value.startswith(CASE_LOGIN_TOKEN):
+                node[key] = case_login_token(value, case_tokens, value)
+            else:
+                resolve_nested_tokens(value, case_tokens, False)
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            if isinstance(value, str) and value.startswith(CASE_LOGIN_TOKEN):
+                node[i] = case_login_token(value, case_tokens, value)
+            else:
+                resolve_nested_tokens(value, case_tokens, False)
+
+
+DENIED_NOTE = "The user don't have authority to execute the task"
+
+
+def is_denied(data):
+    return (data.get("status") == "failure"
+            and str(data.get("note", "")).startswith(DENIED_NOTE))
+
+
+def has_key_path(node, path):
+    """Whether the key path ["a", "b", ...] exists in `node`.
+
+    A list on the way is searched in every element, so that a path like
+    "userlist.user.@passwd" reaches into the lists CMS wraps objects in.
+    """
+    if not path:
+        return True
+    if isinstance(node, list):
+        return any(has_key_path(item, path) for item in node)
+    if isinstance(node, dict) and path[0] in node:
+        return has_key_path(node[path[0]], path[1:])
+    return False
+
+
+def judged_status(data, expected, note_text=None, no_text=None, body="",
+                  no_key=None):
+    """The value compared with `expected` for a response `data`."""
+    if no_text is not None and no_text in body:
+        return "%s (response contains %r)" % (data.get("status"), no_text)
+    if no_key is not None and has_key_path(data, no_key.split(".")):
+        return "%s (response has key %r)" % (data.get("status"), no_key)
+    if note_text is not None and note_text not in str(data.get("note", "")):
+        # Right status for the wrong reason is not a pass.
+        return "%s (note without %r)" % (data.get("status"), note_text)
+    if expected == "denied":
+        return "denied" if is_denied(data) else data.get("status")
+    if expected == "allowed":
+        return "denied" if is_denied(data) else "allowed"
+    if expected == "any":
+        return "any"
+    return data.get("status")
+
+
 # The manager server serves cm_port over TLS with a self signed certificate,
 # so the certificate of the host under test is not verified here.
 ssl_context = ssl._create_unverified_context()
@@ -443,7 +555,7 @@ def follow_job(name, data, token):
 
 
 def send_one(name, req, token, expected="success", casefile="",
-             must_be_sync=False):
+             must_be_sync=False, note_text=None, no_text=None, no_key=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -487,15 +599,19 @@ def send_one(name, req, token, expected="success", casefile="",
             # The final result is recorded as usual. Under --strict-timeout,
             # do_one_job() turns it into a failure once the case is judged and
             # prints that verdict instead of this status line.
-            record(name, casefile, task, data.get("status"),
+            record(name, casefile, task,
+                   judged_status(data, expected, note_text, no_text, body,
+                                 no_key),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
             return data
     # The raw body is kept verbatim: docs/api/*.md quote the server's own
     # formatting, so a re-serialized copy would not be comparable.
-    record(name, casefile, task, data.get("status"), data.get("note", ""),
-           expected, body, quiet=file_check)
+    record(name, casefile, task,
+           judged_status(data, expected, note_text, no_text, body,
+                         no_key),
+           data.get("note", ""), expected, body, quiet=file_check)
     return data
 
 
@@ -533,13 +649,26 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     """
     before = len(results)
     request = load_task(taskfile)
-    if isinstance(request, list):
-        for index, req in enumerate(request):
-            data = send_one("%s[%d]" % (name, index), req, token, expected,
-                            taskfile, must_be_sync)
-    else:
-        data = send_one(name, request, token, expected, taskfile,
-                        must_be_sync)
+    # Tokens of the successful "login" requests of this case, in order, for
+    # the requests that ask for one with "$CASE_LOGIN_TOKEN[#n]".
+    case_tokens = []
+    requests = request if isinstance(request, list) else [request]
+    for index, req in enumerate(requests):
+        req_expected = req.pop("test_expect", expected)
+        req_note = req.pop("test_note", None)
+        req_no_text = req.pop("test_no_text", None)
+        req_no_key = req.pop("test_no_key", None)
+        req_sleep = req.pop("test_sleep", None)
+        req_token = case_login_token(req.get("token"), case_tokens, token)
+        resolve_nested_tokens(req, case_tokens)
+        if req_sleep:
+            time.sleep(float(req_sleep))
+        label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
+        data = send_one(label, req, req_token, req_expected, taskfile,
+                        must_be_sync, req_note, req_no_text, req_no_key)
+        if (req.get("task") == "login" and data.get("status") == "success"
+                and data.get("token")):
+            case_tokens.append(data["token"])
     # An array case sends several requests; its answer covers all of them, in
     # order, so that the file is the record of the whole case.
     entries = results[before:]

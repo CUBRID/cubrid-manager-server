@@ -2,12 +2,14 @@
 
 Delete a database.
 
+Permissions required to run this task: DBC
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | delbackup | on-off indicating whether to remove backup files |
 | async | default "no", if "yes" run the task in asynchronous mode |

@@ -2,12 +2,14 @@
 
 Check the status of a task asynchronously running
 
+Permissions required to run this task: none (only the user who started the job gets its result)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | uuid | uuid from the asynchronous task response |
 
 * an uuid is dropped 3,600 seconds after the job is finished by default,<br>

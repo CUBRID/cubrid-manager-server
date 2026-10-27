@@ -2,12 +2,14 @@
 
 Start shards or turn on a shard.
 
+Permissions required to run this task: one of DBC, DBO, BRK
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | shardname | turn on a shard if a shardname is defined. |
 
 ## Request Sample

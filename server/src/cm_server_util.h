@@ -391,12 +391,12 @@ char *nt_style_path (char *path, char *new_path_buf);
 int _ut_get_dbaccess (nvplist *req, char *dbid, char *dbpasswd);
 void uGenerateStatus (nvplist *req, nvplist *res, int retval,
 		      const char *_dbmt_error);
-int ut_validate_token (nvplist *req);
 void _ut_timeval_diff (struct timeval *start, struct timeval *end,
 		       int *res_msec);
 char *ut_token_generate (char *client_ip, char *client_port,
 			 char *dbmt_id, int proc_id, time_t login_time);
-void _accept_connection (nvplist *cli_request, nvplist *cli_response);
+int _accept_connection (nvplist *cli_request, nvplist *cli_response,
+			char *_dbmt_error);
 #if defined(WINDOWS)
 int gettimeofday (struct timeval *tp, void *tzp);
 #endif
@@ -413,7 +413,6 @@ void env_mutex_lock (void);
 void env_mutex_unlock (void);
 
 int IsValidUserName (const char *pUserName);
-int ut_get_token_active_time (time_t *active_time);
 int remove_extra_subdir (const char *dirpath, const char *pattern,
 			 unsigned int save_num);
 int ut_get_filename (char *fullpath, int with_ext, char *ret_filename);
@@ -433,6 +432,14 @@ bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 bool is_authorized_filename (const char *path, char *_dbmt_error);
+bool is_authorized_write_filename (const char *path, char *_dbmt_error);
+/* how a file task uses a directory tree, for is_authorized_dirname () */
+typedef enum
+{
+  FOR_READ = 0,			/* the tree is read (copied from) */
+  FOR_WRITE = 1			/* the tree is written (copied into, deleted) */
+} T_DIR_ACCESS;
+bool is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string &name);
 std::string expand_env_path (const std::string &path);

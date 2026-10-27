@@ -1,0 +1,65 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ntoken",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_ntoken",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_ntoken",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_ntoken",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "logout",
+  "a": {
+   "token": "$CASE_LOGIN_TOKEN#2"
+  },
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "failure"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ntoken"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "failure"
+ }
+]

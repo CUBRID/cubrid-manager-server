@@ -7,12 +7,14 @@ A template describes which monitoring items are sampled, at which interval, and 
 displayed. The items are given in `target_config`, where the key is the name of the monitoring
 item and the value is `<color> <magnification>`.
 
+Permissions required to run this task: one of DBC, DBO, MON
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | name | the name of the status template |
 | desc | the description of the status template |
 | db_name | the name of the database which is monitored |

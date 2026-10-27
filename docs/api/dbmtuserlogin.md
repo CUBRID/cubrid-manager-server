@@ -2,12 +2,16 @@
 
 The dbmtuserlogin interface will create a session to be accessed by a manager user.
 
+Permissions required to run this task: none (any logged-in user)
+
+* The DB login is kept in this session only (in memory, not on disk). Later requests of the same session that name `dbname` and give no `dbuser`/`dbpasswd` use it; other sessions do not.
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | targetid | dbmt user name |
 | dbname | name of database |
 | dbuser | id of db user |

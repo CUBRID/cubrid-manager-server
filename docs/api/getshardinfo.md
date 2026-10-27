@@ -2,12 +2,14 @@
 
 Get the status of every shard broker by running `cubrid shard status -b -f`.
 
+Permissions required to run this task: none (any logged-in user)
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 
 ## Request Sample
 

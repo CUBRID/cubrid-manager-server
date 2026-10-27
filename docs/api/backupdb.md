@@ -2,12 +2,14 @@
 
 The backupdb interface will create a database backup file.
 
+Permissions required to run this task: one of DBC, DBO
+
 ## Request JSON Syntax
 
 | **Key** | **Description** |
 | --- | --- |
 | task | task name |
-| token | token string encrypted. |
+| token | token returned by login |
 | dbname | database name |
 | level | backup level, 0, 1 or 2 |
 | volname | the name of the backup volume |
