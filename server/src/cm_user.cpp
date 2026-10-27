@@ -1111,7 +1111,6 @@ dbmt_user_delete_token_info_by_token (const char *token)
  * its DB logins. Called periodically, so that an expired session and its DB
  * passwords do not stay in memory until the next login.
  */
-
 void
 dbmt_user_purge_expired_sessions (time_t now_time)
 {
