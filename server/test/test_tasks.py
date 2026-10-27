@@ -116,7 +116,9 @@ VOLATILE_KEYS = frozenset((
     "cpu_kernel", "cpu_user", "cpu_idle", "cpu_iowait",
     "mem_physical", "mem_virtual", "mem_phy_free",
     "free_size", "freespace", "size", "total",
-    "token",
+    "token", "CMS_VER", "CUBRIDVER", "dbsize", "used_size",
+    "BROKERVER", "date", "freepage", "usedpage", "reserved_size",
+    "file_table_size", "file_count",
     # job id of an async (or timed out) request, new on every run
     "uuid",
 ))
@@ -973,6 +975,25 @@ def wait_for_mon_data(timeout=120):
     return False
 
 
+def copy_extra_files():
+    """Copy task_test_config/copy_files/ into $CUBRID, keeping its folders.
+
+    Whatever sits under that directory lands at the same relative path under
+    $CUBRID (copy_files/log/manager/x.log -> $CUBRID/log/manager/x.log).
+    Does nothing when the directory is absent.
+    """
+    srcroot = os.path.join(TEST_CONFIG_DIR, "copy_files")
+    if not os.path.isdir(srcroot):
+        return
+    for root, _dirs, files in os.walk(srcroot):
+        rel = os.path.relpath(root, srcroot)
+        destdir = CUBRID if rel == "." else os.path.join(CUBRID, rel)
+        if not os.path.isdir(destdir):
+            os.makedirs(destdir)
+        for name in files:
+            shutil.copy(os.path.join(root, name), destdir)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1007,6 +1028,7 @@ def build_env():
     if not os.path.isdir(folder):
         os.makedirs(folder)
     make_loaddb_input(tmpdir)
+    copy_extra_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.

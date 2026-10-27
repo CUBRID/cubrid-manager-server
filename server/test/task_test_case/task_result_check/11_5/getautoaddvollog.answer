@@ -1,4 +1,86 @@
 {
+   "log": [
+      {
+         "dbname": "testdb",
+         "outcome": "start",
+         "page": "1920",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "none"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "success",
+         "page": "1920",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "none"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "start",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x001"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "success",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x001"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "start",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x002"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "success",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x002"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "start",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x003"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "success",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x003"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "start",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x004"
+      },
+      {
+         "dbname": "testdb",
+         "outcome": "success",
+         "page": "4096",
+         "purpose": "data",
+         "time": "<volatile>",
+         "volname": "testdb_x004"
+      }
+   ],
    "note": "none",
    "status": "success",
    "task": "getautoaddvollog"

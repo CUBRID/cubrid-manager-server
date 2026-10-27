@@ -1,6 +1,6 @@
 {
-   "CMS_VER": "11.4.0.0085",
-   "CUBRIDVER": "CUBRID 11.5.0 (11.5.0.2490-17a7c58) (64bit release build for Linux) (Aug 27 2026 12:38:43)",
+   "CMS_VER": "<volatile>",
+   "CUBRIDVER": "<volatile>",
    "PLATFORM": "x64",
    "cm_port": "8001",
    "is_default_cert": "yes",

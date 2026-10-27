@@ -32,7 +32,6 @@ updatedbmtuser_newuser
 checkdir
 
 createdb
-sleep 10
 createdb_accesslog,failure
 createdb_errlogpath,failure
 createdb_errlogpath1,failure
@@ -44,11 +43,9 @@ createdb_nullpagesize,failure
 createdb_nullvolpath,failure
 createdb_fail_with_dup_name,failure
 startdb
-sleep 10
 startdb_fail,failure
 
 checkdb
-sleep 10
 checkdb_nullname,failure
 getdbsize
 gettransactioninfo
@@ -56,22 +53,18 @@ killtransaction
 
 // add vol, then spacedb
 addvoldb
-sleep 10
 addvoldb_bigsize,failure
 addvoldb_nullpurpose,failure
 addvoldb_nullsize,failure
 dbspaceinfo
 dbspace
 lockdb
-sleep 10
 backupdb
-sleep 10
 backupdb_nulldir,failure
 backupdb_nullname,failure
 // "safereplication" was dropped in a2393c2 (it used to append a backticked `repl_safe_page` command), 
 // so the key is now ignored and the backup succeeds.
 backupdb_rep
-sleep 10
 backupdbinfo
 
 // test auto tasks.
@@ -88,35 +81,24 @@ getautobackupdberrlog_optional
 deletebackupinfo
 
 optimizedb
-sleep 10
 stopdb
-sleep 10
-backupvolinfo
+backupvolinfo,success
 // createdb_optional and loaddb_optional cover the optional parameters of
 // createdb and loaddb against a database of their own. loaddb_optional runs
 // with delete_orignal_files off so the loaddb case below still finds its input.
 createdb_optional
-sleep 10
 loaddb_optional
-sleep 10
 deletedb_for_optional
-sleep 10
 
 loaddb
-sleep 10
 restoredb
-sleep 10
 
 // compactdb runs against a database of its own: create it, compact it, drop it.
 createdb_for_compactdb
-sleep 10
 compactdb
-sleep 10
 deletedb_for_compactdb
-sleep 10
 
 copydb
-sleep 10
 copydb_nulldest,failure
 copydb_nulldestpath,failure
 copydb_nullexvolpath,failure
@@ -165,47 +147,34 @@ renamedb_adoff,failure
 renamedb_erropen,failure
 // renamedb renames destinationdb to anotherdb, so drop anotherdb afterwards.
 renamedb
-sleep 10
 deletedb_for_renamedb
-sleep 10
 // advanced mode maps every permanent volume by hand, so it runs against a
 // database of its own whose volume set is known: <db> and <db>_x001.
 createdb_for_renameadv
-sleep 10
 renamedb_advanced
-sleep 10
 deletedb_for_renameadv
-sleep 10
 unloaddb
-sleep 10
 unloaddb_optional
-sleep 10
 unloaddb_nullname,failure
 unloaddb_nulltarget,failure
 unloaddb_nulltargetdir,failure
 deletedb
-sleep 10
 
 /* broker api related tasks */
 stopbroker
-sleep 10
 startbroker
-sleep 10
 getaddbrokerinfo
 getbrokerdiagdata
 getbrokerdiagdata_optional
 getbrokersinfo
 getbrokerstatus
 broker_stop
-sleep 10
 broker_stop_errbroker,failure
 broker_stop_nullbroker,failure
 broker_start
-sleep 10
 broker_start_errbroker,failure
 broker_start_nullbroker,failure
 broker_restart
-sleep 10
 broker_restart_errbroker,failure
 broker_restart_nullbroker,failure
 deletebroker
@@ -248,19 +217,14 @@ statdump_nullname,failure
 // start_statdump must stay right before stop_statdump: stop fails with
 // "no statdump running" unless the background process was just started.
 start_statdump
-sleep 10
 stop_statdump
-sleep 10
 plandump
 plandump_nullname,failure
 
 // create a new database to test copydb.
 createdb_for_copydb
-sleep 10
 copydb_advance
-sleep 10
 deletedb_for_copydb
-sleep 10
 
 // get host stat
 gethoststat,success
