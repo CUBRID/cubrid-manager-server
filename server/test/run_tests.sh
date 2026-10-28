@@ -12,7 +12,7 @@
 #   ./run_tests.sh -st                          fail cases that ran past http_timeout
 #
 # Baselines are per CUBRID version. Pass the version as a bare argument to pick
-# the directory they live in; without one, 11.4 is used.
+# the directory they live in; without one, 11.5 is used.
 #   ./run_tests.sh -a  11.4 task_result_check.txt
 #   ./run_tests.sh -fc 11.4 task_result_check.txt
 #   ./run_tests.sh --all                        run every set in task_test_case/

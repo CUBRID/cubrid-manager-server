@@ -1434,6 +1434,35 @@ time_t SpaceDbResultNewFormat::get_my_time (char *dbloca)
   return mytime;
 }
 
+bool SpaceDbResultOldFormat::get_last_volume_name (const char *type, char *buf, size_t buf_size)
+{
+  for (size_t i = volumes.size (); i > 0; i--)
+    {
+      if (uStringEqualIgnoreCase (volumes[i - 1].purpose, type) && volumes[i - 1].vol_name[0] != '\0')
+	{
+	  snprintf (buf, buf_size, "%s", volumes[i - 1].vol_name);
+	  return true;
+	}
+    }
+  return false;
+}
+
+bool SpaceDbResultNewFormat::get_last_volume_name (const char *type, char *buf, size_t buf_size)
+{
+  const char *p;
+
+  for (size_t i = volumes.size (); i > 0; i--)
+    {
+      if (uStringEqual (volumes[i - 1].purpose, "PERMANENT") && volumes[i - 1].volume_name[0] != '\0')
+	{
+	  p = strrchr (volumes[i - 1].volume_name, '/');
+	  snprintf (buf, buf_size, "%s", (p != NULL) ? p + 1 : volumes[i - 1].volume_name);
+	  return true;
+	}
+    }
+  return false;
+}
+
 void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mode, char *dbname_at_hostname)
 {
   double frate;
@@ -1449,8 +1478,6 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	{
 	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
 	    }
 	  else
@@ -1472,8 +1499,6 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	{
 	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "index", page_add, page_size);
 	    }
 	  else
@@ -1497,10 +1522,8 @@ void SpaceDbResultNewFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	}
       if (curr->data_warn_outofspace >= frate)
 	{
-	  if (db_mode == 2)
+	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
 	    }
 	  else

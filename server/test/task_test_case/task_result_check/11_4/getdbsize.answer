@@ -1,5 +1,5 @@
 {
-   "dbsize": "150999328",
+   "dbsize": "<volatile>",
    "note": "none",
    "status": "success",
    "task": "getdbsize"

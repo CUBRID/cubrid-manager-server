@@ -21,7 +21,7 @@ DEFAULT_TEST_SET = "task_status_check.txt"
 TEST_CONFIG_DIR = "task_test_config/"
 
 KNOWN_VERSIONS = ("10_2", "11_0", "11_2", "11_3", "11_4", "11_5")
-DEFAULT_VERSION = "11_4"
+DEFAULT_VERSION = "11_5"
 # Where start_kill_targets() records the processes it spawned, so that a run
 # killed before clean_env() can be cleaned up by the next one.
 HELPER_PID_FILE = "log/helper_pids"
@@ -116,10 +116,44 @@ VOLATILE_KEYS = frozenset((
     "cpu_kernel", "cpu_user", "cpu_idle", "cpu_iowait",
     "mem_physical", "mem_virtual", "mem_phy_free",
     "free_size", "freespace", "size", "total",
-    "token",
+    "token", "CMS_VER", "CUBRIDVER", "dbsize", "used_size",
+    "BROKERVER", "date", "freepage", "usedpage", "reserved_size",
+    "file_table_size", "file_count", "totalnum", "total_size",
     # job id of an async (or timed out) request, new on every run
     "uuid",
 ))
+
+# Lists the server builds from readdir(), whose order depends on the file
+# system rather than on the server: the name of the list, the field that orders
+# it, and which items to order. getlogfileinfo answers "logfile" in a different
+# order on every run, and dbspace/dbspaceinfo append the log volumes they find
+# in the database directory to "spaceinfo" after the volumes spacedb lists in
+# volid order. Only those log items are ordered; the rest keep their place.
+UNORDERED_LISTS = {
+    "logfile": ("path", None),
+    "spaceinfo": ("spacename", {"type": ("Active_log", "Archive_log")}),
+}
+
+
+def sort_unordered(items, field, only):
+    """Order the items of a list that "only" selects by "field", in place.
+
+    The selected items are put back into the slots they came from, so the
+    position of every other item is still compared as the server sent it.
+    """
+    def selected(item):
+        if only is None:
+            return True
+        return isinstance(item, dict) and all(item.get(k) in v
+                                              for k, v in only.items())
+
+    slots = [i for i, item in enumerate(items) if selected(item)]
+    ordered = sorted((items[i] for i in slots),
+                     key=lambda item: str(item.get(field, ""))
+                     if isinstance(item, dict) else str(item))
+    for i, item in zip(slots, ordered):
+        items[i] = item
+
 
 # Timestamps and temporary file names are embedded in longer strings, so they
 # are masked by shape rather than by key.
@@ -169,7 +203,12 @@ def normalize_response(body):
             for key, value in node.items():
                 if key == "__EXEC_TIME":
                     continue
-                out[key] = "<volatile>" if key in VOLATILE_KEYS else walk(value)
+                if key in VOLATILE_KEYS:
+                    out[key] = "<volatile>"
+                    continue
+                out[key] = walk(value)
+                if key in UNORDERED_LISTS and isinstance(out[key], list):
+                    sort_unordered(out[key], *UNORDERED_LISTS[key])
             return out
         if isinstance(node, list):
             return [walk(v) for v in node]
@@ -1102,6 +1141,25 @@ def wait_for_mon_data(timeout=120):
     return False
 
 
+def copy_extra_files():
+    """Copy task_test_config/copy_files/ into $CUBRID, keeping its folders.
+
+    Whatever sits under that directory lands at the same relative path under
+    $CUBRID (copy_files/log/manager/x.log -> $CUBRID/log/manager/x.log).
+    Does nothing when the directory is absent.
+    """
+    srcroot = os.path.join(TEST_CONFIG_DIR, "copy_files")
+    if not os.path.isdir(srcroot):
+        return
+    for root, _dirs, files in os.walk(srcroot):
+        rel = os.path.relpath(root, srcroot)
+        destdir = CUBRID if rel == "." else os.path.join(CUBRID, rel)
+        if not os.path.isdir(destdir):
+            os.makedirs(destdir)
+        for name in files:
+            shutil.copy(os.path.join(root, name), destdir)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1136,6 +1194,7 @@ def build_env():
     if not os.path.isdir(folder):
         os.makedirs(folder)
     make_loaddb_input(tmpdir)
+    copy_extra_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1437,6 +1496,71 @@ def diagnose_db_state(task, casefile):
         print("    no server log for %s under %s" % (dbname, logdir))
 
 
+# The cases below rewrite these files under $CUBRID/conf: setsysparam_cmconf and
+# setsysparam_cubridconf replace cm.conf and cubrid.conf, and deletebroker
+# rewrites cubrid_broker.conf even for a broker that does not exist.
+CONF_FILES = ("cm.conf", "cubrid.conf", "cubrid_broker.conf", "autoaddvoldb.conf")
+CONF_BACKUP_NAME = "cmstest_backup"
+
+
+def prepare_confs(cubrid_home):
+    """Start every run from the same CONF_FILES.
+
+    The first run copies them to $CUBRID/conf/cmstest_backup. Later runs find
+    that folder and copy the files back from it, which undoes whatever the
+    previous run did to them. The backup is never removed; delete the folder to
+    take a new one.
+    """
+    confdir = os.path.join(cubrid_home, "conf")
+    backup = os.path.join(confdir, CONF_BACKUP_NAME)
+    if os.path.isdir(backup):
+        for name in os.listdir(backup):
+            shutil.copy2(os.path.join(backup, name), os.path.join(confdir, name))
+        print("restored %s from %s" % (", ".join(sorted(os.listdir(backup))),
+                                       backup))
+        return
+    # Copy next to the final name and rename, so an interrupted copy does not
+    # leave a half-filled folder that the next run would take for the original.
+    partial = backup + ".partial"
+    shutil.rmtree(partial, ignore_errors=True)
+    os.makedirs(partial)
+    for name in CONF_FILES:
+        src = os.path.join(confdir, name)
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(partial, name))
+    os.rename(partial, backup)
+    print("backed up %s to %s" % (", ".join(sorted(os.listdir(backup))), backup))
+
+
+def enable_mon_statistic(cubrid_home):
+    """Make sure cm.conf has support_mon_statistic=YES before the manager starts.
+
+    A fresh install ships it as NO, and the manager reads cm.conf only at start,
+    so the setsysparam_cmconf case further down the list comes too late for the
+    monitoring gather that wait_for_mon_data() waits on.
+    """
+    path = os.path.join(cubrid_home, "conf", "cm.conf")
+    if not os.path.isfile(path):
+        return
+    with open(path, "r") as f:
+        lines = f.read().split("\n")
+    key = re.compile(r"^\s*support_mon_statistic\s*[=\s]\s*(\S*)")
+    for i, line in enumerate(lines):
+        m = key.match(line)
+        if m:
+            if m.group(1).upper() == "YES":
+                return
+            lines[i] = "support_mon_statistic=YES"
+            break
+    else:
+        pos = next((i + 1 for i, l in enumerate(lines) if l.strip() == "[cm]"),
+                   len(lines))
+        lines.insert(pos, "support_mon_statistic=YES")
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+    print("set support_mon_statistic=YES in %s" % path)
+
+
 def restart_services():
     """Start the run from a known state.
 
@@ -1450,6 +1574,7 @@ def restart_services():
     print("restarting the CUBRID service to start from a known state ...")
     run_service_cmd([cubrid_bin, "service", "stop"], "service stop")
     reset_mon_data(cubrid_home)
+    enable_mon_statistic(cubrid_home)
     run_service_cmd([cubrid_bin, "service", "start"], "service start")
     # demodb is what most of the cases run against; "service start" only starts
     # it when cubrid.conf lists it, so ask for it explicitly.
@@ -1595,6 +1720,8 @@ if not dump_mode:
         print("no case directory for the set: %s" % CASE_DIR)
         sys.exit(2)
     if local_env:
+        # Before restart_services(), which already edits cm.conf.
+        prepare_confs(os.environ["CUBRID"])
         reset_leftovers()
         restart_services()
     else:

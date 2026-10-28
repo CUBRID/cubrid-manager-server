@@ -136,16 +136,6 @@
                "virtual": "normal"
             },
             {
-               "classname": "db_direct_super_class",
-               "owner": "DBA",
-               "virtual": "view"
-            },
-            {
-               "classname": "db_class",
-               "owner": "DBA",
-               "virtual": "view"
-            },
-            {
                "classname": "_db_synonym",
                "owner": "DBA",
                "virtual": "normal"
@@ -161,14 +151,19 @@
                "virtual": "normal"
             },
             {
+               "classname": "db_direct_super_class",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_class",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
                "classname": "_db_global_tran",
                "owner": "DBA",
                "virtual": "normal"
-            },
-            {
-               "classname": "db_serial",
-               "owner": "DBA",
-               "virtual": "view"
             },
             {
                "classname": "db_ha_apply_info",
@@ -202,6 +197,11 @@
             },
             {
                "classname": "db_stored_procedure_args",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_serial",
                "owner": "DBA",
                "virtual": "view"
             },
@@ -276,12 +276,22 @@
                "virtual": "view"
             },
             {
-               "classname": "db_histogram",
-               "owner": "DBA",
+               "classname": "information_schema.statistics",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
                "classname": "information_schema.synonyms",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.table_constraints",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.table_privileges",
                "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
@@ -326,8 +336,8 @@
                "virtual": "view"
             },
             {
-               "classname": "information_schema.statistics",
-               "owner": "INFORMATION_SCHEMA",
+               "classname": "db_histogram",
+               "owner": "DBA",
                "virtual": "view"
             },
             {
@@ -351,27 +361,17 @@
                "virtual": "view"
             },
             {
+               "classname": "information_schema.tables",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
                "classname": "information_schema.triggers",
                "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
                "classname": "information_schema.views",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.table_constraints",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.table_privileges",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.tables",
                "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             }
@@ -408,22 +408,22 @@
                "virtual": "normal"
             },
             {
-               "classname": "public.participant",
-               "owner": "PUBLIC",
-               "virtual": "normal"
-            },
-            {
                "classname": "public.olympic",
                "owner": "PUBLIC",
                "virtual": "normal"
             },
             {
-               "classname": "public.game",
+               "classname": "public.record",
                "owner": "PUBLIC",
                "virtual": "normal"
             },
             {
-               "classname": "public.record",
+               "classname": "public.participant",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.game",
                "owner": "PUBLIC",
                "virtual": "normal"
             },

@@ -183,6 +183,7 @@ class GeneralSpacedbResult
     virtual int get_cnt_tpage() = 0;
     virtual void get_total_and_free_page (const char *type, double &free_page, double &total_page) = 0;
     virtual time_t get_my_time (char *dbloca) = 0;
+    virtual bool get_last_volume_name (const char *type, char *buf, size_t buf_size) = 0;
     virtual void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname) = 0;
     virtual void read_spacedb_output (FILE *fp) = 0;
     virtual ~GeneralSpacedbResult() {}
@@ -206,6 +207,7 @@ class SpaceDbResultNewFormat : public GeneralSpacedbResult
 	}
     }
     time_t get_my_time (char *dbloca);
+    bool get_last_volume_name (const char *type, char *buf, size_t buf_size);
     void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname);
     void read_spacedb_output (FILE *fp);
     void create_result (nvplist *res);
@@ -257,6 +259,7 @@ class SpaceDbResultOldFormat : public GeneralSpacedbResult
     }
     int get_cnt_tpage();
     time_t get_my_time (char *dbloca);
+    bool get_last_volume_name (const char *type, char *buf, size_t buf_size);
     void auto_add_volume (autoaddvoldb_node *current, int db_mode, char *dbname);
     void read_spacedb_output (FILE *);
   private:

@@ -315,11 +315,18 @@ aj_add_volume (char *dbname, const char *type, int increase,
   argv[argc++] = NULL;
   retval = run_child_env (argv, RUN_FOREGROUND, NULL, NULL, NULL, NULL);    /* addvoldb  */
 
+  all_volumes = cmd_spacedb (dbname, CUBRID_MODE_CS);
+  if (all_volumes != NULL && retval == 0)
+    {
+      all_volumes->get_last_volume_name (type, volname, sizeof (volname));
+    }
+
   mytime = time (NULL);
   conf_get_dbmt_file (FID_AUTO_ADDVOLDB_LOG, log_file_name);
   if ((outfile = fopen (log_file_name, "a")) != NULL)
     {
       fprintf (outfile, "%s ", dbname);
+      fprintf (outfile, "%s ", (volname[0] != '\0') ? volname : "none");
       fprintf (outfile, "%s ", type);
       fprintf (outfile, "%d ", increase);
       time_to_str (mytime, "%d-%d-%d,%d:%d:%d", strbuf,
@@ -331,7 +338,6 @@ aj_add_volume (char *dbname, const char *type, int increase,
 
   mytime = 0;
 
-  all_volumes = cmd_spacedb (dbname, CUBRID_MODE_CS);
   if (all_volumes == NULL)
     {
       return;
@@ -342,14 +348,7 @@ aj_add_volume (char *dbname, const char *type, int increase,
   if ((outfile = fopen (log_file_name, "a")) != NULL)
     {
       fprintf (outfile, "%s ", dbname);
-      if (retval == 0)
-	{
-	  fprintf (outfile, "%s ", volname);
-	}
-      else
-	{
-	  fprintf (outfile, "none ");
-	}
+      fprintf (outfile, "%s ", (volname[0] != '\0') ? volname : "none");
       fprintf (outfile, "%s ", type);
       fprintf (outfile, "%d ", increase);
       time_to_str (mytime, "%d-%d-%d,%d:%d:%d", strbuf,
@@ -365,6 +364,8 @@ aj_add_volume (char *dbname, const char *type, int increase,
 	}
       fclose (outfile);
     }
+
+  delete all_volumes;
 }
 
 static void

@@ -46,7 +46,7 @@ permissions:
 env:
   ENGINE_REPO: ${{ github.event.inputs.engine_repo || vars.ENGINE_REPO || 'CUBRID/cubrid' }}
   ENGINE_REF: ${{ github.event.inputs.engine_ref || vars.ENGINE_REF || 'develop' }}
-  TEST_SET: task_status_check.txt
+  TEST_SET: task_result_check.txt
   # -st: count requests that outlived http_timeout as failures. Off by default,
   # where they are only listed as a warning in the summary.
   TEST_OPTS: ${{ github.event.inputs.strict_timeout == 'true' && '-st' || '' }}
@@ -304,7 +304,7 @@ jobs:
           export PYTHONUNBUFFERED=1
           cd "$WORKSPACE/cubrid/cubridmanager/server/test"
           timeout --signal=INT --kill-after=1m 50m \
-            ./run_tests.sh -ns $TEST_OPTS "$TEST_SET" </dev/null 2>&1 | tee run.log
+            ./run_tests.sh -fc -ns $TEST_OPTS "$TEST_SET" </dev/null 2>&1 | tee run.log
           exit ${PIPESTATUS[0]}
           EOS
           chmod 0755 /tmp/test-as-cubrid.sh
