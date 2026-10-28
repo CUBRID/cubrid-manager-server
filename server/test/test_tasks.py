@@ -123,6 +123,38 @@ VOLATILE_KEYS = frozenset((
     "uuid",
 ))
 
+# Lists the server builds from readdir(), whose order depends on the file
+# system rather than on the server: the name of the list, the field that orders
+# it, and which items to order. getlogfileinfo answers "logfile" in a different
+# order on every run, and dbspace/dbspaceinfo append the log volumes they find
+# in the database directory to "spaceinfo" after the volumes spacedb lists in
+# volid order. Only those log items are ordered; the rest keep their place.
+UNORDERED_LISTS = {
+    "logfile": ("path", None),
+    "spaceinfo": ("spacename", {"type": ("Active_log", "Archive_log")}),
+}
+
+
+def sort_unordered(items, field, only):
+    """Order the items of a list that "only" selects by "field", in place.
+
+    The selected items are put back into the slots they came from, so the
+    position of every other item is still compared as the server sent it.
+    """
+    def selected(item):
+        if only is None:
+            return True
+        return isinstance(item, dict) and all(item.get(k) in v
+                                              for k, v in only.items())
+
+    slots = [i for i, item in enumerate(items) if selected(item)]
+    ordered = sorted((items[i] for i in slots),
+                     key=lambda item: str(item.get(field, ""))
+                     if isinstance(item, dict) else str(item))
+    for i, item in zip(slots, ordered):
+        items[i] = item
+
+
 # Timestamps and temporary file names are embedded in longer strings, so they
 # are masked by shape rather than by key.
 VOLATILE_PATTERNS = (
@@ -171,7 +203,12 @@ def normalize_response(body):
             for key, value in node.items():
                 if key == "__EXEC_TIME":
                     continue
-                out[key] = "<volatile>" if key in VOLATILE_KEYS else walk(value)
+                if key in VOLATILE_KEYS:
+                    out[key] = "<volatile>"
+                    continue
+                out[key] = walk(value)
+                if key in UNORDERED_LISTS and isinstance(out[key], list):
+                    sort_unordered(out[key], *UNORDERED_LISTS[key])
             return out
         if isinstance(node, list):
             return [walk(v) for v in node]

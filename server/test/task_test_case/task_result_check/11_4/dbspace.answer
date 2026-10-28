@@ -81,17 +81,17 @@
                "date": "<volatile>",
                "freepage": "<volatile>",
                "location": "$CUBRID_DATABASES/demodb",
-               "spacename": "demodb_lgat",
+               "spacename": "demodb_lgar_t",
                "totalpage": "6400",
-               "type": "Active_log"
+               "type": "Archive_log"
             },
             {
                "date": "<volatile>",
                "freepage": "<volatile>",
                "location": "$CUBRID_DATABASES/demodb",
-               "spacename": "demodb_lgar_t",
+               "spacename": "demodb_lgat",
                "totalpage": "6400",
-               "type": "Archive_log"
+               "type": "Active_log"
             }
          ]
       }
