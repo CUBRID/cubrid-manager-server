@@ -1261,7 +1261,7 @@ aj_execquery (autoexecquery_node *c)
   int argc = 0;
   const char *argv[11];
   char cmd_name[CUBRID_CMD_NAME_LEN + 1];
-  int ha_mode;
+  int ha_mode = 0;
   T_DB_SERVICE_MODE db_mode;
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   char dbpasswd[PASSWD_LENGTH + 1];
@@ -1533,7 +1533,7 @@ static void
 aj_backupdb (autobackupdb_node *n)
 {
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
-  int ha_mode;
+  int ha_mode = 0;
   char bkpath[512];
   char inputfilepath[512];
   char buf[2048], dbdir[512];
