@@ -364,6 +364,8 @@ aj_add_volume (char *dbname, const char *type, int increase,
 	}
       fclose (outfile);
     }
+
+  delete all_volumes;
 }
 
 static void

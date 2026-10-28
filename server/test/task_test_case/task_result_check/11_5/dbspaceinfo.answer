@@ -102,17 +102,17 @@
          "date": "<volatile>",
          "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb",
-         "spacename": "alatestdb_lgat",
+         "spacename": "alatestdb_lgar_t",
          "totalpage": "10240",
-         "type": "Active_log"
+         "type": "Archive_log"
       },
       {
          "date": "<volatile>",
          "freepage": "<volatile>",
          "location": "$CUBRID_DATABASES/alatestdb",
-         "spacename": "alatestdb_lgar_t",
+         "spacename": "alatestdb_lgat",
          "totalpage": "10240",
-         "type": "Archive_log"
+         "type": "Active_log"
       }
    ],
    "status": "success",

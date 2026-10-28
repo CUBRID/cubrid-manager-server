@@ -1478,8 +1478,6 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	{
 	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
 	    }
 	  else
@@ -1501,8 +1499,6 @@ void SpaceDbResultOldFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	{
 	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "index", page_add, page_size);
 	    }
 	  else
@@ -1526,10 +1522,8 @@ void SpaceDbResultNewFormat::auto_add_volume (autoaddvoldb_node *curr, int db_mo
 	}
       if (curr->data_warn_outofspace >= frate)
 	{
-	  if (db_mode == 2)
+	  if (db_mode == HA_MODE)
 	    {
-	      append_host_to_dbname (dbname_at_hostname, curr->dbname,
-				     sizeof (dbname_at_hostname));
 	      aj_add_volume (dbname_at_hostname, "data", page_add, page_size);
 	    }
 	  else

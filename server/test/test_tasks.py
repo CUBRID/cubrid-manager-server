@@ -1462,7 +1462,7 @@ def diagnose_db_state(task, casefile):
 # The cases below rewrite these files under $CUBRID/conf: setsysparam_cmconf and
 # setsysparam_cubridconf replace cm.conf and cubrid.conf, and deletebroker
 # rewrites cubrid_broker.conf even for a broker that does not exist.
-CONF_FILES = ("cm.conf", "cubrid.conf", "cubrid_broker.conf")
+CONF_FILES = ("cm.conf", "cubrid.conf", "cubrid_broker.conf", "autoaddvoldb.conf")
 CONF_BACKUP_NAME = "cmstest_backup"
 
 
