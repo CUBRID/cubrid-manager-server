@@ -13945,19 +13945,24 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 		  fgets (buf, sizeof (buf), infile);
 		}
 
-	      /* "Timeout_period : Infinite wait": the value is everything after
-	       * ':' and may be more than one word ("No wait"). */
-	      timeout_val = strchr (buf, ':');
-	      if (timeout_val == NULL)
+	      /* Since CUBRIDSUS-8915 (2012) the engine prints
+	       * "Timeout_period : <value>", where the value may be more than one
+	       * word ("No wait", "Infinite wait"). Older engines printed
+	       * "Timeout_period <seconds>". Keep everything after the label and
+	       * the optional ':'. */
+	      timeout_val = buf + strspn (buf, " \t");
+	      timeout_val += strcspn (timeout_val, " \t\r\n");
+	      timeout_val += strspn (timeout_val, " \t");
+	      if (*timeout_val == ':')
+		{
+		  timeout_val++;
+		  timeout_val += strspn (timeout_val, " \t");
+		}
+	      timeout_val[strcspn (timeout_val, "\r\n")] = '\0';
+	      if (*timeout_val == '\0')
 		{
 		  return -1;
 		}
-	      timeout_val++;
-	      while (*timeout_val == ' ' || *timeout_val == '\t')
-		{
-		  timeout_val++;
-		}
-	      timeout_val[strcspn (timeout_val, "\r\n")] = '\0';
 	      nv_add_nvp (res, "timeout", timeout_val);
 	      nv_add_nvp (res, "close", "transaction");
 	    }
