@@ -13868,6 +13868,7 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 {
   char buf[1024], s[256], s1[256], s2[256], s3[256], s4[256];
   char *temp, *temp2;
+  char *timeout_val;
   int scan_matched;
   int flag = 0;
   int flag_lot_tag = 0;
@@ -13944,13 +13945,25 @@ _ts_lockdb_parse_us (nvplist *res, FILE *infile)
 		  fgets (buf, sizeof (buf), infile);
 		}
 
-	      scan_matched = sscanf (buf, "%*s %255s", s1);
-
-	      if (scan_matched != 1)
+	      /* Since CUBRIDSUS-8915 (2012) the engine prints
+	       * "Timeout_period : <value>", where the value may be more than one
+	       * word ("No wait", "Infinite wait"). Older engines printed
+	       * "Timeout_period <seconds>". Keep everything after the label and
+	       * the optional ':'. */
+	      timeout_val = buf + strspn (buf, " \t");
+	      timeout_val += strcspn (timeout_val, " \t\r\n");
+	      timeout_val += strspn (timeout_val, " \t");
+	      if (*timeout_val == ':')
+		{
+		  timeout_val++;
+		  timeout_val += strspn (timeout_val, " \t");
+		}
+	      timeout_val[strcspn (timeout_val, "\r\n")] = '\0';
+	      if (*timeout_val == '\0')
 		{
 		  return -1;
 		}
-	      nv_add_nvp (res, "timeout", s1);
+	      nv_add_nvp (res, "timeout", timeout_val);
 	      nv_add_nvp (res, "close", "transaction");
 	    }
 	  else if (strcmp (s, "Object") == 0)
