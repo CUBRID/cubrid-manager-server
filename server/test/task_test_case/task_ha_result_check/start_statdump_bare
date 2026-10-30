@@ -1,0 +1,4 @@
+{"task":"start_statdump",
+"token":"",
+"dbname":"demodb",
+"interval":"5"}
