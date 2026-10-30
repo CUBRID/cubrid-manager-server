@@ -51,10 +51,10 @@ getdbmode
 statdump_zero
 start_statdump_host
 statdump_check1
-stop_statdump_host
+stop_statdump_bare
 start_statdump_bare
 statdump_check2
-stop_statdump_bare
+stop_statdump_host
 runsqlstatement_bare
 runsqlstatement_host
 
