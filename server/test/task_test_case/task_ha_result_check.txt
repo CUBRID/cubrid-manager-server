@@ -44,7 +44,21 @@ heartbeatlist
 changemode
 getdbmode
 
-// ---- 6. heartbeat down and up, first for one database, then for all ----
+// ---- 6. "dbname" and "dbname@host" name the same local HA database
+// (CBRD-27818). start and stop are given different forms on purpose: both map
+// to the same statdump entry, and stop only succeeds if the statdump worker
+// started by start is still alive (it dies at once on a multihost name error).
+statdump_zero
+start_statdump_host
+statdump_check1
+stop_statdump_bare
+start_statdump_bare
+statdump_check2
+stop_statdump_host
+runsqlstatement_bare
+runsqlstatement_host
+
+// ---- 7. heartbeat down and up, first for one database, then for all ----
 ha_stop_dbname
 ha_status
 ha_start_dbname

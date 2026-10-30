@@ -149,6 +149,8 @@ typedef struct
 int _op_check_is_localhost (char *token, char *tmpdbname);
 void append_host_to_dbname (char *name_buf, const char *dbname,
 			    int buf_len);
+int strip_host_from_dbname (char *name_buf, const char *dbname,
+			    int buf_len);
 void *increase_capacity (void *ptr, int block_size, int old_count,
 			 int new_count);
 char *strcpy_limit (char *dest, const char *src, int buf_len);

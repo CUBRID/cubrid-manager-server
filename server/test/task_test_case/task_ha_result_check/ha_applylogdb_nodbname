@@ -1,4 +1,4 @@
 {"task":"ha_applylogdb",
 "token":"",
-"on_off":"on",
-"peer_node":"ha-test-81"}
+"on_off":"start",
+"peer_node":"cubrid_ha_52"}
