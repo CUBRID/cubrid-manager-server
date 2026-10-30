@@ -86,6 +86,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"get_mon_statistic", 0, ext_get_mon_statistic, AU_ANY},
   {"getserverstatus", 0, ext_get_server_status, AU_ADMIN},
   {"getserverinfo", 0, ext_get_server_info, AU_ANY},
+  {"force_logout", 0, ext_force_logout, AU_ADMIN},
   {NULL, 0, NULL, 0}
 };
 
@@ -2703,6 +2704,83 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
     }
 
   dbmt_user_free (&dbmt_user);
+  return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
+}
+
+/*
+ * force_logout: close every session of a CMS user without deleting it.
+ * ADMIN only, see ext_task_info[].
+ *
+ * The user, its password and its authority are not changed, so the user can
+ * log in again at once. The DB logins of the closed sessions are wiped with
+ * them. The target may be the requester itself: the current request still
+ * completes, because its token was already validated, and the next request
+ * with that token is refused (ERR_INVALID_TOKEN).
+ */
+int ext_force_logout (Json::Value &request, Json::Value &response)
+{
+  T_DBMT_USER dbmt_user;
+  char dbmt_error[DBMT_ERROR_MSG_SIZE];
+  char log_head[512];
+  char log_msg[DBMT_ERROR_MSG_SIZE];
+  string target_id;
+  bool found = false;
+  int closed_sessions;
+  int retval;
+
+  /* only the top-level targetid, never one inside a nested object */
+  const Json::Value &target = request["targetid"];
+
+  if (target.isNull ())
+    {
+      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request.");
+    }
+  if (!target.isString ())
+    {
+      return build_server_header (response, ERR_WITH_MSG, "Parameter(targetid) must be a string.");
+    }
+  target_id = target.asString ();
+  if (target_id.empty ())
+    {
+      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request.");
+    }
+
+  /* the target must be a user in cm.pass */
+  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+    {
+      dbmt_user_free (&dbmt_user);
+      return build_server_header (response, retval, dbmt_error);
+    }
+  for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
+    {
+      if (strcmp (dbmt_user.user_info[i].user_name, target_id.c_str ()) == 0)
+	{
+	  found = true;
+	  break;
+	}
+    }
+  dbmt_user_free (&dbmt_user);
+
+  if (!found)
+    {
+      string note = "The user does not exist: " + target_id;
+      return build_server_header (response, ERR_WITH_MSG, note.c_str ());
+    }
+
+  closed_sessions = dbmt_user_delete_all_sessions_of_user (target_id.c_str ());
+
+  /*
+   * access log, in the form of ut_access_log (): "access_log <requester>
+   * <client address> <task> <message>"
+   */
+  snprintf (log_head, sizeof (log_head), "%s %s %s force_logout", ACCESS_LOG,
+	    request.get ("_ID", "-").asString ().c_str (), request.get ("_CLIENTIP", "-").asString ().c_str ());
+  snprintf (log_msg, sizeof (log_msg), "target=%s closed_sessions=%d", target_id.c_str (), closed_sessions);
+  write_manager_access_log (log_head, log_msg);
+
+  response["targetid"] = target_id;
+  response["closed_sessions"] = closed_sessions;
+
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
