@@ -573,6 +573,12 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `session_multi` | 기존 API | 같은 ID로 두 번 로그인하면 두 토큰 모두 동작, logout은 그 세션만 닫음, 사용자 삭제 시 남은 세션도 닫힘 |
 | `session_nested_token` | 기존 API | 세션 1의 토큰으로 보내는 `logout`의 중첩 객체 `a.token`에 세션 2의 토큰을 넣어도, 닫히는 것은 검증된 세션 1이고 세션 2는 계속 동작 |
 | `session_limit` | 기존 API | 17번 로그인하면 가장 오래 쓰지 않은 첫 세션이 닫히고 나머지는 동작. `max_sessions_per_user`=16(기본)을 전제로 한다 |
+| `force_admin_only` | 기존 API 계정, `_new` API로 admin 외 권한 모두 yes | 두 사용자 모두 `force_logout`이 거부되고, 대상 사용자의 세션은 그대로 동작 |
+| `force_two_sessions` | 기존 API | 같은 ID로 두 번 로그인한 뒤 admin이 `force_logout`: `closed_sessions` 2, 두 토큰 모두 `keepalive` 거부. 다른 사용자와 admin(러너) 세션은 동작 |
+| `force_no_session` | 기존 API | 세션이 없는 사용자: 성공, `closed_sessions` 0 |
+| `force_bad_param` | 기존 API | 없는 사용자, `targetid` 없음, 빈 값, 중첩 객체에만 있는 `targetid`, 문자열이 아닌 `targetid`(숫자·배열·객체)가 각각 정해진 note로 실패. 중첩 객체가 가리킨 사용자의 세션은 그대로 동작 |
+| `force_self` | `_new` API, `admin:yes` | 자기 자신 대상: 응답은 성공(`closed_sessions` 1), 같은 토큰의 다음 요청은 거부. 러너 토큰이 끊기지 않도록 케이스에서 만든 admin 사용자로 실행 |
+| `force_relogin` | 기존 API | 강제 로그아웃 뒤 같은 비밀번호로 다시 로그인할 수 있고, 새 토큰이 동작 |
 
 보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.
 `copyfolder`는 존재하지 않는 원본을 주어 회귀해도 아무것도 복사되지 않게 한다. `deletefolder`는
