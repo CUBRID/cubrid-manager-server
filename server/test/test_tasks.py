@@ -327,6 +327,11 @@ helper_procs = []
 #                                  (removed before sending); "." separates
 #                                  object keys, and a list on the way is
 #                                  searched in every element
+#   "test_value": {"<a.b.c>": <v>}  the value at each key path must equal <v>
+#                                  (removed before sending); paths as for
+#                                  test_no_key, a list on the way passes when
+#                                  any element has the value. JSON types must
+#                                  match: 2 is not "2", and true is not 1
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -393,9 +398,52 @@ def has_key_path(node, path):
     return False
 
 
+def values_at_path(node, path):
+    """Every value found at the key path ["a", "b", ...] in `node`.
+
+    Lists on the way are searched like has_key_path () does.
+    """
+    if not path:
+        return [node]
+    if isinstance(node, list):
+        found = []
+        for item in node:
+            found.extend(values_at_path(item, path))
+        return found
+    if isinstance(node, dict) and path[0] in node:
+        return values_at_path(node[path[0]], path[1:])
+    return []
+
+
+def same_json_value(a, b):
+    """JSON equality: Python's == alone takes True for 1 and 2 for 2.0 only."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return a == b
+    return type(a) is type(b) and a == b
+
+
+def value_mismatch(data, values):
+    """The first test_value entry `data` does not satisfy, as a message."""
+    for path, want in values.items():
+        found = values_at_path(data, path.split("."))
+        if not any(same_json_value(v, want) for v in found):
+            if not found:
+                return "no key %r" % path
+            got = found[0] if len(found) == 1 else found
+            return "%s is %s, not %s" % (path, json.dumps(got),
+                                         json.dumps(want))
+    return None
+
+
 def judged_status(data, expected, note_text=None, no_text=None, body="",
-                  no_key=None):
+                  no_key=None, values=None):
     """The value compared with `expected` for a response `data`."""
+    if values:
+        mismatch = value_mismatch(data, values)
+        if mismatch is not None:
+            return "%s (%s)" % (data.get("status"), mismatch)
     if no_text is not None and no_text in body:
         return "%s (response contains %r)" % (data.get("status"), no_text)
     if no_key is not None and has_key_path(data, no_key.split(".")):
@@ -592,7 +640,8 @@ def follow_job(name, data, token):
 
 
 def send_one(name, req, token, expected="success", casefile="",
-             must_be_sync=False, note_text=None, no_text=None, no_key=None):
+             must_be_sync=False, note_text=None, no_text=None, no_key=None,
+             values=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -638,7 +687,7 @@ def send_one(name, req, token, expected="success", casefile="",
             # prints that verdict instead of this status line.
             record(name, casefile, task,
                    judged_status(data, expected, note_text, no_text, body,
-                                 no_key),
+                                 no_key, values),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
@@ -647,7 +696,7 @@ def send_one(name, req, token, expected="success", casefile="",
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task,
            judged_status(data, expected, note_text, no_text, body,
-                         no_key),
+                         no_key, values),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -695,6 +744,11 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         req_note = req.pop("test_note", None)
         req_no_text = req.pop("test_no_text", None)
         req_no_key = req.pop("test_no_key", None)
+        req_values = req.pop("test_value", None)
+        if req_values is not None and not isinstance(req_values, dict):
+            print("\033[31m%s: \"test_value\" must be an object of key "
+                  "path to value.\033[0m" % taskfile)
+            sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
@@ -702,7 +756,8 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             time.sleep(float(req_sleep))
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
-                        must_be_sync, req_note, req_no_text, req_no_key)
+                        must_be_sync, req_note, req_no_text, req_no_key,
+                        req_values)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_tokens.append(data["token"])
