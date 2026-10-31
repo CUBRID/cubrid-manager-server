@@ -2684,9 +2684,9 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
   char dbmt_error[DBMT_ERROR_MSG_SIZE];
   int retval;
 
+  /* on failure dbmt_user_read () has already freed what it read */
   if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
-      dbmt_user_free (&dbmt_user);
       return build_server_header (response, retval, dbmt_error);
     }
 
