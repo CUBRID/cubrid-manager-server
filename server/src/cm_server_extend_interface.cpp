@@ -2745,10 +2745,12 @@ int ext_force_logout (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request.");
     }
 
-  /* the target must be a user in cm.pass */
+  /*
+   * the target must be a user in cm.pass. On failure dbmt_user_read () has
+   * already freed what it read, so there is nothing to free here.
+   */
   if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
-      dbmt_user_free (&dbmt_user);
       return build_server_header (response, retval, dbmt_error);
     }
   for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
