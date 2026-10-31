@@ -421,7 +421,15 @@ def same_json_value(a, b):
         return isinstance(a, bool) and isinstance(b, bool) and a == b
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return a == b
-    return type(a) is type(b) and a == b
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, list):
+        return len(a) == len(b) and all(
+            same_json_value(x, y) for x, y in zip(a, b))
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(
+            same_json_value(a[key], b[key]) for key in a)
+    return a == b
 
 
 def value_mismatch(data, values):
