@@ -27,3 +27,11 @@ session_multi,success
 session_nested_token,success
 // assumes max_sessions_per_user=16 (default)
 session_limit,success
+
+// force_logout (CBRD-27833): ADMIN only, closes every session of the target
+force_admin_only,success
+force_two_sessions,success
+force_no_session,success
+force_bad_param,success
+force_self,success
+force_relogin,success

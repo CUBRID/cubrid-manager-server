@@ -1120,8 +1120,9 @@ dbmt_user_purge_expired_sessions (time_t now_time)
 }
 
 /*
- * Delete every session of a user (e.g. the user is deleted). Returns the
- * number of sessions removed.
+ * Delete every session of a user: the user is deleted (deletedbmtuser) or
+ * its sessions are closed by force (force_logout). The DB logins of the
+ * removed sessions are wiped. Returns the number of sessions removed.
  */
 int
 dbmt_user_delete_all_sessions_of_user (const char *user_id)

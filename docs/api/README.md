@@ -85,7 +85,7 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 
 ### Rules beyond the permission
 
-- CMS user management (`adddbmtuser`, `updatedbmtuser`, `deletedbmtuser`, `adddbmtuser_new`, `updatedbmtuser_new`) requires ADMIN.
+- CMS user management (`adddbmtuser`, `updatedbmtuser`, `deletedbmtuser`, `adddbmtuser_new`, `updatedbmtuser_new`, `force_logout`) requires ADMIN.
 - `setdbmtpasswd`: every user can change its own password; only ADMIN can change another user's.
 - No response carries a password: neither CMS user passwords (`getdbmtuserinfo`) nor the mail password (`getautojobconf`).
 
@@ -95,6 +95,7 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 - A user can hold several sessions at once (one per login). `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed it, the least recently used session of that user is closed. Set it to 1 for one session per user.
 - A session expires after `token_active_time` seconds (default 7200) without a request. It must be an integer from 1 to 2147483647; any other value is logged and 7200 is used.
 - `logout` closes only its own session. Deleting a CMS user closes all of its sessions. Changing a password keeps the existing sessions; the new password applies from the next login.
+- `force_logout` (ADMIN) closes all sessions of a CMS user without changing the user. A closed session's token is refused like an expired one, and the user can log in again; to keep the user out, also change its password or delete it.
 - The DB login given to `dbmtuserlogin` is kept in that session only, in memory, and is used for later requests of the same session that name the database and give no `dbuser`/`dbpasswd` of their own. Other sessions, other users and the disk never see it.
 
 ### Reserved keys
@@ -209,6 +210,7 @@ The Permission column is generated from the task tables (see [Interface Permissi
 | [adddbmtuser](adddbmtuser.md) | socket, http | ADMIN |
 | [getaddvolstatus](getaddvolstatus.md) | socket, http | any logged-in user |
 | [dbmtuserlogin](dbmtuserlogin.md) | socket, http | any logged-in user |
+| [force_logout](force_logout.md) | http | ADMIN |
 
 ### Transaction
 

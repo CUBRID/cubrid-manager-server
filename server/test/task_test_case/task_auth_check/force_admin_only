@@ -1,0 +1,126 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_target",
+  "test_expect": "any"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_plain",
+  "test_expect": "any"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_allauth",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_target",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_plain",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_fl_allauth",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "yes",
+   "dbo": "yes",
+   "brk": "yes",
+   "mon": "yes",
+   "job": "yes",
+   "var": "yes"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_target",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_plain",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_allauth",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "force_logout",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "targetid": "authtest_fl_target",
+  "test_expect": "denied"
+ },
+ {
+  "task": "force_logout",
+  "token": "$CASE_LOGIN_TOKEN#3",
+  "targetid": "authtest_fl_target",
+  "test_expect": "denied"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_target"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_plain"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_allauth"
+ }
+]

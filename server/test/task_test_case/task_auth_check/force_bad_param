@@ -1,0 +1,106 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_nested",
+  "test_expect": "any"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_nouser",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_nested",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_nested",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": "authtest_fl_nouser",
+  "test_expect": "failure",
+  "test_note": "The user does not exist: authtest_fl_nouser"
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) missing in the request."
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": "",
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) missing in the request."
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "a": {
+   "targetid": "authtest_fl_nested"
+  },
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) missing in the request."
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "success"
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": 123,
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) must be a string."
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": [
+   "authtest_fl_nested"
+  ],
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) must be a string."
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": {
+   "id": "authtest_fl_nested"
+  },
+  "test_expect": "failure",
+  "test_note": "Parameter(targetid) must be a string."
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_nested"
+ }
+]
