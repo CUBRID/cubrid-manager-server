@@ -36,6 +36,7 @@
 #define MAX_MAX_SESSIONS_PER_USER       64
 #define DEFAULT_MAX_SESSIONS_PER_USER   16
 #define DEFAULT_TOKEN_ACTIVE_TIME       7200    /* token_active_time (seconds): default */
+#define DEFAULT_SESSION_IP_CHECK        SESSION_IP_CHECK_LOG    /* session_ip_check: default */
 #define MAX_NUM_ASYNC_TASK_LIMIT        12
 #define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
 
@@ -587,6 +588,18 @@ typedef struct
   char file_name[32];
 } T_DBMT_FILE_INFO;
 
+/*
+ * session_ip_check of cm.conf: what to do when a request comes from an IP
+ * address other than the one its session logged in from.
+ */
+typedef enum
+{
+  SESSION_IP_CHECK_OFF,		/* do not compare */
+  SESSION_IP_CHECK_LOG,		/* log a warning, process the request */
+  SESSION_IP_CHECK_ENFORCE	/* log a warning, reject the request and
+				 * delete the session */
+} T_SESSION_IP_CHECK;
+
 typedef struct
 {
   /*
@@ -617,6 +630,7 @@ typedef struct
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   int iTokenActiveTime;		/* token_active_time (seconds), always > 0 */
+  T_SESSION_IP_CHECK session_ip_check;	/* session_ip_check */
   char szMaxSessionsPerUser[PATH_MAX];
   int hmtab1, hmtab2, hmtab3, hmtab4;
   char szAccessLog[PATH_MAX];

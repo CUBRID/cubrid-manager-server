@@ -139,6 +139,7 @@ static int check_file (char *fname, char *pname);
 static int check_path (char *path, char *pname);
 static int check_max_sessions_per_user (void);
 static int parse_token_active_time (const char *val);
+static T_SESSION_IP_CHECK parse_session_ip_check (const char *val);
 
 void
 sys_config_init (void)
@@ -248,6 +249,7 @@ uReadSystemConfig (void)
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
   sco.iTokenActiveTime = DEFAULT_TOKEN_ACTIVE_TIME;
+  sco.session_ip_check = DEFAULT_SESSION_IP_CHECK;
   snprintf (sco.szMaxSessionsPerUser, PATH_MAX, "%d", DEFAULT_MAX_SESSIONS_PER_USER);
   snprintf (sco.szCWMPath, PATH_MAX, "%s%s", sco.szCubrid,
 	    DEFAULT_CWM_PATH_SHORT);
@@ -445,6 +447,11 @@ uReadSystemConfig (void)
 	{
 	  ut_trim (ent_val);
 	  sco.iTokenActiveTime = parse_token_active_time (ent_val);
+	}
+      else if (strcasecmp (ent_name, "session_ip_check") == 0)
+	{
+	  ut_trim (ent_val);
+	  sco.session_ip_check = parse_session_ip_check (ent_val);
 	}
       else if (strcasecmp (ent_name, "max_sessions_per_user") == 0)
 	{
@@ -1019,6 +1026,38 @@ parse_token_active_time (const char *val)
     }
 
   return (int) n;
+}
+
+/*
+ * parse_session_ip_check () - session_ip_check: off, log or enforce, in any
+ *   case. Any other value is logged and the default
+ *   (DEFAULT_SESSION_IP_CHECK, log) is used: CMS still starts, and the
+ *   default only adds log messages, so a typo does not stop requests.
+ */
+static T_SESSION_IP_CHECK
+parse_session_ip_check (const char *val)
+{
+  char err_buf[DBMT_ERROR_MSG_SIZE];
+
+  if (strcasecmp (val, "off") == 0)
+    {
+      return SESSION_IP_CHECK_OFF;
+    }
+  if (strcasecmp (val, "log") == 0)
+    {
+      return SESSION_IP_CHECK_LOG;
+    }
+  if (strcasecmp (val, "enforce") == 0)
+    {
+      return SESSION_IP_CHECK_ENFORCE;
+    }
+
+  snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+	    "CUBRID Manager Server : invalid session_ip_check in cm.conf (%s). "
+	    "It must be off, log or enforce. Using the default log.\n", val);
+  ut_record_cubrid_utility_log_stderr (err_buf);
+
+  return DEFAULT_SESSION_IP_CHECK;
 }
 
 static int
