@@ -3167,6 +3167,101 @@ bool ext_ut_validate_auth (Json::Value &request)
   return (auth_user & auth_task) ? true : false;
 }
 
+/*
+ * ext_ut_log_field () - a request value for a log line field.
+ *
+ *   The fields are separated by spaces and read back by ts_load_access_log
+ *   (), so a value that is missing, not a string or empty is "-", and any
+ *   character that is not printable, a space or '%' becomes '_'.
+ */
+static string
+ext_ut_log_field (const Json::Value &request, const char *key)
+{
+  const Json::Value &value = request[key];
+  string field;
+
+  if (!value.isString () || value.asString ().empty ())
+    {
+      return "-";
+    }
+  field = value.asString ();
+  for (size_t i = 0; i < field.size (); ++i)
+    {
+      unsigned char c = (unsigned char) field[i];
+      if (!isgraph (c) || c == '%')
+	{
+	  field[i] = '_';
+	}
+    }
+  return field;
+}
+
+/*
+ * ext_ut_write_log () - write "<kind> <requester> <client address> <task>
+ *   <msg>", the line ut_access_log ()/ut_error_log () write for nvplist
+ *   requests.
+ *
+ *   write_manager_access_log ()/write_manager_error_log () pass the line to
+ *   LOG_INFO/LOG_ERROR as the format string, so '%' and control characters
+ *   in msg become '_': msg may carry what a client sent.
+ */
+static void
+ext_ut_write_log (const Json::Value &request, const char *kind, const char *msg, bool is_error)
+{
+  string head;
+  /* no message: "" in the access log, "-" in the error log, as in ut_*_log () */
+  string message = (msg != NULL) ? msg : (is_error ? "-" : "");
+
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  string task = ext_ut_log_field (request, "_TASK");
+  if (task == "-")
+    {
+      task = ext_ut_log_field (request, "task");
+    }
+
+  head = string (kind) + " " + ext_ut_log_field (request, "_ID") + " " + ext_ut_log_field (request, "_CLIENTIP")
+	 + " " + task;
+
+  for (size_t i = 0; i < message.size (); ++i)
+    {
+      unsigned char c = (unsigned char) message[i];
+      if (iscntrl (c) || c == '%')
+	{
+	  message[i] = '_';
+	}
+    }
+
+  if (is_error)
+    {
+      write_manager_error_log (head.c_str (), message.c_str ());
+    }
+  else
+    {
+      write_manager_access_log (head.c_str (), message.c_str ());
+    }
+}
+
+/*
+ * ext_ut_access_log () - an access_log line for a JSON request, in the form
+ *   of ut_access_log (); written to the access log.
+ */
+void
+ext_ut_access_log (const Json::Value &request, const char *msg)
+{
+  ext_ut_write_log (request, ACCESS_LOG, msg, false);
+}
+
+/*
+ * ext_ut_error_log () - an access_err line for a JSON request, in the form
+ *   of ut_error_log (); written to the error log, where ts_load_access_log
+ *   () reads access_err lines.
+ */
+void
+ext_ut_error_log (const Json::Value &request, const char *msg)
+{
+  ext_ut_write_log (request, ACCESS_ERR, msg, true);
+}
+
 int ext_get_mon_interval (Json::Value &request, Json::Value &response)
 {
   response["task"] = request["task"];

@@ -99,5 +99,7 @@ std::string ext_ut_generate_token (const std::string &client_ip,
 int ext_ut_validate_token (Json::Value &resquest, Json::Value &response);
 bool ext_ut_validate_token (const char *token);
 bool ext_ut_validate_auth (Json::Value &request);
+void ext_ut_access_log (const Json::Value &request, const char *msg);
+void ext_ut_error_log (const Json::Value &request, const char *msg);
 
 #endif
