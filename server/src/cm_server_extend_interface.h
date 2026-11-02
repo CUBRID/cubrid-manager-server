@@ -96,7 +96,10 @@ std::string ext_ut_generate_token (const std::string &client_ip,
 				   const std::string &client_id, int proc_id,
 				   time_t login_time);
 int ext_ut_validate_token (Json::Value &resquest, Json::Value &response);
-bool ext_ut_validate_token (const char *token);
+#if !defined (NDEBUG)
+/* /upload, debug builds only */
+bool ext_ut_validate_token (const char *token, const char *request_ip);
+#endif
 bool ext_ut_validate_auth (Json::Value &request);
 
 #endif

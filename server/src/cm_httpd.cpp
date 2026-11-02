@@ -494,7 +494,8 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
 
   cookie.copy (token, TOKEN_ENC_LENGTH - 1, token_pos + strlen ("token="));
   token[TOKEN_ENC_LENGTH - 1] = '\0';
-  if (!ext_ut_validate_token (token))
+  /* remote_host: the address of this connection, as for _CLIENTIP */
+  if (!ext_ut_validate_token (token, req->remote_host))
     {
       goto send_nok_reply;
     }

@@ -2904,7 +2904,8 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
  *   the caller rejects the request as an invalid token, the same as an
  *   expired one, so the client learns nothing about the token.
  *
- *   Called after the token and its expiry are checked, with cm_mutex held.
+ *   Called after the token and its expiry are checked, for a JSON request
+ *   and (debug builds) for /upload.
  *
  *   return: true to go on with the request, false to reject it
  *   token_info(in): the session the token maps to
@@ -2956,7 +2957,17 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
   return true;
 }
 
-bool ext_ut_validate_token (const char *token)
+#if !defined (NDEBUG)
+/*
+ * ext_ut_validate_token () - validate the token of a /upload request (the
+ *   cookie), which only debug builds serve (cub_post_request_handler ()).
+ *   The same checks as for a JSON request, including check_session_ip ().
+ *
+ *   return: true if the request may go on
+ *   token(in): token from the cookie
+ *   request_ip(in): address the request came from (NULL if unknown)
+ */
+bool ext_ut_validate_token (const char *token, const char *request_ip)
 {
   T_USER_TOKEN_INFO token_info;
   time_t now_time = time (0);
@@ -2982,6 +2993,12 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
+  /* before the session is touched, as for a JSON request */
+  if (!check_session_ip (&token_info, token, request_ip, "/upload"))
+    {
+      return false;
+    }
+
   if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return false;
@@ -2989,6 +3006,7 @@ bool ext_ut_validate_token (const char *token)
 
   return true;
 }
+#endif
 
 int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 {
@@ -3063,7 +3081,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  /* see the comment in the (const char *token) overload above */
+  /* the request is accepted: update the session's last access time */
   if (!dbmt_user_touch_token_login_time_by_token (token.c_str(), now_time))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
