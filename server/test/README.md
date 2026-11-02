@@ -291,6 +291,25 @@ loaddb  lockdb  optimizedb  renamedb  restoredb  start_statdump
 startbroker  startdb  stop_statdump  stopbroker  stopdb  unloaddb
 ```
 
+### `cm_conf <key>=<value>` — cm.conf 변경과 manager 재시작
+
+manager는 cm.conf를 시작할 때만 읽으므로, 설정에 따라 동작이 바뀌는지 보려면 설정을 바꾸고
+다시 시작해야 한다. 목록에 다음 줄을 두면 러너가 `$CUBRID/conf/cm.conf`의 `[cm]` 절에서 그
+항목을 바꾸고 `cubrid manager stop` / `start`로 다시 시작한다.
+
+```
+cm_conf session_ip_check=enforce     # 항목을 이 값으로 (없으면 추가)
+cm_conf session_ip_check             # 항목을 지움 (서버 기본값으로)
+```
+
+- 다시 시작하면 모든 세션이 끝나므로, 러너는 자기 토큰을 새로 로그인해 받는다. 케이스 안의
+  `$CASE_LOGIN_TOKEN`은 케이스마다 새로 로그인하므로 영향이 없다.
+- 주석 처리된 줄(`#session_ip_check=log`)은 건드리지 않는다.
+- 세트 끝에서 바꾼 항목을 되돌리는 줄을 둔다. 중간에 멈춘 실행이 남긴 변경은 다음 실행의
+  시작에서 `cmstest_backup`으로 복원된다(`prepare_confs ()`).
+- manager가 이 호스트에 있어야 한다. 로컬 환경을 준비하지 않는 세트(`task_ha_result_check`)에서는
+  쓸 수 없다.
+
 **`,<status>`가 붙으면 그 케이스는 status 검사 전용이다.** `-a`로도 기준값을 만들지 않고,
 `-fc`에서도 선언한 status로만 판정한다. 쓰는 경우는 두 가지다.
 
@@ -538,6 +557,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
 | `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
 | `"test_no_text": "<문자열>"` | 응답 원문에 이 문자열이 없어야 통과. 러너가 지우고 보낸다. 비밀번호가 응답에 나오지 않는지 확인할 때 쓴다 |
+| `"test_source_ip": "<주소>"` | 이 요청을 이 호스트의 그 주소에서 보낸다. 러너가 지우고 보낸다. 서버가 다른 클라이언트의 요청으로 보게 할 때 쓴다. `cmsip`가 `127.0.0.1`이면 Linux에서는 `127.0.0.2`처럼 `127.x.x.x` 아무 주소나 쓸 수 있다 |
 | `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
 
 판정 값은 `success`, `failure` 외에 다음을 쓸 수 있다.
