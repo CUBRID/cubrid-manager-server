@@ -16,6 +16,7 @@
 #   ./run_tests.sh -a  11.4 task_result_check.txt
 #   ./run_tests.sh -fc 11.4 task_result_check.txt
 #   ./run_tests.sh --all                        run every set in task_test_case/
+#                                               but those run only by name
 #   ./run_tests.sh --clean                      drop log/ and the .result files
 #   ./run_tests.sh --check-docs                 check that docs/api match the task tables
 #
@@ -30,8 +31,14 @@ PYTHON=${PYTHON:-python3}
 CASE_ROOT=task_test_case
 LOG_DIR=log
 
+# Sets that --all leaves out, because they need a particular environment;
+# they run only when named. task_session_ip_check sends requests from
+# 127.0.0.1 and 127.0.0.2, so it needs cmsip 127.0.0.1 on a Linux host
+# (README.md 4.10).
+NAMED_ONLY_SETS="task_session_ip_check.txt"
+
 usage() {
-    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 clean() {
@@ -61,6 +68,11 @@ if [ "${1:-}" = "--all" ]; then
     status=0
     for listfile in "$CASE_ROOT"/*.txt; do
         setname=$(basename "$listfile")
+        case " $NAMED_ONLY_SETS " in
+            *" $setname "*)
+                echo "===== $setname (skipped: run it by name) ====="
+                continue ;;
+        esac
         echo "===== $setname ====="
         "$PYTHON" test_tasks.py "$setname" "$@" || status=1
     done

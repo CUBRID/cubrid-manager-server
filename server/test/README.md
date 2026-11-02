@@ -54,7 +54,7 @@ cd server/test
 # 동기로 실행된 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
 ./run_tests.sh -st
 
-# task_test_case/ 의 모든 세트를 차례로 실행
+# task_test_case/ 의 모든 세트를 차례로 실행 (이름으로만 실행하는 세트는 제외, 4.10 참고)
 ./run_tests.sh --all
 
 # 단건 응답을 실제 토큰으로 덤프 (문서 검증/작성용)
@@ -620,7 +620,10 @@ python3 test_tasks.py --dump <name> [<name> ...]
 cm.conf의 `session_ip_check`(CBRD-27861)에 따라, 로그인한 곳과 다른 주소에서 온 요청을 처리하거나
 거부하는지 확인한다. 케이스는 `127.0.0.1`에서 로그인하고, 일부 요청을 `"test_source_ip":
 "127.0.0.2"`로 보낸다. 그래서 `cmsip`가 `127.0.0.1`이고 Linux 호스트여야 한다. 모드는 목록의
-`cm_conf` 줄로 바꾼다(4.4). 줄마다 manager를 다시 시작하므로 몇 분 걸리며, CI에서는 돌지 않는다.
+`cm_conf` 줄로 바꾼다(4.4). 줄마다 manager를 다시 시작하므로 몇 분 걸린다.
+
+이 조건을 갖추지 않은 환경에서 실패하지 않도록, 이 세트는 **이름을 지정했을 때만 실행한다.**
+`--all`은 이 세트를 건너뛰고(`run_tests.sh`의 `NAMED_ONLY_SETS`), CI에서도 돌지 않는다.
 
 ```sh
 ./run_tests.sh task_session_ip_check.txt
