@@ -97,6 +97,31 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 - `logout` closes only its own session. Deleting a CMS user closes all of its sessions. Changing a password keeps the existing sessions; the new password applies from the next login.
 - The DB login given to `dbmtuserlogin` is kept in that session only, in memory, and is used for later requests of the same session that name the database and give no `dbuser`/`dbpasswd` of their own. Other sessions, other users and the disk never see it.
 
+### Request IP check
+
+CMS compares the IP address each request comes from with the IP address its session logged in from. `session_ip_check` in `cm.conf` sets what happens when they differ:
+
+| Value | When a request comes from another IP address |
+| --- | --- |
+| `off` | Nothing; the addresses are not compared. |
+| `log` (default) | A warning is written to the error log (`cub_manager.err`) and the request is processed. |
+| `enforce` | A warning is written, the session is closed together with its DB logins, and the request is rejected as an invalid token, the same response as an expired session. Log in again to go on. |
+
+Any other value is logged and `log` is used.
+
+- The port is not compared. Addresses are compared in a normalized form, so different spellings of one address are equal: an IPv6 address with or without leading zeros or in another case, a link-local address with a scope (`fe80::1%eth0`), and an IPv4-mapped IPv6 address (`::ffff:1.2.3.4`, the same as `1.2.3.4`).
+- `login` and `getcmsenv` are not checked: they do not use a token.
+- When an address cannot be determined, this is logged and the request is not treated as coming from another address.
+- The warning names the user, the login IP, the request IP, the task and what was done. It never contains the token.
+- Whatever the value, the access log and the error log write the address of the request and, when it differs from the login IP, end the line with `login_ip=<login IP>`. As before, the access log is written only for some tasks.
+
+Set `enforce` only when each client has a fixed IP address and does not share its token with other hosts. The check has these limits:
+
+- Valid requests come from different addresses when several hosts share one token, or behind a forward proxy with several outgoing addresses; `enforce` rejects them.
+- Clients behind the same NAT or forward proxy share one address and are not told apart.
+- Behind a reverse proxy or a layer 4 load balancer, CMS sees the address of the proxy, and the check has no effect. CMS does not read `X-Forwarded-For` or the PROXY protocol.
+- An active man-in-the-middle logs in from its own address, so it is not detected. What the check detects is a token used somewhere other than where it was issued, such as a token leaked from a log or a client PC.
+
 ### Reserved keys
 
 Keys starting with `_` (`_ID`, `_DBID`, `_DBPASSWD`, ...) are reserved for values the server sets. A client must not send them: CMS removes them from a request at every nesting level before processing it. Send the DB login as `dbuser`/`dbpasswd`. (For compatibility, `loaddb` and `killtransaction` still take `_DBID`/`_DBPASSWD` for one more release; see their documents.)
