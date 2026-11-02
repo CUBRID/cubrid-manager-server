@@ -755,11 +755,65 @@ write_manager_error_log (const char *protocol_str, const char *msg)
   LOG_ERROR (message);
 }
 
+/*
+ * ut_log_msg_with_login_ip () - the message part of an access or error log
+ *   line, with the session's login IP appended when the request came from
+ *   another address.
+ *
+ *   _IP is the IP the session logged in from (set by token validation) and
+ *   _CLIENTIP the address this request came from; both are in the form of
+ *   ut_normalize_ip (). When they differ, " login_ip=<_IP>" is appended to
+ *   msg, at the end so that the fields before it keep their positions
+ *   (loadaccesslog reads them by position). A request without a validated
+ *   token (login) has no _IP and gets msg unchanged.
+ *
+ *   The log writers cut "<head> <msg>" at DBMT_ERROR_MSG_SIZE; msg is cut
+ *   here instead so that login_ip is kept.
+ *
+ *   return: msg, or buf holding msg with login_ip
+ *   req(in): request
+ *   head(in): the part of the line before msg
+ *   msg(in): message
+ *   buf(out): buffer for msg with login_ip
+ *   buf_size(in): size of buf
+ */
+static const char *
+ut_log_msg_with_login_ip (nvplist *req, const char *head, const char *msg,
+			  char *buf, size_t buf_size)
+{
+  const char *login_ip, *client_ip;
+  char suffix[sizeof (" login_ip=") + DBMT_USER_IP_LEN];
+  int room;
+
+  login_ip = nv_get_val (req, "_IP");
+  client_ip = nv_get_val (req, "_CLIENTIP");
+  if (login_ip == NULL || login_ip[0] == '\0'
+      || (client_ip != NULL && strcmp (login_ip, client_ip) == 0))
+    {
+      return msg;
+    }
+
+  snprintf (suffix, sizeof (suffix), "%slogin_ip=%s",
+	    (msg[0] != '\0') ? " " : "", login_ip);
+
+  /* DBMT_ERROR_MSG_SIZE - NUL - head - ' ' - suffix */
+  room = DBMT_ERROR_MSG_SIZE - 1 - (int) strlen (head) - 1 - (int) strlen (suffix);
+  if (room < 0)
+    {
+      room = 0;
+    }
+
+  snprintf (buf, buf_size, "%.*s%s", room, msg, suffix);
+
+  return buf;
+}
+
 void
 ut_error_log (nvplist *req, const char *errmsg)
 {
   const char *id, *addr, *task;
   char strbuf[512];
+  char msgbuf[DBMT_ERROR_MSG_SIZE];
 
   /* _TASK is the task that runs (cub_cm_request_handler ()) */
   if ((task = nv_get_val (req, "_TASK")) == NULL
@@ -782,7 +836,9 @@ ut_error_log (nvplist *req, const char *errmsg)
 
   snprintf (strbuf, sizeof (strbuf), "%s %s %s %s", ACCESS_ERR, id, addr, task);
 
-  write_manager_error_log (strbuf, errmsg);
+  write_manager_error_log (strbuf,
+			   ut_log_msg_with_login_ip (req, strbuf, errmsg,
+						     msgbuf, sizeof (msgbuf)));
 }
 
 void
@@ -800,6 +856,7 @@ ut_access_log (nvplist *req, const char *msg)
 {
   const char *id, *cli_addr, *task;
   char strbuf[512];
+  char msgbuf[DBMT_ERROR_MSG_SIZE];
 
   strbuf[0] = '\0';
 
@@ -824,7 +881,9 @@ ut_access_log (nvplist *req, const char *msg)
 
   snprintf (strbuf, sizeof (strbuf), "%s %s %s %s", ACCESS_LOG, id, cli_addr, task);
 
-  write_manager_access_log (strbuf, msg);
+  write_manager_access_log (strbuf,
+			    ut_log_msg_with_login_ip (req, strbuf, msg,
+						      msgbuf, sizeof (msgbuf)));
 }
 
 /* the session keeps a normalized address in user_ip (DBMT_USER_IP_LEN) */
