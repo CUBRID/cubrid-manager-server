@@ -752,7 +752,7 @@ write_manager_error_log (const char *protocol_str, const char *msg)
 
   snprintf (message, DBMT_ERROR_MSG_SIZE, "%s %s", protocol_str, msg);
 
-  LOG_ERROR (message);
+  LOG_ERROR ("%s", message);
 }
 
 /*
@@ -848,7 +848,7 @@ write_manager_access_log (const char *protocol_str, const char *msg)
 
   snprintf (message, DBMT_ERROR_MSG_SIZE, "%s %s", protocol_str, msg);
 
-  LOG_INFO (message);
+  LOG_INFO ("%s", message);
 }
 
 void
