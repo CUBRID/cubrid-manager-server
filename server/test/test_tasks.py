@@ -331,7 +331,8 @@ helper_procs = []
 #                                  (removed before sending); paths as for
 #                                  test_no_key, a list on the way passes when
 #                                  any element has the value. JSON types must
-#                                  match: 2 is not "2", and true is not 1
+#                                  match: 2 is not "2", and true is not 1; an
+#                                  empty object stops the run
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -753,9 +754,11 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         req_no_text = req.pop("test_no_text", None)
         req_no_key = req.pop("test_no_key", None)
         req_values = req.pop("test_value", None)
-        if req_values is not None and not isinstance(req_values, dict):
-            print("\033[31m%s: \"test_value\" must be an object of key "
-                  "path to value.\033[0m" % taskfile)
+        if req_values is not None and (not isinstance(req_values, dict)
+                                       or not req_values):
+            # an empty object would compare nothing and always pass
+            print("\033[31m%s: \"test_value\" must be a non-empty object of "
+                  "key path to value.\033[0m" % taskfile)
             sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_token = case_login_token(req.get("token"), case_tokens, token)
