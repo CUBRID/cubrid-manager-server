@@ -2708,6 +2708,47 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
 }
 
 /*
+ * force_logout_log_target () - "target=<id>" for a force_logout log line.
+ *
+ *   On a failure targetid is what the client sent, so a missing or empty one
+ *   is "-", one that is not a string is "<non-string>", a space, a control
+ *   character or '%' becomes '_', and only the first 64 characters are kept.
+ */
+static string
+force_logout_log_target (const Json::Value &target)
+{
+  const size_t max_len = 64;
+  string id;
+
+  if (target.isNull ())
+    {
+      return "target=-";
+    }
+  if (!target.isString ())
+    {
+      return "target=<non-string>";
+    }
+  id = target.asString ();
+  if (id.empty ())
+    {
+      return "target=-";
+    }
+  if (id.size () > max_len)
+    {
+      id.resize (max_len);
+    }
+  for (size_t i = 0; i < id.size (); ++i)
+    {
+      unsigned char c = (unsigned char) id[i];
+      if (!isgraph (c) || c == '%')
+	{
+	  id[i] = '_';
+	}
+    }
+  return "target=" + id;
+}
+
+/*
  * force_logout: close every session of a CMS user without deleting it.
  * ADMIN only, see ext_task_info[].
  *
@@ -2716,34 +2757,40 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
  * them. The target may be the requester itself: the current request still
  * completes, because its token was already validated, and the next request
  * with that token is refused (ERR_INVALID_TOKEN).
+ *
+ * A success is logged as access_log and a failure as access_err, both with
+ * the target. A refusal for authority is logged by cub_cm_request_handler ().
  */
 int ext_force_logout (Json::Value &request, Json::Value &response)
 {
   T_DBMT_USER dbmt_user;
   char dbmt_error[DBMT_ERROR_MSG_SIZE];
-  char log_head[512];
-  char log_msg[DBMT_ERROR_MSG_SIZE];
   string target_id;
+  string log_msg;
+  char count_str[16];
   bool found = false;
   int closed_sessions;
   int retval;
 
   /* only the top-level targetid, never one inside a nested object */
   const Json::Value &target = request["targetid"];
+  const string log_target = force_logout_log_target (target);
 
-  if (target.isNull ())
+  if (target.isNull () || (target.isString () && target.asString ().empty ()))
     {
-      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request.");
+      const char *note = "Parameter(targetid) missing in the request.";
+      log_msg = log_target + " " + note;
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, ERR_PARAM_MISSING, note);
     }
   if (!target.isString ())
     {
-      return build_server_header (response, ERR_WITH_MSG, "Parameter(targetid) must be a string.");
+      const char *note = "Parameter(targetid) must be a string.";
+      log_msg = log_target + " " + note;
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, note);
     }
   target_id = target.asString ();
-  if (target_id.empty ())
-    {
-      return build_server_header (response, ERR_PARAM_MISSING, "Parameter(targetid) missing in the request.");
-    }
 
   /*
    * the target must be a user in cm.pass. On failure dbmt_user_read () has
@@ -2751,6 +2798,8 @@ int ext_force_logout (Json::Value &request, Json::Value &response)
    */
   if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
+      log_msg = log_target + " " + dbmt_error;
+      ext_ut_error_log (request, log_msg.c_str ());
       return build_server_header (response, retval, dbmt_error);
     }
   for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
@@ -2766,19 +2815,17 @@ int ext_force_logout (Json::Value &request, Json::Value &response)
   if (!found)
     {
       string note = "The user does not exist: " + target_id;
+      /* the note carries the raw id; the log carries log_target instead */
+      log_msg = log_target + " The user does not exist";
+      ext_ut_error_log (request, log_msg.c_str ());
       return build_server_header (response, ERR_WITH_MSG, note.c_str ());
     }
 
   closed_sessions = dbmt_user_delete_all_sessions_of_user (target_id.c_str ());
 
-  /*
-   * access log, in the form of ut_access_log (): "access_log <requester>
-   * <client address> <task> <message>"
-   */
-  snprintf (log_head, sizeof (log_head), "%s %s %s force_logout", ACCESS_LOG,
-	    request.get ("_ID", "-").asString ().c_str (), request.get ("_CLIENTIP", "-").asString ().c_str ());
-  snprintf (log_msg, sizeof (log_msg), "target=%s closed_sessions=%d", target_id.c_str (), closed_sessions);
-  write_manager_access_log (log_head, log_msg);
+  snprintf (count_str, sizeof (count_str), "%d", closed_sessions);
+  log_msg = log_target + " closed_sessions=" + count_str;
+  ext_ut_access_log (request, log_msg.c_str ());
 
   response["targetid"] = target_id;
   response["closed_sessions"] = closed_sessions;
