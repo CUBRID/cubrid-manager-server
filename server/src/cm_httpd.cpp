@@ -289,7 +289,22 @@ cub_accept_legacy_db_keys (Json::Value &root)
 void
 cub_add_private_param (struct evhttp_request *req, Json::Value &root)
 {
-  root["_CLIENTIP"] = req->remote_host;
+  char client_ip[DBMT_USER_IP_LEN];
+
+  /*
+   * _CLIENTIP is the address of the connection this request came on, in the
+   * standard form of ut_normalize_ip (): login stores it in the session, and
+   * the access and error logs write it. An address that cannot be
+   * normalized is kept as it is, so that the logs show what was received.
+   */
+  if (ut_normalize_ip (req->remote_host, client_ip, sizeof (client_ip)))
+    {
+      root["_CLIENTIP"] = client_ip;
+    }
+  else
+    {
+      root["_CLIENTIP"] = req->remote_host;
+    }
   root["_CLIENTPORT"] = req->remote_port;
   root["_STAMP"] = 1;
   root["_PROGNAME"] = CMS_NAME;

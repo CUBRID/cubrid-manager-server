@@ -827,6 +827,91 @@ ut_access_log (nvplist *req, const char *msg)
   write_manager_access_log (strbuf, msg);
 }
 
+/* the session keeps a normalized address in user_ip (DBMT_USER_IP_LEN) */
+static_assert (DBMT_USER_IP_LEN >= INET6_ADDRSTRLEN,
+	       "DBMT_USER_IP_LEN is smaller than INET6_ADDRSTRLEN");
+
+/*
+ * ut_normalize_ip () - convert an IP address in text form to one standard
+ *   form, so that two forms of the same address compare equal as strings.
+ *
+ *   An IPv4 address is written as inet_ntop () writes it. For an IPv6
+ *   address, the scope after '%' (link-local address) is removed, and the
+ *   address is written as inet_ntop () writes it, which drops leading zeros,
+ *   compresses runs of zero fields and uses lowercase. An IPv4-mapped IPv6
+ *   address (::ffff:1.2.3.4) is written as the IPv4 address (1.2.3.4).
+ *
+ *   return: true if src is an IP address and the result fits in dst;
+ *           false otherwise, with dst set to "".
+ *   src(in): address in text form
+ *   dst(out): normalized address; DBMT_USER_IP_LEN bytes are always enough
+ *   dst_size(in): size of dst
+ */
+bool
+ut_normalize_ip (const char *src, char *dst, size_t dst_size)
+{
+  char addr_str[INET6_ADDRSTRLEN];
+  const char *scope;
+  size_t addr_len;
+  struct in_addr addr4;
+  struct in6_addr addr6;
+  int i;
+
+  if (dst == NULL || dst_size == 0)
+    {
+      return false;
+    }
+  dst[0] = '\0';
+
+  if (src == NULL)
+    {
+      return false;
+    }
+
+  if (inet_pton (AF_INET, src, &addr4) == 1)
+    {
+      return inet_ntop (AF_INET, &addr4, dst, dst_size) != NULL;
+    }
+
+  /* IPv6: drop the scope (fe80::1%eth0 -> fe80::1) */
+  scope = strchr (src, '%');
+  addr_len = (scope != NULL) ? (size_t) (scope - src) : strlen (src);
+  if (addr_len >= sizeof (addr_str))
+    {
+      return false;
+    }
+  memcpy (addr_str, src, addr_len);
+  addr_str[addr_len] = '\0';
+
+  if (inet_pton (AF_INET6, addr_str, &addr6) != 1)
+    {
+      return false;
+    }
+
+  /* IPv4-mapped IPv6 (::ffff:a.b.c.d): 10 zero bytes, 0xff 0xff, IPv4 */
+  for (i = 0; i < 10 && addr6.s6_addr[i] == 0; i++)
+    {
+      ;
+    }
+  if (i == 10 && addr6.s6_addr[10] == 0xff && addr6.s6_addr[11] == 0xff)
+    {
+      memcpy (&addr4, &addr6.s6_addr[12], sizeof (addr4));
+      if (inet_ntop (AF_INET, &addr4, dst, dst_size) == NULL)
+	{
+	  dst[0] = '\0';
+	  return false;
+	}
+      return true;
+    }
+
+  if (inet_ntop (AF_INET6, &addr6, dst, dst_size) == NULL)
+    {
+      dst[0] = '\0';
+      return false;
+    }
+  return true;
+}
+
 int
 ut_get_task_info (const char *task, char *access_log_flag,
 		  T_TASK_FUNC *task_func, T_USER_AUTH *auth)

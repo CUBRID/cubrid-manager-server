@@ -31,7 +31,8 @@
  * DBMT_USER_IP_LEN - size of a buffer that holds a client IP address in text
  *   form. Not less than INET6_ADDRSTRLEN on any supported platform (46 on
  *   POSIX, 65 on Windows); a number here so that this header does not need
- *   the network headers.
+ *   the network headers. cm_server_util.cpp checks it against
+ *   INET6_ADDRSTRLEN.
  */
 #define DBMT_USER_IP_LEN 65
 
