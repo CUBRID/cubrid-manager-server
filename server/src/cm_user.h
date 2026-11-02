@@ -27,6 +27,14 @@
 
 #define DBMT_USER_NAME_LEN 64
 
+/*
+ * DBMT_USER_IP_LEN - size of a buffer that holds a client IP address in text
+ *   form. Not less than INET6_ADDRSTRLEN on any supported platform (46 on
+ *   POSIX, 65 on Windows); a number here so that this header does not need
+ *   the network headers.
+ */
+#define DBMT_USER_IP_LEN 65
+
 typedef struct
 {
   char dbname[DBMT_USER_NAME_LEN];
@@ -72,7 +80,7 @@ typedef struct T_USER_TOKEN_INFO T_USER_TOKEN_INFO;
 struct T_USER_TOKEN_INFO
 {
   char user_id[DBMT_USER_NAME_LEN];
-  char user_ip[20];
+  char user_ip[DBMT_USER_IP_LEN];
   char user_port[10];
 #ifdef WINDOWS
   HANDLE proc_id;
