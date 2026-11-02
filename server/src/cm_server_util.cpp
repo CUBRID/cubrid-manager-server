@@ -838,7 +838,7 @@ ut_error_log (nvplist *req, const char *errmsg)
 
   write_manager_error_log (strbuf,
 			   ut_log_msg_with_login_ip (req, strbuf, errmsg,
-						     msgbuf, sizeof (msgbuf)));
+			       msgbuf, sizeof (msgbuf)));
 }
 
 void
@@ -883,7 +883,7 @@ ut_access_log (nvplist *req, const char *msg)
 
   write_manager_access_log (strbuf,
 			    ut_log_msg_with_login_ip (req, strbuf, msg,
-						      msgbuf, sizeof (msgbuf)));
+				msgbuf, sizeof (msgbuf)));
 }
 
 /* the session keeps a normalized address in user_ip (DBMT_USER_IP_LEN) */
