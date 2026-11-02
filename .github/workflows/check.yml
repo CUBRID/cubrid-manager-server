@@ -87,6 +87,14 @@ jobs:
         uses: reviewdog/action-suggester@2558ba17e65a9039e73764a73009fc05fef28a46 # v1.24.3
         with:
           tool_name: code-style (indent, astyle)
+  unit-test:
+    name: unit-test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build and run the unit tests
+        # server/test/unit: tests of server sources that need no CUBRID build
+        run: server/test/unit/run_unit_tests.sh
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-24.04

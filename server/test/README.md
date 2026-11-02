@@ -655,4 +655,5 @@ task_test_case/task_status_check/unloaddb_optional  # as-dba 등 선택 파라�
   `server/src/cm_server_extend_interface.cpp`의 `ext_task_info[]`
 - API 문서: `docs/api/<task>.md` (요청/응답 규격)
 - 실행 스크립트: `run_tests.sh`
+- 단위 테스트: `unit/` (CUBRID 빌드 없이 도는 서버 소스 테스트, `unit/README.md` 참고)
 
