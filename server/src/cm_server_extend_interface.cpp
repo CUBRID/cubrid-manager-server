@@ -2888,6 +2888,74 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
   return ERR_NO_ERROR;
 }
 
+/*
+ * check_session_ip () - compare the IP address a request came from with the
+ *   IP address its session logged in from, as session_ip_check of cm.conf
+ *   says (sco.session_ip_check).
+ *
+ *   Both addresses are normalized by ut_normalize_ip () and compared as
+ *   strings; the port is not compared (each request may use a new
+ *   connection). An address that cannot be normalized is "unknown": it is
+ *   logged and not treated as a mismatch.
+ *
+ *   On a mismatch a warning is logged with the user, both addresses, the
+ *   task and what was done; never the token. With enforce, the session is
+ *   deleted (with its DB logins), so the leaked token cannot be used again;
+ *   the caller rejects the request as an invalid token, the same as an
+ *   expired one, so the client learns nothing about the token.
+ *
+ *   Called after the token and its expiry are checked, with cm_mutex held.
+ *
+ *   return: true to go on with the request, false to reject it
+ *   token_info(in): the session the token maps to
+ *   token(in): the token, to delete the session
+ *   request_ip(in): address the request came from (NULL if unknown)
+ *   task(in): task name, for the log
+ */
+static bool
+check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
+		  const char *request_ip, const char *task)
+{
+  char login_ip[DBMT_USER_IP_LEN];
+  char req_ip[DBMT_USER_IP_LEN];
+  bool enforce;
+
+  if (sco.session_ip_check == SESSION_IP_CHECK_OFF)
+    {
+      return true;
+    }
+
+  if (!ut_normalize_ip (request_ip, req_ip, sizeof (req_ip))
+      || !ut_normalize_ip (token_info->user_ip, login_ip, sizeof (login_ip)))
+    {
+      LOG_WARN ("session IP check: unknown address, not compared "
+		"(user: %s, login IP: %s, request IP: %s, task: %s)",
+		token_info->user_id, token_info->user_ip,
+		(request_ip != NULL) ? request_ip : "-", task);
+      return true;
+    }
+
+  if (strcmp (login_ip, req_ip) == 0)
+    {
+      return true;
+    }
+
+  enforce = (sco.session_ip_check == SESSION_IP_CHECK_ENFORCE);
+
+  LOG_WARN ("session IP check: request from another IP "
+	    "(user: %s, login IP: %s, request IP: %s, task: %s): %s",
+	    token_info->user_id, login_ip, req_ip, task,
+	    enforce ? "rejected, session deleted" : "processed");
+
+  if (enforce)
+    {
+      dbmt_user_delete_token_info_by_token (token);
+      return false;
+    }
+
+  return true;
+}
+
 bool ext_ut_validate_token (const char *token)
 {
   T_USER_TOKEN_INFO token_info;
@@ -2928,6 +2996,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   T_USER_TOKEN_INFO token_info;
   string task;
   string token;
+  const char *request_ip = NULL;
   time_t now_time = time (0);
   time_t active_time;
 
@@ -2977,6 +3046,20 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
     {
       /* expired: drop the session and its DB logins now */
       dbmt_user_delete_token_info_by_token (token.c_str ());
+      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
+    }
+
+  /*
+   * _CLIENTIP is the address of this request's connection, normalized
+   * (cub_add_private_param ()). Checked before the session is touched, so a
+   * rejected request does not extend it.
+   */
+  if (request.isMember ("_CLIENTIP") && request["_CLIENTIP"].isString ())
+    {
+      request_ip = request["_CLIENTIP"].asCString ();
+    }
+  if (!check_session_ip (&token_info, token.c_str (), request_ip, task.c_str ()))
+    {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
