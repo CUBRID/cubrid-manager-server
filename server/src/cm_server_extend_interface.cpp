@@ -40,6 +40,7 @@
 #include "cm_mailer.h"
 #include "cm_mon_stat.h"
 #include "cm_user.h"
+#include "cm_session_ip.h"
 
 #include <fstream>
 #include <sstream>
@@ -2889,20 +2890,20 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
 }
 
 /*
- * check_session_ip () - compare the IP address a request came from with the
- *   IP address its session logged in from, as session_ip_check of cm.conf
- *   says (sco.session_ip_check).
+ * check_session_ip () - check a request's IP address against the IP address
+ *   its session logged in from, as session_ip_check of cm.conf says
+ *   (sco.session_ip_check).
  *
- *   Both addresses are normalized by ut_normalize_ip () and compared as
- *   strings; the port is not compared (each request may use a new
- *   connection). An address that cannot be normalized is "unknown": it is
- *   logged and not treated as a mismatch.
+ *   The comparison and the decision for each mode are in cm_session_ip.cpp
+ *   (ut_session_ip_compare (), ut_session_ip_action ()), where they are unit
+ *   tested; this function logs and deletes the session.
  *
- *   On a mismatch a warning is logged with the user, both addresses, the
- *   task and what was done; never the token. With enforce, the session is
- *   deleted (with its DB logins), so the leaked token cannot be used again;
- *   the caller rejects the request as an invalid token, the same as an
- *   expired one, so the client learns nothing about the token.
+ *   A warning is logged for an unknown address and for another address, with
+ *   the user, both addresses, the task and what was done; never the token.
+ *   When the request is rejected (enforce, another address), the session is
+ *   deleted with its DB logins, so the leaked token cannot be used again; the
+ *   caller rejects the request as an invalid token, the same as an expired
+ *   one, so the client learns nothing about the token.
  *
  *   Called after the token and its expiry are checked, for a JSON request
  *   and (debug builds) for /upload.
@@ -2919,36 +2920,34 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
 {
   char login_ip[DBMT_USER_IP_LEN];
   char req_ip[DBMT_USER_IP_LEN];
-  bool enforce;
+  T_SESSION_IP_MATCH match;
+  T_SESSION_IP_ACTION action;
 
   if (sco.session_ip_check == SESSION_IP_CHECK_OFF)
     {
       return true;
     }
 
-  if (!ut_normalize_ip (request_ip, req_ip, sizeof (req_ip))
-      || !ut_normalize_ip (token_info->user_ip, login_ip, sizeof (login_ip)))
+  match = ut_session_ip_compare (token_info->user_ip, request_ip, login_ip, req_ip,
+				 sizeof (login_ip));
+  action = ut_session_ip_action (sco.session_ip_check, match);
+
+  if (match == SESSION_IP_UNKNOWN)
     {
       LOG_WARN ("session IP check: unknown address, not compared "
 		"(user: %s, login IP: %s, request IP: %s, task: %s)",
 		token_info->user_id, token_info->user_ip,
 		(request_ip != NULL) ? request_ip : "-", task);
-      return true;
     }
-
-  if (strcmp (login_ip, req_ip) == 0)
+  else if (match == SESSION_IP_DIFFERENT)
     {
-      return true;
+      LOG_WARN ("session IP check: request from another IP "
+		"(user: %s, login IP: %s, request IP: %s, task: %s): %s",
+		token_info->user_id, login_ip, req_ip, task,
+		(action == SESSION_IP_REJECT) ? "rejected, session deleted" : "processed");
     }
 
-  enforce = (sco.session_ip_check == SESSION_IP_CHECK_ENFORCE);
-
-  LOG_WARN ("session IP check: request from another IP "
-	    "(user: %s, login IP: %s, request IP: %s, task: %s): %s",
-	    token_info->user_id, login_ip, req_ip, task,
-	    enforce ? "rejected, session deleted" : "processed");
-
-  if (enforce)
+  if (action == SESSION_IP_REJECT)
     {
       dbmt_user_delete_token_info_by_token (token);
       return false;

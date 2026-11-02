@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include "cm_porting.h"
+#include "cm_session_ip.h"
 
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
@@ -587,18 +588,6 @@ typedef struct
   char dir_name[PATH_MAX];
   char file_name[32];
 } T_DBMT_FILE_INFO;
-
-/*
- * session_ip_check of cm.conf: what to do when a request comes from an IP
- * address other than the one its session logged in from.
- */
-typedef enum
-{
-  SESSION_IP_CHECK_OFF,		/* do not compare */
-  SESSION_IP_CHECK_LOG,		/* log a warning, process the request */
-  SESSION_IP_CHECK_ENFORCE	/* log a warning, reject the request and
-				 * delete the session */
-} T_SESSION_IP_CHECK;
 
 typedef struct
 {

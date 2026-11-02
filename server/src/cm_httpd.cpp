@@ -67,6 +67,7 @@
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
 #include "cm_user.h"
+#include "cm_session_ip.h"
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 

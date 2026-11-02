@@ -156,7 +156,6 @@ int ut_getdelim (char **lineptr, int *n, int delimiter, FILE *fp);
 int ut_getline (char **lineptr, int *n, FILE *fp);
 void ut_error_log (nvplist *req, const char *errmsg);
 void ut_access_log (nvplist *req, const char *msg);
-bool ut_normalize_ip (const char *src, char *dst, size_t dst_size);
 void uRemoveCRLF (char *str);
 int uStringEqual (const char *str1, const char *str2);
 int uStringEqualIgnoreCase (const char *str1, const char *str2);
