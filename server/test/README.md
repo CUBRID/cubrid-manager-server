@@ -108,6 +108,9 @@ server/test/
     task_result_check/11_5/  11_2/  11_0/  10_2/
     task_auth_check.txt               세트 3: 권한 검사 (CMS 사용자별, 4.8 참고)
     task_auth_check/<case>            그 세트의 요청 JSON
+    task_session_ip_check.txt         세트 4: 요청 IP 검사 (session_ip_check, 4.10 참고)
+    task_session_ip_check/<case>      그 세트의 요청 JSON
+  unit/                               단위 테스트 (CUBRID 빌드 없이 실행, unit/README.md)
   task_test_config/                   케이스가 읽을 픽스처
     test_analyzecaslog.sql.log          analyzecaslog 용 CAS 로그
     tmp_file_for_test/                  getcaslogtopresult / removecasrunnertmpfile 용
@@ -611,6 +614,35 @@ python3 test_tasks.py --dump <name> [<name> ...]
 ```sh
 ./run_tests.sh --check-docs
 ```
+
+### 4.10 요청 IP 검사 세트 (`task_session_ip_check`)
+
+cm.conf의 `session_ip_check`(CBRD-27861)에 따라, 로그인한 곳과 다른 주소에서 온 요청을 처리하거나
+거부하는지 확인한다. 케이스는 `127.0.0.1`에서 로그인하고, 일부 요청을 `"test_source_ip":
+"127.0.0.2"`로 보낸다. 그래서 `cmsip`가 `127.0.0.1`이고 Linux 호스트여야 한다. 모드는 목록의
+`cm_conf` 줄로 바꾼다(4.4). 줄마다 manager를 다시 시작하므로 몇 분 걸리며, CI에서는 돌지 않는다.
+
+```sh
+./run_tests.sh task_session_ip_check.txt
+```
+
+| 케이스 | 모드 | 확인하는 것 |
+| --- | --- | --- |
+| `session_ip_off` | `off` | 다른 주소의 요청(`keepalive`, `dbmtuserlogin`)이 처리되고, 그 뒤 로그인한 주소에서도 같은 토큰이 동작. `logout` 뒤에는 토큰이 거부됨 |
+| `session_ip_log` | `log` | `off`와 같은 결과(요청 처리, 세션 유지). 경고 로그는 확인하지 않는다 |
+| `session_ip_enforce` | `enforce` | 로그인한 주소의 요청은 처리. 다른 주소의 요청은 `invalid token`으로 거부되고, 그 뒤 로그인한 주소에서도 같은 토큰이 거부됨(세션 삭제). 다른 주소에서 새로 로그인한 세션은 그 주소에서만 동작 |
+| `session_ip_default` | 항목 없음 | 기본값이 `log`처럼 동작. 이 줄이 세트가 바꾼 cm.conf를 되돌린다 |
+
+케이스마다 CMS 사용자(`iptest_`로 시작)를 만들고 지운다. 중간에 멈춰 남은 사용자는 다음 실행의
+첫 요청(`deletedbmtuser`, `any`)이 지운다.
+
+**DB 로그인 삭제는 세션이 없어졌는지로 확인한다.** `dbmtuserlogin`으로 저장한 DB 로그인은
+그 세션 객체 안에만 있고(디스크에 쓰지 않음), 세션을 지우는 함수가 함께 지운다. 이를 조회하는
+API는 없으므로, `enforce` 케이스는 DB 로그인을 저장한 세션이 거부 후 어디서도 쓸 수 없는지를 본다.
+
+같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략과 대소문자, scope)는 CMS가 IPv4로만
+listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표는 단위 테스트(`unit/test_session_ip.cpp`)가
+확인한다. `off`와 `log`는 경고 로그만 다르므로, 둘을 구분하는 것도 단위 테스트다.
 
 ---
 

@@ -1,0 +1,97 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "iptest_enforce",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "iptest_enforce",
+  "password": "iptest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "iptest_enforce",
+  "password": "iptest1",
+  "clientver": "8.4",
+  "test_source_ip": "127.0.0.1"
+ },
+ {
+  "task": "dbmtuserlogin",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "targetid": "iptest_enforce",
+  "dbname": "demodb",
+  "dbuser": "dba",
+  "dbpasswd": "",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_source_ip": "127.0.0.2",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "dbmtuserlogin",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "targetid": "iptest_enforce",
+  "dbname": "demodb",
+  "dbuser": "dba",
+  "dbpasswd": "",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "failure"
+ },
+ {
+  "task": "login",
+  "id": "iptest_enforce",
+  "password": "iptest1",
+  "clientver": "8.4",
+  "test_source_ip": "127.0.0.2"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_source_ip": "127.0.0.2",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "iptest_enforce"
+ }
+]

@@ -15,7 +15,8 @@ CXX=clang++ ./run_unit_tests.sh  # 다른 컴파일러
 | --- | --- | --- |
 | `test_session_ip` | `server/src/cm_session_ip.cpp` | `session_ip_check`의 주소 비교. 같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략·대소문자, link-local의 scope)는 같은 주소, 다른 주소는 다른 주소, 해석할 수 없는 값은 알 수 없음. 모드(`off`/`log`/`enforce`)와 비교 결과별 처리(허용, 경고 후 허용, 거부) |
 
-CMS는 IPv4로만 listen하므로 IPv6 표기는 API 테스트로 만들 수 없다.
+CMS는 IPv4로만 listen하므로 IPv6 표기는 API 테스트로 만들 수 없다. 실제 세션이 유지되거나
+삭제되는지는 API 테스트 세트 `task_session_ip_check`가 확인한다(`../README.md` 4.10).
 
 ## 테스트 추가
 

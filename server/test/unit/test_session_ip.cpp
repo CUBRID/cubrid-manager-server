@@ -29,7 +29,8 @@
  *
  *   Build and run with run_unit_tests.sh in this directory; it needs no
  *   CUBRID build. A running manager server listens on IPv4 only, so the
- *   IPv6 forms here cannot be produced by an API test.
+ *   IPv6 forms here cannot be produced by an API test; the API test set
+ *   task_session_ip_check checks the sessions themselves.
  */
 
 #include <stdio.h>

@@ -1,0 +1,21 @@
+// Request IP check (CBRD-27861): session_ip_check of cm.conf. See README.md 4.10.
+// Each "cm_conf" line changes cm.conf and restarts the manager server.
+// The cases log in from 127.0.0.1 and send requests from 127.0.0.2
+// ("test_source_ip"), so cmsip must be 127.0.0.1 on a Linux host.
+//
+// off and log: a request from another address is processed, the session and
+// its DB login stay, and the same token still works from the login address
+cm_conf session_ip_check=off
+session_ip_off,success
+cm_conf session_ip_check=log
+session_ip_log,success
+
+// enforce: only the login address is accepted. A request from another
+// address is rejected and deletes the session (with its DB login), so the
+// token no longer works from the login address either
+cm_conf session_ip_check=enforce
+session_ip_enforce,success
+
+// no entry (the default) behaves as log; this also leaves cm.conf as it was
+cm_conf session_ip_check
+session_ip_default,success
