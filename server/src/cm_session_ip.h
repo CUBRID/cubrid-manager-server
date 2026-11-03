@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+#include <string>
+
 /*
  * session_ip_check of cm.conf: what to do when a request comes from an IP
  * address other than the one its session logged in from.
@@ -70,5 +72,39 @@ T_SESSION_IP_MATCH ut_session_ip_compare (const char *login_ip,
     size_t norm_size);
 T_SESSION_IP_ACTION ut_session_ip_action (T_SESSION_IP_CHECK mode,
     T_SESSION_IP_MATCH match);
+
+/*
+ * ut_session_ip_should_warn () - whether a session IP warning is logged for a
+ *   request from addr, given the address the session last warned about, and
+ *   remember addr as that address.
+ *
+ *   log mode warned for every request from another address; a client that
+ *   shares its token, polling every few seconds, would fill the error log
+ *   with the same warning. The warning is logged only when the address
+ *   differs from the last one warned about in the session; the requests in
+ *   between are recorded by login_ip= of the access log. A rejection
+ *   (enforce) deletes the session and is always logged by the caller,
+ *   without this.
+ *
+ *   Inline so that cm_user.cpp, which cm_admin also builds, can use it
+ *   without linking cm_session_ip.cpp.
+ *
+ *   return: true to log the warning
+ *   last_warned_ip(in/out): the address the session last warned about
+ *   addr(in): the request's address (normalized), or what was received when
+ *             it is unknown; NULL for none
+ */
+inline bool
+ut_session_ip_should_warn (std::string &last_warned_ip, const char *addr)
+{
+  std::string key = (addr != NULL) ? addr : "-";
+
+  if (key == last_warned_ip)
+    {
+      return false;
+    }
+  last_warned_ip = key;
+  return true;
+}
 
 #endif /* _CM_SESSION_IP_H_ */

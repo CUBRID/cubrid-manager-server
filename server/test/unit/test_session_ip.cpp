@@ -241,12 +241,38 @@ test_action (void)
   action (SESSION_IP_CHECK_ENFORCE, "enforce", SESSION_IP_UNKNOWN, SESSION_IP_ALLOW_WARN);
 }
 
+static void
+test_should_warn (void)
+{
+  std::string last;
+
+  /* the first request from another address is logged, the next ones are not */
+  check (ut_session_ip_should_warn (last, "10.0.0.2"), "first warning for 10.0.0.2 is logged");
+  check (!ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 again is not logged");
+  check (!ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 a third time is not logged");
+
+  /* a change of address is logged, and so is a change back */
+  check (ut_session_ip_should_warn (last, "10.0.0.3"), "10.0.0.3 after 10.0.0.2 is logged");
+  check (!ut_session_ip_should_warn (last, "10.0.0.3"), "10.0.0.3 again is not logged");
+  check (ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 after 10.0.0.3 is logged again");
+
+  /* an unknown address (NULL) is remembered as "-" */
+  check (ut_session_ip_should_warn (last, NULL), "an unknown address after 10.0.0.2 is logged");
+  check (!ut_session_ip_should_warn (last, NULL), "an unknown address again is not logged");
+  check (ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 after an unknown address is logged");
+
+  /* sessions do not share the last address */
+  std::string other;
+  check (ut_session_ip_should_warn (other, "10.0.0.2"), "another session logs 10.0.0.2 again");
+}
+
 int
 main (void)
 {
   test_normalize ();
   test_compare ();
   test_action ();
+  test_should_warn ();
 
   printf ("%d of %d checks failed\n", failures, checks);
   return (failures == 0) ? 0 : 1;

@@ -151,6 +151,7 @@ int dbmt_user_new_token_info (const char *user_id,
 
 bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
 bool dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time);
+bool dbmt_user_session_ip_should_warn (const char *token, const char *addr);
 bool dbmt_user_delete_token_info_by_token (const char *token);
 int dbmt_user_delete_all_sessions_of_user (const char *user_id);
 void dbmt_user_purge_expired_sessions (time_t now_time);
