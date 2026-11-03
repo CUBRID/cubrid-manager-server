@@ -156,6 +156,11 @@
                "virtual": "view"
             },
             {
+               "classname": "db_vclass",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
                "classname": "db_class",
                "owner": "DBA",
                "virtual": "view"
@@ -166,42 +171,52 @@
                "virtual": "normal"
             },
             {
-               "classname": "db_ha_apply_info",
-               "owner": "DBA",
+               "classname": "information_schema.key_column_usage",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_collation",
-               "owner": "DBA",
+               "classname": "information_schema.parameters",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_auth",
-               "owner": "DBA",
+               "classname": "information_schema.partitions",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_trigger",
-               "owner": "DBA",
+               "classname": "information_schema.referential_constraints",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_partition",
-               "owner": "DBA",
+               "classname": "information_schema.routine_privileges",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_stored_procedure",
-               "owner": "DBA",
+               "classname": "information_schema.routines",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_stored_procedure_args",
-               "owner": "DBA",
+               "classname": "information_schema.schemata",
+               "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
             {
-               "classname": "db_serial",
+               "classname": "information_schema.column_privileges",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.columns",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_attribute",
                "owner": "DBA",
                "virtual": "view"
             },
@@ -241,12 +256,42 @@
                "virtual": "view"
             },
             {
-               "classname": "db_vclass",
+               "classname": "db_auth",
                "owner": "DBA",
                "virtual": "view"
             },
             {
-               "classname": "db_attribute",
+               "classname": "db_trigger",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_partition",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_stored_procedure",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_stored_procedure_args",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_serial",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_ha_apply_info",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "db_collation",
                "owner": "DBA",
                "virtual": "view"
             },
@@ -276,6 +321,26 @@
                "virtual": "view"
             },
             {
+               "classname": "db_histogram",
+               "owner": "DBA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.domains",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.foreign_servers",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
+               "classname": "information_schema.sequences",
+               "owner": "INFORMATION_SCHEMA",
+               "virtual": "view"
+            },
+            {
                "classname": "information_schema.statistics",
                "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
@@ -292,71 +357,6 @@
             },
             {
                "classname": "information_schema.table_privileges",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.key_column_usage",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.parameters",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.partitions",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.referential_constraints",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.routine_privileges",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.routines",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.schemata",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.sequences",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "db_histogram",
-               "owner": "DBA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.column_privileges",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.columns",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.domains",
-               "owner": "INFORMATION_SCHEMA",
-               "virtual": "view"
-            },
-            {
-               "classname": "information_schema.foreign_servers",
                "owner": "INFORMATION_SCHEMA",
                "virtual": "view"
             },
@@ -408,22 +408,22 @@
                "virtual": "normal"
             },
             {
-               "classname": "public.olympic",
-               "owner": "PUBLIC",
-               "virtual": "normal"
-            },
-            {
-               "classname": "public.record",
-               "owner": "PUBLIC",
-               "virtual": "normal"
-            },
-            {
                "classname": "public.participant",
                "owner": "PUBLIC",
                "virtual": "normal"
             },
             {
+               "classname": "public.olympic",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
                "classname": "public.game",
+               "owner": "PUBLIC",
+               "virtual": "normal"
+            },
+            {
+               "classname": "public.record",
                "owner": "PUBLIC",
                "virtual": "normal"
             },
