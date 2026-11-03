@@ -19,7 +19,7 @@
                "isolevel": "COMMITTED READ",
                "pid": "<volatile>",
                "pname": "",
-               "timeout": ":"
+               "timeout": "Infinite wait"
             },
             {
                "@uid": "DBA",
@@ -28,7 +28,7 @@
                "isolevel": "COMMITTED READ",
                "pid": "<volatile>",
                "pname": "lockdb",
-               "timeout": ":"
+               "timeout": "No wait"
             }
          ]
       }
