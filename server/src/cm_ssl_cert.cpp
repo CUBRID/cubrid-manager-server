@@ -1465,20 +1465,36 @@ remove_leftovers (const std::string &cert_path, const std::string &key_path)
 
 /* ------------------------------------------------------------ startup check */
 
-static void
-log_unreadable (const ssl_file &f)
+/*
+ * fail () - keep the first reason the startup check stops for, in a line
+ *   cub_manager prints on stderr (the details and what to do are logged)
+ */
+static int
+fail (std::string &why, const std::string &reason)
+{
+  if (why.empty ())
+    {
+      why = reason;
+    }
+  return -1;
+}
+
+static int
+fail_unreadable (std::string &why, const ssl_file &f)
 {
   LOG_ERROR ("cannot tell whether the SSL %s %s holds a key shipped with an earlier version: %s. "
 	     "The files are left unchanged; make the file readable by this account, in PEM, without a passphrase, "
 	     "and restart.", f.what, f.path.c_str (), f.reason.c_str ());
+  return fail (why, std::string ("cannot read the SSL ") + f.what + " " + f.path + ": " + f.reason);
 }
 
-static void
-log_mismatch (const ssl_file &cert, const ssl_file &key)
+static int
+fail_mismatch (std::string &why, const ssl_file &cert, const ssl_file &key)
 {
   LOG_ERROR ("the SSL certificate %s and private key %s do not match. "
 	     "Replace both with a certificate and its own private key, and restart.", cert.path.c_str (),
 	     key.path.c_str ());
+  return fail (why, "the SSL certificate " + cert.path + " and private key " + key.path + " do not match");
 }
 
 /*
@@ -1487,7 +1503,7 @@ log_mismatch (const ssl_file &cert, const ssl_file &key)
  *   shipped(in): index of the shipped key being replaced, -1 if none exists
  */
 static int
-replace_pair (ssl_file &cert, ssl_file &key, int shipped)
+replace_pair (ssl_file &cert, ssl_file &key, int shipped, std::string &why)
 {
   X509 *new_cert = NULL;
   std::string err;
@@ -1497,7 +1513,7 @@ replace_pair (ssl_file &cert, ssl_file &key, int shipped)
       LOG_ERROR ("failed to generate a new SSL key pair: %s. The existing files are left unchanged. "
 		 "Fix the cause and restart, or install a certificate and its private key as %s and %s.",
 		 err.c_str (), cert.path.c_str (), key.path.c_str ());
-      return -1;
+      return fail (why, "failed to generate a new SSL key pair: " + err);
     }
 
   if (shipped >= 0)
@@ -1523,7 +1539,7 @@ replace_pair (ssl_file &cert, ssl_file &key, int shipped)
 }
 
 static int
-ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
+ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why)
 {
   int shipped;
 
@@ -1532,10 +1548,12 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
       if (cert.kind == PATH_NOT_FILE)
 	{
 	  LOG_ERROR ("the SSL certificate %s is not a regular file. Fix it and restart.", cert.path.c_str ());
+	  fail (why, "the SSL certificate " + cert.path + " is not a regular file");
 	}
       if (key.kind == PATH_NOT_FILE)
 	{
 	  LOG_ERROR ("the SSL private key %s is not a regular file. Fix it and restart.", key.path.c_str ());
+	  fail (why, "the SSL private key " + key.path + " is not a regular file");
 	}
       return -1;
     }
@@ -1548,9 +1566,10 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
 	  LOG_ERROR ("the SSL certificate %s and private key %s do not exist. "
 		     "Install a certificate and its private key, or set %s=YES in cm.conf to generate them.",
 		     cert.path.c_str (), key.path.c_str (), CONF_AUTO_GENERATE);
-	  return -1;
+	  return fail (why, "the SSL certificate " + cert.path + " and private key " + key.path
+		       + " do not exist (" CONF_AUTO_GENERATE "=NO)");
 	}
-      return replace_pair (cert, key, -1);
+      return replace_pair (cert, key, -1, why);
     }
 
   /*
@@ -1573,7 +1592,8 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
 		     "Remove it and restart to generate a new key pair (%s=YES).", present.path.c_str (),
 		     shipped_keys[present.shipped].desc, CONF_AUTO_GENERATE);
 	}
-      return -1;
+      return fail (why, std::string ("the SSL ") + missing.what + " " + missing.path + " does not exist, while the "
+		   + present.what + " " + present.path + " does");
     }
 
   load_ssl_file (cert);
@@ -1585,19 +1605,19 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
     {
       if (auto_generate)
 	{
-	  return replace_pair (cert, key, shipped);
+	  return replace_pair (cert, key, shipped, why);
 	}
 
       if (!cert.loaded || !key.loaded)
 	{
-	  log_unreadable (cert.loaded ? key : cert);
+	  int ret = fail_unreadable (why, cert.loaded ? key : cert);
+
 	  LOG_ERROR ("the other file holds the %s, whose private key is public.", shipped_keys[shipped].desc);
-	  return -1;
+	  return ret;
 	}
       if (!pair_matches (cert, key))
 	{
-	  log_mismatch (cert, key);
-	  return -1;
+	  return fail_mismatch (why, cert, key);
 	}
       LOG_ERROR ("the SSL key pair %s, %s is the %s. Its private key is public, so TLS does not authenticate "
 		 "this server. Set %s=YES in cm.conf and restart, run generatecert, or install a certificate with "
@@ -1613,19 +1633,18 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
     {
       if (!cert.loaded)
 	{
-	  log_unreadable (cert);
+	  fail_unreadable (why, cert);
 	}
       if (!key.loaded)
 	{
-	  log_unreadable (key);
+	  fail_unreadable (why, key);
 	}
       return -1;
     }
 
   if (!pair_matches (cert, key))
     {
-      log_mismatch (cert, key);
-      return -1;
+      return fail_mismatch (why, cert, key);
     }
 
   /* generated before, or installed by the administrator: use as is */
@@ -1640,16 +1659,19 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate)
 /* ------------------------------------------------------------------ public */
 
 int
-cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate)
+cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate, char *err_buf, size_t err_size)
 {
   cert_lock lock;
   bool is_link = false;
+  std::string why;
   int ret;
 
   shipped_key_in_use = false;
+  copy_error (err_buf, err_size, std::string ());
   if (cert_path == NULL || cert_path[0] == '\0' || key_path == NULL || key_path[0] == '\0')
     {
       LOG_ERROR ("the SSL certificate or private key path is not set");
+      copy_error (err_buf, err_size, "the SSL certificate or private key path is not set");
       return -1;
     }
 
@@ -1659,8 +1681,12 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
   cert.kind = check_path (cert.path, &is_link);
   key.kind = check_path (key.path, &is_link);
 
-  ret = ensure_pair (cert, key, auto_generate);
+  ret = ensure_pair (cert, key, auto_generate, why);
   ERR_clear_error ();
+  if (ret != 0)
+    {
+      copy_error (err_buf, err_size, why.empty ()? std::string ("the SSL key pair cannot be used") : why);
+    }
   return ret;
 }
 

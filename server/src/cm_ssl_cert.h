@@ -60,8 +60,11 @@ typedef struct
  *   cert_path(in): certificate file (PEM)
  *   key_path(in): private key file (PEM)
  *   auto_generate(in): ssl_cert_auto_generate of cm.conf
+ *   err_buf(out): on failure, why in one line (for stderr), may be NULL
+ *   err_size(in): size of err_buf
  */
-extern int cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate);
+extern int cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate, char *err_buf,
+			       size_t err_size);
 
 /*
  * cm_ssl_cert_generate () - generate a new key pair and replace the files

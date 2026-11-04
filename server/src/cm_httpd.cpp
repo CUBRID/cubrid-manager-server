@@ -618,9 +618,11 @@ start_service ()
 {
   struct worker_context *start_ctx[DEFAULT_THRD_NUM];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
+  char ssl_err[DBMT_ERROR_MSG_SIZE];
   int nfd, err, i = 0;
 
   tmpstrbuf[0] = '\0';
+  ssl_err[0] = '\0';
 #ifdef WINDOWS
   wsa_initialize ();
 #endif
@@ -629,13 +631,13 @@ start_service ()
 
   /*
    * Keep, generate or replace the key pair before TLS loads it. On failure
-   * the reason and what to do are in the error log; do not start.
+   * print why, and do not start; what to do is in the error log.
    */
-  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE) != 0)
+  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE, ssl_err,
+			  sizeof (ssl_err)) != 0)
     {
-      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
-		"CUBRID Manager Server : cannot use the SSL certificate %s and private key %s. See %s.\n",
-		sco.szSSLCertificate, sco.szSSLKey, sco.szErrorLog);
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : %s. See %s for what to do.\n", ssl_err,
+		sco.szErrorLog);
       ut_record_cubrid_utility_log_stderr (tmpstrbuf);
       return -1;
     }
