@@ -64,11 +64,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/config.h.cmake
 set(CMS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(CMS_EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
-# RSA bits of the shipped self-signed certificate. 1024 is not offered: OpenSSL 3.x
-# refuses to even load such a certificate ("ee key too small"), so a build configured
-# that way would produce a manager whose HTTPS never comes up.
-set(CMS_SSL_RSA_BITS 2048)
-
 # --------------------------------------------------------------------------- version
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/BUILD_NUMBER CMS_BUILD_NUMBER_FILE)
 string(STRIP "${CMS_BUILD_NUMBER_FILE}" CMS_BUILD_NUMBER_FILE)
@@ -256,27 +251,6 @@ file(GLOB CMS_CONF_FILES ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/*.conf
 install(FILES ${CMS_CONF_FILES}
   DESTINATION ${CMS_CONFDIR} COMPONENT Manager)
 
-install(FILES
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/cm_ssl_cert_2048.crt
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/cm_ssl_cert_2048.key
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/cm_ssl_cert_1024.crt
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/cm_ssl_cert_1024.key
-  DESTINATION ${CMS_CONFDIR} COMPONENT Manager)
-
-file(MD5 ${CMAKE_CURRENT_SOURCE_DIR}/cmserver/conf/cm_ssl_cert_${CMS_SSL_RSA_BITS}.crt
-     CMS_DEFAULT_CERT_MD5)
-message(STATUS "Default certificate MD5 (RSA ${CMS_SSL_RSA_BITS}): ${CMS_DEFAULT_CERT_MD5}")
-target_compile_definitions(cub_manager PRIVATE
-  CMS_DEFAULT_CERT_MD5="${CMS_DEFAULT_CERT_MD5}")
-
-# cm_ssl_cert.{crt,key} is the name the manager opens; keep it a link to the sized pair
-# the way the automake build did.
-install(CODE "
-  set(cms_conf \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMS_CONFDIR}\")
-  execute_process(COMMAND \${CMAKE_COMMAND} -E rm -f
-    \"\${cms_conf}/cm_ssl_cert.crt\" \"\${cms_conf}/cm_ssl_cert.key\")
-  execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
-    cm_ssl_cert_${CMS_SSL_RSA_BITS}.crt \"\${cms_conf}/cm_ssl_cert.crt\")
-  execute_process(COMMAND \${CMAKE_COMMAND} -E create_symlink
-    cm_ssl_cert_${CMS_SSL_RSA_BITS}.key \"\${cms_conf}/cm_ssl_cert.key\")
-  " COMPONENT Manager)
+# The TLS key pair (conf/cm_ssl_cert.crt, conf/cm_ssl_cert.key) is not installed:
+# cub_manager generates one when it first starts (ssl_cert_auto_generate in cm.conf),
+# and an existing one is left as it is.

@@ -6,7 +6,6 @@ if "%2" == "" goto exit
 set SRC_DIR=%1
 set DEST_DIR=%2
 set exitcode=0
-set SSL_RSA_BITS=2048
 
 mkdir %DEST_DIR%
 mkdir %DEST_DIR%\bin
@@ -22,8 +21,6 @@ IF NOT EXIST "%DEST_DIR%\bin\cm_admin.exe" exit /b 1
 
 copy %SRC_DIR%\..\..\cmserver\conf\*.conf %DEST_DIR%\conf || exit /b 1
 copy %SRC_DIR%\..\..\cmserver\conf\*.pass %DEST_DIR%\conf || exit /b 1
-copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl* %DEST_DIR%\conf || exit /b 1
-copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl_cert_%SSL_RSA_BITS%.key %DEST_DIR%\conf\cm_ssl_cert.key || exit /b 1
-copy %SRC_DIR%\..\..\cmserver\conf\cm_ssl_cert_%SSL_RSA_BITS%.crt %DEST_DIR%\conf\cm_ssl_cert.crt || exit /b 1
+REM the TLS key pair is not installed: cub_manager generates it when it first starts
 
 exit /b %errorlevel%
