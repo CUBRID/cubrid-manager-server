@@ -112,13 +112,14 @@ Any other value is logged and `log` is used.
 - The port is not compared. Addresses are compared in a normalized form, so different spellings of one address are equal: an IPv6 address with or without leading zeros or in another case, a link-local address with a scope (`fe80::1%eth0`), and an IPv4-mapped IPv6 address (`::ffff:1.2.3.4`, the same as `1.2.3.4`).
 - `login` and `getcmsenv` are not checked: they do not use a token.
 - When an address cannot be determined, this is logged and the request is not treated as coming from another address.
-- The warning names the user, the login IP, the request IP, the task and what was done. It never contains the token. When the request is processed (`log`, or an address that cannot be determined), the warning is written only when the address differs from the last one warned about in that session, not for every request, so that a client that shares its token does not fill the error log; the requests in between are recorded by `login_ip=` in the access log. A rejection (`enforce`) is always written.
+- The warning names the user, the login IP, the request IP, the task and what was done. It never contains the token. When the request is processed (`log`, or an address that cannot be determined), the warning is written once for each address, not for every request: a session remembers the last 8 addresses it warned about, so that a client that shares its token, or a forward proxy whose requests come from several addresses in turn, does not fill the error log; the requests in between are recorded by `login_ip=` in the access log. A rejection (`enforce`) is always written.
 - Whatever the value, the access log and the error log write the address of the request and, when it differs from the login IP, end the line with `login_ip=<login IP>`. As before, the access log is written only for some tasks.
 
 Set `enforce` only when each client has a fixed IP address and does not share its token with other hosts. The check has these limits:
 
 - Valid requests come from different addresses when several hosts share one token, or behind a forward proxy with several outgoing addresses; `enforce` rejects them.
 - Clients behind the same NAT or forward proxy share one address and are not told apart.
+- Behind a forward proxy with more than 8 outgoing addresses in turn, `log` can still write a warning for most requests, because the addresses warned about longest ago are forgotten.
 - Behind a reverse proxy or a layer 4 load balancer, CMS sees the address of the proxy, and the check has no effect. CMS does not read `X-Forwarded-For` or the PROXY protocol.
 - An active man-in-the-middle logs in from its own address, so it is not detected. What the check detects is a token used somewhere other than where it was issued, such as a token leaked from a log or a client PC.
 

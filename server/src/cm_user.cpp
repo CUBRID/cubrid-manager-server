@@ -32,6 +32,7 @@
 #include <unistd.h>
 #endif
 
+#include <deque>
 #include <map>
 #include <string>
 #include <utility>
@@ -812,8 +813,9 @@ struct cm_session
   time_t last_access;
   /* dbname -> (db user, db password) saved by dbmtuserlogin */
   std::map<std::string, std::pair<std::string, std::string> > db_logins;
-  /* request address a session IP warning was last logged for (cm_session_ip.h) */
-  std::string last_warned_ip;
+  /* request addresses a session IP warning was logged for, oldest first, at
+   * most SESSION_IP_WARNED_MAX (cm_session_ip.h) */
+  std::deque<std::string> warned_ips;
 };
 
 /* token -> session */
@@ -1089,7 +1091,7 @@ dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time)
 
 /*
  * Whether to log a session IP warning for a request from addr in the session
- * of token: only when addr differs from the address last warned about
+ * of token: only when addr is not among the addresses warned about recently
  * (ut_session_ip_should_warn ()). true when the session is not found, so that
  * nothing is left unlogged.
  */
@@ -1109,7 +1111,7 @@ dbmt_user_session_ip_should_warn (const char *token, const char *addr)
       return true;
     }
 
-  return ut_session_ip_should_warn (it->second.last_warned_ip, addr);
+  return ut_session_ip_should_warn (it->second.warned_ips, addr);
 }
 
 /* Delete one session by its token (e.g. logout). */

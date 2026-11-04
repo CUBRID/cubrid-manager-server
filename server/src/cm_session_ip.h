@@ -33,6 +33,8 @@
 
 #include <stddef.h>
 
+#include <algorithm>
+#include <deque>
 #include <string>
 
 /*
@@ -74,36 +76,49 @@ T_SESSION_IP_ACTION ut_session_ip_action (T_SESSION_IP_CHECK mode,
     T_SESSION_IP_MATCH match);
 
 /*
+ * SESSION_IP_WARNED_MAX - how many request addresses a session remembers
+ *   having warned about. Enough for a forward proxy pool with a few outgoing
+ *   addresses; when it is full, the address warned about longest ago is
+ *   dropped, so the memory of a session stays bounded.
+ */
+#define SESSION_IP_WARNED_MAX 8
+
+/*
  * ut_session_ip_should_warn () - whether a session IP warning is logged for a
- *   request from addr, given the address the session last warned about, and
- *   remember addr as that address.
+ *   request from addr, given the addresses the session warned about
+ *   recently, and remember addr among them.
  *
  *   log mode warned for every request from another address; a client that
- *   shares its token, polling every few seconds, would fill the error log
- *   with the same warning. The warning is logged only when the address
- *   differs from the last one warned about in the session; the requests in
- *   between are recorded by login_ip= of the access log. A rejection
- *   (enforce) deletes the session and is always logged by the caller,
- *   without this.
+ *   shares its token, or a forward proxy pool whose requests come from
+ *   several addresses in turn (A, B, A, B, ...), polling every few seconds,
+ *   would fill the error log with the same warning. The warning is logged
+ *   only for an address that is not among the last SESSION_IP_WARNED_MAX
+ *   addresses warned about in the session; the requests in between are
+ *   recorded by login_ip= of the access log. A rejection (enforce) deletes
+ *   the session and is always logged by the caller, without this.
  *
  *   Inline so that cm_user.cpp, which cm_admin also builds, can use it
  *   without linking cm_session_ip.cpp.
  *
  *   return: true to log the warning
- *   last_warned_ip(in/out): the address the session last warned about
+ *   warned(in/out): the addresses warned about recently, oldest first
  *   addr(in): the request's address (normalized), or what was received when
  *             it is unknown; NULL for none
  */
 inline bool
-ut_session_ip_should_warn (std::string &last_warned_ip, const char *addr)
+ut_session_ip_should_warn (std::deque<std::string> &warned, const char *addr)
 {
   std::string key = (addr != NULL) ? addr : "-";
 
-  if (key == last_warned_ip)
+  if (std::find (warned.begin (), warned.end (), key) != warned.end ())
     {
       return false;
     }
-  last_warned_ip = key;
+  if (warned.size () >= SESSION_IP_WARNED_MAX)
+    {
+      warned.pop_front ();
+    }
+  warned.push_back (key);
   return true;
 }
 

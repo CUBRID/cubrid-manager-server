@@ -244,25 +244,40 @@ test_action (void)
 static void
 test_should_warn (void)
 {
-  std::string last;
+  std::deque<std::string> warned;
+  char addr[32];
+  int i;
 
   /* the first request from another address is logged, the next ones are not */
-  check (ut_session_ip_should_warn (last, "10.0.0.2"), "first warning for 10.0.0.2 is logged");
-  check (!ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 again is not logged");
-  check (!ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 a third time is not logged");
+  check (ut_session_ip_should_warn (warned, "10.0.0.2"), "first warning for 10.0.0.2 is logged");
+  check (!ut_session_ip_should_warn (warned, "10.0.0.2"), "10.0.0.2 again is not logged");
 
-  /* a change of address is logged, and so is a change back */
-  check (ut_session_ip_should_warn (last, "10.0.0.3"), "10.0.0.3 after 10.0.0.2 is logged");
-  check (!ut_session_ip_should_warn (last, "10.0.0.3"), "10.0.0.3 again is not logged");
-  check (ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 after 10.0.0.3 is logged again");
+  /* a proxy pool sending from A, B, A, B, ... is logged once per address */
+  check (ut_session_ip_should_warn (warned, "10.0.0.3"), "first warning for 10.0.0.3 is logged");
+  check (!ut_session_ip_should_warn (warned, "10.0.0.2"), "10.0.0.2 after 10.0.0.3 is not logged");
+  check (!ut_session_ip_should_warn (warned, "10.0.0.3"), "10.0.0.3 after 10.0.0.2 is not logged");
+  check (!ut_session_ip_should_warn (warned, "10.0.0.2"), "10.0.0.2 a third time is not logged");
 
   /* an unknown address (NULL) is remembered as "-" */
-  check (ut_session_ip_should_warn (last, NULL), "an unknown address after 10.0.0.2 is logged");
-  check (!ut_session_ip_should_warn (last, NULL), "an unknown address again is not logged");
-  check (ut_session_ip_should_warn (last, "10.0.0.2"), "10.0.0.2 after an unknown address is logged");
+  check (ut_session_ip_should_warn (warned, NULL), "first warning for an unknown address is logged");
+  check (!ut_session_ip_should_warn (warned, NULL), "an unknown address again is not logged");
 
-  /* sessions do not share the last address */
-  std::string other;
+  /* at most SESSION_IP_WARNED_MAX addresses; the oldest is dropped */
+  warned.clear ();
+  for (i = 0; i < SESSION_IP_WARNED_MAX; i++)
+    {
+      snprintf (addr, sizeof (addr), "10.1.0.%d", i);
+      ut_session_ip_should_warn (warned, addr);
+    }
+  check (warned.size () == SESSION_IP_WARNED_MAX, "8 addresses are remembered");
+  check (!ut_session_ip_should_warn (warned, "10.1.0.0"), "the oldest of 8 is still remembered");
+  check (ut_session_ip_should_warn (warned, "10.9.9.9"), "a 9th address is logged");
+  check (warned.size () == SESSION_IP_WARNED_MAX, "the set does not grow beyond 8");
+  check (ut_session_ip_should_warn (warned, "10.1.0.0"), "the oldest address, dropped for the 9th, is logged again");
+  check (!ut_session_ip_should_warn (warned, "10.9.9.9"), "the 9th address is still remembered");
+
+  /* sessions do not share what they have logged */
+  std::deque<std::string> other;
   check (ut_session_ip_should_warn (other, "10.0.0.2"), "another session logs 10.0.0.2 again");
 }
 

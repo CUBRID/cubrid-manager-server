@@ -2900,8 +2900,9 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
  *
  *   A warning is logged for an unknown address and for another address, with
  *   the user, both addresses, the task and what was done; never the token.
- *   When the request is processed, it is logged only when its address
- *   differs from the last one warned about in the session.
+ *   When the request is processed, it is logged only when its address is not
+ *   among the last SESSION_IP_WARNED_MAX addresses warned about in the
+ *   session.
  *   When the request is rejected (enforce, another address), the session is
  *   deleted with its DB logins, so the leaked token cannot be used again; the
  *   caller rejects the request as an invalid token, the same as an expired
@@ -2935,10 +2936,11 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
   action = ut_session_ip_action (sco.session_ip_check, match);
 
   /*
-   * A request that is processed is logged only when its address differs
-   * from the last one warned about in the session
+   * A request that is processed is logged only when its address is not
+   * among the addresses warned about recently in the session
    * (dbmt_user_session_ip_should_warn ()), so that a client sharing its
-   * token does not fill the error log; a rejection is always logged.
+   * token or a proxy pool does not fill the error log; a rejection is always
+   * logged.
    */
   if (match == SESSION_IP_UNKNOWN)
     {
@@ -2946,7 +2948,7 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
 	{
 	  LOG_WARN ("session IP check: unknown address, not compared "
 		    "(user: %s, login IP: %s, request IP: %s, task: %s); "
-		    "logged again when the address changes",
+		    "logged once per address (last 8 addresses) in this session",
 		    token_info->user_id, token_info->user_ip,
 		    (request_ip != NULL) ? request_ip : "-", task);
 	}
@@ -2963,7 +2965,7 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
 	{
 	  LOG_WARN ("session IP check: request from another IP "
 		    "(user: %s, login IP: %s, request IP: %s, task: %s): processed; "
-		    "logged again when the address changes",
+		    "logged once per address (last 8 addresses) in this session",
 		    token_info->user_id, login_ip, req_ip, task);
 	}
     }
