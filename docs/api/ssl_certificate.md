@@ -21,14 +21,16 @@ When CMS starts, after reading `cm.conf` and before it starts serving TLS, it ch
 | --- | --- | --- |
 | both missing (a link whose target is missing counts as missing) | generate a key pair, start | do not start |
 | only one exists | do not start, keep the file | do not start, keep the file |
-| a key pair shipped by an earlier version | replace it, start | start with an error log (do not start if a file cannot be read or the pair does not match) |
+| a key pair shipped by an earlier version | replace it, start | start with an error log (do not start if a file cannot be read, the pair does not match or TLS refuses it) |
 | a file cannot be read (permission, not PEM, protected by a passphrase) | do not start, keep the files | do not start, keep the files |
 | the certificate and key do not match | do not start | do not start |
 | any other pair (generated before, installed by the administrator, issued by a CA) | use it as is | use it as is |
+| TLS refuses the pair it would use (for example a key smaller than the OpenSSL security level allows) | do not start, keep the files | do not start, keep the files |
 | generation fails (for example `conf` is not writable) | do not start, keep the files | - |
 | a path is not a regular file (for example a directory) | do not start | do not start |
 
 - A shipped key is recognized by its public key (SHA-256 of the public key in DER), not by the certificate file, so a certificate re-signed with a shipped key, or issued by a CA for one, is also replaced. When either file holds a shipped key, the pair is replaced with `YES` even if the files do not match or one of them cannot be read: the key is public, so there is nothing to lose.
+- Before using a pair it keeps or has generated, CMS loads it into a TLS context the way the server does. OpenSSL refuses for example an RSA 1024 key when its security level is 2 or higher, which depends on how OpenSSL is built and configured. The RSA 1024 keys shipped with CUBRID 11.3 and earlier and with some develop builds are such keys, so with `NO` an installation upgraded from 11.3 may not start; set `YES`, or install a key pair of RSA 2048 bits or more. At security level 3 or higher, OpenSSL refuses RSA 2048 too, including the key CMS generates.
 - When only one file exists, CMS never overwrites it: it may be a key the administrator is installing, and the private key of a CA-issued certificate cannot be recovered.
 - With `YES`, the files `cm_ssl_cert_1024.crt/.key` and `cm_ssl_cert_2048.crt/.key` that an earlier version installed in `conf` are removed when they hold a shipped key. Other files of these names are left as they are. With `NO`, nothing is removed.
 - When CMS does not start, the reason is printed on standard error, and the reason and what to do are written to `$CUBRID/log/manager/cub_manager.err`. For example:

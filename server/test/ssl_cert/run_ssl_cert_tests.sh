@@ -61,9 +61,9 @@ flags="-std=gnu++11 -Wall -W -Wno-unused -pthread -DGCC -DLINUX -D_GNU_SOURCE -D
 flags="$flags -I$work -I$src"
 if [ -n "${OPENSSL_DIR:-}" ]; then
   flags="$flags -I$OPENSSL_DIR/include"
-  libs="$OPENSSL_DIR/lib/libcrypto.a -ldl"
+  libs="$OPENSSL_DIR/lib/libssl.a $OPENSSL_DIR/lib/libcrypto.a -ldl"
 else
-  libs="-lcrypto"
+  libs="-lssl -lcrypto"
 fi
 
 driver="$work/ssl_cert_driver"
@@ -169,6 +169,26 @@ install_develop ()
 }
 
 host=$(hostname)
+
+# an OpenSSL configuration that sets the TLS security level, for OPENSSL_CONF
+for level in 1 2 3; do
+  cat > "$work/seclevel$level.cnf" << EOF
+openssl_conf = cms_conf
+[cms_conf]
+ssl_conf = cms_ssl
+[cms_ssl]
+system_default = cms_ssl_default
+[cms_ssl_default]
+CipherString = DEFAULT@SECLEVEL=$level
+EOF
+done
+
+# ensure with the TLS security level $2 (1, 2 or 3)
+ensure_at ()
+{
+  OPENSSL_CONF="$work/seclevel$2.cnf" timeout 30 "$driver" ensure "$CRT" "$KEY" "$1" < /dev/null > "$work/out" 2>&1
+  RET=$?
+}
 
 # ---------------------------------------------------------------- fixtures
 
@@ -475,6 +495,67 @@ cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
 ensure YES
 ok "CA-issued certificate for a shipped key: replaced, reissue noted" \
   "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY) && log | grep -q 'issued by a CA'"
+
+# ------------------------------------------------------- what TLS accepts
+
+# whether OPENSSL_CONF sets the TLS security level with this OpenSSL
+setup
+cp "$shipped/develop/cm_ssl_cert_1024.crt" "$CRT"
+cp "$shipped/develop/cm_ssl_cert_1024.key" "$KEY"
+ensure_at NO 1
+level1_ret=$RET
+setup
+cp "$shipped/develop/cm_ssl_cert_1024.crt" "$CRT"
+cp "$shipped/develop/cm_ssl_cert_1024.key" "$KEY"
+ensure_at NO 2
+if [ $level1_ret = 0 ] && [ $RET != 0 ]; then
+  for f in 11.3/cm_ssl_cert develop/cm_ssl_cert_1024; do
+    setup
+    cp "$shipped/$f.crt" "$CRT"
+    cp "$shipped/$f.key" "$KEY"
+    ensure_at NO 1
+    ok "NO + $f, level 1: starts with a warning" "[ $RET = 0 ] && grep -q 'shipped_in_use=1' $work/out"
+
+    setup
+    cp "$shipped/$f.crt" "$CRT"
+    cp "$shipped/$f.key" "$KEY"
+    sum=$(files_sum)
+    ensure_at NO 2
+    ok "NO + $f, level 2: does not start, files kept" "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ]"
+    ok "NO + $f, level 2: why" \
+      "grep -q 'why=the SSL key pair .* is the .*, and TLS refuses it (the certificate: .*key too small)$' $work/out"
+    ok "NO + $f, level 2: what to do" "log | grep -q 'ssl_cert_auto_generate=YES in cm.conf and restart to replace it'"
+    ok "NO + $f, level 2: not reported as in use" "grep -q 'shipped_in_use=0' $work/out"
+  done
+
+  setup
+  cp "$shipped/11.3/cm_ssl_cert.crt" "$CRT"
+  cp "$shipped/11.3/cm_ssl_cert.key" "$KEY"
+  ensure_at YES 2
+  ok "YES + 11.3 pair, level 2: replaced, starts" "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY)"
+
+  setup
+  install_develop 2048 2048
+  ensure_at NO 2
+  ok "NO + RSA 2048 shipped pair, level 2: starts with a warning" \
+    "[ $RET = 0 ] && grep -q 'shipped_in_use=1' $work/out"
+
+  setup
+  openssl req -x509 -newkey rsa:1024 -nodes -keyout "$KEY" -out "$CRT" -subj /CN=own1024 -days 30 2> /dev/null
+  sum=$(files_sum)
+  ensure_at YES 2
+  ok "own RSA 1024 pair, level 2: does not start, files kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && grep -q 'why=TLS refuses the SSL key pair .*key too small)$' $work/out"
+
+  setup
+  ensure_at YES 3
+  ok "new, YES, level 3: generated, but does not start" \
+    "[ $RET != 0 ] && [ -f $CRT -a -f $KEY ] && grep -q 'why=TLS refuses the newly generated SSL key pair .*key too small)$' $work/out"
+  ok "new, YES, level 3: what to do" "log | grep -q 'may require a stronger key than RSA 2048'"
+else
+  skip=$((skip + 1))
+  echo "SKIP  TLS security level scenarios (OPENSSL_CONF does not set the TLS security level with this OpenSSL)"
+fi
 
 # --------------------------------------------------------------- generate
 

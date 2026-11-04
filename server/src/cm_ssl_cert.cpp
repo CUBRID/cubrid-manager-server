@@ -64,6 +64,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
@@ -588,6 +589,76 @@ self_issued (X509 *cert)
   ok = X509_check_issued (cert, cert);
   ERR_clear_error ();
   return ok == X509_V_OK;
+}
+
+/*
+ * openssl_reason () - the reason of the first queued OpenSSL error, short
+ *   (for example "ee key too small"); clears the queue
+ */
+static std::string
+openssl_reason (void)
+{
+  unsigned long e = ERR_get_error ();
+  const char *r;
+
+  ERR_clear_error ();
+  if (e == 0)
+    {
+      return std::string ("unknown error");
+    }
+  r = ERR_reason_error_string (e);
+  if (r == NULL)
+    {
+      char buf[256];
+
+      ERR_error_string_n (e, buf, sizeof (buf));
+      return std::string (buf);
+    }
+  return std::string (r);
+}
+
+/*
+ * tls_accepts () - can TLS use the key pair, loaded the way init_SSL () loads
+ *   it? OpenSSL refuses for example a key smaller than its security level
+ *   allows (RSA 1024 at level 2 or higher), which the earlier checks do not see.
+ *
+ *   reason(out): why not
+ */
+static bool
+tls_accepts (const std::string &cert_path, const std::string &key_path, std::string &reason)
+{
+  SSL_CTX *ctx;
+  bool ok = false;
+
+  ERR_clear_error ();
+  ctx = SSL_CTX_new (TLS_server_method ());
+  if (ctx == NULL)
+    {
+      reason = "cannot create a TLS context: " + openssl_reason ();
+      return false;
+    }
+  SSL_CTX_set_default_passwd_cb (ctx, no_passphrase);
+
+  if (SSL_CTX_use_certificate_chain_file (ctx, cert_path.c_str ()) != 1)
+    {
+      reason = "the certificate: " + openssl_reason ();
+    }
+  else if (SSL_CTX_use_PrivateKey_file (ctx, key_path.c_str (), SSL_FILETYPE_PEM) != 1)
+    {
+      reason = "the private key: " + openssl_reason ();
+    }
+  else if (SSL_CTX_check_private_key (ctx) != 1)
+    {
+      reason = "the private key: " + openssl_reason ();
+    }
+  else
+    {
+      ok = true;
+    }
+
+  SSL_CTX_free (ctx);
+  ERR_clear_error ();
+  return ok;
 }
 
 /* ----------------------------------------------------------------- generation */
@@ -1535,12 +1606,23 @@ replace_pair (ssl_file &cert, ssl_file &key, int shipped, std::string &why)
   X509_free (new_cert);
 
   remove_leftovers (cert.path, key.path);
+
+  if (!tls_accepts (cert.path, key.path, err))
+    {
+      LOG_ERROR ("TLS refuses the newly generated SSL key pair %s, %s: %s. "
+		 "The OpenSSL configuration may require a stronger key than RSA 2048; "
+		 "install a certificate and its private key that it accepts, and restart.",
+		 cert.path.c_str (), key.path.c_str (), err.c_str ());
+      return fail (why, "TLS refuses the newly generated SSL key pair " + cert.path + ", " + key.path + " ("
+		   + err + ")");
+    }
   return 0;
 }
 
 static int
 ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why)
 {
+  std::string reason;
   int shipped;
 
   if (cert.kind == PATH_NOT_FILE || key.kind == PATH_NOT_FILE)
@@ -1619,6 +1701,15 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why
 	{
 	  return fail_mismatch (why, cert, key);
 	}
+      if (!tls_accepts (cert.path, key.path, reason))
+	{
+	  LOG_ERROR ("the SSL key pair %s, %s is the %s, and TLS refuses it: %s. "
+		     "Set %s=YES in cm.conf and restart to replace it, or install a certificate and its private key "
+		     "that TLS accepts (for example RSA 2048 bits or more).", cert.path.c_str (), key.path.c_str (),
+		     shipped_keys[shipped].desc, reason.c_str (), CONF_AUTO_GENERATE);
+	  return fail (why, "the SSL key pair " + cert.path + ", " + key.path + " is the "
+		       + shipped_keys[shipped].desc + ", and TLS refuses it (" + reason + ")");
+	}
       LOG_ERROR ("the SSL key pair %s, %s is the %s. Its private key is public, so TLS does not authenticate "
 		 "this server. Set %s=YES in cm.conf and restart, run generatecert, or install a certificate with "
 		 "a new private key.", cert.path.c_str (), key.path.c_str (), shipped_keys[shipped].desc,
@@ -1648,6 +1739,13 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why
     }
 
   /* generated before, or installed by the administrator: use as is */
+  if (!tls_accepts (cert.path, key.path, reason))
+    {
+      LOG_ERROR ("TLS refuses the SSL key pair %s, %s: %s. The files are left unchanged; install a certificate "
+		 "and its private key that TLS accepts (for example RSA 2048 bits or more), and restart.",
+		 cert.path.c_str (), key.path.c_str (), reason.c_str ());
+      return fail (why, "TLS refuses the SSL key pair " + cert.path + ", " + key.path + " (" + reason + ")");
+    }
   log_fingerprint (cert.path, cert.cert);
   if (auto_generate)
     {
