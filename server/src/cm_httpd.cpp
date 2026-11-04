@@ -69,6 +69,7 @@
 #include "cm_user.h"
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
+#include "cm_ssl_cert.h"
 
 using namespace std;
 
@@ -625,6 +626,19 @@ start_service ()
 #endif
 
   thread_setup_SSL ();
+
+  /*
+   * Keep, generate or replace the key pair before TLS loads it. On failure
+   * the reason and what to do are in the error log; do not start.
+   */
+  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE) != 0)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE,
+		"CUBRID Manager Server : cannot use the SSL certificate %s and private key %s. See %s.\n",
+		sco.szSSLCertificate, sco.szSSLKey, sco.szErrorLog);
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      return -1;
+    }
 
   SSL_CTX *ctx = init_SSL (sco.szSSLCertificate, sco.szSSLKey);
   if (ctx == NULL)

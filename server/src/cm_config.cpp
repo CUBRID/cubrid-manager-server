@@ -58,6 +58,7 @@
 #define DEFAULT_CWM_PATH_SHORT            "/share/webmanager"
 #define DEFAULT_SSL_CERTIFICATE           "cm_ssl_cert.crt"
 #define DEFAULT_SSL_PRIVATEKEY            "cm_ssl_cert.key"
+#define DEFAULT_SSL_CERT_AUTO_GENERATE    TRUE
 
 #define DEFAULT_LOG_FILE_COUNT            10
 #define DEFAULT_LOG_FILE_SIZE             (4 * 1024 * 1024)
@@ -245,6 +246,7 @@ uReadSystemConfig (void)
   sco.iAutoJobTimeout = DEFAULT_AUTOJOB_TIMEOUT;
   sco.iMaxLogFiles = DEFAULT_LOG_FILE_COUNT;
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
+  sco.iSSLCertAutoGenerate = DEFAULT_SSL_CERT_AUTO_GENERATE;
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
   sco.iTokenActiveTime = DEFAULT_TOKEN_ACTIVE_TIME;
@@ -367,6 +369,31 @@ uReadSystemConfig (void)
 	  else
 	    {
 	      sco.iSupportMonStat = FALSE;
+	    }
+	}
+      else if (strcasecmp (ent_name, "ssl_cert_auto_generate") == 0)
+	{
+	  /*
+	   * An unknown value keeps the default (YES): with NO a missing or
+	   * shipped key pair is not replaced, so a typo must not turn generation off.
+	   */
+	  if (strcasecmp (ent_val, "yes") == 0)
+	    {
+	      sco.iSSLCertAutoGenerate = TRUE;
+	    }
+	  else if (strcasecmp (ent_val, "no") == 0)
+	    {
+	      sco.iSSLCertAutoGenerate = FALSE;
+	    }
+	  else
+	    {
+	      char err_buf[DBMT_ERROR_MSG_SIZE];
+
+	      snprintf (err_buf, DBMT_ERROR_MSG_SIZE,
+			"CUBRID Manager Server : invalid ssl_cert_auto_generate in cm.conf (%s). "
+			"It must be YES or NO. Using the default YES.\n", ent_val);
+	      ut_record_cubrid_utility_log_stderr (err_buf);
+	      sco.iSSLCertAutoGenerate = DEFAULT_SSL_CERT_AUTO_GENERATE;
 	    }
 	}
       else if (strcasecmp (ent_name, "http_timeout") == 0 ||
@@ -527,19 +554,14 @@ uCheckSystemConfig (char *progname)
     {
       return -1;
     }
-  /* cubrid manager only support https connections,
-  * Thus private key and certificate must be checked before process starting.
-  */
+  /*
+   * cubrid manager only supports https connections. The private key and
+   * certificate are not checked here: they may not exist yet, and
+   * cm_ssl_cert_ensure () checks, generates or replaces them when the server
+   * starts (start_service ()), and logs why it cannot.
+   */
   snprintf (sco.szSSLKey, PATH_MAX, "%s/conf/%s", sco.szCubrid, DEFAULT_SSL_PRIVATEKEY);
-  if (check_file (sco.szSSLKey, progname) < 0)
-    {
-      return -1;
-    }
   snprintf (sco.szSSLCertificate, PATH_MAX, "%s/conf/%s", sco.szCubrid, DEFAULT_SSL_CERTIFICATE);
-  if (check_file (sco.szSSLCertificate, progname) < 0)
-    {
-      return -1;
-    }
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
   sprintf (filepath, "%s/%s", sco.szCubrid, DBMT_LOG_DIR);
