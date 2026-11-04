@@ -117,6 +117,7 @@
     <ClCompile Include="..\..\src\cm_server_interface.cpp" />
     <ClCompile Include="..\..\src\cm_server_util.cpp" />
     <ClCompile Include="..\..\src\cm_server_status.cpp" />
+    <ClCompile Include="..\..\src\cm_ssl_cert.cpp" />
     <ClCompile Include="..\..\src\cm_text_encryption.cpp" />
     <ClCompile Include="..\..\src\cm_user.cpp" />
     <ClCompile Include="..\..\src\cm_win_wsa.c" />
