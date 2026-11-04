@@ -2099,14 +2099,23 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why
  *   The lock file is left in place: removing it would let another process
  *   lock a new file of the same name.
  *
- *   When the lock file cannot be created because its directory is not
- *   writable, no lock is taken: then no process can create, rename or
- *   remove anything there, so there is nothing to serialize, and a key pair
- *   in a read-only conf is still used as it is.
+ *   When the lock file cannot be created because this process cannot write
+ *   in its directory (permissions, a read-only file system, or on Windows an
+ *   ACL), no lock is taken: then this process cannot create, rename or
+ *   remove anything there, and a key pair in a read-only conf is still used
+ *   as it is. If another account could still write there, the worst case is
+ *   that this process reads a pair being replaced, which the pair check
+ *   refuses.
  *
  *   return: true if this process holds the lock (taken now or before)
  */
-/* dir_writable () - can this process create files in the directory of path */
+#if !defined (WINDOWS)
+/*
+ * dir_writable () - can this process create files in the directory of path.
+ *   access () checks the effective permissions, POSIX ACLs included. (On
+ *   Windows _access () looks only at the read-only attribute, not at the
+ *   ACL, so the Windows code decides from what CreateFileA () returns.)
+ */
 static bool
 dir_writable (const std::string &path)
 {
@@ -2114,6 +2123,7 @@ dir_writable (const std::string &path)
 
   return access (dir.empty ()? "." : dir.c_str (), W_OK) == 0;
 }
+#endif
 
 static bool
 hold_process_lock (const std::string &key_path, std::string &err)
@@ -2131,15 +2141,30 @@ hold_process_lock (const std::string &key_path, std::string &err)
   HANDLE h = CreateFileA (path.c_str (), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
 			  OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
-  if (h == INVALID_HANDLE_VALUE)
+  if (h == INVALID_HANDLE_VALUE && GetLastError () == ERROR_ACCESS_DENIED)
     {
+      DWORD attr = GetFileAttributesA (path.c_str ());
       DWORD e = GetLastError ();
 
-      if (e == ERROR_ACCESS_DENIED && !dir_writable (path))
+      /*
+       * Decided by what Windows returns, as the ACL may deny writing even when
+       * _access () says otherwise:
+       * - no lock file, and it cannot be created: this account cannot create
+       *   files in conf, so it cannot replace anything there; go on without
+       *   the lock, as for a read-only conf.
+       * - the lock file exists but cannot be opened for writing: a read
+       *   handle is enough for LockFileEx ().
+       */
+      if (attr == INVALID_FILE_ATTRIBUTES && (e == ERROR_FILE_NOT_FOUND || e == ERROR_PATH_NOT_FOUND))
 	{
 	  return true;
 	}
-      err = "cannot open " + path + ": " + win_error_string (e);
+      h = CreateFileA (path.c_str (), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+		       FILE_ATTRIBUTE_NORMAL, NULL);
+    }
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      err = "cannot open " + path + ": " + win_error_string (GetLastError ());
       return false;
     }
   for (;;)
