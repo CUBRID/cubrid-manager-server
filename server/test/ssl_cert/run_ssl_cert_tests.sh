@@ -551,15 +551,71 @@ ensure YES
 ok "interrupted with a link as the key: link restored, then replaced" \
   "[ $RET = 0 ] && [ ! -L $KEY ] && ! is_shipped \$(key_fp $KEY) && [ \$(nfiles) = 2 ]"
 
+# first generation (no previous key): <key>.new-<s> records it
+
+# stopped after placing the new key, before the certificate
+for mode in YES NO; do
+  setup
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+  : > "$KEY.new-$s"
+  first_key=$(key_fp "$KEY")
+  ensure $mode
+  if [ $mode = YES ]; then
+    ok "first generation interrupted before the certificate, YES: generated again" \
+      "[ $RET = 0 ] && [ \$(nfiles) = 2 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \"\$(key_fp $KEY)\" != \"$first_key\" ] && log | grep -q 'removed its private key'"
+  else
+    ok "first generation interrupted before the certificate, NO: no key pair, as before" \
+      "[ $RET != 0 ] && [ \$(nfiles) = 0 ] && grep -q 'do not exist (ssl_cert_auto_generate=NO)' $work/out"
+  fi
+done
+
+# stopped before placing the new key
+setup
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY.tmp-$s" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+: > "$KEY.new-$s"
+ensure YES
+ok "first generation interrupted before the key: generated" \
+  "[ $RET = 0 ] && [ \$(nfiles) = 2 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+
+# stopped after placing both, before removing the record
+setup
+make_own_pair
+sum=$(files_sum)
+: > "$KEY.new-$s"
+ensure YES
+ok "first generation interrupted after the certificate: pair kept, record removed" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+# the key was replaced by hand after the interruption: not removed
+setup
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/new.key" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+: > "$KEY.new-$s"
+make_own_pair
+sum=$(files_sum)
+ensure YES
+ok "first generation interrupted, then a pair installed by hand: pair kept" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ] && log | grep -q 'is not its key'"
+
+# a replacement interrupted before the certificate, then a pair installed by hand
+setup
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KEY.old-$s" 2> /dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/new.key" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+make_own_pair
+sum=$(files_sum)
+ensure YES
+ok "replacement interrupted, then a pair installed by hand: pair kept" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'is not its new key'"
+
 # names that are not work files are left alone
 setup
 make_own_pair
 echo keep > "$KEY.old-1234567"
 echo keep > "$KEY.old-DEADBEEF"
 echo keep > "$CRT.tmp-deadbeef.bak"
+echo keep > "$KEY.new-deadbee"
 ensure YES
 ok "other names are not work files: kept" \
-  "[ $RET = 0 ] && [ -f $KEY.old-1234567 ] && [ -f $KEY.old-DEADBEEF ] && [ -f $CRT.tmp-deadbeef.bak ]"
+  "[ $RET = 0 ] && [ -f $KEY.old-1234567 ] && [ -f $KEY.old-DEADBEEF ] && [ -f $CRT.tmp-deadbeef.bak ] && [ -f $KEY.new-deadbee ]"
 
 # ------------------------------------------------------- what TLS accepts
 

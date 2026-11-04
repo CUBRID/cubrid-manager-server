@@ -133,12 +133,16 @@ static const char *leftover_key_names[] = { "cm_ssl_cert_1024.key", "cm_ssl_cert
 #define CERT_MAX_FILE_SIZE              (1024 * 1024)
 
 /*
- * Work files of a replacement (install_pair ()): <path>.tmp-<suffix> and
- * <key>.old-<suffix>, <suffix> being 8 lower-case hex digits (random_suffix ()).
- * A replacement that stops midway (crash, power loss) leaves them behind.
+ * Work files of a replacement (install_pair ()), <suffix> being 8 lower-case
+ * hex digits (random_suffix ()). A replacement that stops midway (crash, power
+ * loss) leaves them behind, and recover_interrupted () reads them.
+ *   <path>.tmp-<suffix>  the new key or certificate, not in place yet
+ *   <key>.old-<suffix>   the previous key, set aside
+ *   <key>.new-<suffix>   empty: there was no previous key (first generation)
  */
 #define WORK_TMP                        ".tmp-"
 #define WORK_OLD                        ".old-"
+#define WORK_NEW                        ".new-"
 #define WORK_SUFFIX_LEN                 8
 
 #define ARRAY_COUNT(a)                  (sizeof (a) / sizeof ((a)[0]))
@@ -1353,7 +1357,10 @@ random_suffix (std::string &suffix, std::string &err)
  *
  *   Both are written to temporary files first, then renamed over the old
  *   ones. The old key is set aside until the certificate is in place, so that
- *   on failure the old key and certificate are both back as they were.
+ *   on failure the old key and certificate are both back as they were. When
+ *   there is no old key, an empty <key>.new-<suffix> records that instead, so
+ *   that recover_interrupted () can tell a new key placed before an
+ *   interruption from a key that was there.
  */
 static bool
 install_pair (const std::string &cert_path, const std::string &key_path, X509 *cert, EVP_PKEY *pkey,
@@ -1365,8 +1372,10 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
   std::string key_tmp;
   std::string cert_tmp;
   std::string key_old;
+  std::string key_new_mark;
   std::string e2;
   bool key_set_aside = false;
+  bool key_marked = false;
   bool key_placed = false;
   bool ok = false;
 
@@ -1377,6 +1386,7 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
   key_tmp = key_path + WORK_TMP + suffix;
   cert_tmp = cert_path + WORK_TMP + suffix;
   key_old = key_path + WORK_OLD + suffix;
+  key_new_mark = key_path + WORK_NEW + suffix;
 
   do
     {
@@ -1401,6 +1411,14 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
 	    }
 	  key_set_aside = true;
 	}
+      else
+	{
+	  if (!write_new_file (key_new_mark, std::string (), true, err))
+	    {
+	      break;
+	    }
+	  key_marked = true;
+	}
       if (!replace_file (key_tmp, key_path, err))
 	{
 	  break;
@@ -1422,6 +1440,10 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
 	{
 	  unlink (key_old.c_str ());
 	}
+      if (key_marked)
+	{
+	  unlink (key_new_mark.c_str ());
+	}
       return true;
     }
 
@@ -1436,6 +1458,10 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
     }
   unlink (key_tmp.c_str ());
   unlink (cert_tmp.c_str ());
+  if (key_marked)
+    {
+      unlink (key_new_mark.c_str ());
+    }
   return false;
 }
 
@@ -1652,23 +1678,86 @@ work_file_exists (const std::string &path)
  *   removed. Done whatever ssl_cert_auto_generate is: it restores the state
  *   before the replacement, it does not generate anything.
  */
+/*
+ * key_is_of_cert_file () - does the private key at key_path belong to the
+ *   certificate at cert_path, that is, is it the new key of the replacement
+ *   whose certificate was not put in place
+ */
+static bool
+key_is_of_cert_file (const std::string &key_path, const std::string &cert_path)
+{
+  ssl_file key ("private key", key_path.c_str (), true);
+  ssl_file cert ("certificate", cert_path.c_str (), false);
+
+  load_ssl_file (key);
+  load_ssl_file (cert);
+  return key.loaded && cert.loaded && pair_matches (cert, key);
+}
+
 static void
 recover_interrupted (const std::string &cert_path, const std::string &key_path)
 {
   std::vector < std::string > olds = work_suffixes (key_path, WORK_OLD);
+  std::vector < std::string > news = work_suffixes (key_path, WORK_NEW);
   std::vector < std::string > tmps;
   std::string err;
   size_t i;
 
+  /*
+   * first generation (no previous key): <key>.new-<s> and <cert>.tmp-<s>
+   * mean the certificate was not put in place, so the key at the key path,
+   * if any, is the new one; remove it, as a failed generation does. The
+   * startup check then generates again (YES) or reports that there is no key
+   * pair (NO). A key that does not belong to <cert>.tmp-<s> was not placed by
+   * that generation and is left alone.
+   */
+  for (i = 0; i < news.size (); i++)
+    {
+      std::string mark = key_path + WORK_NEW + news[i];
+      std::string cert_tmp = cert_path + WORK_TMP + news[i];
+
+      if (!work_file_exists (mark))
+	{
+	  continue;
+	}
+      if (work_file_exists (cert_tmp) && path_entry_exists (key_path))
+	{
+	  if (!key_is_of_cert_file (key_path, cert_tmp))
+	    {
+	      LOG_WARN ("an earlier generation of the SSL key pair was interrupted, but %s is not its key; "
+			"it is left unchanged", key_path.c_str ());
+	    }
+	  else if (unlink (key_path.c_str ()) == 0)
+	    {
+	      LOG_WARN ("an earlier generation of the SSL key pair was interrupted before the certificate was in "
+			"place: removed its private key %s", key_path.c_str ());
+	    }
+	  else
+	    {
+	      LOG_ERROR ("an earlier generation of the SSL key pair was interrupted, and its private key %s cannot "
+			 "be removed: %s. Remove it and restart.", key_path.c_str (), errno_string (errno).c_str ());
+	    }
+	}
+      unlink (mark.c_str ());
+    }
+
   for (i = 0; i < olds.size (); i++)
     {
       std::string old_key = key_path + WORK_OLD + olds[i];
+      std::string cert_tmp = cert_path + WORK_TMP + olds[i];
 
       if (!work_file_exists (old_key))
 	{
 	  continue;
 	}
-      if (!path_entry_exists (key_path) || work_file_exists (cert_path + WORK_TMP + olds[i]))
+      if (path_entry_exists (key_path) && work_file_exists (cert_tmp) && !key_is_of_cert_file (key_path, cert_tmp))
+	{
+	  /* the key was changed after the interruption: do not overwrite it */
+	  LOG_WARN ("an earlier replacement of the SSL key pair was interrupted, but %s is not its new key; "
+		    "it is left unchanged, and the previous key is left in %s", key_path.c_str (), old_key.c_str ());
+	  continue;
+	}
+      if (!path_entry_exists (key_path) || work_file_exists (cert_tmp))
 	{
 	  if (replace_file (old_key, key_path, err))
 	    {
