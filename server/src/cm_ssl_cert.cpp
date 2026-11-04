@@ -1675,8 +1675,13 @@ work_file_exists (const std::string &path)
  *   - otherwise the replacement completed: remove the previous key, as the
  *     replacement would have.
  *   The remaining <cert>.tmp-*, <key>.tmp-* were never put in place and are
- *   removed. Done whatever ssl_cert_auto_generate is: it restores the state
- *   before the replacement, it does not generate anything.
+ *   removed, except those of a replacement that could not be undone or whose
+ *   key was changed afterwards. Done whatever ssl_cert_auto_generate is: it
+ *   restores the state before the replacement, it does not generate anything.
+ *
+ *   return: false if a replacement could not be undone (the server must not
+ *           start; its files are kept so that the next start decides again)
+ *   why(out): the reason, when false
  */
 /*
  * key_is_of_cert_file () - does the private key at key_path belong to the
@@ -1694,13 +1699,15 @@ key_is_of_cert_file (const std::string &key_path, const std::string &cert_path)
   return key.loaded && cert.loaded && pair_matches (cert, key);
 }
 
-static void
-recover_interrupted (const std::string &cert_path, const std::string &key_path)
+static bool
+recover_interrupted (const std::string &cert_path, const std::string &key_path, std::string &why)
 {
   std::vector < std::string > olds = work_suffixes (key_path, WORK_OLD);
   std::vector < std::string > news = work_suffixes (key_path, WORK_NEW);
+  std::vector < std::string > keep;	/* suffixes whose work files must stay */
   std::vector < std::string > tmps;
   std::string err;
+  bool ok = true;
   size_t i;
 
   /*
@@ -1734,13 +1741,30 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path)
 	    }
 	  else
 	    {
+	      /* keep the record and the certificate: the next start decides again */
 	      LOG_ERROR ("an earlier generation of the SSL key pair was interrupted, and its private key %s cannot "
-			 "be removed: %s. Remove it and restart.", key_path.c_str (), errno_string (errno).c_str ());
+			 "be removed: %s. The files are left as they are; fix the cause (for example a program that "
+			 "keeps the file open) and restart.", key_path.c_str (), errno_string (errno).c_str ());
+	      if (why.empty ())
+		{
+		  why = "cannot remove the private key " + key_path + " of an interrupted generation: "
+			+ errno_string (errno);
+		}
+	      keep.push_back (news[i]);
+	      ok = false;
+	      continue;
 	    }
 	}
       unlink (mark.c_str ());
     }
 
+  /*
+   * replacement: <key>.old-<s> is the previous key. Put it back when the key
+   * path is empty, or when <cert>.tmp-<s> shows that the new certificate was
+   * not placed; otherwise the replacement completed and it is removed. If it
+   * cannot be put back, nothing of that replacement is removed, so that the
+   * next start can still tell that it was not completed.
+   */
   for (i = 0; i < olds.size (); i++)
     {
       std::string old_key = key_path + WORK_OLD + olds[i];
@@ -1752,9 +1776,12 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path)
 	}
       if (path_entry_exists (key_path) && work_file_exists (cert_tmp) && !key_is_of_cert_file (key_path, cert_tmp))
 	{
-	  /* the key was changed after the interruption: do not overwrite it */
+	  /* the key was changed after the interruption: do not overwrite it, and keep the files */
 	  LOG_WARN ("an earlier replacement of the SSL key pair was interrupted, but %s is not its new key; "
-		    "it is left unchanged, and the previous key is left in %s", key_path.c_str (), old_key.c_str ());
+		    "it is left unchanged. The previous key is in %s and the certificate of the interrupted "
+		    "replacement in %s; remove them when they are no longer needed.", key_path.c_str (),
+		    old_key.c_str (), cert_tmp.c_str ());
+	  keep.push_back (olds[i]);
 	  continue;
 	}
       if (!path_entry_exists (key_path) || work_file_exists (cert_tmp))
@@ -1767,8 +1794,15 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path)
 	  else
 	    {
 	      LOG_ERROR ("an earlier replacement of the SSL key pair was interrupted, and the previous private key "
-			 "cannot be restored: %s. Rename %s to %s, and restart.", err.c_str (), old_key.c_str (),
-			 key_path.c_str ());
+			 "cannot be restored: %s. The files are left as they are; fix the cause (for example a "
+			 "program that keeps the file open) and restart, or rename %s to %s.", err.c_str (),
+			 old_key.c_str (), key_path.c_str ());
+	      if (why.empty ())
+		{
+		  why = "cannot restore the previous private key of an interrupted replacement: " + err;
+		}
+	      keep.push_back (olds[i]);
+	      ok = false;
 	    }
 	}
       else if (unlink (old_key.c_str ()) == 0)
@@ -1791,8 +1825,13 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path)
       for (i = 0; i < tmps.size (); i++)
 	{
 	  std::string tmp = path + WORK_TMP + tmps[i];
+	  size_t k;
 
-	  if (!work_file_exists (tmp))
+	  for (k = 0; k < keep.size () && keep[k] != tmps[i]; k++)
+	    {
+	      ;
+	    }
+	  if (k < keep.size () || !work_file_exists (tmp))
 	    {
 	      continue;
 	    }
@@ -1807,6 +1846,7 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path)
 	    }
 	}
     }
+  return ok;
 }
 
 /* ------------------------------------------------------------ startup check */
@@ -2051,11 +2091,17 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
   ssl_file cert ("certificate", cert_path, false);
   ssl_file key ("private key", key_path, true);
 
-  recover_interrupted (cert.path, key.path);
-  cert.kind = check_path (cert.path, &is_link);
-  key.kind = check_path (key.path, &is_link);
-
-  ret = ensure_pair (cert, key, auto_generate, why);
+  /* an interrupted replacement that cannot be undone: do not start, keep its files */
+  if (!recover_interrupted (cert.path, key.path, why))
+    {
+      ret = -1;
+    }
+  else
+    {
+      cert.kind = check_path (cert.path, &is_link);
+      key.kind = check_path (key.path, &is_link);
+      ret = ensure_pair (cert, key, auto_generate, why);
+    }
   ERR_clear_error ();
   if (ret != 0)
     {

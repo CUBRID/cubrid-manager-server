@@ -606,6 +606,48 @@ ensure YES
 ok "replacement interrupted, then a pair installed by hand: pair kept" \
   "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'is not its new key'"
 
+# the previous key cannot be put back (conf not writable): do not start, keep the files
+if ! skip_as_root "recovery that cannot be done"; then
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  mv "$KEY" "$KEY.old-$s"
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+  chmod 555 "$C"
+  ensure YES
+  ok "previous key cannot be put back: does not start, files kept" \
+    "[ $RET != 0 ] && [ -f $KEY.old-$s ] && [ -f $CRT.tmp-$s ] && [ -f $KEY ] && grep -q 'why=cannot restore the previous private key of an interrupted replacement' $work/out"
+  ensure YES
+  ok "previous key cannot be put back, second start: still does not start, files kept" \
+    "[ $RET != 0 ] && [ -f $KEY.old-$s ] && [ -f $CRT.tmp-$s ]"
+  chmod 755 "$C"
+  ensure YES
+  ok "previous key cannot be put back, after the cause is fixed: previous pair restored" \
+    "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+  setup
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+  : > "$KEY.new-$s"
+  chmod 555 "$C"
+  ensure YES
+  ok "new key of a first generation cannot be removed: does not start, files kept" \
+    "[ $RET != 0 ] && [ -f $KEY.new-$s ] && [ -f $CRT.tmp-$s ] && [ -f $KEY ] && grep -q 'why=cannot remove the private key .* of an interrupted generation' $work/out"
+  chmod 755 "$C"
+  ensure YES
+  ok "new key of a first generation cannot be removed, after the cause is fixed: generated" \
+    "[ $RET = 0 ] && [ \$(nfiles) = 2 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+fi
+
+# the key was changed after an interrupted replacement: the files of that replacement stay
+setup
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KEY.old-$s" 2> /dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/new.key" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+make_own_pair
+ensure YES
+ensure YES
+ok "replacement interrupted, then a pair installed by hand: its files stay across starts" \
+  "[ $RET = 0 ] && [ -f $KEY.old-$s ] && [ -f $CRT.tmp-$s ]"
+
 # names that are not work files are left alone
 setup
 make_own_pair
