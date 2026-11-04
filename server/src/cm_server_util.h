@@ -74,8 +74,6 @@ typedef unsigned __int8  uint8_t;
 #define BYTES_IN_M (1024 * 1024)
 #define BYTES_IN_G (1024 * 1024 * 1024)
 
-#define RSA_KEY_SIZE 2048
-
 #ifdef _DEBUG_
 #include "deb.h"
 #define MALLOC(p) debug_malloc(p)

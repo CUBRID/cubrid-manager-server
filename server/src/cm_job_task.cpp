@@ -71,14 +71,7 @@
 #include "cm_text_encryption.h"
 #include "cm_connect_info.h"
 #include "cm_server_autoupdate.h"
-
-#include "openssl/pem.h"
-#include "openssl/conf.h"
-#include "openssl/x509v3.h"
-#include "openssl/md5.h"
-#ifndef OPENSSL_NO_ENGINE
-#include "openssl/engine.h"
-#endif
+#include "cm_ssl_cert.h"
 
 #include <list>
 #include <map>
@@ -365,16 +358,6 @@ static int _check_backup_info (const char *conf_item[], int check_backupid,
 			       char *_dbmt_error);
 static int _verify_user_passwd (char *dbname, char *dbuser, char *dbpasswd,
 				char *_dbmt_error);
-static int _add_extensions (X509 *cert, int nid, char *value);
-static void _add_issuer_info (X509_NAME *name, const char *item_name,
-			      char *item_value);
-static int _make_cert (nvplist *req, X509 **x509p, EVP_PKEY **pkeyp,
-		       int bits, char *_dbmt_error);
-static int _hash_cert (char *hash_value, char *file_path);
-static int _is_default_cert (char *_dbmt_error);
-static int _is_exist_default_backup_cert (char *_dbmt_error);
-static int _backup_cert (char *_dbmt_error);
-static int _recover_cert (char *_dbmt_error);
 
 static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
@@ -12637,27 +12620,17 @@ get_processor_architecture ()
 int
 ts_get_cms_env (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  int is_default_cert_file = 0;
-
   ts_get_server_version (req, res);
   nv_add_nvp (res, "PLATFORM", get_processor_architecture ());
   nv_add_nvp (res, "CMS_VER", makestring (BUILD_NUMBER));
 
   nv_add_nvp_int (res, "cm_port", sco.iCMS_port);
 
-  is_default_cert_file = _is_default_cert (_dbmt_error);
-  if (is_default_cert_file < 0)
-    {
-      return ERR_WITH_MSG;
-    }
-  if (is_default_cert_file == 0)
-    {
-      nv_add_nvp (res, "is_default_cert", "no");
-    }
-  else
-    {
-      nv_add_nvp (res, "is_default_cert", "yes");
-    }
+  /*
+   * yes: the key pair checked at startup is one an earlier version shipped
+   * (its private key is public), accepted with ssl_cert_auto_generate=NO
+   */
+  nv_add_nvp (res, "is_default_cert", cm_ssl_cert_shipped_key_in_use ()? "yes" : "no");
 
   return ERR_NO_ERROR;
 }
@@ -16894,414 +16867,54 @@ ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
-static int
-_make_cert (nvplist *req, X509 **x509p, EVP_PKEY **pkeyp, int bits,
-	    char *_dbmt_error)
+int
+ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error)
 {
-  char user_info[PATH_MAX];
-  char nid_basic_constraints[PATH_MAX];
-  char nid_key_usage[PATH_MAX];
-  char nid_subject_key_identifier[PATH_MAX];
-  char nid_netscape_cert_type[PATH_MAX];
-  char nid_netscape_comment[PATH_MAX];
+  T_CM_SSL_CERT_OPTS opts;
+  const char *requester;
+  const char *client_ip;
+  char *days;
 
-  X509 *x509_local = NULL;
-  EVP_PKEY *pub_key = NULL;
-  RSA *rsa = NULL;
-  X509_NAME *name = NULL;
-  BIGNUM *bignum = NULL;
+  memset (&opts, 0, sizeof (opts));
+  opts.country = nv_get_val (req, "cname");
+  opts.state = nv_get_val (req, "stname");
+  opts.locality = nv_get_val (req, "loname");
+  opts.organization = nv_get_val (req, "orgname");
+  opts.org_unit = nv_get_val (req, "orgutname");
+  opts.common_name = nv_get_val (req, "comname");
+  opts.email = nv_get_val (req, "email");
 
-  char *country_name = NULL;
-  char *state_name = NULL;
-  char *locality_name = NULL;
-  char *organization_name = NULL;
-  char *organizational_unit_name = NULL;
-  char *common_name = NULL;
-  char *email_addr = NULL;
-  char *days = NULL;
-
-  int day = 0;
-
-  user_info[0] = '\0';
-  nid_basic_constraints[0] = '\0';
-  nid_key_usage[0] = '\0';
-  nid_subject_key_identifier[0] = '\0';
-  nid_netscape_cert_type[0] = '\0';
-  nid_netscape_comment[0] = '\0';
-
-  country_name = nv_get_val (req, "cname");
-  state_name = nv_get_val (req, "stname");
-  locality_name = nv_get_val (req, "loname");
-  organization_name = nv_get_val (req, "orgname");
-  organizational_unit_name = nv_get_val (req, "orgutname");
-  common_name = nv_get_val (req, "comname");
-  email_addr = nv_get_val (req, "email");
   days = nv_get_val (req, "days");
-
   if (days == NULL)
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", "days");
       return ERR_PARAM_MISSING;
     }
-
-  if ((pkeyp == NULL) || (*pkeyp == NULL))
+  /* as before: a value that is not a positive number means 365 days */
+  opts.days = atoi (days);
+  if (opts.days <= 0)
     {
-      if ((pub_key = EVP_PKEY_new ()) == NULL)
-	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		    "Cannot make a new private key.");
-	  return ERR_WITH_MSG;
-	}
-    }
-  else
-    {
-      pub_key = *pkeyp;
+      opts.days = 365;
     }
 
-  if ((x509p == NULL) || (*x509p == NULL))
+  /*
+   * Same certificate as the one generated at startup, written to the
+   * cm.conf paths. The files are replaced (no .bak); the running server keeps
+   * the certificate it loaded, the new one is used after a restart.
+   */
+  if (cm_ssl_cert_generate (sco.szSSLCertificate, sco.szSSLKey, &opts, _dbmt_error, DBMT_ERROR_MSG_SIZE) != 0)
     {
-      if ((x509_local = X509_new ()) == NULL)
-	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		    "Cannot make a new certification file.");
-	  return ERR_WITH_MSG;
-	}
-    }
-  else
-    {
-      x509_local = *x509p;
-    }
-
-  /* Generate RSA key using RSA_generate_key_ex to replace RSA_generate_key
-  *
-  */
-  if ((bignum = BN_new ()) == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot make a new SSL private key file - create bignum failed.");
-      return ERR_WITH_MSG;
-    }
-  if (BN_set_word (bignum, RSA_F4) == 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot make a new SSL private key file - set bignum failed.");
-      return ERR_WITH_MSG;
-    }
-  if ((rsa = RSA_new ()) == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot make a new SSL private key file - create RSA failed.");
-      return ERR_WITH_MSG;
-    }
-  if (RSA_generate_key_ex (rsa, bits, bignum, NULL) == 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot make a new SSL private key file.");
-      return ERR_WITH_MSG;
-    }
-  if (EVP_PKEY_assign_RSA (pub_key, rsa) == 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Failed to generate public key.");
-      return ERR_WITH_MSG;
-    }
-  rsa = NULL;
-
-  X509_set_version (x509_local, 2);
-  ASN1_INTEGER_set (X509_get_serialNumber (x509_local), 0);
-  X509_gmtime_adj (X509_get_notBefore (x509_local), 0);
-
-  day = atoi (days);
-  if (day <= 0)
-    {
-      day = 365;
-    }
-  X509_gmtime_adj (X509_get_notAfter (x509_local), (long) 60 * 60 * 24 * day);
-  X509_set_pubkey (x509_local, pub_key);
-
-  name = X509_get_subject_name (x509_local);
-
-  /* This function creates and adds the entry, working out the
-  * correct string type and performing checks on its length.
-  * Normally we'd check the return value for errors...
-  */
-  if (country_name != NULL)
-    {
-      _add_issuer_info (name, "C", country_name);
-    }
-  if (state_name != NULL)
-    {
-      _add_issuer_info (name, "ST", state_name);
-    }
-  if (locality_name != NULL)
-    {
-      _add_issuer_info (name, "L", locality_name);
-    }
-  if (organization_name != NULL)
-    {
-      _add_issuer_info (name, "O", organization_name);
-    }
-  if (organizational_unit_name != NULL)
-    {
-      _add_issuer_info (name, "OU", organizational_unit_name);
-    }
-  if ((common_name != NULL) && (email_addr != NULL))
-    {
-      snprintf (user_info, PATH_MAX, "%s/%s", common_name, email_addr);
-      _add_issuer_info (name, "CN", user_info);
-    }
-  else if ((common_name != NULL) && (email_addr == NULL))
-    {
-      snprintf (user_info, PATH_MAX, "%s", common_name);
-      _add_issuer_info (name, "CN", user_info);
-    }
-  else if ((common_name == NULL) && (email_addr != NULL))
-    {
-      snprintf (user_info, PATH_MAX, "%s", email_addr);
-      _add_issuer_info (name, "CN", user_info);
-    }
-
-  /* Issuer should not be null for all items,
-  *  We have to set at least one issue as default,
-  *  We decide to set organizational_unit_name as the last one.
-  */
-  if ((country_name == NULL) && (state_name == NULL)
-      && (locality_name == NULL) && (organization_name == NULL)
-      && (organizational_unit_name == NULL) && (common_name == NULL)
-      && (email_addr == NULL))
-    {
-      snprintf (user_info, PATH_MAX, "CUBRID Manger Server Group.");
-      _add_issuer_info (name, "OU", user_info);
-    }
-  /* Its self signed so set the issuer name to be the same as the
-  * subject.
-  */
-  X509_set_issuer_name (x509_local, name);
-
-  /* Add various extensions: standard extensions */
-  snprintf (nid_basic_constraints, PATH_MAX, "critical,CA:TRUE");
-  _add_extensions (x509_local, NID_basic_constraints, nid_basic_constraints);
-
-  snprintf (nid_key_usage, PATH_MAX, "critical,keyCertSign,cRLSign");
-  _add_extensions (x509_local, NID_key_usage, nid_key_usage);
-
-  snprintf (nid_subject_key_identifier, PATH_MAX, "hash");
-  _add_extensions (x509_local, NID_subject_key_identifier,
-		   nid_subject_key_identifier);
-
-  /* Some Netscape specific extensions */
-  snprintf (nid_netscape_cert_type, PATH_MAX, "sslCA");
-  _add_extensions (x509_local, NID_netscape_cert_type,
-		   nid_netscape_cert_type);
-
-  snprintf (nid_netscape_comment, PATH_MAX,
-	    "CUBRID Manager server comment extension");
-  _add_extensions (x509_local, NID_netscape_comment, nid_netscape_comment);
-
-  if (X509_sign (x509_local, pub_key, EVP_sha256 ()) == 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot sign with public key.");
       return ERR_WITH_MSG;
     }
 
-  *x509p = x509_local;
-  *pkeyp = pub_key;
+  requester = nv_get_val (req, "_ID");
+  client_ip = nv_get_val (req, "_CLIENTIP");
+  LOG_WARN ("generatecert by %s from %s replaced the SSL key pair %s, %s. "
+	    "cub_manager uses the new certificate after a restart; clients will see a new fingerprint.",
+	    requester != NULL ? requester : "(unknown)", client_ip != NULL ? client_ip : "(unknown)",
+	    sco.szSSLCertificate, sco.szSSLKey);
+
   return ERR_NO_ERROR;
-}
-
-static void
-_add_issuer_info (X509_NAME *name, const char *item_name, char *item_value)
-{
-  X509_NAME_add_entry_by_txt (name, item_name, MBSTRING_ASC,
-			      (const unsigned char *) item_value, -1, -1, 0);
-}
-
-static int
-_add_extensions (X509 *cert, int nid, char *value)
-{
-  X509_EXTENSION *extension;
-  X509V3_CTX ctx;
-  /* This sets the 'context' of the extensions. */
-  /* No configuration database */
-  X509V3_set_ctx_nodb (&ctx);
-  /* Issuer and subject certs: both the target since it is self signed,
-  * no request and no CRL
-  */
-  X509V3_set_ctx (&ctx, cert, cert, NULL, NULL, 0);
-  extension = X509V3_EXT_conf_nid (NULL, &ctx, nid, value);
-  if (extension == 0)
-    {
-      return 1;
-    }
-
-  X509_add_ext (cert, extension, -1);
-  X509_EXTENSION_free (extension);
-  return 0;
-}
-
-static int
-_backup_cert (char *_dbmt_error)
-{
-  char default_backup_cert_path[COMPOSED_PATH_MAX];
-  char default_cert_path[PATH_MAX];
-
-  default_backup_cert_path[0] = '\0';
-  default_cert_path[0] = '\0';
-
-  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
-	    sco.szSSLCertificate);
-  if (access (default_backup_cert_path, F_OK) == 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot backup SSL certification file: %s.",
-		sco.szSSLCertificate);
-      return 1;
-    }
-
-  snprintf (default_cert_path, PATH_MAX, "%s", sco.szSSLCertificate);
-  if (access (default_cert_path, F_OK) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot find SSL certification file: %s.",
-		sco.szSSLCertificate);
-      return 1;
-    }
-  /*No need to backup custom certification file */
-  if (_is_default_cert (_dbmt_error) == 0)
-    {
-      return 1;
-    }
-
-  if (file_copy (default_cert_path, default_backup_cert_path) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Failed to backup SSL certification file: %s.",
-		sco.szSSLCertificate);
-      return 1;
-    }
-  return 0;
-}
-
-static int
-_recover_cert (char *_dbmt_error)
-{
-  char default_cert_path[PATH_MAX];
-  char default_backup_cert_path[COMPOSED_PATH_MAX];
-
-  default_cert_path[0] = '\0';
-  default_backup_cert_path[0] = '\0';
-
-  /*Check the validation of backup certification file */
-  if (_is_exist_default_backup_cert (_dbmt_error) != 1)
-    {
-      return 1;
-    }
-
-  snprintf (default_cert_path, PATH_MAX, "%s", sco.szSSLCertificate);
-  if (access (default_cert_path, F_OK) == 0)
-    {
-      if (uRemoveDir (default_cert_path, REMOVE_DIR_FORCED) != ERR_NO_ERROR)
-	{
-	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		    "Cannot delete SSL certification file: %s.",
-		    sco.szSSLCertificate);
-	  return 1;
-	}
-    }
-
-  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
-	    sco.szSSLCertificate);
-  if (file_copy (default_backup_cert_path, default_cert_path) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Failed to recover SSL certification file: %s.",
-		sco.szSSLCertificate);
-      return 1;
-    }
-  return 0;
-}
-
-int
-ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error)
-{
-  BIO *bio_err = NULL;
-  X509 *x509 = NULL;
-  EVP_PKEY *pub_key = NULL;
-  FILE *keyfile = NULL;
-  FILE *crtfile = NULL;
-  char keyfilepath[PATH_MAX], crtfilepath[PATH_MAX];
-  int ret_val = ERR_NO_ERROR;
-
-  keyfilepath[0] = '\0';
-  crtfilepath[0] = '\0';
-
-  bio_err = BIO_new_fp (stderr, BIO_NOCLOSE);
-
-  /*Backup default certification file. */
-
-  if (_is_exist_default_backup_cert (_dbmt_error) != 1)
-    {
-      if (_backup_cert (_dbmt_error) != 0)
-	{
-	  ret_val = ERR_WITH_MSG;
-	  goto release_src;
-	}
-    }
-
-  ret_val = _make_cert (req, &x509, &pub_key, RSA_KEY_SIZE, _dbmt_error);
-  if (ret_val != ERR_NO_ERROR)
-    {
-      goto release_src;
-    }
-
-  snprintf (keyfilepath, PATH_MAX, "%s", sco.szSSLKey);
-  if ((keyfile = fopen (keyfilepath, "w")) == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", sco.szSSLKey);
-      ret_val = ERR_FILE_OPEN_FAIL;
-      goto release_src;
-    }
-  PEM_write_PrivateKey (keyfile, pub_key, NULL, NULL, 0, NULL, NULL);
-  fclose (keyfile);
-
-  snprintf (crtfilepath, PATH_MAX, "%s", sco.szSSLCertificate);
-  if ((crtfile = fopen (crtfilepath, "w")) == NULL)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", sco.szSSLCertificate);
-      ret_val = ERR_FILE_OPEN_FAIL;
-      goto release_src;
-    }
-  if (PEM_write_X509 (crtfile, x509) != 1)
-    {
-      _recover_cert (_dbmt_error);
-      ret_val = ERR_WITH_MSG;
-      goto release_src;
-    }
-
-release_src:
-  if (crtfile != NULL)
-    {
-      fclose (crtfile);
-    }
-  if (x509 != NULL)
-    {
-      X509_free (x509);
-    }
-  if (pub_key != NULL)
-    {
-      EVP_PKEY_free (pub_key);
-    }
-
-#ifndef OPENSSL_NO_ENGINE
-  ENGINE_cleanup ();
-#endif
-  CRYPTO_cleanup_all_ex_data ();
-  if (pub_key != NULL)
-    {
-      BIO_free (bio_err);
-    }
-  return ret_val;
 }
 
 /*
@@ -18098,138 +17711,6 @@ get_statdump_daemon_list (void)
     }
 
   return result;
-}
-
-static int
-_hash_cert (char *hash_value, char *file_path)
-{
-  EVP_MD_CTX *mdContext = NULL;
-  unsigned char data[1024];	/* file read buffer */
-  unsigned char md5_final[EVP_MAX_MD_SIZE];
-  char *hash_p = NULL;
-  unsigned int md5_len = 0;
-  int bytes = 0;
-  unsigned int i = 0;
-  FILE *inFile = NULL;
-
-  if ((inFile = fopen (file_path, "rb")) == NULL)
-    {
-      return 1;
-    }
-
-  if ((mdContext = EVP_MD_CTX_new ()) == NULL)
-    {
-      fclose (inFile);
-      return 1;
-    }
-
-  if (EVP_DigestInit_ex (mdContext, EVP_md5 (), NULL) != 1)
-    {
-      EVP_MD_CTX_free (mdContext);
-      fclose (inFile);
-      return 1;
-    }
-
-  while ((bytes = (int) fread (data, 1, sizeof (data), inFile)) != 0)
-    {
-      if (EVP_DigestUpdate (mdContext, data, bytes) != 1)
-	{
-	  EVP_MD_CTX_free (mdContext);
-	  fclose (inFile);
-	  return 1;
-	}
-    }
-
-  if (EVP_DigestFinal_ex (mdContext, md5_final, &md5_len) != 1)
-    {
-      EVP_MD_CTX_free (mdContext);
-      fclose (inFile);
-      return 1;
-    }
-
-  EVP_MD_CTX_free (mdContext);
-  fclose (inFile);
-
-  hash_p = hash_value + strlen (hash_value);
-  for (i = 0; i < md5_len; i++)
-    {
-      snprintf (hash_p, 3, "%02x", md5_final[i]);
-      hash_p += 2;
-    }
-  return 0;
-}
-
-#ifndef CMS_DEFAULT_CERT_MD5
-#define CMS_DEFAULT_CERT_MD5 "4b0f669d5001f0cb4aca77ec71f4e2e2"
-#endif
-static const char *default_hash_file = CMS_DEFAULT_CERT_MD5;
-
-static int
-_is_default_cert (char *_dbmt_error)
-{
-  char new_hash_value[33];
-  char default_cert_path[PATH_MAX];
-  int compare_ret = 0;
-
-  new_hash_value[0] = '\0';
-  default_cert_path[0] = '\0';
-
-  snprintf (default_cert_path, PATH_MAX, "%s", sco.szSSLCertificate);
-
-  if (_hash_cert (new_hash_value, default_cert_path) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Fail to get the value of SSL certification file.");
-      return -1;
-    }
-
-  compare_ret = strcmp (default_hash_file, new_hash_value);
-
-  if (compare_ret == 0)
-    {
-      return 1;
-    }
-  return 0;
-}
-
-static int
-_is_exist_default_backup_cert (char *_dbmt_error)
-{
-  char new_hash_value[33];
-  char default_backup_cert_path[COMPOSED_PATH_MAX];
-  int compare_ret = 0;
-
-  new_hash_value[0] = '\0';
-  default_backup_cert_path[0] = '\0';
-
-  snprintf (default_backup_cert_path, sizeof (default_backup_cert_path), "%s.bak",
-	    sco.szSSLCertificate);
-
-  if (access (default_backup_cert_path, F_OK) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Cannot find the backup SSL certification file: %s.",
-		default_backup_cert_path);
-      return -1;
-    }
-
-  if (_hash_cert (new_hash_value, default_backup_cert_path) != 0)
-    {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-		"Fail to get the value of backup SSL certification file.");
-      return -1;
-    }
-
-  compare_ret = strcmp (default_hash_file, new_hash_value);
-
-  if (compare_ret == 0)
-    {
-      return 1;
-    }
-  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE,
-	    "(%s) is not default backup SSL certification file.",
-	    default_backup_cert_path);
-  return 0;
 }
 
 static int
