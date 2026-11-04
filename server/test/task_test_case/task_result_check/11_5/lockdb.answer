@@ -8,7 +8,7 @@
                "maxnumlock": "-1",
                "numallocated": "1000",
                "numlocked": "0",
-               "sizelock": "250K"
+               "sizelock": "<volatile>"
             }
          ],
          "transaction": [
