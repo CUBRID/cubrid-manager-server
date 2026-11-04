@@ -17,6 +17,16 @@
   "test_note": "access to a protected file is not allowed"
  },
  {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/conf/cm_ssl_cert.key.tmp-0123abcd",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
   "task": "writeprivatedata",
   "token": "",
   "confname": "conlist",

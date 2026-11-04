@@ -63,6 +63,27 @@
   "test_note": "access to a protected file is not allowed"
  },
  {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm_ssl_cert.key.tmp-0123abcd",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm_ssl_cert.key.old-0123abcd",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/cm_ssl_cert.crt.tmp-0123abcd",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
   "task": "getfiletotallinenum",
   "token": "",
   "filepath": "$CUBRID/conf/cm.pass",
