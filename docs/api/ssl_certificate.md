@@ -9,7 +9,7 @@ CMS serves its interface only over TLS (`cm_port`, default 8001). This document 
 | `$CUBRID/conf/cm_ssl_cert.crt` | certificate in PEM. It may be followed by intermediate CA certificates (a chain), server certificate first |
 | `$CUBRID/conf/cm_ssl_cert.key` | private key in PEM, without a passphrase |
 
-The two files are a pair: the private key must be the one of the certificate. No task can read or write them (see [File Access](README.md#file-access)).
+The two files are a pair: the private key must be the one of the certificate. No task that takes a file path can read or write them (see [File Access](README.md#file-access)); the only task that changes them is [generatecert](generatecert.md), which replaces both.
 
 CMS does not ship a key pair. Up to CUBRID 11.3, and in earlier develop builds, every installation shipped the same key pair; its private key is public, so TLS did not authenticate the server. CMS generates a key pair of its own on the first start instead, and replaces a key pair an earlier version shipped.
 
@@ -59,12 +59,12 @@ openssl x509 -in $CUBRID/conf/cm_ssl_cert.crt -noout -fingerprint -sha256
 | key | RSA 2048, generated for each installation. The private key is written with mode 0600 |
 | version, serial number | X.509 v3, a random positive 128-bit serial number |
 | signature | sha256WithRSAEncryption |
-| subject, issuer | `C=KR, ST=SEOUL, L=Default City, O=CUBRID, OU=RND, CN=<host name>, emailAddress=admin@cubrid.com`, self-signed. When the host name is unknown or longer than 64 characters, CN is `cubrid-manager-server` |
+| subject, issuer | `C=KR, ST=SEOUL, L=Default City, O=CUBRID, OU=RND, CN=<host name>, emailAddress=admin@cubrid.com`, self-signed. When the host name is unknown, is not a valid DNS name (only letters, digits, `-` and `.`; for example a name with `_`) or is longer than 64 characters, CN is `cubrid-manager-server` |
 | basic constraints | critical, CA:FALSE |
 | key usage | critical, digitalSignature, keyEncipherment |
 | extended key usage | serverAuth |
 | subject key identifier | hash |
-| subject alternative name | DNS: the host name, `localhost`; IP: `127.0.0.1`, `::1` and the IPv4 and IPv6 addresses of the network interfaces that are up (loopback, link-local and duplicate addresses excluded, at most 32) |
+| subject alternative name | DNS: the host name (only when it is a valid DNS name), `localhost`; IP: `127.0.0.1`, `::1` and the IPv4 and IPv6 addresses of the network interfaces that are up (loopback, link-local, unspecified, IPv4-mapped and duplicate addresses excluded, at most 32) |
 | validity | from one day before generation (for client clock skew), for 10 years |
 
 The key and certificate are written to temporary files and renamed into place, so the two files always change together. When a path was a symbolic link, the link itself becomes a regular file. Only SHA-256 is used, so generation and the startup check also work with OpenSSL in FIPS mode.
