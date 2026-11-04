@@ -10,11 +10,11 @@ CMS의 TLS 키쌍(`conf/cm_ssl_cert.crt`, `conf/cm_ssl_cert.key`)을 다루는
 
 ```sh
 ./run_ssl_cert_tests.sh                                          # 시스템 OpenSSL, g++
-OPENSSL_DIR=../../external/openssl/linux_64 ./run_ssl_cert_tests.sh   # 다른 OpenSSL (include/, lib/libcrypto.a)
+OPENSSL_DIR=../../external/openssl/linux_64 ./run_ssl_cert_tests.sh   # 다른 OpenSSL (include/, lib/libssl.a, lib/libcrypto.a)
 CXX=clang++ ./run_ssl_cert_tests.sh                              # 다른 컴파일러
 ```
 
-- 입력을 만들고 결과를 확인하는 데 `openssl` 명령(3.0 이상)을 쓴다.
+- Linux에서 실행한다. 입력을 만들고 결과를 확인하는 데 `openssl` 명령(3.0 이상)과 GNU coreutils(`stat -c`, `date -d`, `timeout`)를 쓴다.
 - root가 아닌 사용자로 실행한다. root는 파일 권한과 무관하게 읽고 쓰므로, 권한 시나리오
   (읽을 수 없는 키, 쓸 수 없는 conf 디렉터리)는 root로 실행하면 건너뛴다(`SKIP`).
 - driver가 빌드되지 않거나 확인이 하나라도 실패하면 0이 아닌 값으로 끝난다.
@@ -41,6 +41,8 @@ CXX=clang++ ./run_ssl_cert_tests.sh                              # 다른 컴파
 | 한 파일만 있음 | 키만 / 인증서만, 배포 키 / 아님, YES / NO: 종료, 남은 파일 유지, 없는 파일 안내. 남은 파일이 배포 키이면 그 안내 |
 | 짝 불일치, 판정 실패 | 짝 불일치, 읽을 수 없는 키, 손상된 키, DER 인증서, passphrase 키(PKCS#8, 전통 형식, 입력을 기다리지 않음): YES, NO 모두 종료하고 파일 유지. 한 파일을 읽을 수 없고 다른 파일이 배포 키이면 YES 교체, NO 종료. conf 디렉터리에 쓸 수 없으면 종료하고 파일 유지. 경로가 디렉터리이면 종료 |
 | 관리자 키쌍 | 관리자 키쌍 + 남은 배포 키 파일(YES: 남은 파일만 삭제, NO: 변경 없음), 배포 키가 아닌 같은 이름 파일은 유지, 중간 체인이 있는 CA 발급 인증서 유지, 배포 키로 받은 CA 발급 인증서는 교체하고 재발급 안내 |
+| 교체 중단 복구 | 새 키를 넣기 전(YES, NO), 새 인증서를 넣기 전, 이전 키 정리 전, 임시 파일을 쓰는 중에 멈춘 상태: 이전 키쌍이 그대로 남고 작업 파일(`.tmp-*`, `.old-*`)이 지워짐. 키가 링크였으면 링크를 되돌린 뒤 교체. 형식이 다른 이름의 파일은 유지 |
+| TLS 보안 수준 | `OPENSSL_CONF`로 수준 1~3 지정. NO + RSA 1024 배포 키(11.3, develop 1024): 수준 1 경고 후 기동, 수준 2 종료하고 원인·조치 안내. YES + 11.3 키 수준 2: 교체 후 기동. NO + RSA 2048 배포 키 수준 2: 기동. 관리자 RSA 1024 키쌍 수준 2: 종료. 새 설치 수준 3: 생성 후 종료. 이 OpenSSL이 `OPENSSL_CONF`에서 TLS 보안 수준을 읽지 않으면 건너뜀 |
 | 생성 | subject와 유효기간 반영, 링크가 일반 파일이 됨, `.bak`과 임시 파일이 남지 않음. 잘못된 국가 코드나 유효기간, 쓸 수 없는 conf 디렉터리는 실패하고 파일 유지 |
 
 `cub_manager`의 기동 절차(`start_service ()`에서의 호출, stderr 메시지)와 `generatecert`,
