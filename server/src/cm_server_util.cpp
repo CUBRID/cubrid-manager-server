@@ -5129,7 +5129,9 @@ is_subpath (const char *allowd_path, const char *path)
  * These files hold CMS user passwords and authorities, DB passwords or the
  * TLS private key. No file task may read or write them, whatever the
  * caller's authority (admin included); the server itself reaches them only
- * through its own code, never through a path taken from a request.
+ * through its own code, never through a path taken from a request. The files
+ * named after the TLS key and certificate (<name>.<anything>, the work files
+ * of a replacement) are protected too, see is_tls_work_file ().
  */
 static std::vector<std::string>
 protected_files (void)
@@ -5292,6 +5294,82 @@ is_same_path (const std::string &a, const std::string &b)
   return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
 }
 
+/* split `path` into its directory and its last part */
+static bool
+split_dir_name (const std::string &path, std::string &dir, std::string &name)
+{
+#if defined (WINDOWS)
+  size_t pos = path.find_last_of ("/\\");
+#else
+  size_t pos = path.find_last_of ('/');
+#endif
+
+  if (pos == std::string::npos)
+    {
+      return false;
+    }
+  dir = path.substr (0, (pos == 0) ? 1 : pos);
+  name = path.substr (pos + 1);
+  return !name.empty ();
+}
+
+/* `name` is `prefix` followed by at least one character (case-insensitive on Windows) */
+static bool
+name_starts_with (const std::string &name, const std::string &prefix)
+{
+  if (name.size () <= prefix.size ())
+    {
+      return false;
+    }
+#if defined (WINDOWS)
+  return _strnicmp (name.c_str (), prefix.c_str (), prefix.size ()) == 0;
+#else
+  return name.compare (0, prefix.size (), prefix) == 0;
+#endif
+}
+
+/*
+ * is_tls_work_file () - `path` (expanded) is a file named after the TLS key
+ *   or certificate, in the same directory: <name>.<anything>, for example
+ *   cm_ssl_cert.key.tmp-<suffix> (the new key) and cm_ssl_cert.key.old-<suffix>
+ *   (the previous key) that cm_ssl_cert.cpp writes while it replaces the key
+ *   pair (CBRD-27829). They hold private keys, and a replacement runs while
+ *   file tasks are served, so they are protected like the key itself.
+ */
+static bool
+is_tls_work_file (const std::string &path)
+{
+  const char *tls_files[] = { sco.szSSLKey, sco.szSSLCertificate };
+  std::string candidates[] = { path, resolve_path (path) };
+
+  for (size_t i = 0; i < sizeof (tls_files) / sizeof (tls_files[0]); i++)
+    {
+      std::string tls_dir, tls_name;
+
+      if (tls_files[i][0] == '\0' || !split_dir_name (tls_files[i], tls_dir, tls_name))
+	{
+	  continue;
+	}
+      std::string prefix = tls_name + ".";
+      std::string tls_dir_resolved = resolve_path (tls_dir);
+
+      for (size_t j = 0; j < sizeof (candidates) / sizeof (candidates[0]); j++)
+	{
+	  std::string dir, name;
+
+	  if (!split_dir_name (candidates[j], dir, name) || !name_starts_with (name, prefix))
+	    {
+	      continue;
+	    }
+	  if (is_same_path (dir, tls_dir) || is_same_path (resolve_path (dir), tls_dir_resolved))
+	    {
+	      return true;
+	    }
+	}
+    }
+  return false;
+}
+
 /* `path` (expanded) is one of the protected files */
 static bool
 is_protected_file (const std::string &path)
@@ -5306,7 +5384,7 @@ is_protected_file (const std::string &path)
 	  return true;
 	}
     }
-  return false;
+  return is_tls_work_file (path);
 }
 
 /* a protected file is `dir` (expanded) itself or somewhere under it */
