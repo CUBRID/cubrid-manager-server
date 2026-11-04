@@ -88,14 +88,14 @@ T_SESSION_IP_ACTION ut_session_ip_action (T_SESSION_IP_CHECK mode,
  *   request from addr, given the addresses the session warned about
  *   recently, and remember addr among them.
  *
- *   log mode warned for every request from another address; a client that
- *   shares its token, or a forward proxy pool whose requests come from
+ *   The warning is logged only for an address that is not among the last
+ *   SESSION_IP_WARNED_MAX addresses warned about in the session. A client
+ *   that shares its token, or a forward proxy pool whose requests come from
  *   several addresses in turn (A, B, A, B, ...), polling every few seconds,
- *   would fill the error log with the same warning. The warning is logged
- *   only for an address that is not among the last SESSION_IP_WARNED_MAX
- *   addresses warned about in the session; the requests in between are
- *   recorded by login_ip= of the access log. A rejection (enforce) deletes
- *   the session and is always logged by the caller, without this.
+ *   would otherwise fill the error log with the same warning. The requests
+ *   that are not logged here are recorded by login_ip= of the access log.
+ *   A rejection (enforce) deletes the session and is always logged by the
+ *   caller, without this.
  *
  *   Inline so that cm_user.cpp, which cm_admin also builds, can use it
  *   without linking cm_session_ip.cpp.
