@@ -149,9 +149,10 @@ files_sum ()
   cat "$CRT" "$KEY" 2> /dev/null | md5sum
 }
 
+# files in conf, not counting the lock file between processes (<key>.lock)
 nfiles ()
 {
-  ls -A "$C" | wc -l
+  ls -A "$C" | grep -v '^cm_ssl_cert\.key\.lock$' | wc -l
 }
 
 # a key pair of the administrator (not shipped)
@@ -659,6 +660,54 @@ ensure YES
 ok "other names are not work files: kept" \
   "[ $RET = 0 ] && [ -f $KEY.old-1234567 ] && [ -f $KEY.old-DEADBEEF ] && [ -f $CRT.tmp-deadbeef.bak ] && [ -f $KEY.new-deadbee ]"
 
+# ------------------------------------------------------- other processes
+
+# another process holds the lock: stop before touching any file
+setup
+python3 -c "
+import fcntl, sys, time
+f = open(sys.argv[1], 'a')
+fcntl.lockf(f, fcntl.LOCK_EX)
+open(sys.argv[2], 'w').close()
+time.sleep(15)
+" "$KEY.lock" "$work/locked" &
+holder=$!
+for i in $(seq 1 50); do [ -f "$work/locked" ] && break; sleep 0.1; done
+t0=$(date +%s)
+ensure YES
+t1=$(date +%s)
+ok "lock held by another process: does not start, nothing created" \
+  "[ $RET != 0 ] && [ \$(nfiles) = 0 ] && grep -q 'why=cannot check the SSL key pair: another cub_manager process holds' $work/out"
+ok "lock held by another process: waits a few seconds first" "[ \$((t1 - t0)) -ge 4 -a \$((t1 - t0)) -le 10 ]"
+kill $holder 2> /dev/null
+wait $holder 2> /dev/null
+rm -f "$work/locked"
+ensure YES
+ok "lock released: starts" "[ $RET = 0 ] && [ \$(nfiles) = 2 ]"
+
+# a read-only conf: no lock file can be created, and none is needed
+if ! skip_as_root "read-only conf"; then
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  chmod 555 "$C"
+  ensure YES
+  ok "own pair in a read-only conf: starts, nothing created" \
+    "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ ! -e $KEY.lock ]"
+  chmod 755 "$C"
+fi
+
+# several processes start at once on an empty conf: one pair, no work files
+for round in 1 2 3; do
+  setup
+  for i in 1 2 3 4; do
+    timeout 30 "$driver" ensure "$CRT" "$KEY" YES < /dev/null > "$work/out.$i" 2>&1 &
+  done
+  wait
+  ok "4 processes at once ($round): all start with the same complete pair" \
+    "[ \$(grep -l 'ret=0' $work/out.? | wc -l) = 4 ] && [ \$(nfiles) = 2 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \$(log | grep -c 'generated a new SSL key pair') = 1 ]"
+done
+
 # ------------------------------------------------------- what TLS accepts
 
 # whether OPENSSL_CONF sets the TLS security level with this OpenSSL
@@ -732,7 +781,7 @@ ok "generate: subject from the options" \
 not_after=$(date -d "$(openssl x509 -in "$CRT" -noout -enddate | cut -d= -f2)" +%s)
 ok "generate: validity from the options" \
   "[ \$(((not_after - now) / 86400)) -ge 29 -a \$(((not_after - now) / 86400)) -le 30 ]"
-ok "generate: no .bak, no temporary file" "[ \$(ls -A $C | grep -c -e bak -e tmp -e old) = 0 ]"
+ok "generate: no .bak, no temporary file" "[ \$(ls -A $C | grep -c -e bak -e tmp -e old -e '\.new-') = 0 ]"
 ok "generate: link targets left" "[ -f $C/cm_ssl_cert_2048.key ]"
 
 sum=$(files_sum)

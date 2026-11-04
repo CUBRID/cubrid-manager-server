@@ -145,6 +145,15 @@ static const char *leftover_key_names[] = { "cm_ssl_cert_1024.key", "cm_ssl_cert
 #define WORK_NEW                        ".new-"
 #define WORK_SUFFIX_LEN                 8
 
+/*
+ * Lock between processes: <key>.lock, held by the cub_manager process for as
+ * long as it runs (see hold_process_lock ()). CERT_LOCK_WAIT_MS covers a
+ * restart, where the previous process may still be exiting.
+ */
+#define PROCESS_LOCK                    ".lock"
+#define CERT_LOCK_WAIT_MS               5000
+#define CERT_LOCK_RETRY_MS              200
+
 #define ARRAY_COUNT(a)                  (sizeof (a) / sizeof ((a)[0]))
 
 enum path_kind
@@ -2069,6 +2078,133 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why
   return 0;
 }
 
+/* ---------------------------------------------------------- process lock */
+
+/*
+ * hold_process_lock () - take <key>.lock for this process, until it exits
+ *
+ *   cert_lock serializes the threads of one process only. Two cub_manager
+ *   processes started at the same time can both pass the pid file check and
+ *   reach the startup check before either binds the port (and with
+ *   SO_REUSEADDR on Windows, binding does not exclude the second one either),
+ *   so they could recover or generate in the same directory at once: one
+ *   removing the other's work files, or each placing its own key or
+ *   certificate. The process that takes this lock keeps it while it runs, so
+ *   it covers the recovery, the generation and the moment TLS loads the files,
+ *   and a second process stops before it touches any file.
+ *
+ *   POSIX: an fcntl () write lock, which a forked child (a task) does not
+ *   inherit and which ends when the process ends; the descriptor is closed
+ *   on exec. Windows: LockFileEx () on a handle that is not inherited.
+ *   The lock file is left in place: removing it would let another process
+ *   lock a new file of the same name.
+ *
+ *   When the lock file cannot be created because its directory is not
+ *   writable, no lock is taken: then no process can create, rename or
+ *   remove anything there, so there is nothing to serialize, and a key pair
+ *   in a read-only conf is still used as it is.
+ *
+ *   return: true if this process holds the lock (taken now or before)
+ */
+/* dir_writable () - can this process create files in the directory of path */
+static bool
+dir_writable (const std::string &path)
+{
+  std::string dir = dir_of (path);
+
+  return access (dir.empty ()? "." : dir.c_str (), W_OK) == 0;
+}
+
+static bool
+hold_process_lock (const std::string &key_path, std::string &err)
+{
+  static bool held = false;
+  std::string path = key_path + PROCESS_LOCK;
+  int waited = 0;
+
+  if (held)
+    {
+      return true;
+    }
+
+#if defined (WINDOWS)
+  HANDLE h = CreateFileA (path.c_str (), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+			  OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      DWORD e = GetLastError ();
+
+      if (e == ERROR_ACCESS_DENIED && !dir_writable (path))
+	{
+	  return true;
+	}
+      err = "cannot open " + path + ": " + win_error_string (e);
+      return false;
+    }
+  for (;;)
+    {
+      OVERLAPPED ov;
+
+      memset (&ov, 0, sizeof (ov));
+      if (LockFileEx (h, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov))
+	{
+	  break;
+	}
+      if (GetLastError () != ERROR_LOCK_VIOLATION || waited >= CERT_LOCK_WAIT_MS)
+	{
+	  err = (GetLastError () == ERROR_LOCK_VIOLATION)
+		? "another cub_manager process holds " + path
+		: "cannot lock " + path + ": " + win_error_string (GetLastError ());
+	  CloseHandle (h);
+	  return false;
+	}
+      Sleep (CERT_LOCK_RETRY_MS);
+      waited += CERT_LOCK_RETRY_MS;
+    }
+  /* the handle stays open until the process exits */
+#else
+  struct flock fl;
+  int fd = open (path.c_str (), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+
+  if (fd < 0)
+    {
+      int e = errno;
+
+      if ((e == EACCES || e == EPERM || e == EROFS) && !dir_writable (path))
+	{
+	  return true;
+	}
+      err = "cannot open " + path + ": " + errno_string (e);
+      return false;
+    }
+  for (;;)
+    {
+      memset (&fl, 0, sizeof (fl));
+      fl.l_type = F_WRLCK;
+      fl.l_whence = SEEK_SET;
+      if (fcntl (fd, F_SETLK, &fl) == 0)
+	{
+	  break;
+	}
+      if ((errno != EACCES && errno != EAGAIN) || waited >= CERT_LOCK_WAIT_MS)
+	{
+	  err = (errno == EACCES || errno == EAGAIN)
+		? "another cub_manager process holds " + path
+		: "cannot lock " + path + ": " + errno_string (errno);
+	  close (fd);
+	  return false;
+	}
+      usleep (CERT_LOCK_RETRY_MS * 1000);
+      waited += CERT_LOCK_RETRY_MS;
+    }
+  /* the descriptor stays open until the process exits */
+#endif
+
+  held = true;
+  return true;
+}
+
 /* ------------------------------------------------------------------ public */
 
 int
@@ -2090,9 +2226,18 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
 
   ssl_file cert ("certificate", cert_path, false);
   ssl_file key ("private key", key_path, true);
+  std::string err;
 
+  /* one process at a time in this directory, from here until it exits */
+  if (!hold_process_lock (key.path, err))
+    {
+      LOG_ERROR ("cannot check the SSL key pair: %s. Another cub_manager may be starting or running with the "
+		 "same configuration; stop it, or wait until it has started, and retry.", err.c_str ());
+      why = "cannot check the SSL key pair: " + err;
+      ret = -1;
+    }
   /* an interrupted replacement that cannot be undone: do not start, keep its files */
-  if (!recover_interrupted (cert.path, key.path, why))
+  else if (!recover_interrupted (cert.path, key.path, why))
     {
       ret = -1;
     }
@@ -2122,6 +2267,14 @@ cm_ssl_cert_generate (const char *cert_path, const char *key_path, const T_CM_SS
   if (cert_path == NULL || cert_path[0] == '\0' || key_path == NULL || key_path[0] == '\0')
     {
       copy_error (err_buf, err_size, "the SSL certificate or private key path is not set");
+      return -1;
+    }
+
+  /* held already when the server started through cm_ssl_cert_ensure () */
+  if (!hold_process_lock (key_path, err))
+    {
+      LOG_ERROR ("cannot generate a new SSL key pair: %s", err.c_str ());
+      copy_error (err_buf, err_size, "Cannot generate a new SSL key pair: " + err);
       return -1;
     }
 
