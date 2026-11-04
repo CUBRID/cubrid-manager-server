@@ -113,6 +113,10 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 - Tasks that write, empty or delete a file (`writeandsaveconf`, `writeprivatedata`, `resetlog`, `removelog`, the destination of `copyfolder`) and `deletefolder` refuse `$CUBRID/bin` and paths under it (`writing under $CUBRID/bin is not allowed`).
 - Both checks compare the file the operating system really opens, so another name for the same file does not get past them: a symbolic link, and on Windows also an 8.3 short name (`CM~1.PAS`), trailing dots or spaces (`cm.pass.`), a different case or a junction. On Windows a path with an alternate data stream (`cm.pass:x`, a `:` anywhere but after the drive letter) is refused as an invalid file name.
 
+## TLS Certificate
+
+CMS serves only over TLS. It generates its own key pair (`conf/cm_ssl_cert.crt`, `conf/cm_ssl_cert.key`) when it first starts and replaces a key pair an earlier version shipped. A client must authenticate the server by its certificate, by pinning its fingerprint or by PKI verification. See [TLS Certificate](ssl_certificate.md) for the startup check, the generated certificate, how to replace it, and server authentication by clients.
+
 ## Asynchronous Task Execution
 
 Some tasks can be run in the background instead of blocking until they finish; see [Asynchronous Task Execution](async_readme.md) for the list of supported tasks, how to request async mode, and the related `cm.conf` settings.
