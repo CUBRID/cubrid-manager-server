@@ -496,6 +496,71 @@ ensure YES
 ok "CA-issued certificate for a shipped key: replaced, reissue noted" \
   "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY) && log | grep -q 'issued by a CA'"
 
+# -------------------------------------------- interrupted replacement
+
+# the files install_pair () leaves when it stops midway, suffix deadbeef
+s=deadbeef
+
+# stopped after setting the old key aside: no key, both new files written
+for mode in YES NO; do
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  mv "$KEY" "$KEY.old-$s"
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KEY.tmp-$s" 2> /dev/null
+  cp "$CRT" "$CRT.tmp-$s"
+  ensure $mode
+  ok "interrupted before the new key, $mode: previous pair restored" \
+    "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ] && log | grep -q 'restored the private key'"
+done
+
+# stopped after placing the new key, before the new certificate
+setup
+make_own_pair
+sum=$(files_sum)
+mv "$KEY" "$KEY.old-$s"
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT.tmp-$s" -subj /CN=new -days 30 2> /dev/null
+ensure YES
+ok "interrupted before the new certificate: previous pair restored" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+# stopped after the new certificate, before removing the previous key
+setup
+make_own_pair
+sum=$(files_sum)
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KEY.old-$s" 2> /dev/null
+ensure YES
+ok "interrupted after the new certificate: previous key removed, pair kept" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ] && log | grep -q 'removed .*old-$s'"
+
+# stopped while writing the temporary files
+setup
+make_own_pair
+sum=$(files_sum)
+echo partial > "$KEY.tmp-$s"
+echo partial > "$CRT.tmp-$s"
+ensure YES
+ok "interrupted while writing: temporary files removed" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+# the key path was a link (an earlier develop install): the link was set aside
+setup
+install_develop 2048 2048
+mv "$KEY" "$KEY.old-$s"
+ensure YES
+ok "interrupted with a link as the key: link restored, then replaced" \
+  "[ $RET = 0 ] && [ ! -L $KEY ] && ! is_shipped \$(key_fp $KEY) && [ \$(nfiles) = 2 ]"
+
+# names that are not work files are left alone
+setup
+make_own_pair
+echo keep > "$KEY.old-1234567"
+echo keep > "$KEY.old-DEADBEEF"
+echo keep > "$CRT.tmp-deadbeef.bak"
+ensure YES
+ok "other names are not work files: kept" \
+  "[ $RET = 0 ] && [ -f $KEY.old-1234567 ] && [ -f $KEY.old-DEADBEEF ] && [ -f $CRT.tmp-deadbeef.bak ]"
+
 # ------------------------------------------------------- what TLS accepts
 
 # whether OPENSSL_CONF sets the TLS security level with this OpenSSL

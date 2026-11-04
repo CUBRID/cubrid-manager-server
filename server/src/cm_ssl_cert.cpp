@@ -55,6 +55,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <ifaddrs.h>
+#include <dirent.h>
 #endif
 
 #include <openssl/bio.h>
@@ -130,6 +131,15 @@ static const char *leftover_key_names[] = { "cm_ssl_cert_1024.key", "cm_ssl_cert
 #define CERT_DNS_NAME_MAX               253
 #define CERT_MAX_IF_ADDRS               32	/* interface addresses in SAN */
 #define CERT_MAX_FILE_SIZE              (1024 * 1024)
+
+/*
+ * Work files of a replacement (install_pair ()): <path>.tmp-<suffix> and
+ * <key>.old-<suffix>, <suffix> being 8 lower-case hex digits (random_suffix ()).
+ * A replacement that stops midway (crash, power loss) leaves them behind.
+ */
+#define WORK_TMP                        ".tmp-"
+#define WORK_OLD                        ".old-"
+#define WORK_SUFFIX_LEN                 8
 
 #define ARRAY_COUNT(a)                  (sizeof (a) / sizeof ((a)[0]))
 
@@ -1364,9 +1374,9 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
     {
       return false;
     }
-  key_tmp = key_path + ".tmp-" + suffix;
-  cert_tmp = cert_path + ".tmp-" + suffix;
-  key_old = key_path + ".old-" + suffix;
+  key_tmp = key_path + WORK_TMP + suffix;
+  cert_tmp = cert_path + WORK_TMP + suffix;
+  key_old = key_path + WORK_OLD + suffix;
 
   do
     {
@@ -1531,6 +1541,182 @@ remove_leftovers (const std::string &cert_path, const std::string &key_path)
   for (i = 0; i < ARRAY_COUNT (leftover_key_names); i++)
     {
       remove_leftover (key_dir + leftover_key_names[i], true, cert_path, key_path);
+    }
+}
+
+static bool
+is_work_suffix (const std::string &s)
+{
+  size_t i;
+
+  if (s.size () != WORK_SUFFIX_LEN)
+    {
+      return false;
+    }
+  for (i = 0; i < s.size (); i++)
+    {
+      if (! ((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'a' && s[i] <= 'f')))
+	{
+	  return false;
+	}
+    }
+  return true;
+}
+
+/*
+ * work_suffixes () - the suffixes of the files in the directory of path whose
+ *   names are the name of path, then tag, then a suffix
+ */
+static std::vector < std::string >
+work_suffixes (const std::string &path, const char *tag)
+{
+  std::vector < std::string > found;
+  std::string dir = dir_of (path);
+  std::string prefix = path.substr (dir.size ()) + tag;
+  std::string name;
+
+#if defined (WINDOWS)
+  WIN32_FIND_DATAA fd;
+  HANDLE h;
+
+  h = FindFirstFileA ((dir.empty ()? std::string (".\\*") : dir + "*").c_str (), &fd);
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      return found;
+    }
+  do
+    {
+      name = fd.cFileName;
+      if (name.compare (0, prefix.size (), prefix) == 0 && is_work_suffix (name.substr (prefix.size ())))
+	{
+	  found.push_back (name.substr (prefix.size ()));
+	}
+    }
+  while (FindNextFileA (h, &fd));
+  FindClose (h);
+#else
+  DIR *d;
+  struct dirent *e;
+
+  d = opendir (dir.empty ()? "." : dir.c_str ());
+  if (d == NULL)
+    {
+      return found;
+    }
+  while ((e = readdir (d)) != NULL)
+    {
+      name = e->d_name;
+      if (name.compare (0, prefix.size (), prefix) == 0 && is_work_suffix (name.substr (prefix.size ())))
+	{
+	  found.push_back (name.substr (prefix.size ()));
+	}
+    }
+  closedir (d);
+#endif
+  return found;
+}
+
+/*
+ * work_file_exists () - a regular file, or a link (the link itself is what
+ *   install_pair () moved when the key path was a link)
+ */
+static bool
+work_file_exists (const std::string &path)
+{
+#if defined (WINDOWS)
+  struct _stat64 st;
+
+  return _stat64 (path.c_str (), &st) == 0 && (st.st_mode & _S_IFMT) == _S_IFREG;
+#else
+  struct stat st;
+
+  return lstat (path.c_str (), &st) == 0 && (S_ISREG (st.st_mode) || S_ISLNK (st.st_mode));
+#endif
+}
+
+/*
+ * recover_interrupted () - finish what an interrupted install_pair () left,
+ *   before the startup check looks at the files
+ *
+ *   An interrupted replacement must leave the key pair as it was before, as
+ *   a failed one does. <key>.old-<s> is the previous private key, set aside
+ *   until the new certificate was in place:
+ *   - the key path is empty: stopped before the new key was placed, put the
+ *     previous key back.
+ *   - <cert>.tmp-<s> still exists: stopped before the new certificate was
+ *     placed, so the key is new but the certificate is not; put the
+ *     previous key back.
+ *   - otherwise the replacement completed: remove the previous key, as the
+ *     replacement would have.
+ *   The remaining <cert>.tmp-*, <key>.tmp-* were never put in place and are
+ *   removed. Done whatever ssl_cert_auto_generate is: it restores the state
+ *   before the replacement, it does not generate anything.
+ */
+static void
+recover_interrupted (const std::string &cert_path, const std::string &key_path)
+{
+  std::vector < std::string > olds = work_suffixes (key_path, WORK_OLD);
+  std::vector < std::string > tmps;
+  std::string err;
+  size_t i;
+
+  for (i = 0; i < olds.size (); i++)
+    {
+      std::string old_key = key_path + WORK_OLD + olds[i];
+
+      if (!work_file_exists (old_key))
+	{
+	  continue;
+	}
+      if (!path_entry_exists (key_path) || work_file_exists (cert_path + WORK_TMP + olds[i]))
+	{
+	  if (replace_file (old_key, key_path, err))
+	    {
+	      LOG_WARN ("an earlier replacement of the SSL key pair was interrupted: restored the private key %s "
+			"from %s", key_path.c_str (), old_key.c_str ());
+	    }
+	  else
+	    {
+	      LOG_ERROR ("an earlier replacement of the SSL key pair was interrupted, and the previous private key "
+			 "cannot be restored: %s. Rename %s to %s, and restart.", err.c_str (), old_key.c_str (),
+			 key_path.c_str ());
+	    }
+	}
+      else if (unlink (old_key.c_str ()) == 0)
+	{
+	  LOG_INFO ("removed %s, the previous private key left by an earlier replacement of the SSL key pair",
+		    old_key.c_str ());
+	}
+      else
+	{
+	  LOG_WARN ("cannot remove %s, the previous private key left by an earlier replacement of the SSL key pair: "
+		    "%s", old_key.c_str (), errno_string (errno).c_str ());
+	}
+    }
+
+  for (int which = 0; which < 2; which++)
+    {
+      const std::string &path = (which == 0) ? cert_path : key_path;
+
+      tmps = work_suffixes (path, WORK_TMP);
+      for (i = 0; i < tmps.size (); i++)
+	{
+	  std::string tmp = path + WORK_TMP + tmps[i];
+
+	  if (!work_file_exists (tmp))
+	    {
+	      continue;
+	    }
+	  if (unlink (tmp.c_str ()) == 0)
+	    {
+	      LOG_INFO ("removed %s, left by an interrupted replacement of the SSL key pair", tmp.c_str ());
+	    }
+	  else
+	    {
+	      LOG_WARN ("cannot remove %s, left by an interrupted replacement of the SSL key pair: %s", tmp.c_str (),
+			errno_string (errno).c_str ());
+	    }
+	}
     }
 }
 
@@ -1776,6 +1962,7 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
   ssl_file cert ("certificate", cert_path, false);
   ssl_file key ("private key", key_path, true);
 
+  recover_interrupted (cert.path, key.path);
   cert.kind = check_path (cert.path, &is_link);
   key.kind = check_path (key.path, &is_link);
 
