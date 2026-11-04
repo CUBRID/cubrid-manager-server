@@ -1,0 +1,515 @@
+#!/bin/bash
+#
+#  Copyright 2016 CUBRID Corporation
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
+# Tests of the manager server key pair (server/src/cm_ssl_cert.cpp, CBRD-27829):
+# the startup check (cm_ssl_cert_ensure ()) and generation
+# (cm_ssl_cert_generate ()). Each scenario lays out a conf directory, runs
+# ssl_cert_driver once, and checks the files, the result and the log.
+# Needs no CUBRID build and no running manager server.
+#
+#   ./run_ssl_cert_tests.sh                       system OpenSSL, g++
+#   OPENSSL_DIR=../../external/openssl/linux_64 ./run_ssl_cert_tests.sh
+#                                                 another OpenSSL (include/, lib/libcrypto.a)
+#   CXX=clang++ ./run_ssl_cert_tests.sh           another compiler
+#
+# The openssl command (3.0 or later) is used to make inputs and check outputs.
+# Run as a user other than root: root reads and writes files regardless of
+# their mode, so the permission scenarios are skipped as root.
+# Exits non-zero if the driver does not build or a check fails.
+
+set -u
+
+here=$(cd "$(dirname "$0")" && pwd)
+src="$here/../../src"
+shipped="$here/shipped"
+work=$(mktemp -d)
+trap 'chmod -R u+rwx "$work" 2>/dev/null; rm -rf "$work"' EXIT
+
+pass=0
+fail=0
+skip=0
+
+# ------------------------------------------------------------------ build
+
+if ! command -v openssl > /dev/null 2>&1; then
+  echo "openssl command not found"
+  exit 1
+fi
+case $(openssl version) in
+  "OpenSSL 0."* | "OpenSSL 1."*)
+    echo "openssl 3.0 or later is needed to make the inputs: $(openssl version)"
+    exit 1
+    ;;
+esac
+
+cxx=${CXX:-g++}
+printf '#define HAVE_MEMSET 1\n#define HAVE_INT64_T 1\n' > "$work/config.h"
+flags="-std=gnu++11 -Wall -W -Wno-unused -pthread -DGCC -DLINUX -D_GNU_SOURCE -D_REENTRANT -D_FILE_OFFSET_BITS=64"
+flags="$flags -I$work -I$src"
+if [ -n "${OPENSSL_DIR:-}" ]; then
+  flags="$flags -I$OPENSSL_DIR/include"
+  libs="$OPENSSL_DIR/lib/libcrypto.a -ldl"
+else
+  libs="-lcrypto"
+fi
+
+driver="$work/ssl_cert_driver"
+# shellcheck disable=SC2086
+if ! $cxx $flags -o "$driver" "$here/ssl_cert_driver.cpp" "$src/cm_ssl_cert.cpp" $libs; then
+  echo "ssl_cert_driver: build failed"
+  exit 1
+fi
+
+# ---------------------------------------------------------------- helpers
+
+ok ()
+{
+  if eval "$2"; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    echo "FAIL  $1"
+  fi
+}
+
+skip_as_root ()
+{
+  if [ "$(id -u)" = 0 ]; then
+    skip=$((skip + 1))
+    echo "SKIP  $1 (running as root)"
+    return 0
+  fi
+  return 1
+}
+
+# a fresh conf directory, as $CUBRID/conf
+setup ()
+{
+  chmod -R u+rwx "$work/c" 2>/dev/null
+  rm -rf "$work/c"
+  mkdir -p "$work/c/conf"
+  C="$work/c/conf"
+  CRT="$C/cm_ssl_cert.crt"
+  KEY="$C/cm_ssl_cert.key"
+  export LOGDIR="$work/c"
+}
+
+ensure ()
+{
+  timeout 30 "$driver" ensure "$CRT" "$KEY" "$1" < /dev/null > "$work/out" 2>&1
+  RET=$?
+}
+
+generate ()
+{
+  timeout 30 "$driver" generate "$CRT" "$KEY" "$@" < /dev/null > "$work/out" 2>&1
+  RET=$?
+}
+
+log ()
+{
+  cat "$LOGDIR/cub_manager.log" "$LOGDIR/cub_manager.err" 2> /dev/null
+}
+
+# SHA-256 of the public key (DER) of a private key or a certificate
+key_fp ()
+{
+  openssl pkey -in "$1" -pubout -outform DER 2> /dev/null | sha256sum | cut -c1-64
+}
+
+cert_fp ()
+{
+  openssl x509 -in "$1" -noout -pubkey 2> /dev/null | openssl pkey -pubin -outform DER 2> /dev/null \
+    | sha256sum | cut -c1-64
+}
+
+is_shipped ()
+{
+  case $1 in
+    385bea60* | 71e2a53e* | 2e3f2eb5*) return 0 ;;
+  esac
+  return 1
+}
+
+files_sum ()
+{
+  cat "$CRT" "$KEY" 2> /dev/null | md5sum
+}
+
+nfiles ()
+{
+  ls -A "$C" | wc -l
+}
+
+# a key pair of the administrator (not shipped)
+make_own_pair ()
+{
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT" -subj /CN=own -days 30 2> /dev/null
+}
+
+# the files an earlier develop build installed: sized files and links to one size
+install_develop ()
+{
+  cp "$shipped"/develop/cm_ssl_cert_* "$C"/
+  ln -s "cm_ssl_cert_$1.crt" "$CRT"
+  ln -s "cm_ssl_cert_$2.key" "$KEY"
+}
+
+host=$(hostname)
+
+# ---------------------------------------------------------------- fixtures
+
+for f in 11.3/cm_ssl_cert develop/cm_ssl_cert_1024 develop/cm_ssl_cert_2048; do
+  ok "fixture $f is a shipped key" "is_shipped \$(key_fp $shipped/$f.key)"
+  ok "fixture $f is a pair" "[ \"\$(key_fp $shipped/$f.key)\" = \"\$(cert_fp $shipped/$f.crt)\" ]"
+done
+
+# ------------------------------------------------------------ new install
+
+setup
+ensure YES
+ok "new, YES: starts" "[ $RET = 0 ] && grep -q 'why=$' $work/out"
+ok "new, YES: regular files" "[ -f $CRT -a ! -L $CRT -a -f $KEY -a ! -L $KEY ]"
+ok "new, YES: key 0600" "[ \$(stat -c %a $KEY) = 600 ]"
+ok "new, YES: a pair" "[ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+ok "new, YES: not shipped" "! is_shipped \$(key_fp $KEY)"
+ok "new, YES: nothing else left" "[ \$(nfiles) = 2 ]"
+
+text=$(openssl x509 -in "$CRT" -noout -text)
+ok "cert: version 3" "grep -q 'Version: 3' <<< \"\$text\""
+ok "cert: RSA 2048" "grep -q 'Public-Key: (2048 bit)' <<< \"\$text\""
+ok "cert: sha256WithRSAEncryption" "grep -q 'Signature Algorithm: sha256WithRSAEncryption' <<< \"\$text\""
+ok "cert: basicConstraints critical CA:FALSE" \
+  "grep -A1 'Basic Constraints: critical' <<< \"\$text\" | grep -q 'CA:FALSE'"
+ok "cert: keyUsage critical" \
+  "grep -A1 'Key Usage: critical' <<< \"\$text\" | grep -q 'Digital Signature, Key Encipherment'"
+ok "cert: extendedKeyUsage serverAuth" \
+  "grep -A1 'Extended Key Usage' <<< \"\$text\" | grep -q 'TLS Web Server Authentication'"
+ok "cert: subjectKeyIdentifier" "grep -q 'Subject Key Identifier' <<< \"\$text\""
+ok "cert: SAN localhost, 127.0.0.1, ::1" \
+  "grep -A1 'Subject Alternative Name' <<< \"\$text\" | grep -q 'DNS:localhost, IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1'"
+ok "cert: default subject" \
+  "openssl x509 -in $CRT -noout -subject | grep -q 'C = KR, ST = SEOUL, L = Default City, O = CUBRID, OU = RND, CN = .*, emailAddress = admin@cubrid.com'"
+ok "cert: self-signed" \
+  "[ \"\$(openssl x509 -in $CRT -noout -subject | cut -d= -f2-)\" = \"\$(openssl x509 -in $CRT -noout -issuer | cut -d= -f2-)\" ]"
+serial=$(openssl x509 -in "$CRT" -noout -serial | cut -d= -f2)
+ok "cert: random serial" "[ \${#serial} -ge 30 ]"
+now=$(date +%s)
+not_before=$(date -d "$(openssl x509 -in "$CRT" -noout -startdate | cut -d= -f2)" +%s)
+not_after=$(date -d "$(openssl x509 -in "$CRT" -noout -enddate | cut -d= -f2)" +%s)
+ok "cert: notBefore 1 day back" "[ \$((now - not_before)) -ge 86000 -a \$((now - not_before)) -le 86700 ]"
+ok "cert: notAfter 10 years" "[ \$(((not_after - now) / 86400)) -ge 3649 -a \$(((not_after - now) / 86400)) -le 3650 ]"
+fp=$(openssl x509 -in "$CRT" -noout -fingerprint -sha256 | cut -d= -f2)
+ok "log: fingerprint as openssl prints it" "log | grep -q \"SHA256 Fingerprint=$fp\""
+
+ok "verify: localhost" "openssl verify -CAfile $CRT -verify_hostname localhost $CRT > /dev/null 2>&1"
+ok "verify: 127.0.0.1" "openssl verify -CAfile $CRT -verify_ip 127.0.0.1 $CRT > /dev/null 2>&1"
+ok "verify: ::1" "openssl verify -CAfile $CRT -verify_ip ::1 $CRT > /dev/null 2>&1"
+ok "verify: sslserver" "openssl verify -CAfile $CRT -purpose sslserver $CRT > /dev/null 2>&1"
+case $host in
+  *[!A-Za-z0-9.-]* | "") ;;
+  *)
+    ok "verify: host name" "openssl verify -CAfile $CRT -verify_hostname $host $CRT > /dev/null 2>&1"
+    ;;
+esac
+
+# restart: the same pair, not generated again
+sum=$(files_sum)
+ensure YES
+ok "restart: starts" "[ $RET = 0 ]"
+ok "restart: files unchanged" "[ \"\$(files_sum)\" = \"$sum\" ]"
+ok "restart: same fingerprint logged again" "[ \$(log | grep -c \"Fingerprint=$fp\") = 2 ]"
+
+setup
+ensure NO
+ok "new, NO: does not start" "[ $RET != 0 ]"
+ok "new, NO: nothing created" "[ ! -e $CRT -a ! -e $KEY ]"
+ok "new, NO: what to do" "log | grep -q 'ssl_cert_auto_generate=YES'"
+ok "new, NO: why" \
+  "grep -q 'why=the SSL certificate .* and private key .* do not exist (ssl_cert_auto_generate=NO)' $work/out"
+
+# ----------------------------------------------------------------- upgrade
+
+setup
+cp "$shipped/11.3/cm_ssl_cert.crt" "$CRT"
+cp "$shipped/11.3/cm_ssl_cert.key" "$KEY"
+ensure YES
+ok "11.3 files: starts" "[ $RET = 0 ] && grep -q 'shipped_in_use=0' $work/out"
+ok "11.3 files: replaced" "! is_shipped \$(key_fp $KEY) && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+ok "11.3 files: logged" "log | grep -q 'CUBRID 11.3 and earlier'"
+
+for bits in 1024 2048; do
+  setup
+  install_develop $bits $bits
+  ensure YES
+  ok "develop $bits links: starts" "[ $RET = 0 ]"
+  ok "develop $bits links: regular files" "[ -f $CRT -a ! -L $CRT -a -f $KEY -a ! -L $KEY ]"
+  ok "develop $bits links: replaced" "! is_shipped \$(key_fp $KEY)"
+  ok "develop $bits links: key 0600" "[ \$(stat -c %a $KEY) = 600 ]"
+  ok "develop $bits links: leftover files removed" "[ \$(nfiles) = 2 ]"
+done
+
+setup
+ln -s cm_ssl_cert_2048.crt "$CRT"
+ln -s cm_ssl_cert_2048.key "$KEY"
+ensure YES
+ok "dangling links, YES: generated" "[ $RET = 0 ] && [ -f $CRT -a ! -L $CRT -a -f $KEY -a ! -L $KEY ]"
+setup
+ln -s cm_ssl_cert_2048.crt "$CRT"
+ln -s cm_ssl_cert_2048.key "$KEY"
+ensure NO
+ok "dangling links, NO: does not start" "[ $RET != 0 ]"
+
+setup
+cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+openssl req -new -x509 -key "$KEY" -subj /CN=resigned -days 30 -out "$CRT" 2> /dev/null
+ensure YES
+ok "re-signed with a shipped key: replaced" "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY)"
+
+setup
+install_develop 2048 1024
+ensure YES
+ok "1024 key + 2048 cert, YES: replaced" "[ $RET = 0 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+setup
+install_develop 2048 1024
+ensure NO
+ok "1024 key + 2048 cert, NO: does not start" "[ $RET != 0 ] && log | grep -q 'do not match'"
+
+setup
+install_develop 2048 2048
+ensure NO
+ok "shipped pair, NO: starts with a warning" \
+  "[ $RET = 0 ] && grep -q 'shipped_in_use=1' $work/out && grep -q 'ERROR' $LOGDIR/cub_manager.err"
+ok "shipped pair, NO: nothing changed" "[ -L $CRT -a -L $KEY ] && [ \$(nfiles) = 6 ]"
+
+# ---------------------------------------------------- only one of the two
+
+for mode in YES NO; do
+  for kind in shipped own; do
+    for which in key crt; do
+      setup
+      if [ $kind = shipped ]; then
+        src_key="$shipped/develop/cm_ssl_cert_2048.key"
+        src_crt="$shipped/develop/cm_ssl_cert_2048.crt"
+      else
+        openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/own.key" -out "$work/own.crt" -subj /CN=own \
+          2> /dev/null
+        src_key="$work/own.key"
+        src_crt="$work/own.crt"
+      fi
+      if [ $which = key ]; then
+        cp "$src_key" "$KEY"
+        left=$KEY
+        missing=$CRT
+      else
+        cp "$src_crt" "$CRT"
+        left=$CRT
+        missing=$KEY
+      fi
+      sum=$(md5sum < "$left")
+      ensure $mode
+      name="only the $which ($kind), $mode"
+      ok "$name: does not start, file kept" \
+        "[ $RET != 0 ] && [ \"\$(md5sum < $left)\" = \"$sum\" ] && [ ! -e $missing ]"
+      ok "$name: what is missing" \
+        "log | grep -q 'does not exist, while' && grep -q 'why=the SSL .* does not exist, while the .* does$' $work/out"
+      if [ $kind = shipped ]; then
+        ok "$name: the remaining file is a shipped key" "log | grep -q 'the remaining'"
+      else
+        ok "$name: no shipped-key note" "! log | grep -q 'the remaining'"
+      fi
+    done
+  done
+done
+
+# --------------------------------------------------- mismatch, cannot tell
+
+for mode in YES NO; do
+  setup
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$work/a.crt" -subj /CN=a 2> /dev/null
+  openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/b.key" -out "$CRT" -subj /CN=b 2> /dev/null
+  sum=$(files_sum)
+  ensure $mode
+  ok "mismatch, $mode: does not start, files kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'do not match'"
+  ok "mismatch, $mode: why" "grep -q 'why=the SSL certificate .* and private key .* do not match$' $work/out"
+
+  if ! skip_as_root "unreadable key, $mode"; then
+    setup
+    make_own_pair
+    chmod 000 "$KEY"
+    sum=$(md5sum < "$CRT")
+    ensure $mode
+    ok "unreadable key, $mode: does not start, files kept" \
+      "[ $RET != 0 ] && [ \"\$(md5sum < $CRT)\" = \"$sum\" ] && [ \$(stat -c %a $KEY) = 0 ]"
+    ok "unreadable key, $mode: why" "grep -q 'why=cannot read the SSL private key .*: Permission denied$' $work/out"
+  fi
+
+  setup
+  make_own_pair
+  echo garbage > "$KEY"
+  sum=$(files_sum)
+  ensure $mode
+  ok "corrupted key, $mode: does not start, files kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'not a PEM private key'"
+
+  setup
+  make_own_pair
+  openssl x509 -in "$CRT" -outform DER -out "$work/der"
+  cp "$work/der" "$CRT"
+  sum=$(files_sum)
+  ensure $mode
+  ok "DER certificate, $mode: does not start, files kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'not a PEM certificate'"
+
+  for format in pkcs8 traditional; do
+    setup
+    make_own_pair
+    if [ $format = pkcs8 ]; then
+      openssl pkey -in "$KEY" -aes256 -passout pass:secret -out "$work/enc"
+    else
+      openssl rsa -in "$KEY" -aes256 -passout pass:secret -traditional -out "$work/enc" 2> /dev/null
+    fi
+    cp "$work/enc" "$KEY"
+    sum=$(files_sum)
+    ensure $mode
+    # 124: timeout, the check waited for a passphrase
+    ok "passphrase key ($format), $mode: does not start, does not wait" \
+      "[ $RET != 0 -a $RET != 124 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'passphrase'"
+  done
+done
+
+if ! skip_as_root "unreadable key + shipped certificate"; then
+  setup
+  cp "$shipped/develop/cm_ssl_cert_2048.crt" "$CRT"
+  cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+  chmod 000 "$KEY"
+  ensure YES
+  ok "unreadable key + shipped certificate, YES: replaced" "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY)"
+
+  setup
+  cp "$shipped/develop/cm_ssl_cert_2048.crt" "$CRT"
+  cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+  chmod 000 "$KEY"
+  sum=$(md5sum < "$CRT")
+  ensure NO
+  ok "unreadable key + shipped certificate, NO: does not start" \
+    "[ $RET != 0 ] && [ \"\$(md5sum < $CRT)\" = \"$sum\" ]"
+fi
+
+if ! skip_as_root "conf not writable"; then
+  setup
+  cp "$shipped/develop/cm_ssl_cert_2048.crt" "$CRT"
+  cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+  chmod 555 "$C"
+  sum=$(files_sum)
+  ensure YES
+  ok "shipped pair, conf not writable: does not start, files kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ]"
+  ok "shipped pair, conf not writable: why" \
+    "grep -q 'why=failed to generate a new SSL key pair: cannot create .*Permission denied$' $work/out"
+  chmod 755 "$C"
+fi
+
+setup
+mkdir "$CRT"
+cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+ensure YES
+ok "certificate path is a directory: does not start" \
+  "[ $RET != 0 ] && grep -q 'why=the SSL certificate .* is not a regular file$' $work/out"
+
+# --------------------------------------------------- administrator's pair
+
+setup
+cp "$shipped"/develop/cm_ssl_cert_* "$C"/
+make_own_pair
+sum=$(files_sum)
+ensure YES
+ok "own pair + leftover shipped files, YES: pair kept, leftovers removed" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+setup
+cp "$shipped"/develop/cm_ssl_cert_* "$C"/
+make_own_pair
+sum=$(files_sum)
+ensure NO
+ok "own pair + leftover shipped files, NO: nothing changed" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 6 ] && grep -q 'shipped_in_use=0' $work/out"
+
+setup
+make_own_pair
+echo junk > "$C/cm_ssl_cert_2048.key"
+ensure YES
+ok "own pair + unknown cm_ssl_cert_2048.key: kept" "[ $RET = 0 ] && [ -f $C/cm_ssl_cert_2048.key ]"
+
+setup
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/ca.key" -out "$work/ca.crt" -subj /CN=RootCA -days 30 \
+  2> /dev/null
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/int.key" -out "$work/int.crt" -subj /CN=Intermediate \
+  -days 30 -CA "$work/ca.crt" -CAkey "$work/ca.key" -addext basicConstraints=critical,CA:TRUE 2> /dev/null
+openssl req -newkey rsa:2048 -nodes -keyout "$KEY" -out "$work/srv.csr" -subj /CN=server 2> /dev/null
+openssl x509 -req -in "$work/srv.csr" -CA "$work/int.crt" -CAkey "$work/int.key" -CAcreateserial -days 30 \
+  -out "$work/srv.crt" 2> /dev/null
+cat "$work/srv.crt" "$work/int.crt" > "$CRT"
+sum=$(files_sum)
+ensure YES
+ok "CA-issued certificate with a chain: kept" "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ]"
+
+setup
+openssl req -new -key "$shipped/develop/cm_ssl_cert_2048.key" -subj /CN=x -out "$work/s.csr" 2> /dev/null
+openssl x509 -req -in "$work/s.csr" -CA "$work/ca.crt" -CAkey "$work/ca.key" -days 30 -out "$CRT" 2> /dev/null
+cp "$shipped/develop/cm_ssl_cert_2048.key" "$KEY"
+ensure YES
+ok "CA-issued certificate for a shipped key: replaced, reissue noted" \
+  "[ $RET = 0 ] && ! is_shipped \$(key_fp $KEY) && log | grep -q 'issued by a CA'"
+
+# --------------------------------------------------------------- generate
+
+setup
+install_develop 2048 2048
+generate US myhost 30
+ok "generate: succeeds" "[ $RET = 0 ]"
+ok "generate: regular files, key 0600" "[ ! -L $CRT -a ! -L $KEY ] && [ \$(stat -c %a $KEY) = 600 ]"
+ok "generate: subject from the options" \
+  "[ \"\$(openssl x509 -in $CRT -noout -subject)\" = 'subject=C = US, CN = myhost' ]"
+not_after=$(date -d "$(openssl x509 -in "$CRT" -noout -enddate | cut -d= -f2)" +%s)
+ok "generate: validity from the options" \
+  "[ \$(((not_after - now) / 86400)) -ge 29 -a \$(((not_after - now) / 86400)) -le 30 ]"
+ok "generate: no .bak, no temporary file" "[ \$(ls -A $C | grep -c -e bak -e tmp -e old) = 0 ]"
+ok "generate: link targets left" "[ -f $C/cm_ssl_cert_2048.key ]"
+
+sum=$(files_sum)
+generate KOR
+ok "generate: invalid country fails, files kept" \
+  "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && grep -q 'invalid subject C' $work/out && [ \$(nfiles) = 6 ]"
+generate "" "" 99999
+ok "generate: invalid validity fails, files kept" "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ]"
+
+generate
+ok "generate: default subject" "[ $RET = 0 ] && openssl x509 -in $CRT -noout -subject | grep -q 'O = CUBRID'"
+
+if ! skip_as_root "generate, conf not writable"; then
+  chmod 555 "$C"
+  sum=$(files_sum)
+  generate
+  ok "generate: conf not writable fails, files kept" "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ]"
+  chmod 755 "$C"
+fi
+
+# ------------------------------------------------------------------ result
+
+echo "passed $pass, failed $fail, skipped $skip"
+[ $fail = 0 ]
