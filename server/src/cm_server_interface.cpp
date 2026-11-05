@@ -1895,6 +1895,8 @@ cub_cm_request_handler (Json::Value &request, Json::Value &response)
 
     if (!ext_ut_validate_auth (request))
       {
+	/* every HTTP task is checked here; keep the refused attempt */
+	ext_ut_error_log (request, "The user don't have authority to execute the task");
 	response["status"] = STATUS_FAILURE;
 	response["note"] = "The user don't have authority to execute the task: " + request["task"].asString();
 	response["task"] = request["task"].asString();

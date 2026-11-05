@@ -1,0 +1,57 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_self",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_fl_self",
+  "password": "authtest1",
+  "authoritylist": {
+   "admin": "yes"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_self",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "force_logout",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "targetid": "authtest_fl_self",
+  "test_expect": "success",
+  "test_value": {
+   "targetid": "authtest_fl_self",
+   "closed_sessions": 1
+  }
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "keepalive",
+  "token": "",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_self"
+ }
+]

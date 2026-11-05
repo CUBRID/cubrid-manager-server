@@ -1,0 +1,118 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_two",
+  "test_expect": "any"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_other",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_two",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_other",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_two",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_two",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_other",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "success"
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": "authtest_fl_two",
+  "test_expect": "success",
+  "test_value": {
+   "targetid": "authtest_fl_two",
+   "closed_sessions": 2
+  }
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#3",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_two"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_other"
+ }
+]
