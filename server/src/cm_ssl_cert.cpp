@@ -1456,15 +1456,44 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
       return true;
     }
 
-  /* roll back */
-  if (key_placed)
+  /*
+   * roll back: put the previous key back over the new one (one rename, so the
+   * key path is never empty), or remove the new key when there was none. If
+   * that fails too (for example another program keeps the new key open on
+   * Windows), keep <cert>.tmp-<s> and <key>.old-<s> or <key>.new-<s>: they
+   * are what recover_interrupted () needs at the next start to see that this
+   * replacement did not complete. Without them it would take the new key as
+   * complete and remove the previous one.
+   */
+  bool undone = true;
+
+  if (key_set_aside)
     {
-      unlink (key_path.c_str ());
+      if (!replace_file (key_old, key_path, e2))
+	{
+	  undone = false;
+	}
     }
-  if (key_set_aside && !replace_file (key_old, key_path, e2))
+  else if (key_placed && unlink (key_path.c_str ()) != 0)
     {
-      LOG_ERROR ("cannot restore the private key: %s; the previous key is in %s", e2.c_str (), key_old.c_str ());
+      e2 = "cannot remove " + key_path + ": " + errno_string (errno);
+      undone = false;
     }
+
+  if (!undone)
+    {
+      LOG_ERROR ("the SSL key pair could not be replaced (%s), and the previous state cannot be restored: %s. "
+		 "%s and %s are kept so that the next start restores it; fix the cause (for example a program "
+		 "that keeps the key file open) and restart.", err.c_str (), e2.c_str (),
+		 (key_set_aside ? key_old : key_new_mark).c_str (), cert_tmp.c_str ());
+      err += "; the previous state cannot be restored: " + e2 + " (restored at the next start)";
+      if (!key_placed)
+	{
+	  unlink (key_tmp.c_str ());
+	}
+      return false;
+    }
+
   unlink (key_tmp.c_str ());
   unlink (cert_tmp.c_str ());
   if (key_marked)
