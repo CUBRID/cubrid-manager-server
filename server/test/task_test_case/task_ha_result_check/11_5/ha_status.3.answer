@@ -1,0 +1,33 @@
+{
+   "current_node": "cubrid_ha_47",
+   "current_node_state": "slave",
+   "ha_info": [
+      {
+         "applylogdb": "testdb1@localhost:$CUBRID_DATABASES/testdb1_cubrid_ha_52",
+         "applylogdb_pid": "230904",
+         "applylogdb_state": "registered",
+         "copylogdb": "testdb1@cubrid_ha_52:$CUBRID_DATABASES/testdb1_cubrid_ha_52",
+         "copylogdb_pid": "230895",
+         "copylogdb_state": "registered",
+         "dbname": "testdb1"
+      },
+      {
+         "applylogdb": "testdb0@localhost:$CUBRID_DATABASES/testdb0_cubrid_ha_52",
+         "applylogdb_pid": "230901",
+         "applylogdb_state": "registered",
+         "copylogdb": "testdb0@cubrid_ha_52:$CUBRID_DATABASES/testdb0_cubrid_ha_52",
+         "copylogdb_pid": "230892",
+         "copylogdb_state": "registered",
+         "dbname": "testdb0"
+      }
+   ],
+   "nodeA": "cubrid_ha_52",
+   "nodeA_state": "master",
+   "nodeB": "cubrid_ha_47",
+   "nodeB_state": "slave",
+   "nodeC": "hwanyseo-33",
+   "nodeC_state": "unidentified_node",
+   "note": "none",
+   "status": "success",
+   "task": "ha_status"
+}

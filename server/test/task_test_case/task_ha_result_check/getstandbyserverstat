@@ -1,5 +1,5 @@
 {"task":"getstandbyserverstat",
 "token":"",
-"dbname":"test",
+"dbname":"demodb",
 "dbid":"dba",
 "dbpasswd":""}

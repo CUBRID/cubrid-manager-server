@@ -555,6 +555,34 @@ append_host_to_dbname (char *name_buf, const char *dbname, int buf_len)
   snprintf (name_buf, buf_len, "%s@127.0.0.1", dbname);
 }
 
+/*
+ * strip_host_from_dbname () - copy dbname into name_buf without the
+ * "@host" part, so "demodb" and "demodb@127.0.0.1" both name the local db
+ *   return: 0 on success, -1 if the name part is empty or does not fit
+ */
+int
+strip_host_from_dbname (char *name_buf, const char *dbname, int buf_len)
+{
+  const char *at;
+  size_t len;
+
+  if (name_buf == NULL || dbname == NULL || buf_len <= 0)
+    {
+      return -1;
+    }
+
+  at = strchr (dbname, '@');
+  len = (at != NULL) ? (size_t) (at - dbname) : strlen (dbname);
+  if (len == 0 || len >= (size_t) buf_len)
+    {
+      return -1;
+    }
+
+  memcpy (name_buf, dbname, len);
+  name_buf[len] = '\0';
+  return 0;
+}
+
 void *
 increase_capacity (void *ptr, int block_size, int old_count, int new_count)
 {

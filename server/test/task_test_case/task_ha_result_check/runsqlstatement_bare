@@ -1,0 +1,6 @@
+{"task":"runsqlstatement",
+"token":"",
+"dbname":"demodb",
+"uid":"dba",
+"passwd":"",
+"command":"select 1 from db_root;"}
