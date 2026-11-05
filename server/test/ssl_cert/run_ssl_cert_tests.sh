@@ -73,6 +73,12 @@ if ! $cxx $flags -o "$driver" "$here/ssl_cert_driver.cpp" "$src/cm_ssl_cert.cpp"
   exit 1
 fi
 
+# LD_PRELOAD library that makes chosen rename () and unlink () calls fail
+fault_lib="$work/fault_inject.so"
+if ! ${CC:-cc} -shared -fPIC -o "$fault_lib" "$here/fault_inject.c" -ldl 2> /dev/null; then
+  fault_lib=""
+fi
+
 # ---------------------------------------------------------------- helpers
 
 ok ()
@@ -648,6 +654,46 @@ ensure YES
 ensure YES
 ok "replacement interrupted, then a pair installed by hand: its files stay across starts" \
   "[ $RET = 0 ] && [ -f $KEY.old-$s ] && [ -f $CRT.tmp-$s ]"
+
+# a replacement fails, and so does undoing it (another program keeps the new
+# key open on Windows; simulated with fault_inject.so): the work files must stay
+# so that the next start restores the previous pair
+if [ -n "$fault_lib" ]; then
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  LD_PRELOAD="$fault_lib" FAULT_RENAME_SRC="crt.tmp-,.key.old-" FAULT_UNLINK_END="/cm_ssl_cert.key" \
+    timeout 30 "$driver" generate "$CRT" "$KEY" < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "replacement and its undo both fail: fails, work files kept" \
+    "[ $RET != 0 ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.key\.old-') = 1 ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.crt\.tmp-') = 1 ] && grep -q 'restored at the next start' $work/out"
+  ensure YES
+  ok "replacement and its undo both fail, next start: previous pair restored" \
+    "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+  setup
+  LD_PRELOAD="$fault_lib" FAULT_RENAME_SRC="crt.tmp-" FAULT_UNLINK_END="/cm_ssl_cert.key" \
+    timeout 30 "$driver" generate "$CRT" "$KEY" < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "first generation and its undo both fail: fails, work files kept" \
+    "[ $RET != 0 ] && [ -f $KEY ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.key\.new-') = 1 ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.crt\.tmp-') = 1 ]"
+  ensure YES
+  ok "first generation and its undo both fail, next start: generated again" \
+    "[ $RET = 0 ] && [ \$(nfiles) = 2 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ]"
+
+  # the undo succeeds: nothing is left
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  LD_PRELOAD="$fault_lib" FAULT_RENAME_SRC="crt.tmp-" timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "replacement fails, undone: previous pair, no work files" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+else
+  skip=$((skip + 1))
+  echo "SKIP  failing undo scenarios (fault_inject.so could not be built)"
+fi
 
 # names that are not work files are left alone
 setup
