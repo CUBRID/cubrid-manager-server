@@ -2948,9 +2948,9 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
 	{
 	  LOG_WARN ("session IP check: unknown address, not compared "
 		    "(user: %s, login IP: %s, request IP: %s, task: %s); "
-		    "logged once per address (last 8 addresses) in this session",
+		    "logged once per address (last %d addresses) in this session",
 		    token_info->user_id, token_info->user_ip,
-		    (request_ip != NULL) ? request_ip : "-", task);
+		    (request_ip != NULL) ? request_ip : "-", task, (int) SESSION_IP_WARNED_MAX);
 	}
     }
   else if (match == SESSION_IP_DIFFERENT)
@@ -2965,8 +2965,8 @@ check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
 	{
 	  LOG_WARN ("session IP check: request from another IP "
 		    "(user: %s, login IP: %s, request IP: %s, task: %s): processed; "
-		    "logged once per address (last 8 addresses) in this session",
-		    token_info->user_id, login_ip, req_ip, task);
+		    "logged once per address (last %d addresses) in this session",
+		    token_info->user_id, login_ip, req_ip, task, (int) SESSION_IP_WARNED_MAX);
 	}
     }
 
