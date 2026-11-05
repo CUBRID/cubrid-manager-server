@@ -1,0 +1,62 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_relogin",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_relogin",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_relogin",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "force_logout",
+  "token": "",
+  "targetid": "authtest_fl_relogin",
+  "test_expect": "success",
+  "test_value": {
+   "closed_sessions": 1
+  }
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "login",
+  "id": "authtest_fl_relogin",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN#2",
+  "test_expect": "success"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_fl_relogin"
+ }
+]

@@ -86,6 +86,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"get_mon_statistic", 0, ext_get_mon_statistic, AU_ANY},
   {"getserverstatus", 0, ext_get_server_status, AU_ADMIN},
   {"getserverinfo", 0, ext_get_server_info, AU_ANY},
+  {"force_logout", 0, ext_force_logout, AU_ADMIN},
   {NULL, 0, NULL, 0}
 };
 
@@ -2683,9 +2684,9 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
   char dbmt_error[DBMT_ERROR_MSG_SIZE];
   int retval;
 
+  /* on failure dbmt_user_read () has already freed what it read */
   if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
     {
-      dbmt_user_free (&dbmt_user);
       return build_server_header (response, retval, dbmt_error);
     }
 
@@ -2703,6 +2704,132 @@ int ext_get_dbmt_user_info_new (Json::Value &request, Json::Value &response)
     }
 
   dbmt_user_free (&dbmt_user);
+  return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
+}
+
+/*
+ * force_logout_log_target () - "target=<id>" for a force_logout log line.
+ *
+ *   On a failure targetid is what the client sent, so a missing or empty one
+ *   is "-", one that is not a string is "<non-string>", a space, a control
+ *   character or '%' becomes '_', and only the first 64 characters are kept.
+ */
+static string
+force_logout_log_target (const Json::Value &target)
+{
+  const size_t max_len = 64;
+  string id;
+
+  if (target.isNull ())
+    {
+      return "target=-";
+    }
+  if (!target.isString ())
+    {
+      return "target=<non-string>";
+    }
+  id = target.asString ();
+  if (id.empty ())
+    {
+      return "target=-";
+    }
+  if (id.size () > max_len)
+    {
+      id.resize (max_len);
+    }
+  for (size_t i = 0; i < id.size (); ++i)
+    {
+      unsigned char c = (unsigned char) id[i];
+      if (!isgraph (c) || c == '%')
+	{
+	  id[i] = '_';
+	}
+    }
+  return "target=" + id;
+}
+
+/*
+ * force_logout: close every session of a CMS user without deleting it.
+ * ADMIN only, see ext_task_info[].
+ *
+ * The user, its password and its authority are not changed, so the user can
+ * log in again at once. The DB logins of the closed sessions are wiped with
+ * them. The target may be the requester itself: the current request still
+ * completes, because its token was already validated, and the next request
+ * with that token is refused (ERR_INVALID_TOKEN).
+ *
+ * A success is logged as access_log and a failure as access_err, both with
+ * the target. A refusal for authority is logged by cub_cm_request_handler ().
+ */
+int ext_force_logout (Json::Value &request, Json::Value &response)
+{
+  T_DBMT_USER dbmt_user;
+  char dbmt_error[DBMT_ERROR_MSG_SIZE];
+  string target_id;
+  string log_msg;
+  char count_str[16];
+  bool found = false;
+  int closed_sessions;
+  int retval;
+
+  /* only the top-level targetid, never one inside a nested object */
+  const Json::Value &target = request["targetid"];
+  const string log_target = force_logout_log_target (target);
+
+  if (target.isNull () || (target.isString () && target.asString ().empty ()))
+    {
+      const char *note = "Parameter(targetid) missing in the request.";
+      log_msg = log_target + " " + note;
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, ERR_PARAM_MISSING, note);
+    }
+  if (!target.isString ())
+    {
+      const char *note = "Parameter(targetid) must be a string.";
+      log_msg = log_target + " " + note;
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, note);
+    }
+  target_id = target.asString ();
+
+  /*
+   * the target must be a user in cm.pass. On failure dbmt_user_read () has
+   * already freed what it read, so there is nothing to free here.
+   */
+  if ((retval = dbmt_user_read (&dbmt_user, dbmt_error)) != ERR_NO_ERROR)
+    {
+      log_msg = log_target + " " + dbmt_error;
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, retval, dbmt_error);
+    }
+  for (int i = 0; i < dbmt_user.num_dbmt_user; ++i)
+    {
+      if (strcmp (dbmt_user.user_info[i].user_name, target_id.c_str ()) == 0)
+	{
+	  found = true;
+	  break;
+	}
+    }
+  dbmt_user_free (&dbmt_user);
+
+  if (!found)
+    {
+      string note = "The user does not exist: " + target_id;
+      /* the note carries the raw id; the log carries log_target instead */
+      log_msg = log_target + " The user does not exist";
+      ext_ut_error_log (request, log_msg.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, note.c_str ());
+    }
+
+  closed_sessions = dbmt_user_delete_all_sessions_of_user (target_id.c_str ());
+
+  snprintf (count_str, sizeof (count_str), "%d", closed_sessions);
+  log_msg = log_target + " closed_sessions=" + count_str;
+  ext_ut_access_log (request, log_msg.c_str ());
+
+  response["targetid"] = target_id;
+  response["closed_sessions"] = closed_sessions;
+
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
@@ -3085,6 +3212,101 @@ bool ext_ut_validate_auth (Json::Value &request)
     }
 
   return (auth_user & auth_task) ? true : false;
+}
+
+/*
+ * ext_ut_log_field () - a request value for a log line field.
+ *
+ *   The fields are separated by spaces and read back by ts_load_access_log
+ *   (), so a value that is missing, not a string or empty is "-", and any
+ *   character that is not printable, a space or '%' becomes '_'.
+ */
+static string
+ext_ut_log_field (const Json::Value &request, const char *key)
+{
+  const Json::Value &value = request[key];
+  string field;
+
+  if (!value.isString () || value.asString ().empty ())
+    {
+      return "-";
+    }
+  field = value.asString ();
+  for (size_t i = 0; i < field.size (); ++i)
+    {
+      unsigned char c = (unsigned char) field[i];
+      if (!isgraph (c) || c == '%')
+	{
+	  field[i] = '_';
+	}
+    }
+  return field;
+}
+
+/*
+ * ext_ut_write_log () - write "<kind> <requester> <client address> <task>
+ *   <msg>", the line ut_access_log ()/ut_error_log () write for nvplist
+ *   requests.
+ *
+ *   write_manager_access_log ()/write_manager_error_log () pass the line to
+ *   LOG_INFO/LOG_ERROR as the format string, so '%' and control characters
+ *   in msg become '_': msg may carry what a client sent.
+ */
+static void
+ext_ut_write_log (const Json::Value &request, const char *kind, const char *msg, bool is_error)
+{
+  string head;
+  /* no message: "" in the access log, "-" in the error log, as in ut_*_log () */
+  string message = (msg != NULL) ? msg : (is_error ? "-" : "");
+
+  /* _TASK is the task that runs (cub_cm_request_handler ()) */
+  string task = ext_ut_log_field (request, "_TASK");
+  if (task == "-")
+    {
+      task = ext_ut_log_field (request, "task");
+    }
+
+  head = string (kind) + " " + ext_ut_log_field (request, "_ID") + " " + ext_ut_log_field (request, "_CLIENTIP")
+	 + " " + task;
+
+  for (size_t i = 0; i < message.size (); ++i)
+    {
+      unsigned char c = (unsigned char) message[i];
+      if (iscntrl (c) || c == '%')
+	{
+	  message[i] = '_';
+	}
+    }
+
+  if (is_error)
+    {
+      write_manager_error_log (head.c_str (), message.c_str ());
+    }
+  else
+    {
+      write_manager_access_log (head.c_str (), message.c_str ());
+    }
+}
+
+/*
+ * ext_ut_access_log () - an access_log line for a JSON request, in the form
+ *   of ut_access_log (); written to the access log.
+ */
+void
+ext_ut_access_log (const Json::Value &request, const char *msg)
+{
+  ext_ut_write_log (request, ACCESS_LOG, msg, false);
+}
+
+/*
+ * ext_ut_error_log () - an access_err line for a JSON request, in the form
+ *   of ut_error_log (); written to the error log, where ts_load_access_log
+ *   () reads access_err lines.
+ */
+void
+ext_ut_error_log (const Json::Value &request, const char *msg)
+{
+  ext_ut_write_log (request, ACCESS_ERR, msg, true);
 }
 
 int ext_get_mon_interval (Json::Value &request, Json::Value &response)
