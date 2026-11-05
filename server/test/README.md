@@ -441,7 +441,8 @@ task_test_case/task_result_check/11_4/<case>.result
 
 `VOLATILE_KEYS`는 **키 이름**으로 가린다. 값 전체가 실행마다 바뀌는 것들이다:
 `pid`, `as_pid`, `as_psize`, `as_lat`, `time`, `tran_time`, `tranindex`,
-`cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`.
+`cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`, `sizelock`
+(`lockdb`의 락 테이블 메모리. 실행 중 잡은 락의 양과 엔진 빌드에 따라 달라진다).
 
 `VOLATILE_PATTERNS`는 **모양**으로 가린다. 긴 문자열 안에 박혀 있어서 키 단위로는
 못 거르는 것들이다.
