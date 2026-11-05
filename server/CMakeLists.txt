@@ -198,6 +198,7 @@ set(CUB_MANAGER_SOURCES
   ${CMS_SRC_DIR}/cm_server_interface.cpp
   ${CMS_SRC_DIR}/cm_server_autoupdate.cpp
   ${CMS_SRC_DIR}/cm_ssl_cert.cpp
+  ${CMS_SRC_DIR}/cm_session_ip.cpp
   )
 
 add_executable(cm_admin ${CM_ADMIN_SOURCES})

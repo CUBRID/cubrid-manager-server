@@ -652,7 +652,7 @@ bool cm_mon_stat::get_mon_statistic (const Json::Value req, Json::Value &res, st
   if (false == _init)
     {
       errmsg = "monitoring staticstic module is not initialized";
-      LOG_WARN (errmsg.c_str());
+      LOG_WARN ("%s", errmsg.c_str ());
       return false;
     }
   string metric = req["metric"].asString();
@@ -753,7 +753,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
   if (false == mdtype_from_str (req["dtype"].asString(), mdtype))
     {
       errmsg = string ("Error format of dtype [") + req["dtype"].asString() + "] in request";
-      LOG_WARN (errmsg.c_str());
+      LOG_WARN ("%s", errmsg.c_str ());
       return false;
     }
 
@@ -769,7 +769,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (false == _meta[K_DB_RRD].isMember (dbname + "_idx"))
 	{
 	  errmsg = string ("Can't find dbname[") + dbname + "] in meta[k_db_rrd]";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       int db_idx = _meta[K_DB_RRD][dbname + "_idx"].asInt();
@@ -786,7 +786,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (i == DB_METRICS_LEN)
 	{
 	  errmsg = string ("Can't find DB metric[") + metric + "] from request";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       string data_path = _data_path + DB_MON;
@@ -802,20 +802,20 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (false == _meta[K_DB_RRD].isMember (dbname + "_vol"))
 	{
 	  errmsg = string ("Can't find dbname_vol[") + dbname + "] in meta[k_db_rrd]";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       if (false == _meta[K_DB_RRD][dbname + "_vol"].isMember (volname))
 	{
 	  errmsg = string ("Can't find volname[") + volname + "] in DB [" + dbname + "] meta[k_db_rrd]";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       int vol_idx = _meta[K_DB_RRD][dbname + "_vol"][volname].asInt();
       if (VOL_FREESPACE != metric)
 	{
 	  errmsg = string ("Can't find volume metric[") + metric + "] from request";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       string data_path = _data_path + VOL_MON;
@@ -829,7 +829,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (false == _meta[K_BROKER_RRD].isMember (bname + "_idx"))
 	{
 	  errmsg = string ("Can't find broker [") + bname + "] in meta[k_db_rrd]";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       int b_idx = _meta[K_BROKER_RRD][bname + "_idx"].asInt();
@@ -846,7 +846,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (i == BROKER_METRICS_LEN)
 	{
 	  errmsg = string ("Can't find broker metric[") + metric + "] from request";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       string data_path = _data_path + BROKER_MON;
@@ -868,7 +868,7 @@ bool cm_mon_stat::m_get_mon_statistic (const Json::Value req, Json::Value &res, 
       if (i == OS_METRICS_LEN)
 	{
 	  errmsg = string ("Can't find os metric[") + metric + "] from request";
-	  LOG_WARN (errmsg.c_str());
+	  LOG_WARN ("%s", errmsg.c_str ());
 	  return false;
 	}
       string data_path = _data_path + OS_MON;
@@ -903,7 +903,7 @@ bool cm_mon_stat::get_rrd_data (MDTYPE mdtype, string dpath, int didx,
   if (false == get_rrdfile (dpath, read_rrd_idx, buf, bufsize, mlen))
     {
       errmsg = string ("read rrd file failed [") + dpath + "]";
-      LOG_WARN (errmsg.c_str());
+      LOG_WARN ("%s", errmsg.c_str ());
       delete [] buf;
       return false;
     }

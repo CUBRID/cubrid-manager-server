@@ -1,0 +1,74 @@
+{
+   "currentnode": "cubrid_ha_47",
+   "currentnodestate": "slave",
+   "hadbinfolist": [
+      {
+         "server": [
+            {
+               "applylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "demodb",
+                           "hostname": "localhost",
+                           "logpath": "$CUBRID_DATABASES/demodb_cubrid_ha_52",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "copylogdb": [
+                  {
+                     "element": [
+                        {
+                           "dbname": "demodb",
+                           "hostname": "cubrid_ha_52",
+                           "logpath": "$CUBRID_DATABASES/demodb_cubrid_ha_52",
+                           "mode": "sync",
+                           "pid": "<volatile>",
+                           "state": "registered"
+                        }
+                     ]
+                  }
+               ],
+               "dbmode": [
+                  {
+                     "dbname": "demodb",
+                     "server_mode": "standby",
+                     "server_msg": "none"
+                  }
+               ],
+               "dbprocinfo": [
+                  {
+                     "dbname": "demodb",
+                     "pid": "<volatile>",
+                     "state": "registered_and_standby"
+                  }
+               ]
+            }
+         ]
+      }
+   ],
+   "hanodelist": [
+      {
+         "node": [
+            {
+               "hostname": "cubrid_ha_52",
+               "ip": "192.168.2.52",
+               "priority": "2",
+               "state": "master"
+            },
+            {
+               "hostname": "cubrid_ha_47",
+               "ip": "192.168.2.47",
+               "priority": "1",
+               "state": "slave"
+            }
+         ]
+      }
+   ],
+   "note": "none",
+   "status": "success",
+   "task": "heartbeatlist"
+}

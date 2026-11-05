@@ -54,7 +54,7 @@ cd server/test
 # 동기로 실행된 요청이 http_timeout을 넘기면 실패로 처리 (기본은 경고만, 4.5 참고)
 ./run_tests.sh -st
 
-# task_test_case/ 의 모든 세트를 차례로 실행
+# task_test_case/ 의 모든 세트를 차례로 실행 (이름으로만 실행하는 세트는 제외, 4.10 참고)
 ./run_tests.sh --all
 
 # 단건 응답을 실제 토큰으로 덤프 (문서 검증/작성용)
@@ -108,6 +108,9 @@ server/test/
     task_result_check/11_5/  11_2/  11_0/  10_2/
     task_auth_check.txt               세트 3: 권한 검사 (CMS 사용자별, 4.8 참고)
     task_auth_check/<case>            그 세트의 요청 JSON
+    task_session_ip_check.txt         세트 4: 요청 IP 검사 (session_ip_check, 4.10 참고)
+    task_session_ip_check/<case>      그 세트의 요청 JSON
+  unit/                               단위 테스트 (CUBRID 빌드 없이 실행, unit/README.md)
   task_test_config/                   케이스가 읽을 픽스처
     test_analyzecaslog.sql.log          analyzecaslog 용 CAS 로그
     tmp_file_for_test/                  getcaslogtopresult / removecasrunnertmpfile 용
@@ -290,6 +293,25 @@ compactdb  copydb  createdb  deletedb  ha_reload  ha_start  ha_stop
 loaddb  lockdb  optimizedb  renamedb  restoredb  start_statdump
 startbroker  startdb  stop_statdump  stopbroker  stopdb  unloaddb
 ```
+
+### `cm_conf <key>=<value>` — cm.conf 변경과 manager 재시작
+
+manager는 cm.conf를 시작할 때만 읽으므로, 설정에 따라 동작이 바뀌는지 보려면 설정을 바꾸고
+다시 시작해야 한다. 목록에 다음 줄을 두면 러너가 `$CUBRID/conf/cm.conf`의 `[cm]` 절에서 그
+항목을 바꾸고 `cubrid manager stop` / `start`로 다시 시작한다.
+
+```
+cm_conf session_ip_check=enforce     # 항목을 이 값으로 (없으면 추가)
+cm_conf session_ip_check             # 항목을 지움 (서버 기본값으로)
+```
+
+- 다시 시작하면 모든 세션이 끝나므로, 러너는 자기 토큰을 새로 로그인해 받는다. 케이스 안의
+  `$CASE_LOGIN_TOKEN`은 케이스마다 새로 로그인하므로 영향이 없다.
+- 주석 처리된 줄(`#session_ip_check=log`)은 건드리지 않는다.
+- 세트 끝에서 바꾼 항목을 되돌리는 줄을 둔다. 중간에 멈춘 실행이 남긴 변경은 다음 실행의
+  시작에서 `cmstest_backup`으로 복원된다(`prepare_confs ()`).
+- manager가 이 호스트에 있어야 한다. 로컬 환경을 준비하지 않는 세트(`task_ha_result_check`)에서는
+  쓸 수 없다.
 
 **`,<status>`가 붙으면 그 케이스는 status 검사 전용이다.** `-a`로도 기준값을 만들지 않고,
 `-fc`에서도 선언한 status로만 판정한다. 쓰는 경우는 두 가지다.
@@ -539,7 +561,9 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"test_expect": "<판정>"` | 이 요청만의 기대값. 러너가 지우고 보낸다. 없으면 목록의 기대값 |
 | `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
 | `"test_no_text": "<문자열>"` | 응답 원문에 이 문자열이 없어야 통과. 러너가 지우고 보낸다. 비밀번호가 응답에 나오지 않는지 확인할 때 쓴다 |
+| `"test_source_ip": "<주소>"` | 이 요청을 이 호스트의 그 주소에서 보낸다. 러너가 지우고 보낸다. 서버가 다른 클라이언트의 요청으로 보게 할 때 쓴다. `cmsip`가 `127.0.0.1`이면 Linux에서는 `127.0.0.2`처럼 `127.x.x.x` 아무 주소나 쓸 수 있다 |
 | `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
+| `"test_value": {"<a.b.c>": <값>, ...}` | 응답 JSON의 각 key 경로 값이 `<값>`과 같아야 통과. 러너가 지우고 보낸다. 경로는 `test_no_key`와 같고, 경로 중간의 배열은 원소 하나라도 같으면 통과. JSON 타입까지 비교한다(`2`와 `"2"`, `true`와 `1`은 다르다). 기대값이 배열·객체이면 원소와 key까지 같은 방식으로 비교한다. 빈 객체(`{}`)는 아무것도 비교하지 않으므로 오류로 실행을 멈춘다. 예: `{"closed_sessions": 2}` |
 
 판정 값은 `success`, `failure` 외에 다음을 쓸 수 있다.
 
@@ -573,6 +597,12 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `session_multi` | 기존 API | 같은 ID로 두 번 로그인하면 두 토큰 모두 동작, logout은 그 세션만 닫음, 사용자 삭제 시 남은 세션도 닫힘 |
 | `session_nested_token` | 기존 API | 세션 1의 토큰으로 보내는 `logout`의 중첩 객체 `a.token`에 세션 2의 토큰을 넣어도, 닫히는 것은 검증된 세션 1이고 세션 2는 계속 동작 |
 | `session_limit` | 기존 API | 17번 로그인하면 가장 오래 쓰지 않은 첫 세션이 닫히고 나머지는 동작. `max_sessions_per_user`=16(기본)을 전제로 한다 |
+| `force_admin_only` | 기존 API 계정, `_new` API로 admin 외 권한 모두 yes | 두 사용자 모두 `force_logout`이 거부되고, 대상 사용자의 세션은 그대로 동작 |
+| `force_two_sessions` | 기존 API | 같은 ID로 두 번 로그인한 뒤 admin이 `force_logout`: `closed_sessions` 2, 두 토큰 모두 `keepalive` 거부. 다른 사용자와 admin(러너) 세션은 동작 |
+| `force_no_session` | 기존 API | 세션이 없는 사용자: 성공, `closed_sessions` 0 |
+| `force_bad_param` | 기존 API | 없는 사용자, `targetid` 없음, 빈 값, 중첩 객체에만 있는 `targetid`, 문자열이 아닌 `targetid`(숫자·배열·객체)가 각각 정해진 note로 실패. 중첩 객체가 가리킨 사용자의 세션은 그대로 동작 |
+| `force_self` | `_new` API, `admin:yes` | 자기 자신 대상: 응답은 성공(`closed_sessions` 1), 같은 토큰의 다음 요청은 거부. 러너 토큰이 끊기지 않도록 케이스에서 만든 admin 사용자로 실행 |
+| `force_relogin` | 기존 API | 강제 로그아웃 뒤 같은 비밀번호로 다시 로그인할 수 있고, 새 토큰이 동작 |
 
 보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.
 `copyfolder`는 존재하지 않는 원본을 주어 회귀해도 아무것도 복사되지 않게 한다. `deletefolder`는
@@ -592,6 +622,38 @@ python3 test_tasks.py --dump <name> [<name> ...]
 ```sh
 ./run_tests.sh --check-docs
 ```
+
+### 4.10 요청 IP 검사 세트 (`task_session_ip_check`)
+
+cm.conf의 `session_ip_check`(CBRD-27861)에 따라, 로그인한 곳과 다른 주소에서 온 요청을 처리하거나
+거부하는지 확인한다. 케이스는 `127.0.0.1`에서 로그인하고, 일부 요청을 `"test_source_ip":
+"127.0.0.2"`로 보낸다. 그래서 `cmsip`가 `127.0.0.1`이고 Linux 호스트여야 한다. 모드는 목록의
+`cm_conf` 줄로 바꾼다(4.4). 줄마다 manager를 다시 시작하므로 몇 분 걸린다.
+
+이 조건을 갖추지 않은 환경에서 실패하지 않도록, 이 세트는 **이름을 지정했을 때만 실행한다.**
+`--all`은 이 세트를 건너뛰고(`run_tests.sh`의 `NAMED_ONLY_SETS`), CI에서도 돌지 않는다.
+
+```sh
+./run_tests.sh task_session_ip_check.txt
+```
+
+| 케이스 | 모드 | 확인하는 것 |
+| --- | --- | --- |
+| `session_ip_off` | `off` | 다른 주소의 요청(`keepalive`, `dbmtuserlogin`)이 처리되고, 그 뒤 로그인한 주소에서도 같은 토큰이 동작. `logout` 뒤에는 토큰이 거부됨 |
+| `session_ip_log` | `log` | `off`와 같은 결과(요청 처리, 세션 유지). 경고 로그는 확인하지 않는다 |
+| `session_ip_enforce` | `enforce` | 로그인한 주소의 요청은 처리. 다른 주소의 요청은 `invalid token`으로 거부되고, 그 뒤 로그인한 주소에서도 같은 토큰이 거부됨(세션 삭제). 다른 주소에서 새로 로그인한 세션은 그 주소에서만 동작 |
+| `session_ip_default` | 항목 없음 | 기본값이 `log`처럼 동작. 이 줄이 세트가 바꾼 cm.conf를 되돌린다 |
+
+케이스마다 CMS 사용자(`iptest_`로 시작)를 만들고 지운다. 중간에 멈춰 남은 사용자는 다음 실행의
+첫 요청(`deletedbmtuser`, `any`)이 지운다.
+
+**DB 로그인 삭제는 세션이 없어졌는지로 확인한다.** `dbmtuserlogin`으로 저장한 DB 로그인은
+그 세션 객체 안에만 있고(디스크에 쓰지 않음), 세션을 지우는 함수가 함께 지운다. 이를 조회하는
+API는 없으므로, `enforce` 케이스는 DB 로그인을 저장한 세션이 거부 후 어디서도 쓸 수 없는지를 본다.
+
+같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략과 대소문자, scope)는 CMS가 IPv4로만
+listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표는 단위 테스트(`unit/test_session_ip.cpp`)가
+확인한다. `off`와 `log`는 경고 로그만 다르므로, 둘을 구분하는 것도 단위 테스트다.
 
 ---
 
@@ -656,4 +718,5 @@ task_test_case/task_status_check/unloaddb_optional  # as-dba 등 선택 파라�
   `server/src/cm_server_extend_interface.cpp`의 `ext_task_info[]`
 - API 문서: `docs/api/<task>.md` (요청/응답 규격)
 - 실행 스크립트: `run_tests.sh`
+- 단위 테스트: `unit/` (CUBRID 빌드 없이 도는 서버 소스 테스트, `unit/README.md` 참고)
 

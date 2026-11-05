@@ -60,6 +60,9 @@
     <ClCompile Include="..\..\src\cm_ssl_cert.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cm_session_ip.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\cm_mem_cpu_stat.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

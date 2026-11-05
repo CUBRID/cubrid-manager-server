@@ -12177,6 +12177,10 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
   char *infile;
   char *command;
   char *error_continue;
+  char raw_dbname[DB_NAME_LEN];
+  char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
+  int ha_mode = 0;
+  T_DB_SERVICE_MODE db_mode;
 
   if ((dbname = nv_get_val (req, "dbname")) == NULL)
     {
@@ -12196,11 +12200,26 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
   passwd = nv_get_val (req, "passwd");
   error_continue = nv_get_val (req, "error_continue");
 
-  mode =
-	  (cms_database_mode (dbname, NULL) ==
-	   DB_SERVICE_MODE_NONE ? CUBRID_MODE_SA : CUBRID_MODE_CS);
+  /* accept both "dbname" and "dbname@host"; the db is always the local one */
+  if (strip_host_from_dbname (raw_dbname, dbname, sizeof (raw_dbname)) < 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid dbname: %s", dbname);
+      return ERR_WITH_MSG;
+    }
 
-  csql_res = cmd_csql (dbname, uid, passwd, mode, infile, command, error_continue);    /* csql */
+  db_mode = cms_database_mode (raw_dbname, &ha_mode);
+  mode = (db_mode == DB_SERVICE_MODE_NONE) ? CUBRID_MODE_SA : CUBRID_MODE_CS;
+
+  /* HA multihost db needs "dbname@host" to be accessed in CS mode */
+  if (ha_mode != 0)
+    {
+      append_host_to_dbname (dbname_at_hostname, raw_dbname, sizeof (dbname_at_hostname));
+      csql_res = cmd_csql (dbname_at_hostname, uid, passwd, mode, infile, command, error_continue);    /* csql */
+    }
+  else
+    {
+      csql_res = cmd_csql (raw_dbname, uid, passwd, mode, infile, command, error_continue);    /* csql */
+    }
 
   if (csql_res == NULL)
     {
@@ -17358,6 +17377,9 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   char path [512];
   int argc = 0;
   char note [20];
+  char raw_dbname[DB_NAME_LEN];
+  char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
+  int ha_mode = 0;
   T_DB_SERVICE_MODE db_mode;
 
   db_name = nv_get_val (req, "dbname");
@@ -17369,10 +17391,21 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = cms_database_mode (db_name, NULL);
+  /*
+   * accept both "dbname" and "dbname@host"; the db is always the local one.
+   * raw_dbname is used for the status check and the statdump_daemon key so
+   * that start and stop find the same entry whichever form they were given.
+   */
+  if (strip_host_from_dbname (raw_dbname, db_name, sizeof (raw_dbname)) < 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid dbname: %s", db_name);
+      return ERR_WITH_MSG;
+    }
+
+  db_mode = cms_database_mode (raw_dbname, &ha_mode);
   if (db_mode != DB_SERVICE_MODE_CS)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", raw_dbname);
       return ERR_DB_INACTIVE;
     }
 
@@ -17404,7 +17437,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 	reserved.worker_pid = -1;
 	reserved.dispatcher_start_time = -1;
 	reserved.worker_start_time = -1;
-	inserted = statdump_daemon.insert (make_pair (string (db_name), reserved)).second;
+	inserted = statdump_daemon.insert (make_pair (string (raw_dbname), reserved)).second;
       }
   }
 
@@ -17426,7 +17459,16 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = "statdump";
   argv[argc++] = "-i";
   argv[argc++] = interval_str;
-  argv[argc++] = db_name;
+  /* HA multihost db needs "dbname@host" to be accessed in CS mode */
+  if (ha_mode != 0)
+    {
+      append_host_to_dbname (dbname_at_hostname, raw_dbname, sizeof (dbname_at_hostname));
+      argv[argc++] = dbname_at_hostname;
+    }
+  else
+    {
+      argv[argc++] = raw_dbname;
+    }
   argv[argc++] = NULL;
 
   long long dispatcher_start_time = -1;
@@ -17466,11 +17508,11 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 	 * give the reserved entry back; nobody else could have touched
 	 * it while it was STATD_STARTING
 	 */
-	statdump_daemon.erase (db_name);
+	statdump_daemon.erase (raw_dbname);
       }
     else
       {
-	T_STATDUMP_STAT &entry = statdump_daemon[db_name];
+	T_STATDUMP_STAT &entry = statdump_daemon[raw_dbname];
 
 	entry.status = STATD_RUNNING;
 	entry.pid = ret_val;
@@ -17492,7 +17534,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       mutex_scope lock (*_statdumpd_mutex ());
 
-      map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (db_name);
+      map <string, T_STATDUMP_STAT>::iterator worker_itor = statdump_daemon.find (raw_dbname);
       if (worker_itor != statdump_daemon.end () && worker_itor->second.pid == ret_val)
 	{
 	  worker_itor->second.worker_pid = worker_pid;
@@ -17500,7 +17542,7 @@ ts_start_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
     }
 
-    nv_update_val (res, "note", db_name);
+    nv_update_val (res, "note", raw_dbname);
     nv_update_val (res, "status", "success");
     nv_add_nvp_int (res, "pid", (worker_pid > 0) ? worker_pid : ret_val);
   }
@@ -17519,6 +17561,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   int worker_pid;
   long long dispatcher_start_time;
   long long worker_start_time;
+  char raw_dbname[DB_NAME_LEN];
   T_DB_SERVICE_MODE db_mode;
 
   db_name = nv_get_val (req, "dbname");
@@ -17528,10 +17571,17 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  db_mode = cms_database_mode (db_name, NULL);
+  /* same normalization as ts_start_statdump () so the key matches */
+  if (strip_host_from_dbname (raw_dbname, db_name, sizeof (raw_dbname)) < 0)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid dbname: %s", db_name);
+      return ERR_WITH_MSG;
+    }
+
+  db_mode = cms_database_mode (raw_dbname, NULL);
   if (db_mode != DB_SERVICE_MODE_CS)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", db_name);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s", raw_dbname);
       return ERR_DB_INACTIVE;
     }
 
@@ -17539,7 +17589,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   {
     mutex_scope lock (*_statdumpd_mutex ());
 
-    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (raw_dbname);
     if (itor != statdump_daemon.end () && itor->second.status == STATD_RUNNING)
       {
 	found = true;
@@ -17558,7 +17608,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
       return -1;
     }
 
-  nv_update_val (res, "note", db_name);
+  nv_update_val (res, "note", raw_dbname);
 
 #if defined (WINDOWS)
   /*
@@ -17629,7 +17679,7 @@ ts_stop_statdump (nvplist *req, nvplist *res, char *_dbmt_error)
   {
     mutex_scope lock (*_statdumpd_mutex ());
 
-    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (db_name);
+    map <string, T_STATDUMP_STAT>::iterator itor = statdump_daemon.find (raw_dbname);
 
     if (itor != statdump_daemon.end ())
       {

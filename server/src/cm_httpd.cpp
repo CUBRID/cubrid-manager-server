@@ -67,6 +67,7 @@
 #include "cm_server_stat.h"
 #include "cm_server_extend_interface.h"
 #include "cm_user.h"
+#include "cm_session_ip.h"
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
 #include "cm_ssl_cert.h"
@@ -290,7 +291,22 @@ cub_accept_legacy_db_keys (Json::Value &root)
 void
 cub_add_private_param (struct evhttp_request *req, Json::Value &root)
 {
-  root["_CLIENTIP"] = req->remote_host;
+  char client_ip[DBMT_USER_IP_LEN];
+
+  /*
+   * _CLIENTIP is the address of the connection this request came on, in the
+   * standard form of ut_normalize_ip (): login stores it in the session, and
+   * the access and error logs write it. An address that cannot be
+   * normalized is kept as it is, so that the logs show what was received.
+   */
+  if (ut_normalize_ip (req->remote_host, client_ip, sizeof (client_ip)))
+    {
+      root["_CLIENTIP"] = client_ip;
+    }
+  else
+    {
+      root["_CLIENTIP"] = req->remote_host;
+    }
   root["_CLIENTPORT"] = req->remote_port;
   root["_STAMP"] = 1;
   root["_PROGNAME"] = CMS_NAME;
@@ -480,7 +496,8 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
 
   cookie.copy (token, TOKEN_ENC_LENGTH - 1, token_pos + strlen ("token="));
   token[TOKEN_ENC_LENGTH - 1] = '\0';
-  if (!ext_ut_validate_token (token))
+  /* remote_host: the address of this connection, as for _CLIENTIP */
+  if (!ext_ut_validate_token (token, req->remote_host))
     {
       goto send_nok_reply;
     }

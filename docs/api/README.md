@@ -85,7 +85,7 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 
 ### Rules beyond the permission
 
-- CMS user management (`adddbmtuser`, `updatedbmtuser`, `deletedbmtuser`, `adddbmtuser_new`, `updatedbmtuser_new`) requires ADMIN.
+- CMS user management (`adddbmtuser`, `updatedbmtuser`, `deletedbmtuser`, `adddbmtuser_new`, `updatedbmtuser_new`, `force_logout`) requires ADMIN.
 - `setdbmtpasswd`: every user can change its own password; only ADMIN can change another user's.
 - No response carries a password: neither CMS user passwords (`getdbmtuserinfo`) nor the mail password (`getautojobconf`).
 
@@ -95,7 +95,34 @@ The permissions of a CMS user are read from `cmdb.pass` on every request:
 - A user can hold several sessions at once (one per login). `max_sessions_per_user` in `cm.conf` limits them (1 to 64, default 16); when a login would exceed it, the least recently used session of that user is closed. Set it to 1 for one session per user.
 - A session expires after `token_active_time` seconds (default 7200) without a request. It must be an integer from 1 to 2147483647; any other value is logged and 7200 is used.
 - `logout` closes only its own session. Deleting a CMS user closes all of its sessions. Changing a password keeps the existing sessions; the new password applies from the next login.
+- `force_logout` (ADMIN) closes all sessions of a CMS user without changing the user. A closed session's token is refused like an expired one, and the user can log in again; to keep the user out, also change its password or delete it.
 - The DB login given to `dbmtuserlogin` is kept in that session only, in memory, and is used for later requests of the same session that name the database and give no `dbuser`/`dbpasswd` of their own. Other sessions, other users and the disk never see it.
+
+### Request IP check
+
+CMS compares the IP address each request comes from with the IP address its session logged in from. `session_ip_check` in `cm.conf` sets what happens when they differ:
+
+| Value | When a request comes from another IP address |
+| --- | --- |
+| `off` | Nothing; the addresses are not compared. |
+| `log` (default) | A warning is written to the error log (`cub_manager.err`) and the request is processed. |
+| `enforce` | A warning is written, the session is closed together with its DB logins, and the request is rejected as an invalid token, the same response as an expired session. Log in again to go on. |
+
+Any other value is logged and `log` is used.
+
+- The port is not compared. Addresses are compared in a normalized form, so different spellings of one address are equal: an IPv6 address with or without leading zeros or in another case, a link-local address with a scope (`fe80::1%eth0`), and an IPv4-mapped IPv6 address (`::ffff:1.2.3.4`, the same as `1.2.3.4`).
+- `login` and `getcmsenv` are not checked: they do not use a token.
+- When an address cannot be determined, this is logged and the request is not treated as coming from another address.
+- The warning names the user, the login IP, the request IP, the task and what was done. It never contains the token. When the request is processed (`log`, or an address that cannot be determined), the warning is written once for each address, not for every request: a session remembers the last 8 addresses it warned about, so that a client that shares its token, or a forward proxy whose requests come from several addresses in turn, does not fill the error log; the requests in between are recorded by `login_ip=` in the access log. A rejection (`enforce`) is always written.
+- Whatever the value, the access log and the error log write the address of the request and, when it differs from the login IP, end the line with `login_ip=<login IP>`. As before, the access log is written only for some tasks.
+
+Set `enforce` only when each client has a fixed IP address and does not share its token with other hosts. The check has these limits:
+
+- Valid requests come from different addresses when several hosts share one token, or behind a forward proxy with several outgoing addresses; `enforce` rejects them.
+- Clients behind the same NAT or forward proxy share one address and are not told apart.
+- Behind a forward proxy with more than 8 outgoing addresses in turn, `log` can still write a warning for most requests, because the addresses warned about longest ago are forgotten.
+- Behind a reverse proxy or a layer 4 load balancer, CMS sees the address of the proxy, and the check has no effect. CMS does not read `X-Forwarded-For` or the PROXY protocol.
+- An active man-in-the-middle logs in from its own address, so it is not detected. What the check detects is a token used somewhere other than where it was issued, such as a token leaked from a log or a client PC.
 
 ### Reserved keys
 
@@ -213,6 +240,7 @@ The Permission column is generated from the task tables (see [Interface Permissi
 | [adddbmtuser](adddbmtuser.md) | socket, http | ADMIN |
 | [getaddvolstatus](getaddvolstatus.md) | socket, http | any logged-in user |
 | [dbmtuserlogin](dbmtuserlogin.md) | socket, http | any logged-in user |
+| [force_logout](force_logout.md) | http | ADMIN |
 
 ### Transaction
 
