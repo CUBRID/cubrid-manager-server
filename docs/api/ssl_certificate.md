@@ -9,7 +9,7 @@ CMS serves its interface only over TLS (`cm_port`, default 8001). This document 
 | `$CUBRID/conf/cm_ssl_cert.crt` | certificate in PEM. It may be followed by intermediate CA certificates (a chain), server certificate first |
 | `$CUBRID/conf/cm_ssl_cert.key` | private key in PEM, without a passphrase |
 
-The two files are a pair: the private key must be the one of the certificate. No task that takes a file path can read or write them (see [File Access](README.md#file-access)); the only task that changes them is [generatecert](generatecert.md), which replaces both.
+The two files are a pair: the private key must be the one of the certificate. No task that takes a file path can read or write them (see [File Access](README.md#file-access)); the only task that changes them is [generatecert](generatecert.md), which replaces both and which only debug builds offer.
 
 CMS does not ship a key pair. Up to CUBRID 11.3, and in earlier develop builds, every installation shipped the same key pair; its private key is public, so TLS did not authenticate the server. CMS generates a key pair of its own on the first start instead, and replaces a key pair an earlier version shipped.
 
@@ -88,7 +88,7 @@ CMS uses such a pair as it is and never replaces it, whatever `ssl_cert_auto_gen
 ### Generate a new key pair
 
 - With `ssl_cert_auto_generate=YES`: `cubrid manager stop`, remove `cm_ssl_cert.crt` and `cm_ssl_cert.key`, then `cubrid manager start`. Remove both files: when only one is missing, CMS does not start.
-- Or run [generatecert](generatecert.md) (ADMIN), and restart CMS.
+- In a debug build, [generatecert](generatecert.md) (ADMIN) also replaces them; restart CMS afterwards. Release builds do not offer it.
 
 Generate a new key pair when the private key may have leaked, or when the certificate no longer covers the addresses clients connect to: the subject alternative names are taken when the certificate is generated, so a client that verifies host names and connects by an IP address the server did not have then fails. A client that pins the fingerprint, or connects by host name, is not affected by an address change.
 

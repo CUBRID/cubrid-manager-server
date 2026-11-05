@@ -418,7 +418,9 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"autoupdate", TS_AUTO_UPDATE, 0, DEF_TASK_FUNC (ts_auto_update), FSVR_NONE, AU_ADMIN},
   {"isupdatesuccess", TS_IS_UPDATE_SUCCESS, 0, DEF_TASK_FUNC (ts_is_update_success), FSVR_NONE, AU_ADMIN},
   {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, AU_ANY},
+#if !defined (NDEBUG)
   {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, AU_ADMIN},
+#endif
   {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
   {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}

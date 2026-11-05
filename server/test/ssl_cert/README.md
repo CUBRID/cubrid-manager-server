@@ -46,5 +46,5 @@ CXX=clang++ ./run_ssl_cert_tests.sh                              # 다른 컴파
 | TLS 보안 수준 | `OPENSSL_CONF`로 수준 1~3 지정. NO + RSA 1024 배포 키(11.3, develop 1024): 수준 1 경고 후 기동, 수준 2 종료하고 원인·조치 안내. YES + 11.3 키 수준 2: 교체 후 기동. NO + RSA 2048 배포 키 수준 2: 기동. 관리자 RSA 1024 키쌍 수준 2: 종료. 새 설치 수준 3: 생성 후 종료. 이 OpenSSL이 `OPENSSL_CONF`에서 TLS 보안 수준을 읽지 않으면 건너뜀 |
 | 생성 | subject와 유효기간 반영, 링크가 일반 파일이 됨, `.bak`과 임시 파일이 남지 않음. 잘못된 국가 코드나 유효기간, 쓸 수 없는 conf 디렉터리는 실패하고 파일 유지 |
 
-`cub_manager`의 기동 절차(`start_service ()`에서의 호출, stderr 메시지)와 `generatecert`,
+`cub_manager`의 기동 절차(`start_service ()`에서의 호출, stderr 메시지)와 `generatecert`(디버그 빌드 전용),
 `getcmsenv` task는 실행 중인 CMS로 확인한다(`../README.md`).

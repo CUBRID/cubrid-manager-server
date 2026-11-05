@@ -16886,6 +16886,16 @@ ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+#if !defined (NDEBUG)
+/*
+ * ts_generate_cert () - generatecert, debug builds only
+ *
+ *   Replacing the key pair from a remote request changes the identity of the
+ *   server without the server administrator knowing, and the fingerprint
+ *   clients pinned. Release builds do not offer it: the administrator
+ *   regenerates on the server (stop, remove both files, start with
+ *   ssl_cert_auto_generate=YES).
+ */
 int
 ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -16935,6 +16945,7 @@ ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error)
 
   return ERR_NO_ERROR;
 }
+#endif
 
 /*
  * _statdumpd_mutex () - the lock guarding statdump_daemon (insertion,

@@ -134,7 +134,7 @@ A request is a JSON object, and `task` is a top-level string. CMS runs that task
 
 Tasks that take a file or directory path accept only paths under `$CUBRID` and `$CUBRID_DATABASES`, and in addition:
 
-- These files are never read or written through a task that takes a file path, whatever the user's permission: `conf/cm.pass`, `conf/cmdb.pass`, `log/manager/conlist`, `conf/autojobs.conf`, `conf/autoexecquery.conf`, and the TLS key and certificate of CMS (`conf/cm_ssl_cert.key`, `conf/cm_ssl_cert.crt`) together with any file named after them in the same directory (`conf/cm_ssl_cert.key.*`, `conf/cm_ssl_cert.crt.*`, such as the temporary files of a replacement). A request for one fails with `access to a protected file is not allowed`. (The TLS key and certificate are replaced only by [generatecert](generatecert.md), at their fixed paths; see [TLS Certificate](ssl_certificate.md).)
+- These files are never read or written through a task that takes a file path, whatever the user's permission: `conf/cm.pass`, `conf/cmdb.pass`, `log/manager/conlist`, `conf/autojobs.conf`, `conf/autoexecquery.conf`, and the TLS key and certificate of CMS (`conf/cm_ssl_cert.key`, `conf/cm_ssl_cert.crt`) together with any file named after them in the same directory (`conf/cm_ssl_cert.key.*`, `conf/cm_ssl_cert.crt.*`, such as the temporary files of a replacement). A request for one fails with `access to a protected file is not allowed`. (Only the server itself replaces the TLS key and certificate, at their fixed paths, and in debug builds [generatecert](generatecert.md); see [TLS Certificate](ssl_certificate.md).)
 - A task that copies or deletes a whole directory (`copyfolder`, `deletefolder`) refuses a directory that holds one of those files (`the directory contains a protected file`).
 - `copyfolder` does not follow links inside the tree: on Linux a symbolic link is copied as a link (its target is not read), on Windows a symbolic link or junction in the source fails the copy, and on both it fails rather than write through a link that is already in the destination. `deletefolder` removes a link itself, not what it points to.
 - Tasks that write, empty or delete a file (`writeandsaveconf`, `writeprivatedata`, `resetlog`, `removelog`, the destination of `copyfolder`) and `deletefolder` refuse `$CUBRID/bin` and paths under it (`writing under $CUBRID/bin is not allowed`).
@@ -361,7 +361,7 @@ document of their own yet.
 | deletefolder | socket, http | DBC, DBO |
 | execautostart | http | DBC, DBO |
 | [executecasrunner](executecasrunner.md) | socket, http | DBC, DBO, BRK, MON |
-| [generatecert](generatecert.md) | socket, http | ADMIN |
+| [generatecert](generatecert.md) | socket, http | ADMIN (debug builds only) |
 | getaccesslogfiles | socket, http | any logged-in user |
 | [getautojobconf](getautojobconf.md) | http | any logged-in user |
 | getautostart | http | any logged-in user |

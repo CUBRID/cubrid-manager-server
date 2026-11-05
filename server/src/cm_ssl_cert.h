@@ -69,6 +69,9 @@ extern int cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool
 /*
  * cm_ssl_cert_generate () - generate a new key pair and replace the files
  *
+ *   Used by generatecert, which only debug builds offer (CBRD-27829); the
+ *   startup check generates through the same code.
+ *
  *   return: 0 on success, -1 on failure (the existing files are unchanged).
  *   cert_path(in): certificate file (PEM)
  *   key_path(in): private key file (PEM), created with mode 0600

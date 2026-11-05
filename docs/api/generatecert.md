@@ -1,5 +1,12 @@
 # generatecert
 
+> **Debug builds only.** Release builds do not offer this task and answer
+> `Undefined request - generatecert`: replacing the key pair from a remote request would change the
+> identity of the server, and the fingerprint clients pinned, without the server administrator
+> knowing. In a release build, regenerate on the server instead: stop CMS, remove
+> `cm_ssl_cert.crt` and `cm_ssl_cert.key`, and start it with `ssl_cert_auto_generate=YES`
+> (see [TLS Certificate](ssl_certificate.md#generate-a-new-key-pair)).
+
 Generate a new key pair (a self-signed certificate and its private key) for CMS, and replace
 `$CUBRID/conf/cm_ssl_cert.crt` and `$CUBRID/conf/cm_ssl_cert.key` with it. The certificate is the
 same as the one CMS generates at startup (see [TLS Certificate](ssl_certificate.md#generated-certificate)),

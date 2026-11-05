@@ -35,7 +35,7 @@ Permissions required to run this task: none (no login required)
 | is_default_cert | yes or no. yes when the key pair CMS checked at startup is one an earlier version shipped, whose private key is public; this happens only with `ssl_cert_auto_generate=NO` in `cm.conf`. See [TLS Certificate](ssl_certificate.md) |
 
 `is_default_cert` is the result of the check made when CMS started; it does not change until CMS
-restarts, even when [generatecert](generatecert.md) replaces the files.
+restarts, even when [generatecert](generatecert.md) (debug builds) replaces the files.
 
 ## Response Sample
 

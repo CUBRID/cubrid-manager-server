@@ -22,7 +22,7 @@
  * cm_ssl_cert.cpp - the TLS certificate and private key of the manager server
  *
  *   cm_ssl_cert_ensure ()              startup check: keep, generate or replace
- *   cm_ssl_cert_generate ()            new key pair (startup and generatecert)
+ *   cm_ssl_cert_generate ()            new key pair (generatecert, debug builds only)
  *   cm_ssl_cert_shipped_key_in_use ()  result of the startup check
  *
  *   A key is identified by the SHA-256 of its public key (DER). MD5 is not
@@ -2035,8 +2035,8 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, std::string &why
 		       + shipped_keys[shipped].desc + ", and TLS refuses it (" + reason + ")");
 	}
       LOG_ERROR ("the SSL key pair %s, %s is the %s. Its private key is public, so TLS does not authenticate "
-		 "this server. Set %s=YES in cm.conf and restart, run generatecert, or install a certificate with "
-		 "a new private key.", cert.path.c_str (), key.path.c_str (), shipped_keys[shipped].desc,
+		 "this server. Set %s=YES in cm.conf and restart, or install a certificate with a new private "
+		 "key.", cert.path.c_str (), key.path.c_str (), shipped_keys[shipped].desc,
 		 CONF_AUTO_GENERATE);
       shipped_key_in_use = true;
       log_fingerprint (cert.path, cert.cert);

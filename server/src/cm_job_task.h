@@ -445,7 +445,9 @@ int ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_auto_update (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_is_update_success (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_monitor_process (nvplist *req, nvplist *res, char *_dbmt_error);
+#if !defined (NDEBUG)
 int ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error);
+#endif
 int
 ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
 		 int type);
