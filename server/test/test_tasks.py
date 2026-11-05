@@ -289,6 +289,8 @@ cmsip, port = load_config()
 url = "/cm_api"
 
 token = ""
+# The login request init_env() succeeded with, for login_again().
+login_request = None
 CUBRID = ""
 CUBRID_DATABASES = ""
 
@@ -337,6 +339,10 @@ helper_procs = []
 #                                  any element has the value. JSON types must
 #                                  match: 2 is not "2", and true is not 1; an
 #                                  empty object stops the run
+#   "test_source_ip": "<address>"  send this request from that local address
+#                                  (removed before sending), so that the
+#                                  manager sees another client; see
+#                                  exec_task ()
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -478,19 +484,33 @@ def judged_status(data, expected, note_text=None, no_text=None, body="",
 ssl_context = ssl._create_unverified_context()
 
 
-def exec_task(ip, port, url, body):
+def exec_task(ip, port, url, body, source_ip=None):
     """Send one request to the manager server.
 
     A refused connection means the manager is not running, which is worth
     saying plainly: as a traceback out of http.client it reads like a bug in
     the runner rather than a service that has to be started first.
+
+    `source_ip` sends the request from that local address ("test_source_ip"
+    of a case), so that the manager sees it come from another client.
     """
     import http.client
-    conn = http.client.HTTPSConnection(ip, port, context=ssl_context)
+    source = (source_ip, 0) if source_ip else None
+    conn = http.client.HTTPSConnection(ip, port, context=ssl_context,
+                                       source_address=source)
     try:
         conn.request("POST", url, body)
         return conn.getresponse().read()
     except (ConnectionError, socket.error) as exc:
+        if source_ip:
+            # Not a manager that is down: this host cannot send from that
+            # address to cmsip (a loopback source needs a loopback cmsip).
+            print("\033[31mcannot send from %s to the manager server at "
+                  "%s:%s (%s).\033[0m" % (source_ip, ip, port, exc))
+            print("\"test_source_ip\" needs an address of this host that can "
+                  "reach cmsip; 127.0.0.2 works when cmsip is 127.0.0.1 on "
+                  "Linux.")
+            sys.exit(1)
         print("\033[31mcannot reach the manager server at %s:%s (%s).\033[0m"
               % (ip, port, exc))
         print("start it with 'cubrid service start' on that host, or check "
@@ -654,11 +674,11 @@ def follow_job(name, data, token):
 
 def send_one(name, req, token, expected="success", casefile="",
              must_be_sync=False, note_text=None, no_text=None, no_key=None,
-             values=None):
+             values=None, source_ip=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
-    response = exec_task(cmsip, port, url, json.dumps(req))
+    response = exec_task(cmsip, port, url, json.dumps(req), source_ip)
     # Tasks that echo a log file back (loadaccesslog) can carry bytes that are
     # not valid UTF-8, because the server writes error messages with an
     # uninitialized buffer into the log. That is a server defect, but it must
@@ -765,6 +785,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
                   "key path to value.\033[0m" % taskfile)
             sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
+        req_source_ip = req.pop("test_source_ip", None)
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
         if req_sleep:
@@ -772,7 +793,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key,
-                        req_values)
+                        req_values, req_source_ip)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_tokens.append(data["token"])
@@ -906,6 +927,10 @@ def report_status_only(name, entries):
 
 
 SLEEP_LINE = re.compile(r"^sleep[ \t]+(\d+(?:\.\d+)?)$")
+# "cm_conf <key>=<value>" sets a cm.conf entry, "cm_conf <key>" removes it;
+# either restarts the manager server, see change_cm_conf().
+CM_CONF_LINE = re.compile(r"^cm_conf[ \t]+([A-Za-z_][A-Za-z_0-9]*)"
+                          r"(?:[ \t]*=[ \t]*(\S+))?[ \t]*$")
 
 
 def do_all_jobs(token):
@@ -933,6 +958,11 @@ def do_all_jobs(token):
                 seconds = float(wait.group(1))
                 print("sleep %s" % wait.group(1))
                 time.sleep(seconds)
+                continue
+            conf = CM_CONF_LINE.match(line)
+            if conf:
+                # The restart ends every session, the runner's own as well.
+                token = change_cm_conf(conf.group(1), conf.group(2))
                 continue
             name, expected, status_only, must_be_sync = parse_list_line(line)
             do_one_job(name, case_path(name), token, expected,
@@ -1370,6 +1400,82 @@ def wait_for_manager(timeout=90):
     return False
 
 
+def set_cm_conf_entry(cubrid_home, key, value):
+    """Set "key=value" in the [cm] section of cm.conf, or remove the key.
+
+    Only lines that set the key are touched; a commented one ("#key=...", as
+    the default cm.conf has) is left as it is. value None removes the key, so
+    that the manager uses its default.
+    """
+    path = os.path.join(cubrid_home, "conf", "cm.conf")
+    with open(path, "r") as f:
+        lines = f.read().split("\n")
+    pattern = re.compile(r"^\s*%s\s*[=\s]" % re.escape(key))
+    lines = [l for l in lines if not pattern.match(l)]
+    if value is not None:
+        pos = next((i + 1 for i, l in enumerate(lines) if l.strip() == "[cm]"),
+                   len(lines))
+        lines.insert(pos, "%s=%s" % (key, value))
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
+def wait_for_port(timeout=90):
+    """Block until something accepts connections on cmsip:port.
+
+    exec_task() stops the run on a refused connection, which is right for a
+    case but not while waiting for a manager that is still starting.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            socket.create_connection((cmsip, port), timeout=2).close()
+            return True
+        except OSError:
+            time.sleep(1)
+    return False
+
+
+def change_cm_conf(key, value):
+    """Handle a "cm_conf" line of the list: change cm.conf, restart the manager.
+
+    The manager reads cm.conf only at start, so the change needs a restart,
+    and the restart ends every session, the runner's own too. Returns the new
+    token of the runner. prepare_confs() puts cm.conf back at the start of
+    the next run, so a run that stops halfway does not leave the change
+    behind; the list should still undo it at its end.
+    """
+    if not local_env:
+        print("\033[31m%s: \"cm_conf\" needs the manager server on this host "
+              "(%s does not set one up).\033[0m" % (LIST_FILE, REPORT_BASE))
+        sys.exit(1)
+    cubrid_home = os.environ["CUBRID"]
+    set_cm_conf_entry(cubrid_home, key, value)
+    if value is None:
+        print("cm.conf: removed %s" % key)
+    else:
+        print("cm.conf: %s=%s" % (key, value))
+    cubrid_bin = os.path.join(cubrid_home, "bin", "cubrid")
+    run_service_cmd([cubrid_bin, "manager", "stop"], "manager stop")
+    run_service_cmd([cubrid_bin, "manager", "start"], "manager start")
+    if not wait_for_port() or not wait_for_manager():
+        print("\033[31mthe manager server did not start after changing "
+              "cm.conf.\033[0m")
+        sys.exit(1)
+    return login_again()
+
+
+def login_again():
+    """Log the runner in again with the login init_env() used."""
+    data = json.loads(exec_task(cmsip, port, url, json.dumps(login_request))
+                      .decode(errors="replace"))
+    if data.get("status") != "success" or not data.get("token"):
+        print("\033[31mlogin after the manager restart failed: %s\033[0m"
+              % data.get("note", ""))
+        sys.exit(1)
+    return data["token"]
+
+
 def reset_mon_data(cubrid_home):
     """Throw away the monitoring statistics files.
 
@@ -1677,6 +1783,8 @@ def stop_services():
 
 
 def init_env():
+    global login_request
+    login_request = load_task(case_path("login"))
     response = do_one_job("login", case_path("login"), "", record_files=False)
     if response["status"] == "failure":
         request = load_task(case_path("login"))
@@ -1695,6 +1803,7 @@ def init_env():
         if response["status"] == "failure":
             print("login failed, cannot run the tests.")
             sys.exit(1)
+        login_request = request
     token = response["token"]
     response = do_one_job("getenv", case_path("getenv"), token,
                           record_files=False)

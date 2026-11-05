@@ -32,6 +32,7 @@
 #include <unistd.h>
 #endif
 
+#include <deque>
 #include <map>
 #include <string>
 #include <utility>
@@ -41,6 +42,7 @@
 #include "cm_config.h"
 #include "cm_server_util.h"
 #include "cm_user.h"
+#include "cm_session_ip.h"
 
 #define CUBRID_PASS_OPEN_TAG         "<<<:"
 #define CUBRID_PASS_OPEN_TAG_LEN     strlen(CUBRID_PASS_OPEN_TAG)
@@ -811,6 +813,9 @@ struct cm_session
   time_t last_access;
   /* dbname -> (db user, db password) saved by dbmtuserlogin */
   std::map<std::string, std::pair<std::string, std::string> > db_logins;
+  /* request addresses a session IP warning was logged for, oldest first, at
+   * most SESSION_IP_WARNED_MAX (cm_session_ip.h) */
+  std::deque<std::string> warned_ips;
 };
 
 /* token -> session */
@@ -1082,6 +1087,31 @@ dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time)
   it->second.info.login_time = now_time;
   it->second.last_access = now_time;
   return true;
+}
+
+/*
+ * Whether to log a session IP warning for a request from addr in the session
+ * of token: only when addr is not among the addresses warned about recently
+ * (ut_session_ip_should_warn ()). true when the session is not found, so that
+ * nothing is left unlogged.
+ */
+bool
+dbmt_user_session_ip_should_warn (const char *token, const char *addr)
+{
+  if (token == NULL)
+    {
+      return true;
+    }
+
+  session_map_guard guard;
+
+  std::map<std::string, cm_session>::iterator it = g_sessions.find (token);
+  if (it == g_sessions.end ())
+    {
+      return true;
+    }
+
+  return ut_session_ip_should_warn (it->second.warned_ips, addr);
 }
 
 /* Delete one session by its token (e.g. logout). */

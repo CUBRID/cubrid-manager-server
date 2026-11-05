@@ -40,6 +40,7 @@
 #include "cm_mailer.h"
 #include "cm_mon_stat.h"
 #include "cm_user.h"
+#include "cm_session_ip.h"
 
 #include <fstream>
 #include <sstream>
@@ -3015,7 +3016,107 @@ int ext_ut_add_userlist_to_response (Json::Value &response, const T_DBMT_USER &d
   return ERR_NO_ERROR;
 }
 
-bool ext_ut_validate_token (const char *token)
+/*
+ * check_session_ip () - check a request's IP address against the IP address
+ *   its session logged in from, as session_ip_check of cm.conf says
+ *   (sco.session_ip_check).
+ *
+ *   The comparison and the decision for each mode are in cm_session_ip.cpp
+ *   (ut_session_ip_compare (), ut_session_ip_action ()), where they are unit
+ *   tested; this function logs and deletes the session.
+ *
+ *   A warning is logged for an unknown address and for another address, with
+ *   the user, both addresses, the task and what was done; never the token.
+ *   When the request is processed, it is logged only when its address is not
+ *   among the last SESSION_IP_WARNED_MAX addresses warned about in the
+ *   session.
+ *   When the request is rejected (enforce, another address), the session is
+ *   deleted with its DB logins, so the leaked token cannot be used again; the
+ *   caller rejects the request as an invalid token, the same as an expired
+ *   one, so the client learns nothing about the token.
+ *
+ *   Called after the token and its expiry are checked, for a JSON request
+ *   and (debug builds) for /upload.
+ *
+ *   return: true to go on with the request, false to reject it
+ *   token_info(in): the session the token maps to
+ *   token(in): the token, to delete the session
+ *   request_ip(in): address the request came from (NULL if unknown)
+ *   task(in): task name, for the log
+ */
+static bool
+check_session_ip (const T_USER_TOKEN_INFO *token_info, const char *token,
+		  const char *request_ip, const char *task)
+{
+  char login_ip[DBMT_USER_IP_LEN];
+  char req_ip[DBMT_USER_IP_LEN];
+  T_SESSION_IP_MATCH match;
+  T_SESSION_IP_ACTION action;
+
+  if (sco.session_ip_check == SESSION_IP_CHECK_OFF)
+    {
+      return true;
+    }
+
+  match = ut_session_ip_compare (token_info->user_ip, request_ip, login_ip, req_ip,
+				 sizeof (login_ip));
+  action = ut_session_ip_action (sco.session_ip_check, match);
+
+  /*
+   * A request that is processed is logged only when its address is not
+   * among the addresses warned about recently in the session
+   * (dbmt_user_session_ip_should_warn ()), so that a client sharing its
+   * token or a proxy pool does not fill the error log; a rejection is always
+   * logged.
+   */
+  if (match == SESSION_IP_UNKNOWN)
+    {
+      if (dbmt_user_session_ip_should_warn (token, request_ip))
+	{
+	  LOG_WARN ("session IP check: unknown address, not compared "
+		    "(user: %s, login IP: %s, request IP: %s, task: %s); "
+		    "logged once per address (last %d addresses) in this session",
+		    token_info->user_id, token_info->user_ip,
+		    (request_ip != NULL) ? request_ip : "-", task, (int) SESSION_IP_WARNED_MAX);
+	}
+    }
+  else if (match == SESSION_IP_DIFFERENT)
+    {
+      if (action == SESSION_IP_REJECT)
+	{
+	  LOG_WARN ("session IP check: request from another IP "
+		    "(user: %s, login IP: %s, request IP: %s, task: %s): rejected, session deleted",
+		    token_info->user_id, login_ip, req_ip, task);
+	}
+      else if (dbmt_user_session_ip_should_warn (token, req_ip))
+	{
+	  LOG_WARN ("session IP check: request from another IP "
+		    "(user: %s, login IP: %s, request IP: %s, task: %s): processed; "
+		    "logged once per address (last %d addresses) in this session",
+		    token_info->user_id, login_ip, req_ip, task, (int) SESSION_IP_WARNED_MAX);
+	}
+    }
+
+  if (action == SESSION_IP_REJECT)
+    {
+      dbmt_user_delete_token_info_by_token (token);
+      return false;
+    }
+
+  return true;
+}
+
+#if !defined (NDEBUG)
+/*
+ * ext_ut_validate_token () - validate the token of a /upload request (the
+ *   cookie), which only debug builds serve (cub_post_request_handler ()).
+ *   The same checks as for a JSON request, including check_session_ip ().
+ *
+ *   return: true if the request may go on
+ *   token(in): token from the cookie
+ *   request_ip(in): address the request came from (NULL if unknown)
+ */
+bool ext_ut_validate_token (const char *token, const char *request_ip)
 {
   T_USER_TOKEN_INFO token_info;
   time_t now_time = time (0);
@@ -3041,6 +3142,12 @@ bool ext_ut_validate_token (const char *token)
       return false;
     }
 
+  /* before the session is touched, as for a JSON request */
+  if (!check_session_ip (&token_info, token, request_ip, "/upload"))
+    {
+      return false;
+    }
+
   if (!dbmt_user_touch_token_login_time_by_token (token, now_time))
     {
       return false;
@@ -3048,6 +3155,7 @@ bool ext_ut_validate_token (const char *token)
 
   return true;
 }
+#endif
 
 int ext_ut_validate_token (Json::Value &request, Json::Value &response)
 {
@@ -3055,6 +3163,7 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
   T_USER_TOKEN_INFO token_info;
   string task;
   string token;
+  const char *request_ip = NULL;
   time_t now_time = time (0);
   time_t active_time;
 
@@ -3107,7 +3216,21 @@ int ext_ut_validate_token (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
     }
 
-  /* see the comment in the (const char *token) overload above */
+  /*
+   * _CLIENTIP is the address of this request's connection, normalized
+   * (cub_add_private_param ()). Checked before the session is touched, so a
+   * rejected request does not extend it.
+   */
+  if (request.isMember ("_CLIENTIP") && request["_CLIENTIP"].isString ())
+    {
+      request_ip = request["_CLIENTIP"].asCString ();
+    }
+  if (!check_session_ip (&token_info, token.c_str (), request_ip, task.c_str ()))
+    {
+      return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");
+    }
+
+  /* the request is accepted: update the session's last access time */
   if (!dbmt_user_touch_token_login_time_by_token (token.c_str(), now_time))
     {
       return build_server_header (response, ERR_INVALID_TOKEN, "Request is rejected due to invalid token. Please reconnect.");

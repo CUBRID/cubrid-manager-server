@@ -1,0 +1,82 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "iptest_default",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "iptest_default",
+  "password": "iptest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "iptest_default",
+  "password": "iptest1",
+  "clientver": "8.4",
+  "test_source_ip": "127.0.0.1"
+ },
+ {
+  "task": "dbmtuserlogin",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "iptest_default",
+  "dbname": "demodb",
+  "dbuser": "dba",
+  "dbpasswd": "",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_source_ip": "127.0.0.2",
+  "test_expect": "success"
+ },
+ {
+  "task": "dbmtuserlogin",
+  "token": "$CASE_LOGIN_TOKEN",
+  "targetid": "iptest_default",
+  "dbname": "demodb",
+  "dbuser": "dba",
+  "dbpasswd": "",
+  "test_source_ip": "127.0.0.2",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "success"
+ },
+ {
+  "task": "keepalive",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_source_ip": "127.0.0.1",
+  "test_expect": "failure",
+  "test_note": "invalid token"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "iptest_default"
+ }
+]

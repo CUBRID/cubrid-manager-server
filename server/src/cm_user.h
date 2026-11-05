@@ -27,6 +27,15 @@
 
 #define DBMT_USER_NAME_LEN 64
 
+/*
+ * DBMT_USER_IP_LEN - size of a buffer that holds a client IP address in text
+ *   form. Not less than INET6_ADDRSTRLEN on any supported platform (46 on
+ *   POSIX, 65 on Windows); a number here so that this header does not need
+ *   the network headers. cm_server_util.cpp checks it against
+ *   INET6_ADDRSTRLEN.
+ */
+#define DBMT_USER_IP_LEN 65
+
 typedef struct
 {
   char dbname[DBMT_USER_NAME_LEN];
@@ -72,7 +81,7 @@ typedef struct T_USER_TOKEN_INFO T_USER_TOKEN_INFO;
 struct T_USER_TOKEN_INFO
 {
   char user_id[DBMT_USER_NAME_LEN];
-  char user_ip[20];
+  char user_ip[DBMT_USER_IP_LEN];
   char user_port[10];
 #ifdef WINDOWS
   HANDLE proc_id;
@@ -142,6 +151,7 @@ int dbmt_user_new_token_info (const char *user_id,
 
 bool dbmt_user_search_token_info_by_token (const char *token, T_USER_TOKEN_INFO *out);
 bool dbmt_user_touch_token_login_time_by_token (const char *token, time_t now_time);
+bool dbmt_user_session_ip_should_warn (const char *token, const char *addr);
 bool dbmt_user_delete_token_info_by_token (const char *token);
 int dbmt_user_delete_all_sessions_of_user (const char *user_id);
 void dbmt_user_purge_expired_sessions (time_t now_time);

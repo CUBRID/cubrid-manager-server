@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include "cm_porting.h"
+#include "cm_session_ip.h"
 
 #define MAX_INSTALLED_DB                256
 #define MAX_UNICAS_PROC                 40
@@ -36,6 +37,7 @@
 #define MAX_MAX_SESSIONS_PER_USER       64
 #define DEFAULT_MAX_SESSIONS_PER_USER   16
 #define DEFAULT_TOKEN_ACTIVE_TIME       7200    /* token_active_time (seconds): default */
+#define DEFAULT_SESSION_IP_CHECK        SESSION_IP_CHECK_LOG    /* session_ip_check: default */
 #define MAX_NUM_ASYNC_TASK_LIMIT        12
 #define DEFAULT_MAX_NUM_ASYNC_TASK      8       /* default max number of concurrently running async ("async":"yes") jobs */
 
@@ -617,6 +619,7 @@ typedef struct
   char szAutoUpdateURL[PATH_MAX];
   char szCMSVersion[PATH_MAX];
   int iTokenActiveTime;		/* token_active_time (seconds), always > 0 */
+  T_SESSION_IP_CHECK session_ip_check;	/* session_ip_check */
   char szMaxSessionsPerUser[PATH_MAX];
   int hmtab1, hmtab2, hmtab3, hmtab4;
   char szAccessLog[PATH_MAX];
