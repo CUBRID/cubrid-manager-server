@@ -121,6 +121,10 @@ VOLATILE_KEYS = frozenset((
     "file_table_size", "file_count", "totalnum", "total_size",
     # job id of an async (or timed out) request, new on every run
     "uuid",
+    # lockdb: memory of the object lock table, the allocated entries and
+    # resources times their struct sizes. It grows with the locks the run has
+    # held so far and changes with the engine build.
+    "sizelock",
 ))
 
 # Lists the server builds from readdir(), whose order depends on the file
