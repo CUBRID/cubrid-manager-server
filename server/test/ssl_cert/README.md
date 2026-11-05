@@ -18,6 +18,7 @@ CXX=clang++ ./run_ssl_cert_tests.sh                              # 다른 컴파
 - root가 아닌 사용자로 실행한다. root는 파일 권한과 무관하게 읽고 쓰므로, 권한 시나리오
   (읽을 수 없는 키, 쓸 수 없는 conf 디렉터리)는 root로 실행하면 건너뛴다(`SKIP`).
 - driver가 빌드되지 않거나 확인이 하나라도 실패하면 0이 아닌 값으로 끝난다.
+- PR마다 CI(`.github/workflows/check.yml`의 `unit-test` job)에서 `../unit/run_unit_tests.sh` 다음에 실행된다.
 
 ## 파일
 
