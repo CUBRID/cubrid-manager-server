@@ -919,6 +919,18 @@ ok "ssl_cert_san with bad entries: starts, good entry added" "[ $RET = 0 ] && gr
 ok "ssl_cert_san with bad entries: bad entries left out and logged" \
   "! grep -q 'bad_name' <<< \"\$san\" && [ \$(log | grep -c 'ssl_cert_san in cm.conf: ignored') = 4 ]"
 
+# DNS names are checked label by label (RFC 1123)
+setup
+l63=$(printf 'a%.0s' $(seq 1 63))
+export SSL_CERT_SAN="DNS:a..b,DNS:a-.example.com,DNS:-a.example.com,DNS:${l63}a.com,DNS:example.com.,DNS:a-b.example.com,DNS:${l63}.com"
+ensure YES
+unset SSL_CERT_SAN
+san=$(openssl x509 -in "$CRT" -noout -ext subjectAltName 2> /dev/null | tail -1)
+ok "ssl_cert_san DNS labels: valid names added" \
+  "[ $RET = 0 ] && grep -q 'DNS:a-b.example.com' <<< \"\$san\" && grep -q \"DNS:${l63}.com\" <<< \"\$san\""
+ok "ssl_cert_san DNS labels: empty, '-'-ended, 64-character labels and a trailing dot left out" \
+  "! grep -q 'a\.\.b\|a-\.example\|-a\.example\|example\.com\.\|${l63}a' <<< \"\$san\" && [ \$(log | grep -c 'ssl_cert_san in cm.conf: ignored DNS:') = 5 ]"
+
 # at most 32 entries
 setup
 list=""

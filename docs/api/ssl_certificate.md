@@ -60,7 +60,7 @@ openssl x509 -in $CUBRID/conf/cm_ssl_cert.crt -noout -fingerprint -sha256
 | key | RSA 2048, generated for each installation. The private key is written with mode 0600 |
 | version, serial number | X.509 v3, a random positive 128-bit serial number |
 | signature | sha256WithRSAEncryption |
-| subject, issuer | `C=KR, ST=SEOUL, L=Default City, O=CUBRID, OU=RND, CN=<host name>, emailAddress=admin@cubrid.com`, self-signed. When the host name is unknown, is not a valid DNS name (only letters, digits, `-` and `.`; for example a name with `_`) or is longer than 64 characters, CN is `cubrid-manager-server` |
+| subject, issuer | `C=KR, ST=SEOUL, L=Default City, O=CUBRID, OU=RND, CN=<host name>, emailAddress=admin@cubrid.com`, self-signed. When the host name is unknown, is not a valid DNS name (see [Subject alternative names](#subject-alternative-names); for example a name with `_`) or is longer than 64 characters, CN is `cubrid-manager-server` |
 | basic constraints | critical, CA:FALSE |
 | key usage | critical, digitalSignature, keyEncipherment |
 | extended key usage | serverAuth |
@@ -108,7 +108,7 @@ A client that pins the fingerprint (the default) does not look at these names. A
 ssl_cert_san=DNS:cms.example.com,IP:10.0.0.5,IP:fd00::5
 ```
 
-- Entries are `DNS:<name>` or `IP:<IPv4 or IPv6 address>`, separated by commas, at most 32. They are added to the default names; duplicates are dropped. A name may contain only letters, digits, `-` and `.` (no wildcard).
+- Entries are `DNS:<name>` or `IP:<IPv4 or IPv6 address>`, separated by commas, at most 32. They are added to the default names; duplicates are dropped. A name must be a valid host name: labels of 1 to 63 letters, digits and `-` separated by single dots, no label starting or ending with `-`, at most 253 characters, no trailing dot and no wildcard.
 - An entry that cannot be used is left out, and `cub_manager.err` names it.
 - `ssl_cert_san` is used only when a key pair is generated. After changing it, generate a new key pair (stop CMS, remove `cm_ssl_cert.crt` and `cm_ssl_cert.key`, start it with `ssl_cert_auto_generate=YES`); clients then see a new fingerprint.
 - Until then, for a self-signed certificate, a warning in `cub_manager.err` on every start names the entries of `ssl_cert_san` the certificate does not have, and the names it has that neither the defaults nor `ssl_cert_san` list (for example an address removed from `ssl_cert_san`, or the interface addresses an earlier build put in it), since anyone who can reach the port can read them. If you made that self-signed certificate yourself, you can ignore the warning.

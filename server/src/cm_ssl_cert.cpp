@@ -128,6 +128,7 @@ static const char *leftover_key_names[] = { "cm_ssl_cert_1024.key", "cm_ssl_cert
 #define CERT_SERIAL_BYTES               16	/* 128 bits */
 #define CERT_CN_MAX                     64	/* ub-common-name */
 #define CERT_DNS_NAME_MAX               253
+#define CERT_DNS_LABEL_MAX              63
 #define CERT_MAX_EXTRA_SAN              32	/* entries of ssl_cert_san */
 #define CERT_MAX_FILE_SIZE              (1024 * 1024)
 
@@ -721,26 +722,46 @@ local_host_name (void)
 }
 
 /*
- * is_dns_name () - letters, digits, '-' and '.', as a SAN dNSName allows
+ * is_dns_name () - a host name as a SAN dNSName and the CN hold it
+ *   (RFC 1123 labels): at most 253 characters; labels separated by single
+ *   dots, each 1 to 63 letters, digits and '-', neither starting nor ending
+ *   with '-'; no trailing dot, no wildcard. Strict clients refuse anything
+ *   else, so such a name is left out rather than put in the certificate.
  */
 static bool
 is_dns_name (const std::string &name)
 {
-  size_t i;
+  size_t start = 0;
 
-  if (name.empty () || name.size () > CERT_DNS_NAME_MAX || name[0] == '.' || name[0] == '-'
-      || name[name.size () - 1] == '.')
+  if (name.empty () || name.size () > CERT_DNS_NAME_MAX)
     {
       return false;
     }
-  for (i = 0; i < name.size (); i++)
+  while (start <= name.size ())
     {
-      char c = name[i];
+      size_t dot = name.find ('.', start);
+      size_t end = (dot == std::string::npos) ? name.size () : dot;
+      size_t len = end - start;
+      size_t i;
 
-      if (! ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.'))
+      if (len == 0 || len > CERT_DNS_LABEL_MAX || name[start] == '-' || name[end - 1] == '-')
 	{
-	  return false;
+	  return false;		/* empty (a..b, .a, a.), too long, or '-' at an end */
 	}
+      for (i = start; i < end; i++)
+	{
+	  char c = name[i];
+
+	  if (! ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-'))
+	    {
+	      return false;
+	    }
+	}
+      if (dot == std::string::npos)
+	{
+	  break;
+	}
+      start = dot + 1;
     }
   return true;
 }
