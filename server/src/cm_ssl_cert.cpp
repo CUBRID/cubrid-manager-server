@@ -1552,6 +1552,72 @@ replace_file (const std::string &src, const std::string &dst, std::string &err)
   return true;
 }
 
+static std::string dir_of (const std::string &path);
+
+/*
+ * sync_dirs () - make the directory entries of path_a and path_b (their
+ *   creations, renames and removals so far) durable
+ *
+ *   A replacement is a sequence of renames and removals that
+ *   recover_interrupted () reads back after a crash or a power loss; it can
+ *   only tell where the sequence stopped if each step reached the disk before
+ *   the next one. The file contents are fsynced by write_new_file (), but a
+ *   rename or unlink changes the directory, which POSIX makes durable only by
+ *   fsyncing the directory. On Windows MoveFileEx () is called with
+ *   MOVEFILE_WRITE_THROUGH, which returns once the move is on disk, and NTFS
+ *   journals directory changes in order; there is no portable way to flush a
+ *   directory handle there, so this does nothing.
+ */
+static bool
+sync_dirs (const std::string &path_a, const std::string &path_b, std::string &err)
+{
+#if defined (WINDOWS)
+  /* nothing to do in Windows, codes just avoid compiler warning */
+  (void) path_a;
+  (void) path_b;
+  (void) err;
+  return true;
+#else
+  std::string dirs[2];
+  int n = 0;
+  int i;
+
+  dirs[n++] = dir_of (path_a);
+  if (dir_of (path_b) != dirs[0])
+    {
+      dirs[n++] = dir_of (path_b);
+    }
+  for (i = 0; i < n; i++)
+    {
+      std::string dir = dirs[i].empty ()? std::string (".") : dirs[i];
+      int flags = O_RDONLY;
+      int fd;
+
+#if defined (O_DIRECTORY)
+      flags |= O_DIRECTORY;
+#endif
+#if defined (O_CLOEXEC)
+      flags |= O_CLOEXEC;
+#endif
+      fd = open (dir.c_str (), flags);
+      if (fd < 0)
+	{
+	  err = "cannot open the directory " + dir + ": " + errno_string (errno);
+	  return false;
+	}
+      /* EINVAL: a file system that cannot sync a directory; nothing more can be done */
+      if (fsync (fd) != 0 && errno != EINVAL)
+	{
+	  err = "cannot sync the directory " + dir + ": " + errno_string (errno);
+	  close (fd);
+	  return false;
+	}
+      close (fd);
+    }
+  return true;
+#endif
+}
+
 static bool
 random_suffix (std::string &suffix, std::string &err)
 {
@@ -1617,6 +1683,11 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
 	  break;
 	}
 
+      /*
+       * Each step below reaches the disk before the next one (sync_dirs ()),
+       * so that after a power loss recover_interrupted () finds a state the
+       * sequence actually went through.
+       */
       if (path_entry_exists (key_path))
 	{
 	  if (!replace_file (key_path, key_old, err))
@@ -1633,12 +1704,24 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
 	    }
 	  key_marked = true;
 	}
+      if (!sync_dirs (key_path, cert_path, err))
+	{
+	  break;
+	}
       if (!replace_file (key_tmp, key_path, err))
 	{
 	  break;
 	}
       key_placed = true;
+      if (!sync_dirs (key_path, cert_path, err))
+	{
+	  break;
+	}
       if (!replace_file (cert_tmp, cert_path, err))
+	{
+	  break;
+	}
+      if (!sync_dirs (key_path, cert_path, err))
 	{
 	  break;
 	}
@@ -1657,6 +1740,11 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
       if (key_marked)
 	{
 	  unlink (key_new_mark.c_str ());
+	}
+      /* a crash before this reaches the disk leaves a record of a completed replacement, which is removed */
+      if (!sync_dirs (key_path, cert_path, e2))
+	{
+	  LOG_WARN ("%s", e2.c_str ());
 	}
       return true;
     }
@@ -1682,6 +1770,11 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
   else if (key_placed && unlink (key_path.c_str ()) != 0)
     {
       e2 = "cannot remove " + key_path + ": " + errno_string (errno);
+      undone = false;
+    }
+  /* the previous state must be on disk before the records of the replacement are removed */
+  if (undone && (key_set_aside || key_placed) && !sync_dirs (key_path, cert_path, e2))
+    {
       undone = false;
     }
 
@@ -2060,6 +2153,21 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path, 
 	}
     }
 
+  /*
+   * the keys put back or removed above must be on disk before the temporary
+   * certificates that tell an interrupted replacement are removed below
+   */
+  if (!sync_dirs (key_path, cert_path, err))
+    {
+      LOG_ERROR ("cannot make the recovery of an interrupted replacement of the SSL key pair durable: %s. "
+		 "The files are left as they are; fix the cause and restart.", err.c_str ());
+      if (why.empty ())
+	{
+	  why = "cannot recover an interrupted replacement of the SSL key pair: " + err;
+	}
+      return false;
+    }
+
   for (int which = 0; which < 2; which++)
     {
       const std::string &path = (which == 0) ? cert_path : key_path;
@@ -2088,6 +2196,10 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path, 
 			errno_string (errno).c_str ());
 	    }
 	}
+    }
+  if (!sync_dirs (key_path, cert_path, err))
+    {
+      LOG_WARN ("%s", err.c_str ());
     }
   return ok;
 }

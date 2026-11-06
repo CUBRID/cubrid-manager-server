@@ -26,13 +26,38 @@
  *                     source path contains one of them
  *   FAULT_UNLINK_END  comma-separated suffixes: unlink () fails when its path
  *                     ends with one of them
+ *   FAULT_FSYNC_DIR   if set, fsync () of a directory fails with EIO
+ *   FAULT_TRACE       a file to which each rename (), unlink () and fsync ()
+ *                     of a directory is appended, one line each, so that a
+ *                     test can check their order
  */
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static void
+trace (const char *what, const char *a, const char *b)
+{
+  const char *path = getenv ("FAULT_TRACE");
+  FILE *fp;
+
+  if (path == NULL || path[0] == '\0')
+    {
+      return;
+    }
+  fp = fopen (path, "a");
+  if (fp != NULL)
+    {
+      fprintf (fp, "%s %s%s%s\n", what, a, b != NULL ? " " : "", b != NULL ? b : "");
+      fclose (fp);
+    }
+}
 
 static int
 matches (const char *path, const char *list, int suffix)
@@ -72,6 +97,7 @@ rename (const char *oldpath, const char *newpath)
       errno = EACCES;
       return -1;
     }
+  trace ("rename", oldpath, newpath);
   return real_rename (oldpath, newpath);
 }
 
@@ -89,5 +115,28 @@ unlink (const char *path)
       errno = EACCES;
       return -1;
     }
+  trace ("unlink", path, NULL);
   return real_unlink (path);
+}
+
+int
+fsync (int fd)
+{
+  static int (*real_fsync) (int) = NULL;
+  struct stat st;
+
+  if (real_fsync == NULL)
+    {
+      real_fsync = (int (*)(int)) dlsym (RTLD_NEXT, "fsync");
+    }
+  if (fstat (fd, &st) == 0 && S_ISDIR (st.st_mode))
+    {
+      if (getenv ("FAULT_FSYNC_DIR") != NULL)
+	{
+	  errno = EIO;
+	  return -1;
+	}
+      trace ("fsyncdir", "", NULL);
+    }
+  return real_fsync (fd);
 }

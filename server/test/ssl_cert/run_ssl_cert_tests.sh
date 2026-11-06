@@ -697,6 +697,35 @@ else
   echo "SKIP  failing undo scenarios (fault_inject.so could not be built)"
 fi
 
+# directory entries reach the disk in order: each rename is followed by an
+# fsync of the directory before the next step (traced with fault_inject.so)
+if [ -n "$fault_lib" ]; then
+  setup
+  make_own_pair
+  LD_PRELOAD="$fault_lib" FAULT_TRACE="$work/trace" timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  steps=$(grep -v '^unlink [^ ]*\.tmp-' "$work/trace" | sed -e 's| [^ ]*/cm_ssl_cert\.key\.old-[0-9a-f]*| OLD|g' \
+    -e 's| [^ ]*/cm_ssl_cert\.key\.tmp-[0-9a-f]*| KEYTMP|g' -e 's| [^ ]*/cm_ssl_cert\.crt\.tmp-[0-9a-f]*| CRTTMP|g' \
+    -e 's| [^ ]*/cm_ssl_cert\.key | KEY |' -e 's| [^ ]*/cm_ssl_cert\.key$| KEY|' -e 's| [^ ]*/cm_ssl_cert\.crt$| CRT|' | tr '\n' ';')
+  rm -f "$work/trace"
+  ok "replacement: directory synced after each step" \
+    "[ $RET = 0 ] && [ \"\$steps\" = 'rename KEY OLD;fsyncdir ;rename KEYTMP KEY;fsyncdir ;rename CRTTMP CRT;fsyncdir ;unlink OLD;fsyncdir ;' ]"
+
+  # a directory that cannot be synced: the replacement is undone, the previous pair stays
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  LD_PRELOAD="$fault_lib" FAULT_FSYNC_DIR=1 timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "directory cannot be synced: generate fails, previous pair kept" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && grep -q 'cannot sync the directory' $work/out"
+  ensure YES
+  ok "directory cannot be synced, next start: previous pair, no work files" \
+    "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+fi
+
 # names that are not work files are left alone
 setup
 make_own_pair

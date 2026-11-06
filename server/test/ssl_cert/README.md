@@ -26,7 +26,7 @@ CXX=clang++ ./run_ssl_cert_tests.sh                              # 다른 컴파
 | --- | --- |
 | `run_ssl_cert_tests.sh` | driver를 빌드하고 시나리오를 실행 |
 | `ssl_cert_driver.cpp` | `cm_ssl_cert.cpp`의 함수를 명령행에서 한 번 호출하고 결과를 출력 |
-| `fault_inject.c` | `LD_PRELOAD`로 지정한 `rename ()`, `unlink ()` 호출을 실패시키는 라이브러리. Windows에서 다른 프로그램이 파일을 열고 있을 때의 실패를 재현 (빌드할 수 없으면 해당 시나리오를 건너뜀) |
+| `fault_inject.c` | `LD_PRELOAD`로 지정한 `rename ()`, `unlink ()`, 디렉터리 `fsync ()` 호출을 실패시키거나 순서를 기록하는 라이브러리. Windows에서 다른 프로그램이 파일을 열고 있을 때의 실패와, 교체 단계마다 디렉터리가 동기화되는지를 확인 (빌드할 수 없으면 해당 시나리오를 건너뜀) |
 | `shipped/11.3/cm_ssl_cert.crt/.key` | release/11.3 이전에 배포한 RSA 1024 키쌍 |
 | `shipped/develop/cm_ssl_cert_1024.crt/.key`, `cm_ssl_cert_2048.crt/.key` | develop에서 배포한 키쌍 |
 
