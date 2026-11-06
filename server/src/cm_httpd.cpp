@@ -1066,7 +1066,7 @@ main (int argc, char **argv)
 
   ut_daemon_start ();
 
-  /* One cub_manager per configuration. Take the lock before touching any * shared file. */
+  /* One cub_manager per configuration. Take the lock before touching any shared file. */
   if (cm_ssl_cert_lock_process (sco.szSSLKey, tmpstrbuf, sizeof (tmpstrbuf)) != 0)
     {
       char msg[DBMT_ERROR_MSG_SIZE];
