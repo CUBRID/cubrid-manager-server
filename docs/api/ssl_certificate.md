@@ -109,7 +109,7 @@ ssl_cert_san=DNS:cms.example.com,IP:10.0.0.5,IP:fd00::5
 ```
 
 - Entries are `DNS:<name>` or `IP:<IPv4 or IPv6 address>`, separated by commas, at most 32. They are added to the default names; duplicates are dropped. A name must be a valid host name: labels of 1 to 63 letters, digits and `-` separated by single dots, no label starting or ending with `-`, at most 253 characters, no trailing dot and no wildcard.
-- An entry that cannot be used is left out, and `cub_manager.err` names it.
+- An entry that cannot be used is left out, and `cub_manager.err` names it. The whole setting is one line of at most 1023 characters; a longer line is ignored as a whole, with a message, rather than cut.
 - `ssl_cert_san` is used only when a key pair is generated. After changing it, generate a new key pair (stop CMS, remove `cm_ssl_cert.crt` and `cm_ssl_cert.key`, start it with `ssl_cert_auto_generate=YES`); clients then see a new fingerprint.
 - Until then, for a self-signed certificate, a warning in `cub_manager.err` on every start names the entries of `ssl_cert_san` the certificate does not have, and the names it has that neither the defaults nor `ssl_cert_san` list (for example an address removed from `ssl_cert_san`, or the interface addresses an earlier build put in it), since anyone who can reach the port can read them. If you made that self-signed certificate yourself, you can ignore the warning.
 - `ssl_cert_san` does not apply to a certificate issued by a CA: its names are those you asked the CA for. No warning is given for it; to change its names, have the CA issue a new one.
