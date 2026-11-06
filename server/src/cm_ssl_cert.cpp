@@ -2683,8 +2683,20 @@ hold_process_lock (const std::string &key_path, std::string &err, bool &busy)
   return true;
 }
 
-/* ------------------------------------------------------------------ public */
-
+/*
+ * cm_ssl_cert_ensure () - check the key pair at startup, before init_SSL ()
+ *
+ *   return: 0 if cert_path/key_path hold a usable key pair (kept, generated or
+ *           replaced), -1 if the manager must not start. The reason and what
+ *           to do are logged.
+ *   cert_path(in): certificate file (PEM)
+ *   key_path(in): private key file (PEM)
+ *   auto_generate(in): ssl_cert_auto_generate of cm.conf
+ *   extra_san(in): ssl_cert_san of cm.conf, used when a key pair is generated;
+ *                  NULL or empty for none
+ *   err_buf(out): on failure, why in one line (for stderr), may be NULL
+ *   err_size(in): size of err_buf
+ */
 int
 cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate, const char *extra_san,
 		    char *err_buf, size_t err_size)
@@ -2743,6 +2755,19 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
   return ret;
 }
 
+/*
+ * cm_ssl_cert_generate () - generate a new key pair and replace the files
+ *
+ *   Used by generatecert, which only debug builds offer (CBRD-27829); the
+ *   startup check generates through the same code.
+ *
+ *   return: 0 on success, -1 on failure (the existing files are unchanged).
+ *   cert_path(in): certificate file (PEM)
+ *   key_path(in): private key file (PEM), created with mode 0600
+ *   opts(in): subject and validity, NULL for the defaults
+ *   err_buf(out): why it failed, may be NULL
+ *   err_size(in): size of err_buf
+ */
 int
 cm_ssl_cert_generate (const char *cert_path, const char *key_path, const T_CM_SSL_CERT_OPTS *opts, char *err_buf,
 		      size_t err_size)
@@ -2783,6 +2808,20 @@ cm_ssl_cert_generate (const char *cert_path, const char *key_path, const T_CM_SS
   return 0;
 }
 
+/*
+ * cm_ssl_cert_lock_process () - make this process the only cub_manager using
+ *   this configuration: take the lock <key_path>.lock and keep it until the
+ *   process exits. Called by main () before it touches any shared file (the
+ *   pid file, the session list); cm_ssl_cert_ensure () takes it too if it was
+ *   not taken. Waits a few seconds for a previous process that is exiting.
+ *
+ *   return: 0 if this process holds it (or the directory is not writable, so
+ *           that no process can change anything there), -1 if another process
+ *           holds it
+ *   key_path(in): private key file (PEM); the lock file is next to it
+ *   err_buf(out): on failure, why in one line (for stderr), may be NULL
+ *   err_size(in): size of err_buf
+ */
 int
 cm_ssl_cert_lock_process (const char *key_path, char *err_buf, size_t err_size)
 {
@@ -2813,6 +2852,10 @@ cm_ssl_cert_lock_process (const char *key_path, char *err_buf, size_t err_size)
   return 0;
 }
 
+/*
+ * cm_ssl_cert_shipped_key_in_use () - did cm_ssl_cert_ensure () accept a key
+ *   pair that an earlier version shipped (ssl_cert_auto_generate=NO)?
+ */
 bool
 cm_ssl_cert_shipped_key_in_use (void)
 {
