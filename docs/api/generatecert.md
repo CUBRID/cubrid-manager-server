@@ -41,7 +41,7 @@ Permissions required to run this task: ADMIN
 The subject has only the fields given. When none is given, the default subject of
 [the generated certificate](ssl_certificate.md#generated-certificate) is used. A field value
 that a certificate cannot hold (for example a country name that is not two letters) fails the
-task. The subject alternative names are always those of the generated certificate.
+task. The subject alternative names are those of the generated certificate: the default names and `ssl_cert_san` of `cm.conf`.
 
 ## Request Sample
 

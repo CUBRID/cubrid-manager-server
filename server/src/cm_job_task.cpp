@@ -16925,6 +16925,7 @@ ts_generate_cert (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       opts.days = 365;
     }
+  opts.extra_san = sco.szSSLCertSan;
 
   /*
    * Same certificate as the one generated at startup, written to the

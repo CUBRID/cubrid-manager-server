@@ -31,6 +31,8 @@
  *   ssl_cert_driver generate <crt> <key> [country [common_name [days]]]
  *     cm_ssl_cert_generate (); without country the default options (NULL)
  *
+ *   SSL_CERT_SAN, if set, is passed as ssl_cert_san of cm.conf.
+ *
  *   The manager log is written to $LOGDIR/cub_manager.log (INFO) and
  *   $LOGDIR/cub_manager.err (WARN and above).
  */
@@ -74,7 +76,8 @@ main (int argc, char **argv)
 
   if (strcmp (argv[1], "ensure") == 0 && argc == 5)
     {
-      ret = cm_ssl_cert_ensure (argv[2], argv[3], strcmp (argv[4], "YES") == 0, msg, sizeof (msg));
+      ret = cm_ssl_cert_ensure (argv[2], argv[3], strcmp (argv[4], "YES") == 0, getenv ("SSL_CERT_SAN"), msg,
+				sizeof (msg));
       printf ("ret=%d shipped_in_use=%d why=%s\n", ret, cm_ssl_cert_shipped_key_in_use ()? 1 : 0, msg);
       return ret == 0 ? 0 : 1;
     }
@@ -84,6 +87,7 @@ main (int argc, char **argv)
       T_CM_SSL_CERT_OPTS opts;
 
       memset (&opts, 0, sizeof (opts));
+      opts.extra_san = getenv ("SSL_CERT_SAN");
       if (argc > 4)
 	{
 	  opts.country = argv[4];
@@ -96,7 +100,8 @@ main (int argc, char **argv)
 	{
 	  opts.days = atoi (argv[6]);
 	}
-      ret = cm_ssl_cert_generate (argv[2], argv[3], argc > 4 ? &opts : NULL, msg, sizeof (msg));
+      ret = cm_ssl_cert_generate (argv[2], argv[3], (argc > 4 || opts.extra_san != NULL) ? &opts : NULL, msg,
+				  sizeof (msg));
       printf ("ret=%d err=%s\n", ret, msg);
       return ret == 0 ? 0 : 1;
     }

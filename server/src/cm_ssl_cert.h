@@ -49,6 +49,9 @@ typedef struct
   const char *common_name;	/* CN */
   const char *email;		/* emailAddress */
   int days;			/* validity in days, 0 = default (10 years) */
+  const char *extra_san;	/* ssl_cert_san of cm.conf: "DNS:<name>,IP:<address>,..." added to the
+				 * default subject alternative names (host name, localhost, loopback),
+				 * NULL or empty for none */
 } T_CM_SSL_CERT_OPTS;
 
 /*
@@ -60,11 +63,13 @@ typedef struct
  *   cert_path(in): certificate file (PEM)
  *   key_path(in): private key file (PEM)
  *   auto_generate(in): ssl_cert_auto_generate of cm.conf
+ *   extra_san(in): ssl_cert_san of cm.conf, used when a key pair is generated;
+ *                  NULL or empty for none
  *   err_buf(out): on failure, why in one line (for stderr), may be NULL
  *   err_size(in): size of err_buf
  */
-extern int cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate, char *err_buf,
-			       size_t err_size);
+extern int cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_generate, const char *extra_san,
+			       char *err_buf, size_t err_size);
 
 /*
  * cm_ssl_cert_generate () - generate a new key pair and replace the files

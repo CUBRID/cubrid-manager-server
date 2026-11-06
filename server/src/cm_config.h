@@ -610,6 +610,7 @@ typedef struct
   char szSSLKey[PATH_MAX];
   char szSSLCertificate[PATH_MAX];
   int iSSLCertAutoGenerate;	/* ssl_cert_auto_generate: TRUE (YES) or FALSE (NO) */
+  char szSSLCertSan[1024];	/* ssl_cert_san: extra subject alternative names, "" for none */
   int iAutoJobTimeout;
   int iCMS_port;
   int iSupportMonStat;

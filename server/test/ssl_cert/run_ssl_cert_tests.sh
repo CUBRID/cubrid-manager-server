@@ -228,6 +228,8 @@ ok "cert: extendedKeyUsage serverAuth" \
 ok "cert: subjectKeyIdentifier" "grep -q 'Subject Key Identifier' <<< \"\$text\""
 ok "cert: SAN localhost, 127.0.0.1, ::1" \
   "grep -A1 'Subject Alternative Name' <<< \"\$text\" | grep -q 'DNS:localhost, IP Address:127.0.0.1, IP Address:0:0:0:0:0:0:0:1'"
+ok "cert: SAN has no interface address (only the loopback addresses)" \
+  "[ \$(grep -A1 'Subject Alternative Name' <<< \"\$text\" | tail -1 | grep -o 'IP Address' | wc -l) = 2 ]"
 ok "cert: default subject" \
   "openssl x509 -in $CRT -noout -subject | grep -q 'C = KR, ST = SEOUL, L = Default City, O = CUBRID, OU = RND, CN = .*, emailAddress = admin@cubrid.com'"
 ok "cert: self-signed" \
@@ -814,6 +816,108 @@ else
   skip=$((skip + 1))
   echo "SKIP  TLS security level scenarios (OPENSSL_CONF does not set the TLS security level with this OpenSSL)"
 fi
+
+# ------------------------------------------------------------ ssl_cert_san
+
+# names and addresses added to the defaults; duplicates of the defaults dropped
+setup
+export SSL_CERT_SAN="DNS:cms.example.com, IP:10.0.0.5,ip:fd00::5,dns:LOCALHOST,IP:127.0.0.1"
+ensure YES
+unset SSL_CERT_SAN
+san=$(openssl x509 -in "$CRT" -noout -ext subjectAltName 2> /dev/null | tail -1)
+ok "ssl_cert_san: starts" "[ $RET = 0 ]"
+ok "ssl_cert_san: names and addresses added" \
+  "grep -q 'DNS:cms.example.com' <<< \"\$san\" && grep -q 'IP Address:10.0.0.5' <<< \"\$san\" && grep -qi 'IP Address:FD00:0:0:0:0:0:0:5' <<< \"\$san\""
+ok "ssl_cert_san: defaults kept, no duplicates" \
+  "[ \$(grep -o -i 'DNS:localhost' <<< \"\$san\" | wc -l) = 1 ] && [ \$(grep -o 'IP Address:127.0.0.1' <<< \"\$san\" | wc -l) = 1 ] && grep -q 'IP Address:0:0:0:0:0:0:0:1' <<< \"\$san\""
+ok "ssl_cert_san: verify cms.example.com" "openssl verify -CAfile $CRT -verify_hostname cms.example.com $CRT > /dev/null 2>&1"
+ok "ssl_cert_san: verify 10.0.0.5" "openssl verify -CAfile $CRT -verify_ip 10.0.0.5 $CRT > /dev/null 2>&1"
+ok "ssl_cert_san: verify fd00::5" "openssl verify -CAfile $CRT -verify_ip fd00::5 $CRT > /dev/null 2>&1"
+sum=$(files_sum)
+export SSL_CERT_SAN="DNS:cms.example.com,IP:10.0.0.5,IP:fd00::5"
+ensure YES
+unset SSL_CERT_SAN
+ok "ssl_cert_san: restart with the same names, no warning" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && ! log | grep -q 'does not have\\|which neither'"
+
+# entries that cannot be used are logged and left out
+setup
+export SSL_CERT_SAN="DNS:bad_name,IP:999.1.1.1,FOO:x,DNS:,IP:10.0.0.6"
+ensure YES
+unset SSL_CERT_SAN
+san=$(openssl x509 -in "$CRT" -noout -ext subjectAltName 2> /dev/null | tail -1)
+ok "ssl_cert_san with bad entries: starts, good entry added" "[ $RET = 0 ] && grep -q 'IP Address:10.0.0.6' <<< \"\$san\""
+ok "ssl_cert_san with bad entries: bad entries left out and logged" \
+  "! grep -q 'bad_name' <<< \"\$san\" && [ \$(log | grep -c 'ssl_cert_san in cm.conf: ignored') = 4 ]"
+
+# at most 32 entries
+setup
+list=""
+for i in $(seq 1 33); do list="$list,IP:10.1.0.$i"; done
+export SSL_CERT_SAN="${list#,}"
+ensure YES
+unset SSL_CERT_SAN
+san=$(openssl x509 -in "$CRT" -noout -ext subjectAltName 2> /dev/null | tail -1)
+ok "ssl_cert_san with 33 entries: 32 used, the rest logged" \
+  "[ $RET = 0 ] && grep -q 'IP Address:10.1.0.32' <<< \"\$san\" && ! grep -q 'IP Address:10.1.0.33' <<< \"\$san\" && log | grep -q 'ignored IP:10.1.0.33 (more than 32 entries)'"
+
+# applied only when generating: an existing pair is kept, and a warning says so
+setup
+make_own_pair
+sum=$(files_sum)
+export SSL_CERT_SAN="DNS:cms.example.com,IP:10.0.0.5"
+ensure YES
+unset SSL_CERT_SAN
+ok "ssl_cert_san changed for an existing pair: pair kept, warning names the missing entries" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'does not have DNS:cms.example.com, IP:10.0.0.5 of ssl_cert_san'"
+
+# names in the certificate that the configuration no longer lists (self-signed only)
+setup
+export SSL_CERT_SAN="IP:10.0.0.5"
+ensure YES
+unset SSL_CERT_SAN
+sum=$(files_sum)
+ensure YES
+ok "ssl_cert_san removed after generation: pair kept, warning names what the certificate still has" \
+  "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && log | grep -q 'has IP:10.0.0.5, which neither the defaults nor ssl_cert_san'"
+
+# a certificate of an earlier build with the interface addresses
+setup
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$KEY" -out "$CRT" -subj /CN=old -days 30 \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:192.168.0.10,IP:172.17.0.1" 2> /dev/null
+ensure YES
+ok "certificate with interface addresses: warning names them" \
+  "[ $RET = 0 ] && log | grep -q 'has IP:192.168.0.10, IP:172.17.0.1, which neither'"
+
+# a self-signed pair without names, and no ssl_cert_san: nothing to say
+setup
+make_own_pair
+ensure YES
+ok "own pair without SAN, no ssl_cert_san: no SAN warning" \
+  "[ $RET = 0 ] && ! log | grep -q 'ssl_cert_san'"
+
+# a CA-issued certificate: its names are what was asked of the CA, no warning either way
+setup
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/ca2.key" -out "$work/ca2.crt" -subj /CN=RootCA2 -days 30 \
+  2> /dev/null
+openssl req -newkey rsa:2048 -nodes -keyout "$KEY" -out "$work/s2.csr" -subj /CN=server \
+  -addext "subjectAltName=DNS:server.example.com,IP:192.168.0.20" 2> /dev/null
+openssl x509 -req -in "$work/s2.csr" -CA "$work/ca2.crt" -CAkey "$work/ca2.key" -CAcreateserial -days 30 \
+  -copy_extensions copy -out "$CRT" 2> /dev/null
+export SSL_CERT_SAN="DNS:cms.example.com"
+ensure YES
+unset SSL_CERT_SAN
+ok "CA-issued certificate with ssl_cert_san: no SAN warning" \
+  "[ $RET = 0 ] && ! log | grep -q 'does not have\|which neither'"
+
+# generate (generatecert) uses it too
+setup
+export SSL_CERT_SAN="DNS:gen.example.com"
+timeout 30 "$driver" generate "$CRT" "$KEY" < /dev/null > "$work/out" 2>&1
+RET=$?
+unset SSL_CERT_SAN
+ok "generate with ssl_cert_san: added" \
+  "[ $RET = 0 ] && openssl x509 -in $CRT -noout -ext subjectAltName | grep -q 'DNS:gen.example.com'"
 
 # --------------------------------------------------------------- generate
 

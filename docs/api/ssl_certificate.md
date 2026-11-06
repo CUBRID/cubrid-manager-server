@@ -65,7 +65,7 @@ openssl x509 -in $CUBRID/conf/cm_ssl_cert.crt -noout -fingerprint -sha256
 | key usage | critical, digitalSignature, keyEncipherment |
 | extended key usage | serverAuth |
 | subject key identifier | hash |
-| subject alternative name | DNS: the host name (only when it is a valid DNS name), `localhost`; IP: `127.0.0.1`, `::1` and the IPv4 and IPv6 addresses of the network interfaces that are up (loopback, link-local, unspecified, IPv4-mapped and duplicate addresses excluded, at most 32) |
+| subject alternative name | DNS: the host name (only when it is a valid DNS name), `localhost`; IP: `127.0.0.1`, `::1`; plus the names and addresses of `ssl_cert_san` in `cm.conf` (see [Subject alternative names](#subject-alternative-names)) |
 | validity | from one day before generation (for client clock skew), for 10 years |
 
 The key and certificate are written to temporary files and renamed into place, so the two files always change together. When a path was a symbolic link, the link itself becomes a regular file. Only SHA-256 is used, so generation and the startup check also work with OpenSSL in FIPS mode.
@@ -90,7 +90,30 @@ CMS uses such a pair as it is and never replaces it, whatever `ssl_cert_auto_gen
 - With `ssl_cert_auto_generate=YES`: `cubrid manager stop`, remove `cm_ssl_cert.crt` and `cm_ssl_cert.key`, then `cubrid manager start`. Remove both files: when only one is missing, CMS does not start.
 - In a debug build, [generatecert](generatecert.md) (ADMIN) also replaces them; restart CMS afterwards. Release builds do not offer it.
 
-Generate a new key pair when the private key may have leaked, or when the certificate no longer covers the addresses clients connect to: the subject alternative names are taken when the certificate is generated, so a client that verifies host names and connects by an IP address the server did not have then fails. A client that pins the fingerprint, or connects by host name, is not affected by an address change.
+Generate a new key pair when the private key may have leaked, or to apply a change of `ssl_cert_san` (see below).
+
+### Subject alternative names
+
+The certificate is sent in the TLS handshake, so anyone who can reach `cm_port` can read it without logging in:
+
+```
+openssl s_client -connect <host>:8001 </dev/null 2>/dev/null | openssl x509 -noout -ext subjectAltName
+```
+
+For that reason the generated certificate names by default only the host name, `localhost` and the loopback addresses. The addresses of the network interfaces (private, management, replication, container or VPN networks) are not added, so that the certificate does not reveal the network layout of the host.
+
+A client that pins the fingerprint (the default) does not look at these names. A client that verifies the host name (PKI) must find the name or address it connects to among them; add those with `ssl_cert_san` in `cm.conf`:
+
+```
+ssl_cert_san=DNS:cms.example.com,IP:10.0.0.5,IP:fd00::5
+```
+
+- Entries are `DNS:<name>` or `IP:<IPv4 or IPv6 address>`, separated by commas, at most 32. They are added to the default names; duplicates are dropped. A name may contain only letters, digits, `-` and `.` (no wildcard).
+- An entry that cannot be used is left out, and `cub_manager.err` names it.
+- `ssl_cert_san` is used only when a key pair is generated. After changing it, generate a new key pair (stop CMS, remove `cm_ssl_cert.crt` and `cm_ssl_cert.key`, start it with `ssl_cert_auto_generate=YES`); clients then see a new fingerprint.
+- Until then, for a self-signed certificate, a warning in `cub_manager.err` on every start names the entries of `ssl_cert_san` the certificate does not have, and the names it has that neither the defaults nor `ssl_cert_san` list (for example an address removed from `ssl_cert_san`, or the interface addresses an earlier build put in it), since anyone who can reach the port can read them. If you made that self-signed certificate yourself, you can ignore the warning.
+- `ssl_cert_san` does not apply to a certificate issued by a CA: its names are those you asked the CA for. No warning is given for it; to change its names, have the CA issue a new one.
+- Include only the names and addresses clients actually use. Use a host name rather than an address where possible: it keeps working when the address changes.
 
 ### Upgrade from an earlier version
 

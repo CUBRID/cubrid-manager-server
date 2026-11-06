@@ -650,7 +650,7 @@ start_service ()
    * Keep, generate or replace the key pair before TLS loads it. On failure
    * print why, and do not start; what to do is in the error log.
    */
-  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE, ssl_err,
+  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE, sco.szSSLCertSan, ssl_err,
 			  sizeof (ssl_err)) != 0)
     {
       snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : %s. See %s for what to do.\n", ssl_err,
