@@ -51,11 +51,14 @@ OVERRIDES = {
     # handled before the task tables are consulted
     "gettaskstatus": ("none (only the user who started the job gets its result)",
                       "the user who started the job"),
+    # built only in debug builds (#if !defined (NDEBUG)), CBRD-27829
+    "generatecert": ("ADMIN (debug builds only)", "ADMIN (debug builds only)"),
 }
 
 # Documents that describe more than one task, or a task under another name.
 DOC_TASKS = {"viewlogviewlog2": ("viewlog", "viewlog2")}
-NOT_TASK_DOCS = ("README", "async_readme", "template")
+# ssl_certificate: the TLS key pair, not a task (CBRD-27829)
+NOT_TASK_DOCS = ("README", "async_readme", "template", "ssl_certificate")
 
 
 def load_tasks():

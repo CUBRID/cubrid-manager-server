@@ -21,7 +21,7 @@ except for the subject and validity given in the request.
 - CMS logs who requested the task and from which address (`cub_manager.err`).
 - The task works whatever `ssl_cert_auto_generate` in `cm.conf` is.
 
-Permissions required to run this task: ADMIN
+Permissions required to run this task: ADMIN (debug builds only)
 
 ## Request JSON Syntax
 
