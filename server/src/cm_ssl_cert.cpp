@@ -48,6 +48,7 @@
 #include <sys/stat.h>
 #else
 #include <unistd.h>
+#include <pwd.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -2479,12 +2480,46 @@ dir_writable (const std::string &path)
 }
 #endif
 
+#if !defined (WINDOWS)
+/*
+ * lock_file_owner () - "owner <name> (uid <n>), mode 0600; this process runs as
+ *   <name> (uid <n>)", to explain why the lock file cannot be opened
+ */
+static std::string
+lock_file_owner (const std::string &path)
+{
+  struct stat st;
+  struct passwd *pw;
+  char mode[8];
+  std::string t;
+
+  if (stat (path.c_str (), &st) != 0)
+    {
+      return std::string ();
+    }
+  pw = getpwuid (st.st_uid);
+  snprintf (mode, sizeof (mode), "%04o", (unsigned int) (st.st_mode & 07777));
+  t = "owner " + std::string (pw != NULL ? pw->pw_name : "?") + " (uid " + std::to_string ((long) st.st_uid)
+      + "), mode " + mode;
+  pw = getpwuid (geteuid ());
+  t += "; this process runs as " + std::string (pw != NULL ? pw->pw_name : "?") + " (uid "
+       + std::to_string ((long) geteuid ()) + ")";
+  return t;
+}
+#endif
+
+/*
+ *   busy(out): true when another process holds the lock, false when the lock
+ *              file cannot be used (err says why and what to do)
+ */
 static bool
-hold_process_lock (const std::string &key_path, std::string &err)
+hold_process_lock (const std::string &key_path, std::string &err, bool &busy)
 {
   static bool held = false;
   std::string path = key_path + PROCESS_LOCK;
   int waited = 0;
+
+  busy = false;
 
   if (held)
     {
@@ -2518,7 +2553,14 @@ hold_process_lock (const std::string &key_path, std::string &err)
     }
   if (h == INVALID_HANDLE_VALUE)
     {
-      err = "cannot open " + path + ": " + win_error_string (GetLastError ());
+      DWORD e = GetLastError ();
+
+      err = "cannot open the lock file " + path + ": " + win_error_string (e);
+      if (e == ERROR_ACCESS_DENIED)
+	{
+	  err += ". It was probably created by cub_manager running as another account: give the account cub_manager "
+		 "runs as read and write access to it, or remove it while no cub_manager is running";
+	}
       return false;
     }
   for (;;)
@@ -2532,8 +2574,8 @@ hold_process_lock (const std::string &key_path, std::string &err)
 	}
       if (GetLastError () != ERROR_LOCK_VIOLATION || waited >= CERT_LOCK_WAIT_MS)
 	{
-	  err = (GetLastError () == ERROR_LOCK_VIOLATION)
-		? "another cub_manager process holds " + path
+	  busy = (GetLastError () == ERROR_LOCK_VIOLATION);
+	  err = busy ? "another cub_manager process holds " + path
 		: "cannot lock " + path + ": " + win_error_string (GetLastError ());
 	  CloseHandle (h);
 	  return false;
@@ -2554,7 +2596,16 @@ hold_process_lock (const std::string &key_path, std::string &err)
 	{
 	  return true;
 	}
-      err = "cannot open " + path + ": " + errno_string (e);
+      err = "cannot open the lock file " + path + ": " + errno_string (e);
+      if (e == EACCES || e == EPERM)
+	{
+	  /* for example left by cub_manager started once as root: not another running process */
+	  std::string owner = lock_file_owner (path);
+
+	  err += (owner.empty ()? std::string () : " (" + owner + ")")
+		 + ". It was probably created by cub_manager running as another account: make it readable and writable "
+		 "by the account cub_manager runs as (chown or chmod), or remove it while no cub_manager is running";
+	}
       return false;
     }
   for (;;)
@@ -2568,9 +2619,8 @@ hold_process_lock (const std::string &key_path, std::string &err)
 	}
       if ((errno != EACCES && errno != EAGAIN) || waited >= CERT_LOCK_WAIT_MS)
 	{
-	  err = (errno == EACCES || errno == EAGAIN)
-		? "another cub_manager process holds " + path
-		: "cannot lock " + path + ": " + errno_string (errno);
+	  busy = (errno == EACCES || errno == EAGAIN);
+	  err = busy ? "another cub_manager process holds " + path : "cannot lock " + path + ": " + errno_string (errno);
 	  close (fd);
 	  return false;
 	}
@@ -2607,12 +2657,20 @@ cm_ssl_cert_ensure (const char *cert_path, const char *key_path, bool auto_gener
   ssl_file cert ("certificate", cert_path, false);
   ssl_file key ("private key", key_path, true);
   std::string err;
+  bool busy = false;
 
   /* one process at a time in this directory, from here until it exits */
-  if (!hold_process_lock (key.path, err))
+  if (!hold_process_lock (key.path, err, busy))
     {
-      LOG_ERROR ("cannot check the SSL key pair: %s. Another cub_manager may be starting or running with the "
-		 "same configuration; stop it, or wait until it has started, and retry.", err.c_str ());
+      if (busy)
+	{
+	  LOG_ERROR ("cannot check the SSL key pair: %s. Another cub_manager may be starting or running with the "
+		     "same configuration; stop it, or wait until it has started, and retry.", err.c_str ());
+	}
+      else
+	{
+	  LOG_ERROR ("cannot check the SSL key pair: %s.", err.c_str ());
+	}
       why = "cannot check the SSL key pair: " + err;
       ret = -1;
     }
@@ -2652,7 +2710,9 @@ cm_ssl_cert_generate (const char *cert_path, const char *key_path, const T_CM_SS
     }
 
   /* held already when the server started through cm_ssl_cert_ensure () */
-  if (!hold_process_lock (key_path, err))
+  bool busy = false;
+
+  if (!hold_process_lock (key_path, err, busy))
     {
       LOG_ERROR ("cannot generate a new SSL key pair: %s", err.c_str ());
       copy_error (err_buf, err_size, "Cannot generate a new SSL key pair: " + err);
@@ -2685,10 +2745,19 @@ cm_ssl_cert_lock_process (const char *key_path, char *err_buf, size_t err_size)
       copy_error (err_buf, err_size, "the SSL private key path is not set");
       return -1;
     }
-  if (!hold_process_lock (key_path, err))
+  bool busy = false;
+
+  if (!hold_process_lock (key_path, err, busy))
     {
-      LOG_ERROR ("another cub_manager may be starting or running with the same configuration: %s. Stop it, or "
-		 "wait until it has started, and retry.", err.c_str ());
+      if (busy)
+	{
+	  LOG_ERROR ("another cub_manager may be starting or running with the same configuration: %s. Stop it, or "
+		     "wait until it has started, and retry.", err.c_str ());
+	}
+      else
+	{
+	  LOG_ERROR ("cannot take the lock of this configuration: %s.", err.c_str ());
+	}
       copy_error (err_buf, err_size, err);
       return -1;
     }

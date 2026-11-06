@@ -796,6 +796,24 @@ if ! skip_as_root "read-only conf"; then
   chmod 755 "$C"
 fi
 
+# a lock file this account cannot open (for example left by a start as root):
+# not reported as another running process
+if ! skip_as_root "lock file of another account"; then
+  setup
+  make_own_pair
+  : > "$KEY.lock"
+  chmod 000 "$KEY.lock"
+  ensure YES
+  ok "lock file not openable: does not start, says to check its owner and mode" \
+    "[ $RET != 0 ] && grep -q 'why=cannot check the SSL key pair: cannot open the lock file .*Permission denied (owner .*mode 0000; this process runs as' $work/out"
+  ok "lock file not openable: not reported as another process" \
+    "! log | grep -q 'Another cub_manager may be starting' && log | grep -q 'remove it while no cub_manager is running'"
+  timeout 30 "$driver" lock "$KEY" < /dev/null > "$work/out" 2>&1
+  ok "lock file not openable, lock_process: same reason" \
+    "grep -q 'why=cannot open the lock file .*Permission denied' $work/out && ! log | grep -q 'another cub_manager may be starting'"
+  chmod 600 "$KEY.lock"
+fi
+
 # several processes start at once on an empty conf: one pair, no work files
 for round in 1 2 3; do
   setup
