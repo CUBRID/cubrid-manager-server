@@ -462,6 +462,20 @@ ok "certificate path is a directory: does not start" \
 
 # --------------------------------------------------- administrator's pair
 
+# the mode of a key kept as it is: a warning when other accounts can access it
+for mode in 600 640 644; do
+  setup
+  make_own_pair
+  chmod $mode "$KEY"
+  ensure YES
+  if [ $mode = 600 ]; then
+    ok "own key $mode: no mode warning" "[ $RET = 0 ] && ! log | grep -q 'can be accessed by other accounts'"
+  else
+    ok "own key $mode: starts, mode warning with chmod 600" \
+      "[ $RET = 0 ] && log | grep -q 'can be accessed by other accounts (mode 0$mode): .*chmod 600' && [ \$(stat -c %a $KEY) = $mode ]"
+  fi
+done
+
 setup
 cp "$shipped"/develop/cm_ssl_cert_* "$C"/
 make_own_pair

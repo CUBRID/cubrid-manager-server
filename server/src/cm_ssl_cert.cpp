@@ -2226,6 +2226,33 @@ recover_interrupted (const std::string &cert_path, const std::string &key_path, 
   return ok;
 }
 
+/*
+ * report_key_mode () - warn when the private key that is kept as it is can
+ *   be read or written by accounts other than its owner
+ *
+ *   A key CMS generates is 0600, but a key the administrator installed, or one
+ *   an earlier version installed (0644), is used as it is, and CMS does not
+ *   change the mode of a file it did not create. Windows: access is decided
+ *   by the ACL, which this does not check.
+ */
+static void
+report_key_mode (const std::string &key_path)
+{
+#if !defined (WINDOWS)
+  struct stat st;
+
+  if (stat (key_path.c_str (), &st) != 0 || (st.st_mode & 077) == 0)
+    {
+      return;
+    }
+  LOG_WARN ("the SSL private key %s can be accessed by other accounts (mode %04o): restrict it to the account "
+	    "cub_manager runs as, for example chmod 600 %s", key_path.c_str (), (unsigned int) (st.st_mode & 07777),
+	    key_path.c_str ());
+#else
+  (void) key_path;
+#endif
+}
+
 /* ------------------------------------------------------------ startup check */
 
 /*
@@ -2444,6 +2471,7 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, const char *extr
     }
   log_fingerprint (cert.path, cert.cert);
   report_san_mismatch (cert.cert, cert.path, extra_san);
+  report_key_mode (key.path);
   if (auto_generate)
     {
       remove_leftovers (cert.path, key.path);

@@ -79,7 +79,7 @@ The running CMS keeps the certificate it loaded at startup; a change to the file
 1. `cubrid manager stop`
 2. Replace both files together:
    - `cm_ssl_cert.crt`: the server certificate in PEM, followed by the intermediate CA certificates, if any.
-   - `cm_ssl_cert.key`: the private key of that certificate in PEM, without a passphrase, readable by the account CMS runs as. Restrict it to that account (`chmod 600`).
+   - `cm_ssl_cert.key`: the private key of that certificate in PEM, without a passphrase, readable by the account CMS runs as. Restrict it to that account (`chmod 600`); on Linux, CMS logs a warning on every start while other accounts can access it.
    - Use a key OpenSSL accepts at its security level, for example RSA 2048 bits or more; CMS does not start with a key OpenSSL refuses.
 3. `cubrid manager start`, and check the fingerprint in `cub_manager.log`.
 
