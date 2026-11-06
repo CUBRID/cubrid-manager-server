@@ -1679,6 +1679,7 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
   bool key_set_aside = false;
   bool key_marked = false;
   bool key_placed = false;
+  bool durable = false;
   bool ok = false;
 
   if (!random_suffix (suffix, err))
@@ -1743,16 +1744,25 @@ install_pair (const std::string &cert_path, const std::string &key_path, X509 *c
 	{
 	  break;
 	}
-      if (!sync_dirs (key_path, cert_path, err))
-	{
-	  break;
-	}
+      /* From here the new pair is complete, so it is never undone */
       ok = true;
+      durable = sync_dirs (key_path, cert_path, err);
     }
   while (0);
 
   cleanse_string (key_pem);
 
+  if (ok && !durable)
+    {
+      /*
+       * The new pair is in place but may not be on disk yet. Keep
+       * <key>.old-<s> or <key>.new-<s>
+       */
+      LOG_WARN ("the new SSL key pair %s, %s is in place, but the directory cannot be synced: %s. %s is kept until "
+		"the next start, which removes it.", cert_path.c_str (), key_path.c_str (), err.c_str (),
+		(key_set_aside ? key_old : key_new_mark).c_str ());
+      return true;
+    }
   if (ok)
     {
       if (key_set_aside)

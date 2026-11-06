@@ -27,6 +27,8 @@
  *   FAULT_UNLINK_END  comma-separated suffixes: unlink () fails when its path
  *                     ends with one of them
  *   FAULT_FSYNC_DIR   if set, fsync () of a directory fails with EIO
+ *   FAULT_FSYNC_DIR_NTH  if set to n, only the n-th fsync () of a directory
+ *                     (counting from 1 in the process) fails with EIO
  *   FAULT_TRACE       a file to which each rename (), unlink () and fsync ()
  *                     of a directory is appended, one line each, so that a
  *                     test can check their order
@@ -131,7 +133,11 @@ fsync (int fd)
     }
   if (fstat (fd, &st) == 0 && S_ISDIR (st.st_mode))
     {
-      if (getenv ("FAULT_FSYNC_DIR") != NULL)
+      static int count = 0;
+      const char *nth = getenv ("FAULT_FSYNC_DIR_NTH");
+
+      count++;
+      if (getenv ("FAULT_FSYNC_DIR") != NULL || (nth != NULL && atoi (nth) == count))
 	{
 	  errno = EIO;
 	  return -1;

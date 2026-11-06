@@ -738,6 +738,41 @@ if [ -n "$fault_lib" ]; then
   ensure YES
   ok "directory cannot be synced, next start: previous pair, no work files" \
     "[ $RET = 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
+
+  # the directory cannot be synced after the new certificate is in place: the
+  # new pair is kept (never the previous key with the new certificate), with
+  # its record, which the next start removes
+  setup
+  make_own_pair
+  old_key=$(key_fp "$KEY")
+  LD_PRELOAD="$fault_lib" FAULT_FSYNC_DIR_NTH=3 timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "sync fails after the certificate: new pair kept, record kept" \
+    "[ $RET = 0 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \"\$(key_fp $KEY)\" != \"$old_key\" ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.key\.old-') = 1 ] && log | grep -q 'cannot be synced'"
+  ensure YES
+  ok "sync fails after the certificate, next start: new pair, record removed" \
+    "[ $RET = 0 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \"\$(key_fp $KEY)\" != \"$old_key\" ] && [ \$(nfiles) = 2 ]"
+
+  setup
+  LD_PRELOAD="$fault_lib" FAULT_FSYNC_DIR_NTH=3 timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "first generation, sync fails after the certificate: pair kept, record kept" \
+    "[ $RET = 0 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \$(ls -A $C | grep -c '^cm_ssl_cert\.key\.new-') = 1 ]"
+  ensure YES
+  ok "first generation, sync fails after the certificate, next start: same pair, record removed" \
+    "[ $RET = 0 ] && [ \"\$(key_fp $KEY)\" = \"\$(cert_fp $CRT)\" ] && [ \$(nfiles) = 2 ]"
+
+  # the directory cannot be synced after the new key, before the certificate: undone
+  setup
+  make_own_pair
+  sum=$(files_sum)
+  LD_PRELOAD="$fault_lib" FAULT_FSYNC_DIR_NTH=2 timeout 30 "$driver" generate "$CRT" "$KEY" \
+    < /dev/null > "$work/out" 2>&1
+  RET=$?
+  ok "sync fails after the key: undone, previous pair" \
+    "[ $RET != 0 ] && [ \"\$(files_sum)\" = \"$sum\" ] && [ \$(nfiles) = 2 ]"
 fi
 
 # names that are not work files are left alone
