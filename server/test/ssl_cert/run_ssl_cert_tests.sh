@@ -733,6 +733,28 @@ rm -f "$work/locked"
 ensure YES
 ok "lock released: starts" "[ $RET = 0 ] && [ \$(nfiles) = 2 ]"
 
+# cm_ssl_cert_lock_process (), which main () calls before it writes the pid file
+setup
+timeout 30 "$driver" lock "$KEY" < /dev/null > "$work/out" 2>&1
+RET=$?
+ok "lock_process: taken" "[ $RET = 0 ] && grep -q 'ret=0' $work/out && [ -f $KEY.lock ]"
+python3 -c "
+import fcntl, sys, time
+f = open(sys.argv[1], 'a')
+fcntl.lockf(f, fcntl.LOCK_EX)
+open(sys.argv[2], 'w').close()
+time.sleep(15)
+" "$KEY.lock" "$work/locked" &
+holder=$!
+for i in $(seq 1 50); do [ -f "$work/locked" ] && break; sleep 0.1; done
+timeout 30 "$driver" lock "$KEY" < /dev/null > "$work/out" 2>&1
+RET=$?
+ok "lock_process: held by another process, refused with the reason" \
+  "[ $RET != 0 ] && grep -q 'why=another cub_manager process holds' $work/out"
+kill $holder 2> /dev/null
+wait $holder 2> /dev/null
+rm -f "$work/locked"
+
 # a read-only conf: no lock file can be created, and none is needed
 if ! skip_as_root "read-only conf"; then
   setup

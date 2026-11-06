@@ -30,6 +30,8 @@
  *     cm_ssl_cert_ensure (); prints ret, shipped_in_use and why
  *   ssl_cert_driver generate <crt> <key> [country [common_name [days]]]
  *     cm_ssl_cert_generate (); without country the default options (NULL)
+ *   ssl_cert_driver lock <key>
+ *     cm_ssl_cert_lock_process (); prints ret and why
  *
  *   SSL_CERT_SAN, if set, is passed as ssl_cert_san of cm.conf.
  *
@@ -51,7 +53,8 @@ static int
 usage (void)
 {
   fprintf (stderr, "usage: ssl_cert_driver ensure <crt> <key> YES|NO\n"
-	   "       ssl_cert_driver generate <crt> <key> [country [common_name [days]]]\n");
+	   "       ssl_cert_driver generate <crt> <key> [country [common_name [days]]]\n"
+	   "       ssl_cert_driver lock <key>\n");
   return 2;
 }
 
@@ -62,7 +65,7 @@ main (int argc, char **argv)
   char msg[4096];
   int ret;
 
-  if (logdir == NULL || logdir[0] == '\0' || argc < 4)
+  if (logdir == NULL || logdir[0] == '\0' || argc < 3)
     {
       return usage ();
     }
@@ -73,6 +76,13 @@ main (int argc, char **argv)
   snprintf (sco.szErrorLog, sizeof (sco.szErrorLog), "%s/cub_manager.err", logdir);
   sco.iMaxLogFileSize = 100 * 1024 * 1024;
   msg[0] = '\0';
+
+  if (strcmp (argv[1], "lock") == 0 && argc == 3)
+    {
+      ret = cm_ssl_cert_lock_process (argv[2], msg, sizeof (msg));
+      printf ("ret=%d why=%s\n", ret, msg);
+      return ret == 0 ? 0 : 1;
+    }
 
   if (strcmp (argv[1], "ensure") == 0 && argc == 5)
     {

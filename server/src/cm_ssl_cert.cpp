@@ -21,6 +21,7 @@
 /*
  * cm_ssl_cert.cpp - the TLS certificate and private key of the manager server
  *
+ *   cm_ssl_cert_lock_process ()        one cub_manager per configuration (main ())
  *   cm_ssl_cert_ensure ()              startup check: keep, generate or replace
  *   cm_ssl_cert_generate ()            new key pair (generatecert, debug builds only)
  *   cm_ssl_cert_shipped_key_in_use ()  result of the startup check
@@ -2329,7 +2330,10 @@ ensure_pair (ssl_file &cert, ssl_file &key, bool auto_generate, const char *extr
  *   removing the other's work files, or each placing its own key or
  *   certificate. The process that takes this lock keeps it while it runs, so
  *   it covers the recovery, the generation and the moment TLS loads the files,
- *   and a second process stops before it touches any file.
+ *   and a second process stops before it touches any file. main () takes it
+ *   through cm_ssl_cert_lock_process () right after it becomes a daemon,
+ *   before init_files () and before the pid file is written, so that a
+ *   second process cannot remove or overwrite the files of the first.
  *
  *   POSIX: an fcntl () write lock, which a forked child (a task) does not
  *   inherit and which ends when the process ends; the descriptor is closed
@@ -2555,6 +2559,27 @@ cm_ssl_cert_generate (const char *cert_path, const char *key_path, const T_CM_SS
   LOG_INFO ("generated a new SSL key pair: %s, %s", cert_path, key_path);
   log_fingerprint (cert_path, cert);
   X509_free (cert);
+  return 0;
+}
+
+int
+cm_ssl_cert_lock_process (const char *key_path, char *err_buf, size_t err_size)
+{
+  std::string err;
+
+  copy_error (err_buf, err_size, std::string ());
+  if (key_path == NULL || key_path[0] == '\0')
+    {
+      copy_error (err_buf, err_size, "the SSL private key path is not set");
+      return -1;
+    }
+  if (!hold_process_lock (key_path, err))
+    {
+      LOG_ERROR ("another cub_manager may be starting or running with the same configuration: %s. Stop it, or "
+		 "wait until it has started, and retry.", err.c_str ());
+      copy_error (err_buf, err_size, err);
+      return -1;
+    }
   return 0;
 }
 
