@@ -630,6 +630,12 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
   evtimer_add (work_ctx->timer, &auto_task_tv);
 }
 
+/*
+ * write end of the pipe on which the daemon reports its start to the parent
+ * of ut_daemon_start (), which waits for it; -1 once reported or when none
+ */
+static int daemon_ready_fd = -1;
+
 int
 start_service ()
 {
@@ -768,6 +774,9 @@ start_service ()
 		      (void *) start_ctx[i]);
 #endif
     }
+
+  /* the server serves: let the parent of ut_daemon_start () exit with 0 */
+  ut_daemon_started (&daemon_ready_fd);
 
   for (i = 0; i < DEFAULT_THRD_NUM; i++)
     {
@@ -1064,7 +1073,7 @@ main (int argc, char **argv)
       return 0;
     }
 
-  ut_daemon_start ();
+  ut_daemon_start (&daemon_ready_fd);
 
   /* One cub_manager per configuration. Take the lock before touching any shared file. */
   if (cm_ssl_cert_lock_process (sco.szSSLKey, tmpstrbuf, sizeof (tmpstrbuf)) != 0)
