@@ -141,6 +141,15 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 - `$CUBRID/conf/cm.conf` and `$CUBRID_DATABASES/databases.txt` can be written only by an admin, with [setsysparam](setsysparam.md). The tasks above refuse them whatever the user's permission (`cm.conf and databases.txt can be changed only by an admin with setsysparam`), and `copyfolder` (destination) and `deletefolder` refuse a directory that holds one of them (`the directory contains cm.conf or databases.txt`). Any task may still read them.
 - Both checks compare the file the operating system really opens, so another name for the same file does not get past them: a symbolic link, and on Windows also an 8.3 short name (`CM~1.PAS`), trailing dots or spaces (`cm.pass.`), a different case or a junction. On Windows a path with an alternate data stream (`cm.pass:x`, a `:` anywhere but after the drive letter) is refused as an invalid file name.
 
+### DB Utility Task Paths
+
+The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md)) follow their own rule instead of the one above:
+
+- The path must be absolute once its environment variables are expanded (`path must be an absolute path`).
+- It must be under a directory listed in `allowed_db_dirs` of `cm.conf` (default `$CUBRID_DATABASES`; `;`-separated, `$NAME` expanded when CMS starts, read at startup). For a task on an existing database, the volume and log directories registered for that database in `databases.txt` are allowed too, so work on a database made outside `allowed_db_dirs` goes on; a new location (such as the `recoverypath` of restoredb) must be under `allowed_db_dirs`. Otherwise: `path is not under allowed_db_dirs`.
+- Protected files, `$CUBRID/bin`, `lib` and `java`, `cm.conf` and `databases.txt` are refused even under a listed directory, with the messages above.
+- The comparison follows symbolic links and `..` to where the path really leads (on Windows also 8.3 names, case and junctions); a path that does not exist yet is judged by its nearest existing directory.
+
 ## TLS Certificate
 
 CMS serves only over TLS. It generates its own key pair (`conf/cm_ssl_cert.crt`, `conf/cm_ssl_cert.key`) when it first starts and replaces a key pair an earlier version shipped. A client must authenticate the server by its certificate, by pinning its fingerprint or by PKI verification. See [TLS Certificate](ssl_certificate.md) for the startup check, the generated certificate, how to replace it, and server authentication by clients.

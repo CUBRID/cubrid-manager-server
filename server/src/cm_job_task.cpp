@@ -5198,7 +5198,8 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (backupfilepath, PATH_MAX - 1, "%s", backupdir);
     }
 
-  if (is_invalid_filename_with_msg (backupfilepath, _dbmt_error))
+  /* the backup directory (with volname) is created and written; dbname allows its registered directories */
+  if (!is_authorized_db_path (backupfilepath, dbname, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -6174,7 +6175,8 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = lv;
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
+      /* the backup volume read; dbname allows its registered directories */
+      if (!is_authorized_db_path (pathname, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -6189,7 +6191,13 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (recovery_path != NULL && !uStringEqual (recovery_path, "")
       && !uStringEqual (recovery_path, "none"))
     {
-      if (is_invalid_filename_with_msg (recovery_path, _dbmt_error))
+      /*
+       * A new location of the database: it is created here and becomes the
+       * database's path in databases.txt (alter_dblocation ()), so it must be
+       * under allowed_db_dirs; the database's current directories do not
+       * count (NULL dbname).
+       */
+      if (!is_authorized_db_path (recovery_path, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -6291,7 +6299,8 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
+      /* the backup volume read (restoredb --list); dbname allows its registered directories */
+      if (!is_authorized_db_path (pathname, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
