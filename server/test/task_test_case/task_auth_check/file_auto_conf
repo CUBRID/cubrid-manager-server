@@ -17,7 +17,7 @@
    "authtest"
   ],
   "test_expect": "failure",
-  "test_note": "access to a protected file is not allowed"
+  "test_note": "conf path is not authorized"
  },
  {
   "task": "viewlog",
