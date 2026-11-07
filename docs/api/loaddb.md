@@ -33,6 +33,8 @@ Permissions required to run this task: one of DBC, DBO
 
 * `_DBID`/`_DBPASSWD`: older clients send the DB login under these internal names. For compatibility CMS still takes them as `dbuser`/`dbpasswd` (a `dbuser`/`dbpasswd` in the same request wins). This will be removed in the next release; send `dbuser`/`dbpasswd`.
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* `schema`, `object`, `index`, `errorcontrolfile`, `ignoreclassfile`, `schema-file-list` and every file the list names must be under `allowed_db_dirs` of `cm.conf` or under a directory registered for `dbname` in `databases.txt`; see [DB Utility Task Paths](README.md#db-utility-task-paths). They are checked before loaddb runs: if one is not allowed, loaddb does not run.
+* With `delete_orignal_files: "y"`, each file is checked again right before it is deleted; a file that no longer passes is not deleted (and is logged). Files are deleted whether or not loaddb succeeded, as before.
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample

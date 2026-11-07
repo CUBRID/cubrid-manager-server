@@ -363,7 +363,12 @@ static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
 static int get_next_sqltext (FILE *qfp, char *qry_buf, int offset, int query_file_size);
 
-static void unlink_schema_files (const char *schema_list_file);
+static bool loaddb_path_given (const char *path);
+static bool read_schema_file_list (const char *list_file, std::vector<std::string> &entries, char *_dbmt_error);
+static bool is_authorized_loaddb_files (char *const files[], int count, const char *schema_file_list,
+					const char *dbname, char *_dbmt_error);
+static void delete_loaddb_file (const char *path, const char *dbname);
+static void delete_schema_files (const char *schema_list_file, const char *dbname);
 
 static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
@@ -6111,14 +6116,28 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (is_invalid_filename_with_msg (schema_file_list, _dbmt_error) ||
-	  is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
+      if (is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
+
+  /*
+   * Every file loaddb reads, and so every file it may delete afterwards
+   * (delete_orignal_files), must be under allowed_db_dirs or a directory of
+   * this database; if one is not, loaddb does not run at all.
+   */
+  {
+    char *const files[] = { schema, object, index, error_control_file, ignore_class_file };
+
+    if (!is_authorized_loaddb_files (files, (int) (sizeof (files) / sizeof (files[0])), schema_file_list, dbname,
+				     _dbmt_error))
+      {
+	return ERR_WITH_MSG;
+      }
+  }
 
   if (file_not_exist (schema, "none", _dbmt_error) || file_not_exist (object, "none", _dbmt_error)
       || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
@@ -6164,22 +6183,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (uStringEqualIgnoreCase (nv_get_val (req, "delete_orignal_files"), "y"))
     {
-      if (schema)
-	{
-	  unlink (schema);
-	}
-      if (object)
-	{
-	  unlink (object);
-	}
-      if (index)
-	{
-	  unlink (index);
-	}
-      if (schema_file_list)
-	{
-	  unlink_schema_files (schema_file_list);
-	}
+      /* order and timing as before: also when loaddb failed (checked below) */
+      delete_loaddb_file (schema, dbname);
+      delete_loaddb_file (object, dbname);
+      delete_loaddb_file (index, dbname);
+      delete_schema_files (schema_file_list, dbname);
     }
 
   if (exit_status != 0)
@@ -6196,56 +6204,158 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
-static void
-unlink_schema_files (const char *schema_list_file)
+/* a loaddb file parameter that names a file: given and not "none" */
+static bool
+loaddb_path_given (const char *path)
 {
-  FILE *fp;
-  char *p, filename[PATH_MAX] = { 0, };
-  char path_name[PATH_MAX*2];
-  char path[PATH_MAX];
+  return path != NULL && path[0] != '\0' && strcmp (path, "none") != 0;
+}
 
-  if (schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
+/*
+ * read_schema_file_list () - the files named in the schema file list
+ *   `list_file` (one per line, relative to the directory of the list), as
+ *   full paths in `entries`, environment variables of `list_file` expanded.
+ *   Empty lines are skipped. False, with the reason in `_dbmt_error`, if the
+ *   list cannot be read or a path does not fit.
+ */
+static bool
+read_schema_file_list (const char *list_file, std::vector<std::string> &entries, char *_dbmt_error)
+{
+  std::string expanded, dir, line;
+
+  if (!is_valid_filename (list_file, expanded))
     {
-      return;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", list_file);
+      return false;
     }
 
 #if defined (WINDOWS)
-  {
-    char drive[_MAX_DRIVE];
-    char dir[PATH_MAX];
-
-    if (_splitpath_s (schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
-      {
-	snprintf (path, PATH_MAX, "%s%s", drive, dir);
-      }
-    else
-      {
-	fclose (fp);
-	return;
-      }
-  }
+  size_t pos = expanded.find_last_of ("/\\");
 #else
-  snprintf (path, PATH_MAX, "%s", schema_list_file);
-  if (dirname (path) == NULL)
+  size_t pos = expanded.find_last_of ('/');
+#endif
+  dir = (pos == std::string::npos) ? std::string (".") : expanded.substr (0, (pos == 0) ? 1 : pos);
+
+  std::ifstream file (expanded.c_str ());
+
+  if (!file.is_open ())
     {
-      fclose (fp);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", list_file);
+      return false;
+    }
+
+  entries.clear ();
+  while (std::getline (file, line))
+    {
+      if (!line.empty () && line[line.size () - 1] == '\r')
+	{
+	  line.erase (line.size () - 1);
+	}
+      if (line.empty ())
+	{
+	  continue;
+	}
+      if (dir.size () + 1 + line.size () >= PATH_MAX)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s/%s", dir.c_str (), line.c_str ());
+	  return false;
+	}
+      entries.push_back (dir + "/" + line);
+    }
+  return true;
+}
+
+/*
+ * is_authorized_loaddb_files () - loaddb: each given file of `files`
+ *   (schema, object, index, error control and ignore class files), the
+ *   schema file list and every file it names pass is_authorized_db_path ()
+ *   for `dbname`. Checked before loaddb runs, so that every file
+ *   delete_orignal_files may delete has passed it.
+ */
+static bool
+is_authorized_loaddb_files (char *const files[], int count, const char *schema_file_list, const char *dbname,
+			    char *_dbmt_error)
+{
+  for (int i = 0; i < count; i++)
+    {
+      if (loaddb_path_given (files[i]) && !is_authorized_db_path (files[i], dbname, _dbmt_error))
+	{
+	  return false;
+	}
+    }
+
+  if (loaddb_path_given (schema_file_list))
+    {
+      std::vector<std::string> entries;
+
+      if (!is_authorized_db_path (schema_file_list, dbname, _dbmt_error)
+	  || !read_schema_file_list (schema_file_list, entries, _dbmt_error))
+	{
+	  return false;
+	}
+      for (size_t i = 0; i < entries.size (); i++)
+	{
+	  if (!is_authorized_db_path (entries[i].c_str (), dbname, _dbmt_error))
+	    {
+	      return false;
+	    }
+	}
+    }
+  return true;
+}
+
+/*
+ * delete_loaddb_file () - delete_orignal_files: delete the loaddb file
+ *   `path`, if given. It passed is_authorized_db_path () before loaddb ran;
+ *   it is checked again here, as a link on the way may have changed since,
+ *   and a file that no longer passes is kept and logged. The file deleted is
+ *   the one checked: `path` with its environment variables expanded.
+ */
+static void
+delete_loaddb_file (const char *path, const char *dbname)
+{
+  char err[DBMT_ERROR_MSG_SIZE];
+  std::string expanded;
+
+  if (!loaddb_path_given (path))
+    {
       return;
     }
-#endif
 
-  while (fgets (filename, PATH_MAX, fp))
+  err[0] = '\0';
+  if (!is_authorized_db_path (path, dbname, err) || !is_valid_filename (path, expanded))
     {
-      p = strchr (filename, '\n');
-      if (p)
-	{
-	  *p = '\0';
-	}
-      snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
-      unlink (path_name);
+      LOG_WARN ("loaddb of %s: the original file is not deleted: %s", dbname, err);
+      return;
+    }
+  unlink (expanded.c_str ());
+}
+
+/*
+ * delete_schema_files () - delete_orignal_files: delete the files named in
+ *   the schema file list, then the list itself, each through
+ *   delete_loaddb_file ().
+ */
+static void
+delete_schema_files (const char *schema_list_file, const char *dbname)
+{
+  std::vector<std::string> entries;
+  char err[DBMT_ERROR_MSG_SIZE];
+
+  if (!loaddb_path_given (schema_list_file))
+    {
+      return;
     }
 
-  fclose (fp);
-  unlink (schema_list_file);
+  err[0] = '\0';
+  if (read_schema_file_list (schema_list_file, entries, err))
+    {
+      for (size_t i = 0; i < entries.size (); i++)
+	{
+	  delete_loaddb_file (entries[i].c_str (), dbname);
+	}
+    }
+  delete_loaddb_file (schema_list_file, dbname);
 }
 
 int
