@@ -595,7 +595,7 @@ aj_load_autoaddvoldb_config (ajob *ajp)
 	}
 
       memset (curr, 0, sizeof (autoaddvoldb_node));
-      strcpy (curr->dbname, conf_item[0]);
+      strcpy_limit (curr->dbname, conf_item[0], sizeof (curr->dbname));
 
       if (strcmp (conf_item[1], "ON") == 0)
 	{

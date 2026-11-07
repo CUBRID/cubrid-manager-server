@@ -5305,10 +5305,14 @@ is_subpath (const char *allowd_path, const char *path)
 /*
  * Protected files.
  *
- * These files hold CMS user passwords and authorities, DB passwords or the
- * TLS private key. No file task may read or write them, whatever the
- * caller's authority (admin included); the server itself reaches them only
- * through its own code, never through a path taken from a request. The files
+ * These files hold CMS user passwords and authorities, DB passwords, the
+ * TLS private key, or the settings of the automatic jobs, which CMS runs
+ * later with its own privileges (a backup path, a database name). No file
+ * task may read or write them, whatever the caller's authority (admin
+ * included); the server itself reaches them only through its own code, never
+ * through a path taken from a request. The automatic job settings are
+ * changed only through their tasks (setbackupinfo, setautoaddvol, ...),
+ * which check what they write. The files
  * named after the TLS key and certificate (<name>.<anything>, the work files
  * of a replacement) are protected too, see is_tls_work_file ().
  */
@@ -5321,7 +5325,10 @@ protected_files (void)
     FID_DBMT_CUBRID_PASS,	/* cmdb.pass */
     FID_CONN_LIST,		/* conlist */
     FID_AUTO_JOBS_CONF,		/* autojobs.conf */
-    FID_AUTO_EXECQUERY_CONF	/* autoexecquery.conf */
+    FID_AUTO_EXECQUERY_CONF,	/* autoexecquery.conf */
+    FID_AUTO_BACKUPDB_CONF,	/* autobackupdb.conf */
+    FID_AUTO_ADDVOLDB_CONF,	/* autoaddvoldb.conf */
+    FID_AUTO_HISTORY_CONF	/* autohistory.conf */
   };
   std::vector<std::string> files;
   char buf[PATH_MAX];
