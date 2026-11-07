@@ -146,9 +146,10 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md), [createdb](createdb.md), [addvoldb](addvoldb.md), [copydb](copydb.md), [renamedb](renamedb.md), [unloaddb](unloaddb.md), [loaddb](loaddb.md)) follow their own rule instead of the one above:
 
 - The path must be absolute once its environment variables are expanded (`path must be an absolute path`).
+- It must not contain a `..` part (`path must not contain ".."`): the directories along a path are created as written, so `<outside>/../<allowed>/x` would create `<outside>` even though the path leads under `<allowed>`.
 - It must be under a directory listed in `allowed_db_dirs` of `cm.conf` (default `$CUBRID_DATABASES`; `;`-separated, `$NAME` expanded when CMS starts, read at startup). For a task on an existing database, the volume and log directories registered for that database in `databases.txt` are allowed too, so work on a database made outside `allowed_db_dirs` goes on; a new location (a new database of createdb or copydb, the `recoverypath` of restoredb) must be under `allowed_db_dirs`. Otherwise: `path is not under allowed_db_dirs`.
 - Protected files, `$CUBRID/bin`, `lib` and `java`, `cm.conf` and `databases.txt` are refused even under a listed directory, with the messages above.
-- The comparison follows symbolic links and `..` to where the path really leads (on Windows also 8.3 names, case and junctions); a path that does not exist yet is judged by its nearest existing directory.
+- The comparison follows symbolic links to where the path really leads (on Windows also 8.3 names, case and junctions); a path that does not exist yet is judged by its nearest existing directory.
 
 ## TLS Certificate
 

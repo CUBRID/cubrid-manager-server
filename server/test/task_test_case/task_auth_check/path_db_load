@@ -37,7 +37,7 @@
   "schema-file-list": "none",
   "delete_orignal_files": "n",
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "loaddb",

@@ -2633,8 +2633,10 @@ join_db_path (char *buf, size_t size, const char *dir, const char *name, char *_
 /*
  * is_authorized_exvol_paths () - createdb: each extended volume of the
  *   "exvol" section of `req` (NAME = PURPOSE;NPAGES;PATH) is created as
- *   PATH/NAME. That is a new location, so it must be under allowed_db_dirs
- *   (NULL dbname). Checked before createdb creates any directory or file.
+ *   PATH/NAME, and createdb creates PATH itself first (uCreateDir ()). Both
+ *   are a new location, so both must be under allowed_db_dirs (NULL dbname):
+ *   PATH/NAME alone is not enough, a NAME with ".." could bring an outside
+ *   PATH back in. Checked before createdb creates any directory or file.
  */
 static bool
 is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
@@ -2657,7 +2659,8 @@ is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
 	{
 	  continue;		/* skipped by createdb as well */
 	}
-      if (!join_db_path (vol_path, sizeof (vol_path), val[2], tn, _dbmt_error)
+      if (!is_authorized_db_path (val[2], NULL, _dbmt_error)
+	  || !join_db_path (vol_path, sizeof (vol_path), val[2], tn, _dbmt_error)
 	  || !is_authorized_db_path (vol_path, NULL, _dbmt_error))
 	{
 	  return false;
@@ -3631,6 +3634,13 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 		{
 		  *p = '\0';
 		}
+	      /* the directory created below, checked as well */
+	      if (!is_authorized_db_path (v, dbname, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
+		}
 	      if (uCreateDir (v) != ERR_NO_ERROR)
 		{
 		  fclose (outfile);
@@ -4303,6 +4313,13 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 	      if (p)
 		{
 		  *p = '\0';
+		}
+	      /* the directory whose lob subdirectory is created below, checked as well */
+	      if (!is_authorized_db_path (v, NULL, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
 		}
 	      snprintf (lob_base_path, PATH_MAX - 1, "%s/lob", v);
 	      if (uCreateDir (lob_base_path) != ERR_NO_ERROR)

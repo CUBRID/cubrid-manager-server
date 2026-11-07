@@ -45,7 +45,7 @@
   "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
   "exvol": [],
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "createdb",
@@ -61,7 +61,7 @@
   "logvolpath": "$CUBRID_DATABASES/authtest_newdb\\..\\..\\..\\tmp\\cms_authtest_bs",
   "exvol": [],
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "createdb",
@@ -98,6 +98,26 @@
   "exvol": [
    {
     "../../../cms_authtest_x001": "data;1;$CUBRID_DATABASES/authtest_newdb"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "exvol": [
+   {
+    "../../authtest_newdb/authtest_newdb_x001": "data;1;/tmp/cms_authtest_exvol_dir"
    }
   ],
   "test_expect": "failure",

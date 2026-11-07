@@ -17,7 +17,7 @@
   "volname": "../../../cms_authtest_backup",
   "backupdir": "$CUBRID_DATABASES/authtest_nodb",
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "backupdb",
@@ -64,7 +64,7 @@
   "pathname": "none",
   "recoverypath": "$CUBRID_DATABASES/authtest_nodb\\..\\..\\..\\tmp\\cms_authtest_bs",
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "backupvolinfo",

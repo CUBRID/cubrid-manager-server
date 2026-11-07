@@ -24,7 +24,7 @@ Permissions required to run this task: DBC
 | async | default "no", if "yes" run the task in asynchronous mode |
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
-* `genvolpath`, `logvolpath` and the path of each `exvol` volume (PATH/NAME) are a new database, so they must be under `allowed_db_dirs` of `cm.conf`; see [DB Utility Task Paths](README.md#db-utility-task-paths). They are all checked before any directory or file is created.
+* `genvolpath`, `logvolpath`, and for each `exvol` volume both PATH and PATH/NAME are a new database, so they must be under `allowed_db_dirs` of `cm.conf`; see [DB Utility Task Paths](README.md#db-utility-task-paths). They are all checked before any directory or file is created.
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample

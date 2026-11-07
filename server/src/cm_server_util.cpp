@@ -5971,6 +5971,51 @@ is_absolute_path (const std::string &path)
 }
 
 /*
+ * has_parent_dir_part () - `path` has a ".." part. A DB utility task path
+ *   may name directories that do not exist yet, and uCreateDir () creates
+ *   every directory along the path as written: in <outside>/../<allowed>/x,
+ *   the path leads under <allowed>, but <outside> is created on the way. The
+ *   comparison cannot see that, so ".." is refused in these paths. On
+ *   Windows a part of only dots and spaces with two dots or more is refused
+ *   too, as Windows drops trailing dots and spaces.
+ */
+static bool
+has_parent_dir_part (const std::string &path)
+{
+#if defined (WINDOWS)
+  const char *separators = "/\\";
+#else
+  const char *separators = "/";
+#endif
+  size_t start = 0;
+
+  while (start <= path.size ())
+    {
+      size_t end = path.find_first_of (separators, start);
+      std::string part = path.substr (start, (end == std::string::npos) ? std::string::npos : end - start);
+
+#if defined (WINDOWS)
+      if (part.find_first_not_of (". ") == std::string::npos
+	  && std::count (part.begin (), part.end (), '.') >= 2)
+	{
+	  return true;
+	}
+#else
+      if (part == "..")
+	{
+	  return true;
+	}
+#endif
+      if (end == std::string::npos)
+	{
+	  break;
+	}
+      start = end + 1;
+    }
+  return false;
+}
+
+/*
  * add_registered_db_dirs () - append to `dirs` the volume and log
  *   directories registered for `dbname` in databases.txt. An HA name
  *   (db@host) is looked up by the part before '@'. Nothing is added when the
@@ -6025,6 +6070,12 @@ is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
   if (!is_absolute_path (expanded_path))
     {
       set_path_error (_dbmt_error, "path must be an absolute path", path);
+      return false;
+    }
+
+  if (has_parent_dir_part (expanded_path))
+    {
+      set_path_error (_dbmt_error, "path must not contain \"..\"", path);
       return false;
     }
 

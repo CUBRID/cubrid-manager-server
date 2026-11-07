@@ -21,7 +21,7 @@
   "prefix": "none",
   "targetdir": "$CUBRID_DATABASES/../cms_authtest_unload",
   "test_expect": "failure",
-  "test_note": "path is not under allowed_db_dirs"
+  "test_note": "path must not contain \"..\""
  },
  {
   "task": "unloaddb",
