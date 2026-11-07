@@ -14,6 +14,8 @@ Permissions required to run this task: none (any logged-in user)
 | level | backup level, 0, 1 or 2 |
 | pathname | the full path of the backup volume |
 
+* `pathname` must be under `allowed_db_dirs` of `cm.conf` or under a directory registered for `dbname` in `databases.txt`; see [DB Utility Task Paths](README.md#db-utility-task-paths).
+
 ## Request Sample
 
 ```

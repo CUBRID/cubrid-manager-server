@@ -1911,14 +1911,15 @@ err_return:
 int
 uCreateDir (char *new_dir)
 {
-  char *p, path[1024];
+  char *p, path[COMPOSED_PATH_MAX];
 
-  if (new_dir == NULL)
+  /* a path that does not fit fails: a cut one is not the directory the caller checked */
+  if (new_dir == NULL || strlen (new_dir) >= sizeof (path))
     {
       return ERR_DIR_CREATE_FAIL;
     }
-  memset (path, 0, 1024);
-  strncpy (path, new_dir, 1023);
+  memset (path, 0, sizeof (path));
+  strncpy (path, new_dir, sizeof (path) - 1);
   ut_trim (path);
 
 #if defined(WINDOWS)
@@ -4963,42 +4964,6 @@ isEnvVarAllowed (const std::string &var_name)
   return false;
 }
 
-bool
-is_invalid_filename (const char *filename)
-{
-  return is_valid_filename (filename) ? false : true;
-}
-
-bool
-is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
-{
-  bool ret = is_valid_filename (filename) ? false : true;
-
-  if (ret)
-    {
-      if (filename == NULL)
-	{
-	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: (null)");
-	}
-      else
-	{
-	  std::string path = filename;
-
-	  /*
-	   * we want to change % to * in reply message, for example, %CUBRID% to *CUBRID*
-	   */
-
-	  if (!path.empty ())
-	    {
-	      std::replace (path.begin (), path.end (), '%', '*');
-	    }
-	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path.c_str ());
-	}
-    }
-
-  return ret;
-}
-
 /*
  * has_stream_name () - Windows: a ':' anywhere but after the drive letter
  *   names an NTFS alternate data stream (cm.pass:x, cm.pass::$DATA), another
@@ -5149,7 +5114,7 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
 	  continue;
 	}
 
-      if (is_invalid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
+      if (!is_valid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid filename or attempt to access file in parent path: %s",
 		    line.c_str ());
@@ -5340,10 +5305,14 @@ is_subpath (const char *allowd_path, const char *path)
 /*
  * Protected files.
  *
- * These files hold CMS user passwords and authorities, DB passwords or the
- * TLS private key. No file task may read or write them, whatever the
- * caller's authority (admin included); the server itself reaches them only
- * through its own code, never through a path taken from a request. The files
+ * These files hold CMS user passwords and authorities, DB passwords, the
+ * TLS private key, or the settings of the automatic jobs, which CMS runs
+ * later with its own privileges (a backup path, a database name). No file
+ * task may read or write them, whatever the caller's authority (admin
+ * included); the server itself reaches them only through its own code, never
+ * through a path taken from a request. The automatic job settings are
+ * changed only through their tasks (setbackupinfo, setautoaddvol, ...),
+ * which check what they write. The files
  * named after the TLS key and certificate (<name>.<anything>, the work files
  * of a replacement) are protected too, see is_tls_work_file ().
  */
@@ -5356,7 +5325,10 @@ protected_files (void)
     FID_DBMT_CUBRID_PASS,	/* cmdb.pass */
     FID_CONN_LIST,		/* conlist */
     FID_AUTO_JOBS_CONF,		/* autojobs.conf */
-    FID_AUTO_EXECQUERY_CONF	/* autoexecquery.conf */
+    FID_AUTO_EXECQUERY_CONF,	/* autoexecquery.conf */
+    FID_AUTO_BACKUPDB_CONF,	/* autobackupdb.conf */
+    FID_AUTO_ADDVOLDB_CONF,	/* autoaddvoldb.conf */
+    FID_AUTO_HISTORY_CONF	/* autohistory.conf */
   };
   std::vector<std::string> files;
   char buf[PATH_MAX];
@@ -5376,6 +5348,37 @@ protected_files (void)
   if (sco.szSSLCertificate[0] != '\0')
     {
       files.push_back (sco.szSSLCertificate);
+    }
+
+  return files;
+}
+
+/*
+ * Admin configuration files.
+ *
+ * cm.conf holds the security settings of CMS (session_ip_check,
+ * token_active_time, max_sessions_per_user, ...) and databases.txt says where
+ * each database lives, which CMS trusts to find the files of a database.
+ * Users who may run the DB tasks (DBC, DBO) must not be able to change what
+ * limits those tasks. Only an admin may write these files, and only through
+ * setsysparam (cmconf, databases); no file task writes, empties or deletes
+ * them, whatever the caller's authority. Unlike the protected files, any task
+ * may still read them.
+ */
+static std::vector<std::string>
+admin_conf_files (void)
+{
+  std::vector<std::string> files;
+  char buf[PATH_MAX];
+
+  buf[0] = '\0';
+  if (conf_get_dbmt_file (FID_DBMT_CONF, buf) != NULL && buf[0] != '\0')
+    {
+      files.push_back (buf);	/* cm.conf */
+    }
+  if (sco.szCubrid_databases != NULL && sco.szCubrid_databases[0] != '\0')
+    {
+      files.push_back (std::string (sco.szCubrid_databases) + "/" + CUBRID_DATABASE_TXT);
     }
 
   return files;
@@ -5424,15 +5427,12 @@ win_final_path (const std::string &path, std::string &final_path)
 
 /*
  * resolve_path () - the path the operating system really opens, so that
- *   another spelling cannot stand in for a protected file or for a program
- *   directory ($CUBRID/bin, lib, java).
+ *   another spelling cannot stand in for a protected file, a program
+ *   directory ($CUBRID/bin, lib, java) or an allowed directory.
  *   Linux: symbolic links resolved (realpath).
  *   Windows: the name the file system gives the file (win_final_path ()), so
  *   that 8.3 short names (CM~1.PAS), trailing dots or spaces (cm.pass.), case,
  *   symbolic links and junctions all map to the same path.
- *   A path that does not exist yet (a file about to be written) is resolved
- *   through its parent directory. Returns the path unchanged when it cannot be
- *   resolved.
  */
 static std::string
 resolve_path (const std::string &path)
@@ -5440,64 +5440,77 @@ resolve_path (const std::string &path)
 #if defined (WINDOWS)
   char full[PATH_MAX];
   DWORD n;
-  std::string final_path;
+  std::string final_path, head, tail;
 
-  /* separators, "." and ".." and the trailing dots/spaces of the last part */
+  /* separators, "." and ".." first, as Windows itself reads the path */
   n = GetFullPathNameA (path.c_str (), sizeof (full), full, NULL);
   if (n == 0 || n >= sizeof (full))
     {
       return path;
     }
-  std::string normalized = full;
+  head = full;
 
-  if (win_final_path (normalized, final_path))
+  while (!win_final_path (head, final_path))
     {
-      return final_path;
-    }
+      size_t pos = head.find_last_of ('\\');
 
-  size_t pos = normalized.find_last_of ('\\');
-  if (pos != std::string::npos && pos > 0)
-    {
-      std::string parent = normalized.substr (0, pos);
-      std::string last = normalized.substr (pos + 1);
-
-      if (parent.size () == 2 && parent[1] == ':')
+      if (pos == std::string::npos || head.size () <= 3)
 	{
-	  parent += '\\';		/* "C:" is the current directory of C:, not its root */
+	  return full;		/* not even the root resolves */
 	}
-      /* Windows drops them when it creates the file */
+
+      std::string last = head.substr (pos + 1);
+
       while (!last.empty () && (last.back () == '.' || last.back () == ' '))
 	{
 	  last.pop_back ();
 	}
-      if (win_final_path (parent, final_path))
+      tail = tail.empty () ? last : last + "\\" + tail;
+      head = head.substr (0, pos);
+      if (head.size () == 2 && head[1] == ':')
 	{
-	  if (final_path.empty () || final_path.back () != '\\')
-	    {
-	      final_path += '\\';
-	    }
-	  return final_path + last;
+	  head += '\\';		/* "C:" is the current directory of C:, not its root */
 	}
     }
-  return normalized;
+
+  if (!tail.empty ())
+    {
+      if (final_path.empty () || final_path.back () != '\\')
+	{
+	  final_path += '\\';
+	}
+      final_path += tail;
+    }
+  return final_path;
 #else
   char buf[PATH_MAX];
+  std::string head = path, tail;
 
-  if (realpath (path.c_str (), buf) != NULL)
+  while (realpath (head.c_str (), buf) == NULL)
     {
-      return std::string (buf);
-    }
+      size_t pos = head.find_last_of ('/');
 
-  size_t pos = path.find_last_of ('/');
-  if (pos != std::string::npos && pos > 0)
-    {
-      std::string parent = path.substr (0, pos);
-      if (realpath (parent.c_str (), buf) != NULL)
+      if (pos == std::string::npos)
 	{
-	  return std::string (buf) + path.substr (pos);
+	  return path;		/* relative, no ancestor left */
 	}
+      std::string last = head.substr (pos + 1);
+
+      tail = tail.empty () ? last : last + "/" + tail;
+      head = (pos == 0) ? "/" : head.substr (0, pos);
     }
-  return path;
+
+  std::string resolved = buf;
+
+  if (!tail.empty ())
+    {
+      if (resolved.empty () || resolved.back () != '/')
+	{
+	  resolved += '/';
+	}
+      resolved += tail;
+    }
+  return resolved;
 #endif
 }
 
@@ -5507,6 +5520,7 @@ is_same_path (const std::string &a, const std::string &b)
 {
   return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
 }
+
 
 /* split `path` into its directory and its last part */
 static bool
@@ -5584,11 +5598,10 @@ is_tls_work_file (const std::string &path)
   return false;
 }
 
-/* `path` (expanded) is one of the protected files */
+/* `path` (expanded) is one of `files`, compared as written and as resolved */
 static bool
-is_protected_file (const std::string &path)
+is_one_of_files (const std::vector<std::string> &files, const std::string &path)
 {
-  std::vector<std::string> files = protected_files ();
   std::string resolved = resolve_path (path);
 
   for (size_t i = 0; i < files.size (); i++)
@@ -5598,14 +5611,13 @@ is_protected_file (const std::string &path)
 	  return true;
 	}
     }
-  return is_tls_work_file (path);
+  return false;
 }
 
-/* a protected file is `dir` (expanded) itself or somewhere under it */
+/* one of `files` is `dir` (expanded) itself or somewhere under it */
 static bool
-contains_protected_file (const std::string &dir)
+contains_one_of_files (const std::vector<std::string> &files, const std::string &dir)
 {
-  std::vector<std::string> files = protected_files ();
   std::string resolved = resolve_path (dir);
 
   for (size_t i = 0; i < files.size (); i++)
@@ -5617,6 +5629,48 @@ contains_protected_file (const std::string &dir)
 	}
     }
   return false;
+}
+
+/* `path` (expanded) is one of the protected files */
+static bool
+is_protected_file (const std::string &path)
+{
+  return is_one_of_files (protected_files (), path) || is_tls_work_file (path);
+}
+
+/* a protected file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_protected_file (const std::string &dir)
+{
+  return contains_one_of_files (protected_files (), dir);
+}
+
+/* an admin configuration file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_admin_conf_file (const std::string &dir)
+{
+  return contains_one_of_files (admin_conf_files (), dir);
+}
+
+/*
+ * is_admin_conf_file () - `path` is cm.conf or databases.txt (see
+ *   admin_conf_files ()), also when written another way (a symbolic link,
+ *   "..", repeated separators, and on Windows an 8.3 name, case, trailing dots
+ *   or spaces). setsysparam requires AU_ADMIN for such a path; the file tasks
+ *   refuse it through is_authorized_filename () and is_authorized_dirname ()
+ *   with FOR_WRITE. False for an invalid file name.
+ */
+bool
+is_admin_conf_file (const char *path)
+{
+  std::string expanded_path;
+
+  if (path == NULL || !is_valid_filename (path, expanded_path))
+    {
+      return false;
+    }
+
+  return is_one_of_files (admin_conf_files (), expanded_path);
 }
 
 /*
@@ -5677,6 +5731,12 @@ overlaps_cubrid_program_dir (const std::string &dir)
   return NULL;
 }
 
+/* reasons for refusing an admin configuration file in a file task */
+#define ADMIN_CONF_FILE_ERROR \
+  "cm.conf and databases.txt can be changed only by an admin with setsysparam"
+#define ADMIN_CONF_DIR_ERROR \
+  "the directory contains cm.conf or databases.txt"
+
 static void
 set_path_error (char *_dbmt_error, const char *reason, const char *path)
 {
@@ -5696,15 +5756,15 @@ set_program_dir_error (char *_dbmt_error, const char *dir, const char *path)
 }
 
 /*
- * is_authorized_filename () - the path is under $CUBRID or $CUBRID_DATABASES
- * and is not a protected file (cm.pass, cmdb.pass, conlist, autojobs.conf,
- * autoexecquery.conf, the TLS key and certificate). For every file task.
+ * check_base_path () - the checks every file task needs: `path` is a valid
+ *   file name, is under $CUBRID or $CUBRID_DATABASES, and is not a protected
+ *   file (cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, the
+ *   TLS key and certificate and their work files). On success `expanded_path`
+ *   holds `path` with its environment variables expanded.
  */
-bool
-is_authorized_filename (const char *path, char *_dbmt_error)
+static bool
+check_base_path (const char *path, std::string &expanded_path, char *_dbmt_error)
 {
-  std::string expanded_path;
-
   if (path == NULL || !is_valid_filename (path, expanded_path))
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path ? path : "(NULL)");
@@ -5733,26 +5793,43 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_write_filename () - as above, and not under a program
- * directory ($CUBRID/bin, lib, java). For tasks that write, truncate or
- * delete a file (writeandsaveconf, writeprivatedata, resetlog, removelog).
+ * is_authorized_filename () - a file task may use the file `path` for
+ *   `purpose`.
+ *
+ *   FOR_READ: the task reads the file (view, search, list, run). `path` must
+ *     pass check_base_path ().
+ *   FOR_WRITE: the task writes, empties or deletes the file (writeandsaveconf,
+ *     writeprivatedata, resetlog, removelog). In addition, `path` must not be
+ *     under a program directory ($CUBRID/bin, lib, java) nor be an admin
+ *     configuration file (cm.conf, databases.txt; see admin_conf_files ()).
+ *     No file task writes those two files; setsysparam does, for an admin
+ *     only, and checks that itself.
  */
 bool
-is_authorized_write_filename (const char *path, char *_dbmt_error)
+is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)
 {
   std::string expanded_path;
   const char *program_dir;
 
-  if (!is_authorized_filename (path, _dbmt_error))
+  if (!check_base_path (path, expanded_path, _dbmt_error))
     {
       return false;
     }
 
-  /* is_authorized_filename () has already validated and expanded it */
-  (void) is_valid_filename (path, expanded_path);
+  if (purpose != FOR_WRITE)
+    {
+      return true;
+    }
+
   if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
     {
       set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  if (is_one_of_files (admin_conf_files (), expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_FILE_ERROR, path);
       return false;
     }
 
@@ -5760,37 +5837,229 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_dirname () - as is_authorized_filename (), and no protected
- * file under the directory; with FOR_WRITE, the directory must also not
- * overlap a program directory ($CUBRID/bin, lib, java). For tasks that copy
- * or delete a directory tree.
+ * is_authorized_dirname () - a file task may use the directory tree `path`
+ *   for `purpose`.
+ *
+ *   FOR_READ: the task reads the tree (the source of copyfolder). `path` must
+ *     pass check_base_path () and hold no protected file.
+ *   FOR_WRITE: the task writes into or deletes the tree (the destination of
+ *     copyfolder, deletefolder). In addition, the tree must not overlap a
+ *     program directory ($CUBRID/bin, lib, java) nor hold an admin
+ *     configuration file (cm.conf, databases.txt).
  */
 bool
-is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
+is_authorized_dirname (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)
 {
   std::string expanded_path;
   const char *program_dir;
 
-  if (!is_authorized_filename (path, _dbmt_error))
+  if (!check_base_path (path, expanded_path, _dbmt_error))
     {
       return false;
     }
 
-  (void) is_valid_filename (path, expanded_path);
   if (contains_protected_file (expanded_path))
     {
       set_path_error (_dbmt_error, "the directory contains a protected file", path);
       return false;
     }
 
-  if (access == FOR_WRITE
-      && (program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
+  if (purpose != FOR_WRITE)
+    {
+      return true;
+    }
+
+  if ((program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
     {
       set_program_dir_error (_dbmt_error, program_dir, path);
       return false;
     }
 
+  if (contains_admin_conf_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_DIR_ERROR, path);
+      return false;
+    }
+
   return true;
+}
+
+/*
+ * is_absolute_path () - `path` is absolute: /dir on Linux; C:\dir, C:/dir or
+ *   \\server\share on Windows. A relative path would depend on the current
+ *   directory of whichever process uses it.
+ */
+bool
+is_absolute_path (const std::string &path)
+{
+#if defined (WINDOWS)
+  if (path.size () >= 3 && isalpha ((unsigned char) path[0]) && path[1] == ':'
+      && (path[2] == '\\' || path[2] == '/'))
+    {
+      return true;
+    }
+  return path.size () >= 2 && (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/');
+#else
+  return !path.empty () && path[0] == '/';
+#endif
+}
+
+/*
+ * has_parent_dir_part () - `path` has a ".." part. A DB utility task path
+ *   may name directories that do not exist yet, and uCreateDir () creates
+ *   every directory along the path as written: in <outside>/../<allowed>/x,
+ *   the path leads under <allowed>, but <outside> is created on the way. The
+ *   comparison cannot see that, so ".." is refused in these paths. On
+ *   Windows a part of only dots and spaces with two dots or more is refused
+ *   too, as Windows drops trailing dots and spaces.
+ */
+static bool
+has_parent_dir_part (const std::string &path)
+{
+#if defined (WINDOWS)
+  const char *separators = "/\\";
+#else
+  const char *separators = "/";
+#endif
+  size_t start = 0;
+
+  while (start <= path.size ())
+    {
+      size_t end = path.find_first_of (separators, start);
+      std::string part = path.substr (start, (end == std::string::npos) ? std::string::npos : end - start);
+
+#if defined (WINDOWS)
+      if (part.find_first_not_of (". ") == std::string::npos
+	  && std::count (part.begin (), part.end (), '.') >= 2)
+	{
+	  return true;
+	}
+#else
+      if (part == "..")
+	{
+	  return true;
+	}
+#endif
+      if (end == std::string::npos)
+	{
+	  break;
+	}
+      start = end + 1;
+    }
+  return false;
+}
+
+/*
+ * add_registered_db_dirs () - append to `dirs` the volume and log
+ *   directories registered for `dbname` in databases.txt. An HA name
+ *   (db@host) is looked up by the part before '@'. Nothing is added when the
+ *   database is not registered.
+ */
+static void
+add_registered_db_dirs (const char *dbname, std::vector<std::string> &dirs)
+{
+  /* the fields of a databases.txt line: name, volume path, host, log path */
+  static const int db_txt_fields[] = { 1, 3 };
+  std::string name = dbname;
+  size_t at = name.find ('@');
+
+  if (at != std::string::npos)
+    {
+      name.erase (at);
+    }
+  if (name.empty ())
+    {
+      return;
+    }
+
+  for (size_t i = 0; i < sizeof (db_txt_fields) / sizeof (db_txt_fields[0]); i++)
+    {
+      char dir[PATH_MAX];
+
+      if (uReadDBtxtFile (name.c_str (), db_txt_fields[i], dir) == ERR_NO_ERROR && dir[0] != '\0'
+	  && is_absolute_path (dir))
+	{
+	  dirs.push_back (dir);
+	}
+    }
+}
+
+/*
+ * is_authorized_db_path () - a DB utility task (backupdb, restoredb,
+ *   createdb, addvoldb, copydb, renamedb, unloaddb, loaddb, ...) may use
+ *   `path`, a file or directory it reads, creates, writes or deletes.
+ */
+bool
+is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
+{
+  std::string expanded_path;
+  const char *program_dir;
+
+  if (path == NULL || !is_valid_filename (path, expanded_path))
+    {
+      set_path_error (_dbmt_error, "filename is not authorized", path);
+      return false;
+    }
+
+  /*
+   * The tasks copy the path as given, and use it expanded, into PATH_MAX
+   * buffers: a path that does not fit either way is refused here, before any
+   * copy, rather than cut later into one that was not checked.
+   */
+  if (strlen (path) >= PATH_MAX || expanded_path.size () >= PATH_MAX)
+    {
+      set_path_error (_dbmt_error, "path is too long", path);
+      return false;
+    }
+
+  if (!is_absolute_path (expanded_path))
+    {
+      set_path_error (_dbmt_error, "path must be an absolute path", path);
+      return false;
+    }
+
+  if (has_parent_dir_part (expanded_path))
+    {
+      set_path_error (_dbmt_error, "path must not contain \"..\"", path);
+      return false;
+    }
+
+  if (is_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "access to a protected file is not allowed", path);
+      return false;
+    }
+
+  if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
+    {
+      set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  if (is_one_of_files (admin_conf_files (), expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_FILE_ERROR, path);
+      return false;
+    }
+
+  std::vector<std::string> dirs = get_allowed_db_dirs ();
+  std::string resolved = resolve_path (expanded_path);
+
+  if (dbname != NULL && dbname[0] != '\0')
+    {
+      add_registered_db_dirs (dbname, dirs);
+    }
+
+  for (size_t i = 0; i < dirs.size (); i++)
+    {
+      if (is_subpath (resolve_path (dirs[i]).c_str (), resolved.c_str ()))
+	{
+	  return true;
+	}
+    }
+
+  set_path_error (_dbmt_error, "path is not under allowed_db_dirs", path);
+  return false;
 }
 
 bool

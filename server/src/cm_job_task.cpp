@@ -363,7 +363,12 @@ static int get_sql_info (char *dbmt_file, int *file_size);
 static int get_sql_text (char *tmpfile, char *query_p, TS_SQL_INFO *qry_info, int query_file_size);
 static int get_next_sqltext (FILE *qfp, char *qry_buf, int offset, int query_file_size);
 
-static void unlink_schema_files (const char *schema_list_file);
+static bool loaddb_path_given (const char *path);
+static bool read_schema_file_list (const char *list_file, std::vector<std::string> &entries, char *_dbmt_error);
+static bool is_authorized_loaddb_files (char *const files[], int count, const char *schema_file_list,
+					const char *dbname, char *_dbmt_error);
+static void delete_loaddb_file (const char *path, const char *dbname);
+static void delete_schema_files (const char *schema_list_file, const char *dbname);
 
 static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
@@ -1729,6 +1734,30 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * The task is open to DBC and DBO, but cm.conf (security settings of CMS)
+   * and databases.txt (where each database lives) decide what those users
+   * may do, so only an admin may write them. This is the one task that may
+   * write them, which FOR_WRITE refuses, so they are checked here instead.
+   * Checked on the resolved path, so any confname that names one of them
+   * (cmconf, databases, cm.conf, ...) is covered. Any other file is written
+   * under the same rules as in the other file tasks.
+   */
+  if (is_admin_conf_file (conf_path))
+    {
+      if (!dbmt_user_has_auth (nv_get_val (req, "_ID"), AU_ADMIN))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		    "The user don't have authority to execute the task: setsysparam for cm.conf or "
+		    "databases.txt (ADMIN is required)");
+	  return ERR_WITH_MSG;
+	}
+    }
+  else if (!is_authorized_filename (conf_path, FOR_WRITE, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
   if (_write_conf_to_file (req, conf_path) < 0)
     {
       return ERR_TMPFILE_OPEN_FAIL;
@@ -1825,7 +1854,13 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
       snprintf (conf_path, buflen - 1, "%s/conf/%s", sco.szCubrid, conf_name);
     }
 
-  if (retval == 0 && !is_authorized_filename (conf_path, _dbmt_error))
+  /*
+   * FOR_READ: this only maps confname to a path, for getallsysparam (read)
+   * and setsysparam (write). setsysparam checks the write itself, because it
+   * is the one task that may write cm.conf and databases.txt (for an admin),
+   * which FOR_WRITE refuses.
+   */
+  if (retval == 0 && !is_authorized_filename (conf_path, FOR_READ, _dbmt_error))
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "conf path is not authorized: %s.", conf_name);
       retval = ER_VIOLATE_SECURITY;
@@ -2577,6 +2612,69 @@ tsGetDBMTUserInfo (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * join_db_path () - `dir`/`name` into `buf`. False if it does not fit:
+ *   a cut path is not the one the task would use, so it must not be checked
+ *   in its place (a cut "../.." could pass where the whole path would not).
+ */
+static bool
+join_db_path (char *buf, size_t size, const char *dir, const char *name, char *_dbmt_error)
+{
+  int n = snprintf (buf, size, "%s/%s", dir, name);
+
+  if (n < 0 || (size_t) n >= size)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s/%s", dir, name);
+      return false;
+    }
+  return true;
+}
+
+/*
+ * is_authorized_exvol_paths () - createdb: each extended volume of the
+ *   "exvol" section of `req` (NAME = PURPOSE;NPAGES;PATH) is created as
+ *   PATH/NAME, and createdb creates PATH itself first (uCreateDir ()). Both
+ *   are a new location, so both must be under allowed_db_dirs (NULL dbname):
+ *   PATH/NAME alone is not enough, a NAME with ".." could bring an outside
+ *   PATH back in. Checked before createdb creates any directory or file.
+ */
+static bool
+is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
+{
+  int pos, len, i;
+  char *tn, *tv;
+  char buf[1024], *val[3];
+  char vol_path[PATH_MAX];
+
+  nv_locate (req, "exvol", &pos, &len);
+  for (i = pos; i < len + pos; ++i)
+    {
+      nv_lookup (req, i, &tn, &tv);
+      if (tn == NULL || tv == NULL)
+	{
+	  continue;
+	}
+      /* createdb reads the value into a buffer of the same size: a longer one is refused, not cut */
+      if (strlen (tv) >= sizeof (buf))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s", tn);
+	  return false;
+	}
+      strcpy_limit (buf, tv, sizeof (buf));
+      if (string_tokenize2 (buf, val, 3, ';') < 0)
+	{
+	  continue;		/* skipped by createdb as well */
+	}
+      if (!is_authorized_db_path (val[2], NULL, _dbmt_error)
+	  || !join_db_path (vol_path, sizeof (vol_path), val[2], tn, _dbmt_error)
+	  || !is_authorized_db_path (vol_path, NULL, _dbmt_error))
+	{
+	  return false;
+	}
+    }
+  return true;
+}
+
 int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -2676,15 +2774,15 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      if (is_invalid_filename_with_msg (genvolpath, _dbmt_error))
+      /* check_dbpath () turns '\\' into '/', so it comes first. */
+      if ((retval = check_dbpath (genvolpath, _dbmt_error)) != ERR_NO_ERROR)
+	{
+	  return retval;
+	}
+      if (!is_authorized_db_path (genvolpath, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
-    }
-
-  if ((retval = check_dbpath (genvolpath, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
     }
 
   if (logvolpath != NULL)
@@ -2695,17 +2793,21 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       else
 	{
-	  if (is_invalid_filename_with_msg (logvolpath, _dbmt_error))
+	  /* as genvolpath */
+	  if ((retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
+	    {
+	      return retval;
+	    }
+	  if (!is_authorized_db_path (logvolpath, NULL, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
 	}
     }
 
-  if (logvolpath != NULL
-      && (retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
+  if (!is_authorized_exvol_paths (req, _dbmt_error))
     {
-      return retval;
+      return ERR_WITH_MSG;
     }
 
   /* caculate dbvolsize & logvolsize */
@@ -2890,7 +2992,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
@@ -3014,7 +3116,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
@@ -3052,7 +3154,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
@@ -3450,12 +3552,6 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (exvolpath != NULL && strcmp (exvolpath, "none") != 0 &&
-      is_invalid_filename_with_msg (exvolpath, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
-    }
-
   db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
@@ -3528,10 +3624,28 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      replace_colon (n);
 	      replace_colon (v);
 #endif
+	      /*
+	       * The new path of a volume of this database. renamedb works on an
+	       * existing database, so its registered directories count (dbname):
+	       * a volume may stay where it is, even outside allowed_db_dirs.
+	       */
+	      if (!is_authorized_db_path (v, dbname, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
+		}
 	      p = strrchr (v, '/');
 	      if (p)
 		{
 		  *p = '\0';
+		}
+	      /* the directory created below, checked as well */
+	      if (!is_authorized_db_path (v, dbname, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
 		}
 	      if (uCreateDir (v) != ERR_NO_ERROR)
 		{
@@ -3579,6 +3693,11 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }                /* close "if (adv_flag != NULL)" */
   else if (exvolpath != NULL && !uStringEqual (exvolpath, "none"))
     {
+      /* where the extended volumes of this database move to; as above */
+      if (!is_authorized_db_path (exvolpath, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
       if (uCreateDir (exvolpath) != ERR_NO_ERROR)
 	{
 	  strcpy (_dbmt_error, exvolpath);
@@ -3945,9 +4064,21 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       volpath = db_dir;
     }
 
-  if (is_invalid_filename_with_msg (volpath, _dbmt_error))
+  /* a volume of an existing database: its registered directories count (dbname) */
+  if (!is_authorized_db_path (volpath, dbname, _dbmt_error))
     {
       return ERR_WITH_MSG;
+    }
+  if (volname != NULL && volname[0] != '\0')
+    {
+      char vol_full_path[PATH_MAX];
+
+      /* the volume is created as volpath/volname: a "../" in volname must not leave volpath */
+      if (!join_db_path (vol_full_path, sizeof (vol_full_path), volpath, volname, _dbmt_error)
+	  || !is_authorized_db_path (vol_full_path, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
 
   if (access (volpath, F_OK) < 0)
@@ -4104,9 +4235,14 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename_with_msg (logpath, _dbmt_error) ||
-      (destdbpath != NULL && is_invalid_filename_with_msg (destdbpath, _dbmt_error)) ||
-      (exvolpath != NULL && is_invalid_filename_with_msg (exvolpath, _dbmt_error)))
+  /*
+   * The copy is a new database: its paths must be under allowed_db_dirs
+   * (NULL dbname). destdbpath and exvolpath are used only without advanced;
+   * with it, each volume path is checked below.
+   */
+  if (!is_authorized_db_path (logpath, NULL, _dbmt_error)
+      || (adv_flag == 0 && !is_authorized_db_path (destdbpath, NULL, _dbmt_error))
+      || (adv_flag == 0 && !is_authorized_db_path (exvolpath, NULL, _dbmt_error)))
     {
       return ERR_WITH_MSG;
     }
@@ -4172,10 +4308,24 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 	      replace_colon (n);
 	      replace_colon (v);
 #endif
+	      /* the path of a volume of the new database */
+	      if (!is_authorized_db_path (v, NULL, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
+		}
 	      p = strrchr (v, '/');
 	      if (p)
 		{
 		  *p = '\0';
+		}
+	      /* the directory whose lob subdirectory is created below, checked as well */
+	      if (!is_authorized_db_path (v, NULL, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
 		}
 	      snprintf (lob_base_path, PATH_MAX - 1, "%s/lob", v);
 	      if (uCreateDir (lob_base_path) != ERR_NO_ERROR)
@@ -5168,7 +5318,8 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (backupfilepath, PATH_MAX - 1, "%s", backupdir);
     }
 
-  if (is_invalid_filename_with_msg (backupfilepath, _dbmt_error))
+  /* the backup directory (with volname) is created and written; dbname allows its registered directories */
+  if (!is_authorized_db_path (backupfilepath, dbname, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -5273,6 +5424,22 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * is_plain_file_name () - `name` names a file in a directory given elsewhere:
+ *   not empty, not "." or "..", and without '/' or '\\'. unloaddb puts the
+ *   output prefix in front of each file it writes in its output directory,
+ *   so a prefix with a directory part would write outside that directory.
+ */
+static bool
+is_plain_file_name (const char *name)
+{
+  if (name == NULL || name[0] == '\0' || strcmp (name, ".") == 0 || strcmp (name, "..") == 0)
+    {
+      return false;
+    }
+  return strchr (name, '/') == NULL && strchr (name, '\\') == NULL;
+}
+
 int
 ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -5345,15 +5512,22 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (strcmp (targetdir, "+D") == 0)
     {
+      /* the files directory of the web manager, set by the server (cm.conf, admin only): not checked */
       snprintf (fullpath, sizeof (fullpath), "%s/files/", sco.szCWMPath);
     }
   else
     {
+      /* written by unloaddb; dbname allows its registered directories */
       snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
+      if (!is_authorized_db_path (fullpath, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
 
-  if (is_invalid_filename_with_msg (fullpath, _dbmt_error))
+  if (prefix != NULL && !uStringEqual (prefix, "none") && !is_plain_file_name (prefix))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "prefix must be a file name without a directory: %s", prefix);
       return ERR_WITH_MSG;
     }
 
@@ -5366,7 +5540,8 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_PARAM_MISSING;
 	}
 
-      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
+      /* the hash file unloaddb writes; as targetdir */
+      if (strcmp (hashdir, "none") != 0 && !is_authorized_db_path (hashdir, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -5962,14 +6137,28 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (schema_file_list != NULL && !uStringEqual (schema_file_list, "none"))
     {
-      if (is_invalid_filename_with_msg (schema_file_list, _dbmt_error) ||
-	  is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
+      if (is_invalid_schema_file_lists (schema_file_list, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
       snprintf (schema_file_list_opt, PATH_MAX, "%s%s", "--" LOAD_SCHEMA_FILE_LIST_L "=", schema_file_list);
       argv[argc++] = schema_file_list_opt;
     }
+
+  /*
+   * Every file loaddb reads, and so every file it may delete afterwards
+   * (delete_orignal_files), must be under allowed_db_dirs or a directory of
+   * this database; if one is not, loaddb does not run at all.
+   */
+  {
+    char *const files[] = { schema, object, index, error_control_file, ignore_class_file };
+
+    if (!is_authorized_loaddb_files (files, (int) (sizeof (files) / sizeof (files[0])), schema_file_list, dbname,
+				     _dbmt_error))
+      {
+	return ERR_WITH_MSG;
+      }
+  }
 
   if (file_not_exist (schema, "none", _dbmt_error) || file_not_exist (object, "none", _dbmt_error)
       || file_not_exist (index, "none", _dbmt_error) || file_not_exist (ignore_class_file, "none", _dbmt_error)
@@ -6015,22 +6204,11 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (uStringEqualIgnoreCase (nv_get_val (req, "delete_orignal_files"), "y"))
     {
-      if (schema)
-	{
-	  unlink (schema);
-	}
-      if (object)
-	{
-	  unlink (object);
-	}
-      if (index)
-	{
-	  unlink (index);
-	}
-      if (schema_file_list)
-	{
-	  unlink_schema_files (schema_file_list);
-	}
+      /* order and timing as before: also when loaddb failed (checked below) */
+      delete_loaddb_file (schema, dbname);
+      delete_loaddb_file (object, dbname);
+      delete_loaddb_file (index, dbname);
+      delete_schema_files (schema_file_list, dbname);
     }
 
   if (exit_status != 0)
@@ -6047,56 +6225,158 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
-static void
-unlink_schema_files (const char *schema_list_file)
+/* a loaddb file parameter that names a file: given and not "none" */
+static bool
+loaddb_path_given (const char *path)
 {
-  FILE *fp;
-  char *p, filename[PATH_MAX] = { 0, };
-  char path_name[PATH_MAX*2];
-  char path[PATH_MAX];
+  return path != NULL && path[0] != '\0' && strcmp (path, "none") != 0;
+}
 
-  if (schema_list_file == NULL || (fp = fopen (schema_list_file, "r")) == NULL)
+/*
+ * read_schema_file_list () - the files named in the schema file list
+ *   `list_file` (one per line, relative to the directory of the list), as
+ *   full paths in `entries`, environment variables of `list_file` expanded.
+ *   Empty lines are skipped. False, with the reason in `_dbmt_error`, if the
+ *   list cannot be read or a path does not fit.
+ */
+static bool
+read_schema_file_list (const char *list_file, std::vector<std::string> &entries, char *_dbmt_error)
+{
+  std::string expanded, dir, line;
+
+  if (!is_valid_filename (list_file, expanded))
     {
-      return;
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", list_file);
+      return false;
     }
 
 #if defined (WINDOWS)
-  {
-    char drive[_MAX_DRIVE];
-    char dir[PATH_MAX];
-
-    if (_splitpath_s (schema_list_file, drive, _MAX_DRIVE, dir, PATH_MAX, NULL, 0, NULL, 0) == 0)
-      {
-	snprintf (path, PATH_MAX, "%s%s", drive, dir);
-      }
-    else
-      {
-	fclose (fp);
-	return;
-      }
-  }
+  size_t pos = expanded.find_last_of ("/\\");
 #else
-  snprintf (path, PATH_MAX, "%s", schema_list_file);
-  if (dirname (path) == NULL)
+  size_t pos = expanded.find_last_of ('/');
+#endif
+  dir = (pos == std::string::npos) ? std::string (".") : expanded.substr (0, (pos == 0) ? 1 : pos);
+
+  std::ifstream file (expanded.c_str ());
+
+  if (!file.is_open ())
     {
-      fclose (fp);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "file does not exists: %s", list_file);
+      return false;
+    }
+
+  entries.clear ();
+  while (std::getline (file, line))
+    {
+      if (!line.empty () && line[line.size () - 1] == '\r')
+	{
+	  line.erase (line.size () - 1);
+	}
+      if (line.empty ())
+	{
+	  continue;
+	}
+      if (dir.size () + 1 + line.size () >= PATH_MAX)
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s/%s", dir.c_str (), line.c_str ());
+	  return false;
+	}
+      entries.push_back (dir + "/" + line);
+    }
+  return true;
+}
+
+/*
+ * is_authorized_loaddb_files () - loaddb: each given file of `files`
+ *   (schema, object, index, error control and ignore class files), the
+ *   schema file list and every file it names pass is_authorized_db_path ()
+ *   for `dbname`. Checked before loaddb runs, so that every file
+ *   delete_orignal_files may delete has passed it.
+ */
+static bool
+is_authorized_loaddb_files (char *const files[], int count, const char *schema_file_list, const char *dbname,
+			    char *_dbmt_error)
+{
+  for (int i = 0; i < count; i++)
+    {
+      if (loaddb_path_given (files[i]) && !is_authorized_db_path (files[i], dbname, _dbmt_error))
+	{
+	  return false;
+	}
+    }
+
+  if (loaddb_path_given (schema_file_list))
+    {
+      std::vector<std::string> entries;
+
+      if (!is_authorized_db_path (schema_file_list, dbname, _dbmt_error)
+	  || !read_schema_file_list (schema_file_list, entries, _dbmt_error))
+	{
+	  return false;
+	}
+      for (size_t i = 0; i < entries.size (); i++)
+	{
+	  if (!is_authorized_db_path (entries[i].c_str (), dbname, _dbmt_error))
+	    {
+	      return false;
+	    }
+	}
+    }
+  return true;
+}
+
+/*
+ * delete_loaddb_file () - delete_orignal_files: delete the loaddb file
+ *   `path`, if given. It passed is_authorized_db_path () before loaddb ran;
+ *   it is checked again here, as a link on the way may have changed since,
+ *   and a file that no longer passes is kept and logged. The file deleted is
+ *   the one checked: `path` with its environment variables expanded.
+ */
+static void
+delete_loaddb_file (const char *path, const char *dbname)
+{
+  char err[DBMT_ERROR_MSG_SIZE];
+  std::string expanded;
+
+  if (!loaddb_path_given (path))
+    {
       return;
     }
-#endif
 
-  while (fgets (filename, PATH_MAX, fp))
+  err[0] = '\0';
+  if (!is_authorized_db_path (path, dbname, err) || !is_valid_filename (path, expanded))
     {
-      p = strchr (filename, '\n');
-      if (p)
-	{
-	  *p = '\0';
-	}
-      snprintf (path_name, sizeof (path_name), "%s/%s", path, filename);
-      unlink (path_name);
+      LOG_WARN ("loaddb of %s: the original file is not deleted: %s", dbname, err);
+      return;
+    }
+  unlink (expanded.c_str ());
+}
+
+/*
+ * delete_schema_files () - delete_orignal_files: delete the files named in
+ *   the schema file list, then the list itself, each through
+ *   delete_loaddb_file ().
+ */
+static void
+delete_schema_files (const char *schema_list_file, const char *dbname)
+{
+  std::vector<std::string> entries;
+  char err[DBMT_ERROR_MSG_SIZE];
+
+  if (!loaddb_path_given (schema_list_file))
+    {
+      return;
     }
 
-  fclose (fp);
-  unlink (schema_list_file);
+  err[0] = '\0';
+  if (read_schema_file_list (schema_list_file, entries, err))
+    {
+      for (size_t i = 0; i < entries.size (); i++)
+	{
+	  delete_loaddb_file (entries[i].c_str (), dbname);
+	}
+    }
+  delete_loaddb_file (schema_list_file, dbname);
 }
 
 int
@@ -6144,7 +6424,8 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   argv[argc++] = lv;
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
+      /* the backup volume read; dbname allows its registered directories */
+      if (!is_authorized_db_path (pathname, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -6159,19 +6440,18 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (recovery_path != NULL && !uStringEqual (recovery_path, "")
       && !uStringEqual (recovery_path, "none"))
     {
-      if (is_invalid_filename_with_msg (recovery_path, _dbmt_error))
+      /* check_dbpath () turns '\\' into '/', so it comes first */
+      if ((retval = check_dbpath (recovery_path, _dbmt_error)) != ERR_NO_ERROR)
+	{
+	  return retval;
+	}
+      if (!is_authorized_db_path (recovery_path, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
 
       /* use -u option to specify restore database path */
       argv[argc++] = "--" RESTORE_USE_DATABASE_LOCATION_PATH_L;
-
-      if ((retval =
-		   check_dbpath (recovery_path, _dbmt_error)) != ERR_NO_ERROR)
-	{
-	  return retval;
-	}
       if (access (recovery_path, F_OK) < 0)
 	{
 	  retval = uCreateDir (recovery_path);
@@ -6261,7 +6541,8 @@ ts_backup_vol_info (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   if (pathname != NULL && !uStringEqual (pathname, "none"))
     {
-      if (is_invalid_filename_with_msg (pathname, _dbmt_error))
+      /* the backup volume read (restoredb --list); dbname allows its registered directories */
+      if (!is_authorized_db_path (pathname, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -7114,7 +7395,13 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
+	  /*
+	   * The auto backup job (aj_backupdb ()) creates and writes this
+	   * directory later, as backupdb does: checked the same way, for the
+	   * database (conf_item[0], read before "path"). Checked again when the
+	   * job runs.
+	   */
+	  if (!is_authorized_db_path (conf_item[i], conf_item[0], _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -7255,7 +7542,13 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
+	  /*
+	   * The auto backup job (aj_backupdb ()) creates and writes this
+	   * directory later, as backupdb does: checked the same way, for the
+	   * database (conf_item[0], read before "path"). Checked again when the
+	   * job runs.
+	   */
+	  if (!is_authorized_db_path (conf_item[i], conf_item[0], _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -7527,7 +7820,7 @@ ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filepath, _dbmt_error))
+  if (!is_authorized_filename (filepath, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -7588,7 +7881,7 @@ ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* resetlog truncates the file: refuse $CUBRID/bin, lib, java as for any write */
-  if (!is_authorized_write_filename (path, _dbmt_error))
+  if (!is_authorized_filename (path, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -8952,7 +9245,7 @@ ts_check_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (v != NULL)
 	    {
-	      if (!is_authorized_filename (v, _dbmt_error))
+	      if (!is_authorized_filename (v, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -8980,7 +9273,7 @@ ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (v != NULL)
 	    {
-	      if (!is_authorized_filename (v, _dbmt_error))
+	      if (!is_authorized_filename (v, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -10193,7 +10486,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
       nv_lookup (cli_request, sect + i, NULL, &logfile);
       if (logfile)
 	{
-	  if (!is_authorized_filename (logfile, diag_error))
+	  if (!is_authorized_filename (logfile, FOR_READ, diag_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -10548,7 +10841,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   if ((casrunnerwithFile != NULL) && (strcmp (casrunnerwithFile, "yes") == 0)
       && (logfilename != NULL))
     {
-      if (logfilename != NULL && !is_authorized_filename (logfilename, diag_error))
+      if (logfilename != NULL && !is_authorized_filename (logfilename, FOR_READ, diag_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -10765,7 +11058,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename (fullpath_with_filename) || !is_subpath (sco.dbmt_tmp_dir, fullpath_with_filename))
+  if (!is_valid_filename (fullpath_with_filename) || !is_subpath (sco.dbmt_tmp_dir, fullpath_with_filename))
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "invalid filename or path not allowed: %s", fullpath_with_filename);
       return ERR_WITH_MSG;
@@ -10821,7 +11114,7 @@ ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filename, diag_error))
+  if (!is_authorized_filename (filename, FOR_READ, diag_error))
     {
       return ERR_WITH_MSG;
     }
@@ -11071,7 +11364,7 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
       path = nt_style_path (path, full_path_buf);
 #endif
       /* removelog deletes the file: refuse $CUBRID/bin, lib, java as for any write */
-      if (!is_authorized_write_filename (path, _dbmt_error))
+      if (!is_authorized_filename (path, FOR_WRITE, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -12137,7 +12430,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_write_filename (conf_path, _dbmt_error))
+  if (!is_authorized_filename (conf_path, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12189,7 +12482,7 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   infile = nv_get_val (req, "infile");
-  if (infile != NULL && !is_authorized_filename (infile, _dbmt_error))
+  if (infile != NULL && !is_authorized_filename (infile, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12250,7 +12543,7 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (search_folder, _dbmt_error))
+  if (!is_authorized_filename (search_folder, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12292,7 +12585,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
   gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
-  if (!is_authorized_filename (script_path, _dbmt_error))
+  if (!is_authorized_filename (script_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12376,7 +12669,7 @@ ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filepath, _dbmt_error))
+  if (!is_authorized_filename (filepath, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12412,7 +12705,7 @@ ts_error_trace (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (err_log_path, _dbmt_error))
+  if (!is_authorized_filename (err_log_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12512,7 +12805,8 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	      snprintf (fullpath, sizeof (fullpath), "%s/tmp/%s",
 			sco.szCubrid, (path + 2));
 
-	      if (!is_authorized_filename (fullpath, _dbmt_error))
+	      /* deleted, but the name has no separator or "..", so it stays in $CUBRID/tmp; FOR_READ as before */
+	      if (!is_authorized_filename (fullpath, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -16648,7 +16942,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
   sprintf (full_path, "%s/%s/", CUBRID, path);
 #endif
 
-  if (!is_authorized_filename (full_path, _dbmt_error))
+  if (!is_authorized_filename (full_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }

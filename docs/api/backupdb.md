@@ -47,6 +47,7 @@ Permissions required to run this task: one of DBC, DBO
 * If **volname is omitted**, backupdir is used as the database backup directory.
 * The final backup directory name must be used as the **pathname** for the restoredb API.
 * *volname* can be omitted, but *backupdir* cannot.
+* The final backup directory must be under `allowed_db_dirs` of `cm.conf` or under a directory registered for `dbname` in `databases.txt`; see [DB Utility Task Paths](README.md#db-utility-task-paths).
 
 ## Response JSON Syntax
 

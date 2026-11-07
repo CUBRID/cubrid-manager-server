@@ -1,0 +1,42 @@
+[
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/conf/autobackupdb.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "setsysparam",
+  "token": "",
+  "confname": "autoaddvoldb.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "conf path is not authorized"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/autohistory.conf",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/conf/autobackupdb.conf",
+  "test_expect": "failure",
+  "test_note": "access to a protected file is not allowed"
+ },
+ {
+  "task": "getautoaddvol",
+  "token": "",
+  "dbname": "demodb",
+  "test_expect": "success"
+ }
+]

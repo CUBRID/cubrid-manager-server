@@ -1187,7 +1187,10 @@ def make_loaddb_input(tmpdir):
     pointed at. It used to be pointed at demodb's own dump, which the unloaddb
     case (much later in the list) regenerates -- meaning loaddb was really
     reading the *previous* run's output, and a run that died in between broke
-    the next one with "file does not exists". Its input is now produced here.
+    the next one with "file does not exists". Its input is now produced here,
+    in $CUBRID_DATABASES: loaddb reads only files under allowed_db_dirs of
+    cm.conf (default $CUBRID_DATABASES), and with delete_orignal_files=y it
+    really deletes them.
     """
     for suffix in ("schema", "objects", "indexes", "trigger"):
         try:
@@ -1293,7 +1296,7 @@ def build_env():
     folder = os.path.join(tmpdir, "test_result_folder")
     if not os.path.isdir(folder):
         os.makedirs(folder)
-    make_loaddb_input(tmpdir)
+    make_loaddb_input(CUBRID_DATABASES)
     copy_extra_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser

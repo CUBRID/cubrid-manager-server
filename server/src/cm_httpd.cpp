@@ -535,7 +535,7 @@ cub_post_request_handler (struct evhttp_request *req, void *arg)
       if (strcmp (fname, "") != 0 || strcmp (fname, "&") != 0)
 	{
 	  path += fname;
-	  if (is_invalid_filename (fname) || !is_subpath (sco.dbmt_tmp_dir, path.c_str ()))
+	  if (!is_valid_filename (fname) || !is_subpath (sco.dbmt_tmp_dir, path.c_str ()))
 	    {
 	      goto send_nok_reply;
 	    }

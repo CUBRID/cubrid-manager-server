@@ -1,0 +1,184 @@
+[
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "/tmp/cms_authtest_newdb",
+  "logvolpath": "/tmp/cms_authtest_newdb",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "/tmp/cms_authtest_log",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb\\..\\..\\..\\tmp\\cms_authtest_bs",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb\\..\\..\\..\\tmp\\cms_authtest_bs",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "exvol": [
+   {
+    "authtest_newdb_x001": "data;1;/tmp/cms_authtest_exvol"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "exvol": [
+   {
+    "../../../cms_authtest_x001": "data;1;$CUBRID_DATABASES/authtest_newdb"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_newdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "logvolpath": "$CUBRID_DATABASES/authtest_newdb",
+  "exvol": [
+   {
+    "../../authtest_newdb/authtest_newdb_x001": "data;1;/tmp/cms_authtest_exvol_dir"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "copydb",
+  "token": "",
+  "srcdbname": "authtest_nodb",
+  "destdbname": "authtest_nodb2",
+  "destdbpath": "/tmp/cms_authtest_copy",
+  "exvolpath": "/tmp/cms_authtest_copy",
+  "logpath": "$CUBRID_DATABASES/authtest_nodb2",
+  "overwrite": "n",
+  "move": "n",
+  "advanced": "off",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "copydb",
+  "token": "",
+  "srcdbname": "authtest_nodb",
+  "destdbname": "authtest_nodb2",
+  "logpath": "$CUBRID_DATABASES/authtest_nodb2",
+  "overwrite": "n",
+  "move": "n",
+  "advanced": "on",
+  "volume": [
+   {
+    "$CUBRID_DATABASES/authtest_nodb/authtest_nodb": "/tmp/cms_authtest_copy/authtest_nodb2"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "renamedb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "rename": "authtest_nodb2",
+  "exvolpath": "/tmp/cms_authtest_rename",
+  "advanced": "off",
+  "forcedel": "n",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "renamedb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "rename": "authtest_nodb2",
+  "exvolpath": "none",
+  "advanced": "on",
+  "forcedel": "n",
+  "volume": [
+   {
+    "$CUBRID_DATABASES/authtest_nodb/authtest_nodb": "/tmp/cms_authtest_rename/authtest_nodb2"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ }
+]

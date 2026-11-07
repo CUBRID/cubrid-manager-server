@@ -1,0 +1,78 @@
+[
+ {
+  "task": "backupdb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "volname": "lv0",
+  "backupdir": "/tmp/cms_authtest_backup",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "backupdb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "volname": "../../../cms_authtest_backup",
+  "backupdir": "$CUBRID_DATABASES/authtest_nodb",
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "backupdb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "backupdir": "$CUBRID/bin",
+  "test_expect": "failure",
+  "test_note": "writing under $CUBRID/bin is not allowed"
+ },
+ {
+  "task": "backupdb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "backupdir": "cms_authtest_backup",
+  "test_expect": "failure",
+  "test_note": "path must be an absolute path"
+ },
+ {
+  "task": "restoredb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "pathname": "/tmp/cms_authtest_backup/lv0",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "restoredb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "pathname": "none",
+  "recoverypath": "/tmp/cms_authtest_recovery",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "restoredb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "pathname": "none",
+  "recoverypath": "$CUBRID_DATABASES/authtest_nodb\\..\\..\\..\\tmp\\cms_authtest_bs",
+  "test_expect": "failure",
+  "test_note": "path must not contain \"..\""
+ },
+ {
+  "task": "backupvolinfo",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "pathname": "/tmp/cms_authtest_backup/lv0",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ }
+]

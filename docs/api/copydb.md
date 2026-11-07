@@ -21,6 +21,7 @@ Permissions required to run this task: DBC
 | async | default "no", if "yes" run the task in asynchronous mode |
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* The copy is a new database, so `logpath`, `destdbpath` and `exvolpath` (without `advanced`) and each target path of `volume` (with `advanced`) must be under `allowed_db_dirs` of `cm.conf`; the directories of `srcdbname` do not count. See [DB Utility Task Paths](README.md#db-utility-task-paths).
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same database at a time (for copydb, both `srcdbname` and `destdbname` are locked), whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
