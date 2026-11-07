@@ -4963,42 +4963,6 @@ isEnvVarAllowed (const std::string &var_name)
   return false;
 }
 
-bool
-is_invalid_filename (const char *filename)
-{
-  return is_valid_filename (filename) ? false : true;
-}
-
-bool
-is_invalid_filename_with_msg (const char *filename, char *dbmt_error)
-{
-  bool ret = is_valid_filename (filename) ? false : true;
-
-  if (ret)
-    {
-      if (filename == NULL)
-	{
-	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: (null)");
-	}
-      else
-	{
-	  std::string path = filename;
-
-	  /*
-	   * we want to change % to * in reply message, for example, %CUBRID% to *CUBRID*
-	   */
-
-	  if (!path.empty ())
-	    {
-	      std::replace (path.begin (), path.end (), '%', '*');
-	    }
-	  snprintf (dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path.c_str ());
-	}
-    }
-
-  return ret;
-}
-
 /*
  * has_stream_name () - Windows: a ':' anywhere but after the drive letter
  *   names an NTFS alternate data stream (cm.pass:x, cm.pass::$DATA), another
@@ -5149,7 +5113,7 @@ is_invalid_schema_file_lists (char *path, char *_dbmt_error)
 	  continue;
 	}
 
-      if (is_invalid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
+      if (!is_valid_filename (line.c_str ()) || attempt_to_access_parent_dir (line.c_str ()))
 	{
 	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "invalid filename or attempt to access file in parent path: %s",
 		    line.c_str ());

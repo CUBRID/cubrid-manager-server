@@ -11034,7 +11034,7 @@ ts_removecasrunnertmpfile (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename (fullpath_with_filename) || !is_subpath (sco.dbmt_tmp_dir, fullpath_with_filename))
+  if (!is_valid_filename (fullpath_with_filename) || !is_subpath (sco.dbmt_tmp_dir, fullpath_with_filename))
     {
       snprintf (diag_error, DBMT_ERROR_MSG_SIZE, "invalid filename or path not allowed: %s", fullpath_with_filename);
       return ERR_WITH_MSG;

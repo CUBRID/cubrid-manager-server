@@ -427,9 +427,7 @@ void write_manager_error_log (const char *protocol_str, const char *msg);
 bool ut_child_exited_ok (int exit_code);
 
 bool is_valid_filename (const char *filename);
-bool is_invalid_filename (const char *filename);
 bool is_valid_filename (const char *filename, std::string &expanded_path);
-bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
 typedef enum
