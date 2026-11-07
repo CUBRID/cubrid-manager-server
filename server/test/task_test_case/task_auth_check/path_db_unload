@@ -1,0 +1,62 @@
+[
+ {
+  "task": "unloaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "target": "both",
+  "usehash": "no",
+  "hashdir": "none",
+  "prefix": "none",
+  "targetdir": "/tmp/cms_authtest_unload",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "unloaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "target": "both",
+  "usehash": "no",
+  "hashdir": "none",
+  "prefix": "none",
+  "targetdir": "$CUBRID_DATABASES/../cms_authtest_unload",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "unloaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "target": "both",
+  "usehash": "no",
+  "hashdir": "none",
+  "prefix": "../../cms_authtest",
+  "targetdir": "$CUBRID_DATABASES/authtest_nodb",
+  "test_expect": "failure",
+  "test_note": "prefix must be a file name without a directory"
+ },
+ {
+  "task": "unloaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "target": "both",
+  "usehash": "yes",
+  "hashdir": "/tmp/cms_authtest_hash",
+  "prefix": "none",
+  "targetdir": "$CUBRID_DATABASES/authtest_nodb",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "unloaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "target": "both",
+  "usehash": "no",
+  "hashdir": "none",
+  "prefix": "none",
+  "targetdir": "+D",
+  "test_expect": "failure",
+  "test_note": "Invalid password or missing password"
+ }
+]

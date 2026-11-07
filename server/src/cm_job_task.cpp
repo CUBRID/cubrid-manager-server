@@ -5398,6 +5398,22 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * is_plain_file_name () - `name` names a file in a directory given elsewhere:
+ *   not empty, not "." or "..", and without '/' or '\\'. unloaddb puts the
+ *   output prefix in front of each file it writes in its output directory,
+ *   so a prefix with a directory part would write outside that directory.
+ */
+static bool
+is_plain_file_name (const char *name)
+{
+  if (name == NULL || name[0] == '\0' || strcmp (name, ".") == 0 || strcmp (name, "..") == 0)
+    {
+      return false;
+    }
+  return strchr (name, '/') == NULL && strchr (name, '\\') == NULL;
+}
+
 int
 ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -5470,15 +5486,22 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   if (strcmp (targetdir, "+D") == 0)
     {
+      /* the files directory of the web manager, set by the server (cm.conf, admin only): not checked */
       snprintf (fullpath, sizeof (fullpath), "%s/files/", sco.szCWMPath);
     }
   else
     {
+      /* written by unloaddb; dbname allows its registered directories */
       snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
+      if (!is_authorized_db_path (fullpath, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
 
-  if (is_invalid_filename_with_msg (fullpath, _dbmt_error))
+  if (prefix != NULL && !uStringEqual (prefix, "none") && !is_plain_file_name (prefix))
     {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "prefix must be a file name without a directory: %s", prefix);
       return ERR_WITH_MSG;
     }
 
@@ -5491,7 +5514,8 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_PARAM_MISSING;
 	}
 
-      if (strcmp (hashdir, "none") != 0 && is_invalid_filename_with_msg (hashdir, _dbmt_error))
+      /* the hash file unloaddb writes; as targetdir */
+      if (strcmp (hashdir, "none") != 0 && !is_authorized_db_path (hashdir, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}

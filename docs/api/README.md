@@ -143,7 +143,7 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 
 ### DB Utility Task Paths
 
-The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md), [createdb](createdb.md), [addvoldb](addvoldb.md), [copydb](copydb.md), [renamedb](renamedb.md)) follow their own rule instead of the one above:
+The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md), [createdb](createdb.md), [addvoldb](addvoldb.md), [copydb](copydb.md), [renamedb](renamedb.md), [unloaddb](unloaddb.md)) follow their own rule instead of the one above:
 
 - The path must be absolute once its environment variables are expanded (`path must be an absolute path`).
 - It must be under a directory listed in `allowed_db_dirs` of `cm.conf` (default `$CUBRID_DATABASES`; `;`-separated, `$NAME` expanded when CMS starts, read at startup). For a task on an existing database, the volume and log directories registered for that database in `databases.txt` are allowed too, so work on a database made outside `allowed_db_dirs` goes on; a new location (a new database of createdb or copydb, the `recoverypath` of restoredb) must be under `allowed_db_dirs`. Otherwise: `path is not under allowed_db_dirs`.

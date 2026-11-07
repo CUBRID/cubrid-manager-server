@@ -31,6 +31,8 @@ Permissions required to run this task: one of DBC, DBO
 | async | default "no", if "yes" run the task in asynchronous mode |
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
+* `targetdir` and `hashdir` must be under `allowed_db_dirs` of `cm.conf` or under a directory registered for `dbname` in `databases.txt`; see [DB Utility Task Paths](README.md#db-utility-task-paths). `targetdir: "+D"`, the files directory of the web manager, is not checked.
+* `prefix` must be a file name without a directory part (no `/`, `\`, `.` or `..`): `prefix must be a file name without a directory`.
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample
