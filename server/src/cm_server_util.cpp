@@ -5419,97 +5419,15 @@ win_final_path (const std::string &path, std::string &final_path)
 
 /*
  * resolve_path () - the path the operating system really opens, so that
- *   another spelling cannot stand in for a protected file or for a program
- *   directory ($CUBRID/bin, lib, java).
+ *   another spelling cannot stand in for a protected file, a program
+ *   directory ($CUBRID/bin, lib, java) or an allowed directory.
  *   Linux: symbolic links resolved (realpath).
  *   Windows: the name the file system gives the file (win_final_path ()), so
  *   that 8.3 short names (CM~1.PAS), trailing dots or spaces (cm.pass.), case,
  *   symbolic links and junctions all map to the same path.
- *   A path that does not exist yet (a file about to be written) is resolved
- *   through its parent directory. Returns the path unchanged when it cannot be
- *   resolved.
  */
 static std::string
 resolve_path (const std::string &path)
-{
-#if defined (WINDOWS)
-  char full[PATH_MAX];
-  DWORD n;
-  std::string final_path;
-
-  /* separators, "." and ".." and the trailing dots/spaces of the last part */
-  n = GetFullPathNameA (path.c_str (), sizeof (full), full, NULL);
-  if (n == 0 || n >= sizeof (full))
-    {
-      return path;
-    }
-  std::string normalized = full;
-
-  if (win_final_path (normalized, final_path))
-    {
-      return final_path;
-    }
-
-  size_t pos = normalized.find_last_of ('\\');
-  if (pos != std::string::npos && pos > 0)
-    {
-      std::string parent = normalized.substr (0, pos);
-      std::string last = normalized.substr (pos + 1);
-
-      if (parent.size () == 2 && parent[1] == ':')
-	{
-	  parent += '\\';		/* "C:" is the current directory of C:, not its root */
-	}
-      /* Windows drops them when it creates the file */
-      while (!last.empty () && (last.back () == '.' || last.back () == ' '))
-	{
-	  last.pop_back ();
-	}
-      if (win_final_path (parent, final_path))
-	{
-	  if (final_path.empty () || final_path.back () != '\\')
-	    {
-	      final_path += '\\';
-	    }
-	  return final_path + last;
-	}
-    }
-  return normalized;
-#else
-  char buf[PATH_MAX];
-
-  if (realpath (path.c_str (), buf) != NULL)
-    {
-      return std::string (buf);
-    }
-
-  size_t pos = path.find_last_of ('/');
-  if (pos != std::string::npos && pos > 0)
-    {
-      std::string parent = path.substr (0, pos);
-      if (realpath (parent.c_str (), buf) != NULL)
-	{
-	  return std::string (buf) + path.substr (pos);
-	}
-    }
-  return path;
-#endif
-}
-
-/* the same path after normalization (is_subpath () both ways) */
-static bool
-is_same_path (const std::string &a, const std::string &b)
-{
-  return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
-}
-
-/*
- * resolve_nearest_existing () - the path the operating system will use for
- *   `path` (absolute), even when its last parts do not exist yet (a volume,
- *   backup or unload directory about to be created).
- */
-static std::string
-resolve_nearest_existing (const std::string &path)
 {
 #if defined (WINDOWS)
   char full[PATH_MAX];
@@ -5587,6 +5505,14 @@ resolve_nearest_existing (const std::string &path)
   return resolved;
 #endif
 }
+
+/* the same path after normalization (is_subpath () both ways) */
+static bool
+is_same_path (const std::string &a, const std::string &b)
+{
+  return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
+}
+
 
 /* split `path` into its directory and its last part */
 static bool
@@ -6098,7 +6024,7 @@ is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
     }
 
   std::vector<std::string> dirs = get_allowed_db_dirs ();
-  std::string resolved = resolve_nearest_existing (expanded_path);
+  std::string resolved = resolve_path (expanded_path);
 
   if (dbname != NULL && dbname[0] != '\0')
     {
@@ -6107,7 +6033,7 @@ is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
 
   for (size_t i = 0; i < dirs.size (); i++)
     {
-      if (is_subpath (resolve_nearest_existing (dirs[i]).c_str (), resolved.c_str ()))
+      if (is_subpath (resolve_path (dirs[i]).c_str (), resolved.c_str ()))
 	{
 	  return true;
 	}
