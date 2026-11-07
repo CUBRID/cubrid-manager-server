@@ -440,6 +440,8 @@ typedef enum
 bool is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error);
 bool is_authorized_dirname (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error);
 bool is_admin_conf_file (const char *path);
+bool is_absolute_path (const std::string &path);
+bool is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string &name);
 std::string expand_env_path (const std::string &path);

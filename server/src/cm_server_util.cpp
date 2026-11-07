@@ -5539,6 +5539,91 @@ is_same_path (const std::string &a, const std::string &b)
   return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
 }
 
+/*
+ * resolve_nearest_existing () - the path the operating system will use for
+ *   `path` (absolute), even when its last parts do not exist yet (a volume,
+ *   backup or unload directory about to be created).
+ */
+static std::string
+resolve_nearest_existing (const std::string &path)
+{
+#if defined (WINDOWS)
+  char full[PATH_MAX];
+  DWORD n;
+  std::string final_path, head, tail;
+
+  /* separators, "." and ".." first, as Windows itself reads the path */
+  n = GetFullPathNameA (path.c_str (), sizeof (full), full, NULL);
+  if (n == 0 || n >= sizeof (full))
+    {
+      return path;
+    }
+  head = full;
+
+  while (!win_final_path (head, final_path))
+    {
+      size_t pos = head.find_last_of ('\\');
+
+      if (pos == std::string::npos || head.size () <= 3)
+	{
+	  return full;		/* not even the root resolves */
+	}
+
+      std::string last = head.substr (pos + 1);
+
+      while (!last.empty () && (last.back () == '.' || last.back () == ' '))
+	{
+	  last.pop_back ();
+	}
+      tail = tail.empty () ? last : last + "\\" + tail;
+      head = head.substr (0, pos);
+      if (head.size () == 2 && head[1] == ':')
+	{
+	  head += '\\';		/* "C:" is the current directory of C:, not its root */
+	}
+    }
+
+  if (!tail.empty ())
+    {
+      if (final_path.empty () || final_path.back () != '\\')
+	{
+	  final_path += '\\';
+	}
+      final_path += tail;
+    }
+  return final_path;
+#else
+  char buf[PATH_MAX];
+  std::string head = path, tail;
+
+  while (realpath (head.c_str (), buf) == NULL)
+    {
+      size_t pos = head.find_last_of ('/');
+
+      if (pos == std::string::npos)
+	{
+	  return path;		/* relative, no ancestor left */
+	}
+      std::string last = head.substr (pos + 1);
+
+      tail = tail.empty () ? last : last + "/" + tail;
+      head = (pos == 0) ? "/" : head.substr (0, pos);
+    }
+
+  std::string resolved = buf;
+
+  if (!tail.empty ())
+    {
+      if (resolved.empty () || resolved.back () != '/')
+	{
+	  resolved += '/';
+	}
+      resolved += tail;
+    }
+  return resolved;
+#endif
+}
+
 /* split `path` into its directory and its last part */
 static bool
 split_dir_name (const std::string &path, std::string &dir, std::string &name)
@@ -5899,6 +5984,122 @@ is_authorized_dirname (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_d
     }
 
   return true;
+}
+
+/*
+ * is_absolute_path () - `path` is absolute: /dir on Linux; C:\dir, C:/dir or
+ *   \\server\share on Windows. A relative path would depend on the current
+ *   directory of whichever process uses it.
+ */
+bool
+is_absolute_path (const std::string &path)
+{
+#if defined (WINDOWS)
+  if (path.size () >= 3 && isalpha ((unsigned char) path[0]) && path[1] == ':'
+      && (path[2] == '\\' || path[2] == '/'))
+    {
+      return true;
+    }
+  return path.size () >= 2 && (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/');
+#else
+  return !path.empty () && path[0] == '/';
+#endif
+}
+
+/*
+ * add_registered_db_dirs () - append to `dirs` the volume and log
+ *   directories registered for `dbname` in databases.txt. An HA name
+ *   (db@host) is looked up by the part before '@'. Nothing is added when the
+ *   database is not registered.
+ */
+static void
+add_registered_db_dirs (const char *dbname, std::vector<std::string> &dirs)
+{
+  /* the fields of a databases.txt line: name, volume path, host, log path */
+  static const int db_txt_fields[] = { 1, 3 };
+  std::string name = dbname;
+  size_t at = name.find ('@');
+
+  if (at != std::string::npos)
+    {
+      name.erase (at);
+    }
+  if (name.empty ())
+    {
+      return;
+    }
+
+  for (size_t i = 0; i < sizeof (db_txt_fields) / sizeof (db_txt_fields[0]); i++)
+    {
+      char dir[PATH_MAX];
+
+      if (uReadDBtxtFile (name.c_str (), db_txt_fields[i], dir) == ERR_NO_ERROR && dir[0] != '\0'
+	  && is_absolute_path (dir))
+	{
+	  dirs.push_back (dir);
+	}
+    }
+}
+
+/*
+ * is_authorized_db_path () - a DB utility task (backupdb, restoredb,
+ *   createdb, addvoldb, copydb, renamedb, unloaddb, loaddb, ...) may use
+ *   `path`, a file or directory it reads, creates, writes or deletes.
+ */
+bool
+is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
+{
+  std::string expanded_path;
+  const char *program_dir;
+
+  if (path == NULL || !is_valid_filename (path, expanded_path))
+    {
+      set_path_error (_dbmt_error, "filename is not authorized", path);
+      return false;
+    }
+
+  if (!is_absolute_path (expanded_path))
+    {
+      set_path_error (_dbmt_error, "path must be an absolute path", path);
+      return false;
+    }
+
+  if (is_protected_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, "access to a protected file is not allowed", path);
+      return false;
+    }
+
+  if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
+    {
+      set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  if (is_one_of_files (admin_conf_files (), expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_FILE_ERROR, path);
+      return false;
+    }
+
+  std::vector<std::string> dirs = get_allowed_db_dirs ();
+  std::string resolved = resolve_nearest_existing (expanded_path);
+
+  if (dbname != NULL && dbname[0] != '\0')
+    {
+      add_registered_db_dirs (dbname, dirs);
+    }
+
+  for (size_t i = 0; i < dirs.size (); i++)
+    {
+      if (is_subpath (resolve_nearest_existing (dirs[i]).c_str (), resolved.c_str ()))
+	{
+	  return true;
+	}
+    }
+
+  set_path_error (_dbmt_error, "path is not under allowed_db_dirs", path);
+  return false;
 }
 
 bool

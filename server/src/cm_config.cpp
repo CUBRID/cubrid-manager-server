@@ -1211,22 +1211,6 @@ expand_conf_dir (const std::string &entry, std::string &expanded, std::string &r
   return true;
 }
 
-/* `path` is absolute: /dir on Linux; C:\dir, C:/dir or \\server\share on Windows */
-static bool
-is_absolute_dir (const std::string &path)
-{
-#if defined (WINDOWS)
-  if (path.size () >= 3 && isalpha ((unsigned char) path[0]) && path[1] == ':'
-      && (path[2] == '\\' || path[2] == '/'))
-    {
-      return true;
-    }
-  return path.size () >= 2 && (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/');
-#else
-  return !path.empty () && path[0] == '/';
-#endif
-}
-
 /*
  * parse_allowed_db_dirs () - allowed_db_dirs: the directories under which the
  *   DB utility tasks (backupdb, restoredb, createdb, addvoldb, copydb,
@@ -1262,7 +1246,7 @@ parse_allowed_db_dirs (const char *val)
 	  log_allowed_db_dirs ((reason + "; the entry is ignored").c_str (), entry);
 	  continue;
 	}
-      if (!is_absolute_dir (expanded))
+      if (!is_absolute_path (expanded))
 	{
 	  log_allowed_db_dirs ("not an absolute path; the entry is ignored", entry);
 	  continue;
