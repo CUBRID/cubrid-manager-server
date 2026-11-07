@@ -74,8 +74,6 @@ typedef unsigned __int8  uint8_t;
 #define BYTES_IN_M (1024 * 1024)
 #define BYTES_IN_G (1024 * 1024 * 1024)
 
-#define RSA_KEY_SIZE 2048
-
 #ifdef _DEBUG_
 #include "deb.h"
 #define MALLOC(p) debug_malloc(p)
@@ -164,7 +162,8 @@ int uStringEqualIgnoreCase (const char *str1, const char *str2);
 int ut_gettaskcode (char *task);
 int ut_send_response (SOCKET fd, nvplist *res);
 int ut_receive_request (SOCKET fd, nvplist *req);
-void ut_daemon_start (void);
+void ut_daemon_start (int *ready_fd);
+void ut_daemon_started (int *ready_fd);
 void ut_dump_file_to_string (char *string, char *fname);
 int uRetrieveDBDirectory (const char *dbname, char *target);
 int _isRegisteredDB (char *);

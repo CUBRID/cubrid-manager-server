@@ -61,6 +61,7 @@
 #include <sys/types.h>        /* umask()          */
 #include <sys/stat.h>         /* umask(), stat()  */
 #include <unistd.h>
+#include <poll.h>
 #include <dirent.h>           /* opendir() ...    */
 #include <pwd.h>
 #include <sys/socket.h>
@@ -418,7 +419,9 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"autoupdate", TS_AUTO_UPDATE, 0, DEF_TASK_FUNC (ts_auto_update), FSVR_NONE, AU_ADMIN},
   {"isupdatesuccess", TS_IS_UPDATE_SUCCESS, 0, DEF_TASK_FUNC (ts_is_update_success), FSVR_NONE, AU_ADMIN},
   {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, AU_ANY},
+#if !defined (NDEBUG)
   {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, AU_ADMIN},
+#endif
   {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
   {"stop_statdump", TS_STOP_STATDUMP, 0, DEF_TASK_FUNC (ts_stop_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
   {NULL, TS_UNDEFINED, 0, NULL, FSVR_NONE, 0}
@@ -1082,13 +1085,98 @@ error_return:
   return -1;
 }
 
-void
-ut_daemon_start (void)
+#if !defined (WINDOWS)
+#if !defined (UT_DAEMON_START_TIMEOUT_SEC)
+#define UT_DAEMON_START_TIMEOUT_SEC     60
+#endif
+
+/*
+ * wait_daemon_started () - in the parent of ut_daemon_start (), wait for the
+ *   daemon to report its start on the pipe
+ *
+ *   return: the exit code of the parent: 0 if the daemon reported that it
+ *           started, 1 if it ended without reporting (it printed why), or
+ *           did not report within UT_DAEMON_START_TIMEOUT_SEC
+ *   fd(in): read end of the pipe
+ *   child(in): pid of the daemon, for the message
+ */
+static int
+wait_daemon_started (int fd, int child)
 {
+  struct pollfd pfd;
+  time_t deadline = time (NULL) + UT_DAEMON_START_TIMEOUT_SEC;
+  char c;
+
+  for (;;)
+    {
+      time_t now = time (NULL);
+      int r;
+      ssize_t n;
+
+      if (now >= deadline)
+	{
+	  char msg[DBMT_ERROR_MSG_SIZE];
+
+	  snprintf (msg, sizeof (msg),
+		    "CUBRID Manager Server : the server process (pid %d) did not report its start within %d "
+		    "seconds; see %s.\n", child, UT_DAEMON_START_TIMEOUT_SEC, sco.szErrorLog);
+	  ut_record_cubrid_utility_log_stderr (msg);
+	  return 1;
+	}
+      pfd.fd = fd;
+      pfd.events = POLLIN;
+      pfd.revents = 0;
+      r = poll (&pfd, 1, (int) (deadline - now) * 1000);
+      if (r < 0 && errno == EINTR)
+	{
+	  continue;
+	}
+      if (r <= 0)
+	{
+	  continue;		/* timed out: the deadline check above reports it */
+	}
+      n = read (fd, &c, 1);
+      if (n < 0 && errno == EINTR)
+	{
+	  continue;
+	}
+      /* 'S': started; EOF: the daemon ended before starting, after printing why */
+      return (n == 1 && c == 'S') ? 0 : 1;
+    }
+}
+#endif
+
+/*
+ * ut_daemon_start () - detach from the terminal and continue in a child
+ *
+ *   The parent does not return: it waits until the child reports its start
+ *   with ut_daemon_started () and exits with 0, or exits with 1 when the child
+ *   ends without reporting (a failed start, which the child prints on stderr
+ *   before it exits) or does not report in time. So the program that runs
+ *   "cub_manager start" gets the result of the start, after its messages.
+ *   Nothing is done on Windows.
+ *
+ *   ready_fd(out): in the child, the write end of the pipe to report on
+ *                  (close on exec, so that the programs tasks run do not keep
+ *                  it); -1 when there is none
+ */
+void
+ut_daemon_start (int *ready_fd)
+{
+  *ready_fd = -1;
 #if defined(WINDOWS)
   return;
 #else
   int childpid;
+  int fds[2];
+  bool have_pipe;
+
+  have_pipe = (pipe (fds) == 0);
+  if (have_pipe)
+    {
+      (void) fcntl (fds[0], F_SETFD, FD_CLOEXEC);
+      (void) fcntl (fds[1], F_SETFD, FD_CLOEXEC);
+    }
 
   /* Ignore the terminal stop signals */
   signal (SIGTTOU, SIG_IGN);
@@ -1096,17 +1184,52 @@ ut_daemon_start (void)
   signal (SIGTSTP, SIG_IGN);
 
   /* setpgrp(); */
-  setsid ();            /* become process group leader and  */
+  setsid ();			/* become process group leader and  */
   /* disconnect from control terminal */
 
   signal (SIGHUP, SIG_IGN);
-  childpid = PROC_FORK ();    /* to prevent from reaquiring control terminal */
+  childpid = PROC_FORK ();	/* to prevent from reaquiring control terminal */
   if (childpid > 0)
     {
-      exit (0);  /* kill parent */
+      if (!have_pipe)
+	{
+	  exit (0);		/* kill parent */
+	}
+      close (fds[1]);
+      exit (wait_daemon_started (fds[0], childpid));
     }
 
+  if (have_pipe)
+    {
+      close (fds[0]);
+      *ready_fd = fds[1];
+    }
 #endif /* ifndef WINDOWS */
+}
+
+/*
+ * ut_daemon_started () - in the child of ut_daemon_start (), report that the
+ *   server has started, so that the parent exits with 0, and close the pipe
+ *
+ *   ready_fd(in/out): the write end from ut_daemon_start (); set to -1
+ */
+void
+ut_daemon_started (int *ready_fd)
+{
+#if !defined(WINDOWS)
+  if (*ready_fd >= 0)
+    {
+      char c = 'S';
+
+      /* SIGPIPE is ignored: if the parent gave up waiting, this fails with EPIPE */
+      while (write (*ready_fd, &c, 1) < 0 && errno == EINTR)
+	{
+	  ;
+	}
+      close (*ready_fd);
+    }
+#endif
+  *ready_fd = -1;
 }
 
 int
@@ -5220,7 +5343,9 @@ is_subpath (const char *allowd_path, const char *path)
  * These files hold CMS user passwords and authorities, DB passwords or the
  * TLS private key. No file task may read or write them, whatever the
  * caller's authority (admin included); the server itself reaches them only
- * through its own code, never through a path taken from a request.
+ * through its own code, never through a path taken from a request. The files
+ * named after the TLS key and certificate (<name>.<anything>, the work files
+ * of a replacement) are protected too, see is_tls_work_file ().
  */
 static std::vector<std::string>
 protected_files (void)
@@ -5383,6 +5508,82 @@ is_same_path (const std::string &a, const std::string &b)
   return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
 }
 
+/* split `path` into its directory and its last part */
+static bool
+split_dir_name (const std::string &path, std::string &dir, std::string &name)
+{
+#if defined (WINDOWS)
+  size_t pos = path.find_last_of ("/\\");
+#else
+  size_t pos = path.find_last_of ('/');
+#endif
+
+  if (pos == std::string::npos)
+    {
+      return false;
+    }
+  dir = path.substr (0, (pos == 0) ? 1 : pos);
+  name = path.substr (pos + 1);
+  return !name.empty ();
+}
+
+/* `name` is `prefix` followed by at least one character (case-insensitive on Windows) */
+static bool
+name_starts_with (const std::string &name, const std::string &prefix)
+{
+  if (name.size () <= prefix.size ())
+    {
+      return false;
+    }
+#if defined (WINDOWS)
+  return _strnicmp (name.c_str (), prefix.c_str (), prefix.size ()) == 0;
+#else
+  return name.compare (0, prefix.size (), prefix) == 0;
+#endif
+}
+
+/*
+ * is_tls_work_file () - `path` (expanded) is a file named after the TLS key
+ *   or certificate, in the same directory: <name>.<anything>, for example
+ *   cm_ssl_cert.key.tmp-<suffix> (the new key) and cm_ssl_cert.key.old-<suffix>
+ *   (the previous key) that cm_ssl_cert.cpp writes while it replaces the key
+ *   pair (CBRD-27829). They hold private keys, and a replacement runs while
+ *   file tasks are served, so they are protected like the key itself.
+ */
+static bool
+is_tls_work_file (const std::string &path)
+{
+  const char *tls_files[] = { sco.szSSLKey, sco.szSSLCertificate };
+  std::string candidates[] = { path, resolve_path (path) };
+
+  for (size_t i = 0; i < sizeof (tls_files) / sizeof (tls_files[0]); i++)
+    {
+      std::string tls_dir, tls_name;
+
+      if (tls_files[i][0] == '\0' || !split_dir_name (tls_files[i], tls_dir, tls_name))
+	{
+	  continue;
+	}
+      std::string prefix = tls_name + ".";
+      std::string tls_dir_resolved = resolve_path (tls_dir);
+
+      for (size_t j = 0; j < sizeof (candidates) / sizeof (candidates[0]); j++)
+	{
+	  std::string dir, name;
+
+	  if (!split_dir_name (candidates[j], dir, name) || !name_starts_with (name, prefix))
+	    {
+	      continue;
+	    }
+	  if (is_same_path (dir, tls_dir) || is_same_path (resolve_path (dir), tls_dir_resolved))
+	    {
+	      return true;
+	    }
+	}
+    }
+  return false;
+}
+
 /* `path` (expanded) is one of the protected files */
 static bool
 is_protected_file (const std::string &path)
@@ -5397,7 +5598,7 @@ is_protected_file (const std::string &path)
 	  return true;
 	}
     }
-  return false;
+  return is_tls_work_file (path);
 }
 
 /* a protected file is `dir` (expanded) itself or somewhere under it */

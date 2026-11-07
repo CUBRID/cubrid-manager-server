@@ -70,6 +70,7 @@
 #include "cm_session_ip.h"
 #include "cm_mon_stat.h"
 #include "cm_http_server.h"
+#include "cm_ssl_cert.h"
 
 using namespace std;
 
@@ -629,19 +630,40 @@ start_monitor_auto_jobs_cb (evutil_socket_t fd, short event, void *arg)
   evtimer_add (work_ctx->timer, &auto_task_tv);
 }
 
+/*
+ * write end of the pipe on which the daemon reports its start to the parent
+ * of ut_daemon_start (), which waits for it; -1 once reported or when none
+ */
+static int daemon_ready_fd = -1;
+
 int
 start_service ()
 {
   struct worker_context *start_ctx[DEFAULT_THRD_NUM];
   char tmpstrbuf[DBMT_ERROR_MSG_SIZE];
+  char ssl_err[DBMT_ERROR_MSG_SIZE];
   int nfd, err, i = 0;
 
   tmpstrbuf[0] = '\0';
+  ssl_err[0] = '\0';
 #ifdef WINDOWS
   wsa_initialize ();
 #endif
 
   thread_setup_SSL ();
+
+  /*
+   * Keep, generate or replace the key pair before TLS loads it. On failure
+   * print why, and do not start; what to do is in the error log.
+   */
+  if (cm_ssl_cert_ensure (sco.szSSLCertificate, sco.szSSLKey, sco.iSSLCertAutoGenerate == TRUE, sco.szSSLCertSan, ssl_err,
+			  sizeof (ssl_err)) != 0)
+    {
+      snprintf (tmpstrbuf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : %s. See %s for what to do.\n", ssl_err,
+		sco.szErrorLog);
+      ut_record_cubrid_utility_log_stderr (tmpstrbuf);
+      return -1;
+    }
 
   SSL_CTX *ctx = init_SSL (sco.szSSLCertificate, sco.szSSLKey);
   if (ctx == NULL)
@@ -752,6 +774,9 @@ start_service ()
 		      (void *) start_ctx[i]);
 #endif
     }
+
+  /* the server serves: let the parent of ut_daemon_start () exit with 0 */
+  ut_daemon_started (&daemon_ready_fd);
 
   for (i = 0; i < DEFAULT_THRD_NUM; i++)
     {
@@ -1048,7 +1073,17 @@ main (int argc, char **argv)
       return 0;
     }
 
-  ut_daemon_start ();
+  ut_daemon_start (&daemon_ready_fd);
+
+  /* One cub_manager per configuration. Take the lock before touching any shared file. */
+  if (cm_ssl_cert_lock_process (sco.szSSLKey, tmpstrbuf, sizeof (tmpstrbuf)) != 0)
+    {
+      char msg[DBMT_ERROR_MSG_SIZE];
+
+      snprintf (msg, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : %s.\n", tmpstrbuf);
+      ut_record_cubrid_utility_log_stderr (msg);
+      exit (1);
+    }
 
   init_files ();
 

@@ -1,14 +1,27 @@
 # generatecert
 
-Generate a new self signed SSL certificate and its private key for CMS, and write them to the
-certificate files declared in `cm.conf`. The certificate which is currently installed is backed
-up before it is replaced, unless a backup of the default certificate already exists.
+> **Debug builds only.** Release builds do not offer this task and answer
+> `Undefined request - generatecert`: replacing the key pair from a remote request would change the
+> identity of the server, and the fingerprint clients pinned, without the server administrator
+> knowing. In a release build, regenerate on the server instead: stop CMS, remove
+> `cm_ssl_cert.crt` and `cm_ssl_cert.key`, and start it with `ssl_cert_auto_generate=YES`
+> (see [TLS Certificate](ssl_certificate.md#generate-a-new-key-pair)).
 
-CMS must be restarted for the new certificate to be used.
-[getcmsenv](getcmsenv.md) reports, in `is_default_cert`, whether the certificate in use is still
-the default one.
+Generate a new key pair (a self-signed certificate and its private key) for CMS, and replace
+`$CUBRID/conf/cm_ssl_cert.crt` and `$CUBRID/conf/cm_ssl_cert.key` with it. The certificate is the
+same as the one CMS generates at startup (see [TLS Certificate](ssl_certificate.md#generated-certificate)),
+except for the subject and validity given in the request.
 
-Permissions required to run this task: ADMIN
+- The existing certificate and private key are replaced, whatever they are (including a
+  certificate issued by a CA), and are not backed up. No `.bak` file is created.
+- The two files are written to temporary files and renamed into place together; the private key
+  has mode 0600. If the task fails, both files are left as they were.
+- The running CMS keeps using the certificate it loaded; the new one is used after CMS is
+  restarted. Clients that pinned the old certificate then see a new fingerprint.
+- CMS logs who requested the task and from which address (`cub_manager.err`).
+- The task works whatever `ssl_cert_auto_generate` in `cm.conf` is.
+
+Permissions required to run this task: ADMIN (debug builds only)
 
 ## Request JSON Syntax
 
@@ -16,14 +29,19 @@ Permissions required to run this task: ADMIN
 | --- | --- |
 | task | task name |
 | token | token returned by login |
-| cname | country name of the certificate subject, for example KR |
-| stname | state or province name of the certificate subject |
-| loname | locality name of the certificate subject |
-| orgname | organization name of the certificate subject |
-| orgutname | organizational unit name of the certificate subject |
-| comname | common name of the certificate subject |
-| email | the email address of the certificate subject |
-| days | how many days the certificate is valid for |
+| cname | country name (C) of the certificate subject, two letters, for example KR. Optional |
+| stname | state or province name (ST) of the certificate subject. Optional |
+| loname | locality name (L) of the certificate subject. Optional |
+| orgname | organization name (O) of the certificate subject. Optional |
+| orgutname | organizational unit name (OU) of the certificate subject. Optional |
+| comname | common name (CN) of the certificate subject, up to 64 characters. Optional |
+| email | email address (emailAddress) of the certificate subject. Optional |
+| days | how many days the certificate is valid for, up to 36500. A value that is not a positive number means 365 |
+
+The subject has only the fields given. When none is given, the default subject of
+[the generated certificate](ssl_certificate.md#generated-certificate) is used. A field value
+that a certificate cannot hold (for example a country name that is not two letters) fails the
+task. The subject alternative names are those of the generated certificate: the default names and `ssl_cert_san` of `cm.conf`.
 
 ## Request Sample
 

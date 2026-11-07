@@ -3,7 +3,7 @@
    "CUBRIDVER": "<volatile>",
    "PLATFORM": "x64",
    "cm_port": "8001",
-   "is_default_cert": "yes",
+   "is_default_cert": "no",
    "note": "none",
    "status": "success",
    "task": "getversion"

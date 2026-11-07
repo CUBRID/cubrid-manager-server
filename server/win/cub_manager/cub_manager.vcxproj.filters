@@ -57,6 +57,9 @@
     <ClCompile Include="..\..\src\cm_server_status.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cm_ssl_cert.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\cm_session_ip.cpp">
       <Filter>源文件</Filter>
     </ClCompile>

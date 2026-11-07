@@ -45,3 +45,8 @@ server/test/task_test_case/*/*/*.result
 server/test/*.log
 server/test/csql.*
 !server/test/task_test_config/*.log
+
+## Editor temporary files (vim swap and backup files)
+*.swp
+*.swo
+*~

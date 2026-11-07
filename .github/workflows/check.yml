@@ -95,6 +95,12 @@ jobs:
       - name: Build and run the unit tests
         # server/test/unit: tests of server sources that need no CUBRID build
         run: server/test/unit/run_unit_tests.sh
+      - name: Build and run the TLS key pair tests
+        # server/test/ssl_cert: cm_ssl_cert.cpp startup check and generation (CBRD-27829);
+        # needs the OpenSSL headers and the openssl command (3.0 or later)
+        run: |
+          sudo apt-get install -yq libssl-dev openssl
+          server/test/ssl_cert/run_ssl_cert_tests.sh
   cppcheck:
     name: cppcheck
     runs-on: ubuntu-24.04
