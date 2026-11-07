@@ -1732,15 +1732,24 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
   /*
    * The task is open to DBC and DBO, but cm.conf (security settings of CMS)
    * and databases.txt (where each database lives) decide what those users
-   * may do, so only an admin may write them. Checked on the resolved path, so
-   * any confname that names one of them (cmconf, databases, cm.conf, ...) is
-   * covered.
+   * may do, so only an admin may write them. This is the one task that may
+   * write them, which FOR_WRITE refuses, so they are checked here instead.
+   * Checked on the resolved path, so any confname that names one of them
+   * (cmconf, databases, cm.conf, ...) is covered. Any other file is written
+   * under the same rules as in the other file tasks.
    */
-  if (is_admin_conf_file (conf_path) && !dbmt_user_has_auth (nv_get_val (req, "_ID"), AU_ADMIN))
+  if (is_admin_conf_file (conf_path))
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
-		"The user don't have authority to execute the task: setsysparam for cm.conf or "
-		"databases.txt (ADMIN is required)");
+      if (!dbmt_user_has_auth (nv_get_val (req, "_ID"), AU_ADMIN))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		    "The user don't have authority to execute the task: setsysparam for cm.conf or "
+		    "databases.txt (ADMIN is required)");
+	  return ERR_WITH_MSG;
+	}
+    }
+  else if (!is_authorized_filename (conf_path, FOR_WRITE, _dbmt_error))
+    {
       return ERR_WITH_MSG;
     }
 
@@ -1840,7 +1849,13 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
       snprintf (conf_path, buflen - 1, "%s/conf/%s", sco.szCubrid, conf_name);
     }
 
-  if (retval == 0 && !is_authorized_filename (conf_path, _dbmt_error))
+  /*
+   * FOR_READ: this only maps confname to a path, for getallsysparam (read)
+   * and setsysparam (write). setsysparam checks the write itself, because it
+   * is the one task that may write cm.conf and databases.txt (for an admin),
+   * which FOR_WRITE refuses.
+   */
+  if (retval == 0 && !is_authorized_filename (conf_path, FOR_READ, _dbmt_error))
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "conf path is not authorized: %s.", conf_name);
       retval = ER_VIOLATE_SECURITY;
@@ -7129,7 +7144,8 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
+	  /* the auto backup job writes into this directory later; FOR_READ keeps the existing check */
+	  if (!is_authorized_filename (conf_item[i], FOR_READ, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -7270,7 +7286,8 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  if (!is_authorized_filename (conf_item[i], _dbmt_error))
+	  /* the auto backup job writes into this directory later; FOR_READ keeps the existing check */
+	  if (!is_authorized_filename (conf_item[i], FOR_READ, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -7542,7 +7559,7 @@ ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filepath, _dbmt_error))
+  if (!is_authorized_filename (filepath, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -7603,7 +7620,7 @@ ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* resetlog truncates the file: refuse $CUBRID/bin, lib, java as for any write */
-  if (!is_authorized_write_filename (path, _dbmt_error))
+  if (!is_authorized_filename (path, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -8967,7 +8984,7 @@ ts_check_dir (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (v != NULL)
 	    {
-	      if (!is_authorized_filename (v, _dbmt_error))
+	      if (!is_authorized_filename (v, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -8995,7 +9012,7 @@ ts_check_file (nvplist *req, nvplist *res, char *_dbmt_error)
 	{
 	  if (v != NULL)
 	    {
-	      if (!is_authorized_filename (v, _dbmt_error))
+	      if (!is_authorized_filename (v, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -10208,7 +10225,7 @@ ts_analyzecaslog (nvplist *cli_request, nvplist *cli_response,
       nv_lookup (cli_request, sect + i, NULL, &logfile);
       if (logfile)
 	{
-	  if (!is_authorized_filename (logfile, diag_error))
+	  if (!is_authorized_filename (logfile, FOR_READ, diag_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -10563,7 +10580,7 @@ ts_executecasrunner (nvplist *cli_request, nvplist *cli_response,
   if ((casrunnerwithFile != NULL) && (strcmp (casrunnerwithFile, "yes") == 0)
       && (logfilename != NULL))
     {
-      if (logfilename != NULL && !is_authorized_filename (logfilename, diag_error))
+      if (logfilename != NULL && !is_authorized_filename (logfilename, FOR_READ, diag_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -10836,7 +10853,7 @@ ts_getcaslogtopresult (nvplist *cli_request, nvplist *cli_response,
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filename, diag_error))
+  if (!is_authorized_filename (filename, FOR_READ, diag_error))
     {
       return ERR_WITH_MSG;
     }
@@ -11086,7 +11103,7 @@ ts_remove_log (nvplist *req, nvplist *res, char *_dbmt_error)
       path = nt_style_path (path, full_path_buf);
 #endif
       /* removelog deletes the file: refuse $CUBRID/bin, lib, java as for any write */
-      if (!is_authorized_write_filename (path, _dbmt_error))
+      if (!is_authorized_filename (path, FOR_WRITE, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -12152,7 +12169,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_write_filename (conf_path, _dbmt_error))
+  if (!is_authorized_filename (conf_path, FOR_WRITE, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12204,7 +12221,7 @@ ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   infile = nv_get_val (req, "infile");
-  if (infile != NULL && !is_authorized_filename (infile, _dbmt_error))
+  if (infile != NULL && !is_authorized_filename (infile, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12265,7 +12282,7 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (search_folder, _dbmt_error))
+  if (!is_authorized_filename (search_folder, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12307,7 +12324,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   gen_tempfile_path (outfile, sco.dbmt_tmp_dir, "DBMT_task_out", TS_RUN_SCRIPT, PATH_MAX);
   gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
-  if (!is_authorized_filename (script_path, _dbmt_error))
+  if (!is_authorized_filename (script_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12391,7 +12408,7 @@ ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (filepath, _dbmt_error))
+  if (!is_authorized_filename (filepath, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12427,7 +12444,7 @@ ts_error_trace (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (!is_authorized_filename (err_log_path, _dbmt_error))
+  if (!is_authorized_filename (err_log_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }
@@ -12527,7 +12544,8 @@ ts_remove_files (nvplist *req, nvplist *res, char *_dbmt_error)
 	      snprintf (fullpath, sizeof (fullpath), "%s/tmp/%s",
 			sco.szCubrid, (path + 2));
 
-	      if (!is_authorized_filename (fullpath, _dbmt_error))
+	      /* deleted, but the name has no separator or "..", so it stays in $CUBRID/tmp; FOR_READ as before */
+	      if (!is_authorized_filename (fullpath, FOR_READ, _dbmt_error))
 		{
 		  return ERR_WITH_MSG;
 		}
@@ -16663,7 +16681,7 @@ ts_list_dir (nvplist *req, nvplist *res, char *_dbmt_error)
   sprintf (full_path, "%s/%s/", CUBRID, path);
 #endif
 
-  if (!is_authorized_filename (full_path, _dbmt_error))
+  if (!is_authorized_filename (full_path, FOR_READ, _dbmt_error))
     {
       return ERR_WITH_MSG;
     }

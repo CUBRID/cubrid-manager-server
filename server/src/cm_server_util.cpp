@@ -5674,8 +5674,8 @@ contains_admin_conf_file (const std::string &dir)
  *   admin_conf_files ()), also when written another way (a symbolic link,
  *   "..", repeated separators, and on Windows an 8.3 name, case, trailing dots
  *   or spaces). setsysparam requires AU_ADMIN for such a path; the file tasks
- *   refuse it through is_authorized_write_filename () and
- *   is_authorized_dirname (). False for an invalid file name.
+ *   refuse it through is_authorized_filename () and is_authorized_dirname ()
+ *   with FOR_WRITE. False for an invalid file name.
  */
 bool
 is_admin_conf_file (const char *path)
@@ -5773,15 +5773,15 @@ set_program_dir_error (char *_dbmt_error, const char *dir, const char *path)
 }
 
 /*
- * is_authorized_filename () - the path is under $CUBRID or $CUBRID_DATABASES
- * and is not a protected file (cm.pass, cmdb.pass, conlist, autojobs.conf,
- * autoexecquery.conf, the TLS key and certificate). For every file task.
+ * check_base_path () - the checks every file task needs: `path` is a valid
+ *   file name, is under $CUBRID or $CUBRID_DATABASES, and is not a protected
+ *   file (cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, the
+ *   TLS key and certificate and their work files). On success `expanded_path`
+ *   holds `path` with its environment variables expanded.
  */
-bool
-is_authorized_filename (const char *path, char *_dbmt_error)
+static bool
+check_base_path (const char *path, std::string &expanded_path, char *_dbmt_error)
 {
-  std::string expanded_path;
-
   if (path == NULL || !is_valid_filename (path, expanded_path))
     {
       snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "filename is not authorized: %s", path ? path : "(NULL)");
@@ -5810,25 +5810,34 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_write_filename () - as above, not under a program
- * directory ($CUBRID/bin, lib, java), and not an admin configuration file
- * (cm.conf, databases.txt; see admin_conf_files ()). For tasks that write,
- * truncate or delete a file (writeandsaveconf, writeprivatedata, resetlog,
- * removelog).
+ * is_authorized_filename () - a file task may use the file `path` for
+ *   `purpose`.
+ *
+ *   FOR_READ: the task reads the file (view, search, list, run). `path` must
+ *     pass check_base_path ().
+ *   FOR_WRITE: the task writes, empties or deletes the file (writeandsaveconf,
+ *     writeprivatedata, resetlog, removelog). In addition, `path` must not be
+ *     under a program directory ($CUBRID/bin, lib, java) nor be an admin
+ *     configuration file (cm.conf, databases.txt; see admin_conf_files ()).
+ *     No file task writes those two files; setsysparam does, for an admin
+ *     only, and checks that itself.
  */
 bool
-is_authorized_write_filename (const char *path, char *_dbmt_error)
+is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)
 {
   std::string expanded_path;
   const char *program_dir;
 
-  if (!is_authorized_filename (path, _dbmt_error))
+  if (!check_base_path (path, expanded_path, _dbmt_error))
     {
       return false;
     }
 
-  /* is_authorized_filename () has already validated and expanded it */
-  (void) is_valid_filename (path, expanded_path);
+  if (purpose != FOR_WRITE)
+    {
+      return true;
+    }
+
   if ((program_dir = is_under_cubrid_program_dir (expanded_path)) != NULL)
     {
       set_program_dir_error (_dbmt_error, program_dir, path);
@@ -5845,38 +5854,45 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_dirname () - as is_authorized_filename (), and no protected
- * file under the directory; with FOR_WRITE, the directory must also not
- * overlap a program directory ($CUBRID/bin, lib, java) nor hold an admin
- * configuration file (cm.conf, databases.txt). For tasks that copy or delete
- * a directory tree.
+ * is_authorized_dirname () - a file task may use the directory tree `path`
+ *   for `purpose`.
+ *
+ *   FOR_READ: the task reads the tree (the source of copyfolder). `path` must
+ *     pass check_base_path () and hold no protected file.
+ *   FOR_WRITE: the task writes into or deletes the tree (the destination of
+ *     copyfolder, deletefolder). In addition, the tree must not overlap a
+ *     program directory ($CUBRID/bin, lib, java) nor hold an admin
+ *     configuration file (cm.conf, databases.txt).
  */
 bool
-is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
+is_authorized_dirname (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)
 {
   std::string expanded_path;
   const char *program_dir;
 
-  if (!is_authorized_filename (path, _dbmt_error))
+  if (!check_base_path (path, expanded_path, _dbmt_error))
     {
       return false;
     }
 
-  (void) is_valid_filename (path, expanded_path);
   if (contains_protected_file (expanded_path))
     {
       set_path_error (_dbmt_error, "the directory contains a protected file", path);
       return false;
     }
 
-  if (access == FOR_WRITE
-      && (program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
+  if (purpose != FOR_WRITE)
+    {
+      return true;
+    }
+
+  if ((program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
     {
       set_program_dir_error (_dbmt_error, program_dir, path);
       return false;
     }
 
-  if (access == FOR_WRITE && contains_admin_conf_file (expanded_path))
+  if (contains_admin_conf_file (expanded_path))
     {
       set_path_error (_dbmt_error, ADMIN_CONF_DIR_ERROR, path);
       return false;
