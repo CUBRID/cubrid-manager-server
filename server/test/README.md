@@ -593,6 +593,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `file_admin_conf` | admin | admin이라도 `writeandsaveconf`·`writeprivatedata`·`resetlog`·`removelog`로 `cm.conf`·`databases.txt`를 쓰거나 비우거나 지우지 못하고(`..`, `//` 변형 포함), `copyfolder`(dest)로 그 파일이 있는 `$CUBRID_DATABASES`에 쓰지 못함. `getallsysparam`으로는 두 파일을 읽을 수 있음 |
 | `auth_admin_conf` | `_new` API, dbc·dbo yes | `setsysparam`으로 `cm.conf`를 쓰지 못하고(ADMIN 필요), `writeandsaveconf`도 거부. `getallsysparam`으로는 `cm.conf`·`databases.txt`를 읽을 수 있음 |
 | `path_db_backup` | admin | `backupdb`(`backupdir`, `volname`의 `..`), `restoredb`(`pathname`, `recoverypath`), `backupvolinfo`(`pathname`)가 `allowed_db_dirs` 밖, `$CUBRID/bin`, 상대 경로를 거부. 없는 DB(`authtest_nodb`)를 써서 회귀해도 백업·복구가 실제로 일어나지 않음 |
+| `path_db_volume` | admin | `createdb`(`genvolpath`, `logvolpath`, `exvol`의 PATH와 NAME의 `..`), `copydb`(`destdbpath`·`exvolpath`, advanced `volume`), `renamedb`(`exvolpath`, advanced `volume`)가 `allowed_db_dirs` 밖을 거부. 새 DB는 `numpage`·`logsize` 1로, copydb·renamedb는 없는 DB(`authtest_nodb`)로 보내 회귀해도 DB가 만들어지지 않게 함. `addvoldb`는 실제 DB가 필요해 넣지 않음 |
 | `resp_no_user_password` | admin | `getdbmtuserinfo`·`getdbmtuserinfo_new`와 사용자 관리 task 응답에 CMS 사용자 비밀번호(`@passwd`, 평문)가 없음 |
 | `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
 | `auth_internal_keys` | 기존 API, 권한 none | 최상위·중첩 객체·배열 안에 `_ID: admin`을 넣어 보내도 `getadminloginfo`가 거부됨 |

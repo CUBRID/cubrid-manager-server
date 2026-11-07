@@ -20,6 +20,7 @@ file_admin_conf,success
 auth_admin_conf,success
 // DB utility task paths: allowed_db_dirs (CBRD-27832)
 path_db_backup,success
+path_db_volume,success
 
 // Passwords are not returned in responses (run as admin)
 resp_no_user_password,success

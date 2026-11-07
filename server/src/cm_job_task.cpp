@@ -2607,6 +2607,60 @@ tsGetDBMTUserInfo (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * join_db_path () - `dir`/`name` into `buf`. False if it does not fit:
+ *   a cut path is not the one the task would use, so it must not be checked
+ *   in its place (a cut "../.." could pass where the whole path would not).
+ */
+static bool
+join_db_path (char *buf, size_t size, const char *dir, const char *name, char *_dbmt_error)
+{
+  int n = snprintf (buf, size, "%s/%s", dir, name);
+
+  if (n < 0 || (size_t) n >= size)
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s/%s", dir, name);
+      return false;
+    }
+  return true;
+}
+
+/*
+ * is_authorized_exvol_paths () - createdb: each extended volume of the
+ *   "exvol" section of `req` (NAME = PURPOSE;NPAGES;PATH) is created as
+ *   PATH/NAME. That is a new location, so it must be under allowed_db_dirs
+ *   (NULL dbname). Checked before createdb creates any directory or file.
+ */
+static bool
+is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
+{
+  int pos, len, i;
+  char *tn, *tv;
+  char buf[1024], *val[3];
+  char vol_path[PATH_MAX];
+
+  nv_locate (req, "exvol", &pos, &len);
+  for (i = pos; i < len + pos; ++i)
+    {
+      nv_lookup (req, i, &tn, &tv);
+      if (tn == NULL || tv == NULL)
+	{
+	  continue;
+	}
+      strcpy_limit (buf, tv, sizeof (buf));
+      if (string_tokenize2 (buf, val, 3, ';') < 0)
+	{
+	  continue;		/* skipped by createdb as well */
+	}
+      if (!join_db_path (vol_path, sizeof (vol_path), val[2], tn, _dbmt_error)
+	  || !is_authorized_db_path (vol_path, NULL, _dbmt_error))
+	{
+	  return false;
+	}
+    }
+  return true;
+}
+
 int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -2706,7 +2760,8 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      if (is_invalid_filename_with_msg (genvolpath, _dbmt_error))
+      /* a new database: its paths must be under allowed_db_dirs (NULL dbname) */
+      if (!is_authorized_db_path (genvolpath, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
@@ -2725,7 +2780,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       else
 	{
-	  if (is_invalid_filename_with_msg (logvolpath, _dbmt_error))
+	  if (!is_authorized_db_path (logvolpath, NULL, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -2736,6 +2791,11 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       && (retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
     {
       return retval;
+    }
+
+  if (!is_authorized_exvol_paths (req, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
     }
 
   /* caculate dbvolsize & logvolsize */
@@ -3480,12 +3540,6 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (exvolpath != NULL && strcmp (exvolpath, "none") != 0 &&
-      is_invalid_filename_with_msg (exvolpath, _dbmt_error))
-    {
-      return ERR_WITH_MSG;
-    }
-
   db_mode = cms_database_mode (dbname, NULL);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
@@ -3558,6 +3612,17 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	      replace_colon (n);
 	      replace_colon (v);
 #endif
+	      /*
+	       * The new path of a volume of this database. renamedb works on an
+	       * existing database, so its registered directories count (dbname):
+	       * a volume may stay where it is, even outside allowed_db_dirs.
+	       */
+	      if (!is_authorized_db_path (v, dbname, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
+		}
 	      p = strrchr (v, '/');
 	      if (p)
 		{
@@ -3609,6 +3674,11 @@ tsRenameDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }                /* close "if (adv_flag != NULL)" */
   else if (exvolpath != NULL && !uStringEqual (exvolpath, "none"))
     {
+      /* where the extended volumes of this database move to; as above */
+      if (!is_authorized_db_path (exvolpath, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
       if (uCreateDir (exvolpath) != ERR_NO_ERROR)
 	{
 	  strcpy (_dbmt_error, exvolpath);
@@ -3975,9 +4045,21 @@ tsRunAddvoldb (nvplist *req, nvplist *res, char *_dbmt_error)
       volpath = db_dir;
     }
 
-  if (is_invalid_filename_with_msg (volpath, _dbmt_error))
+  /* a volume of an existing database: its registered directories count (dbname) */
+  if (!is_authorized_db_path (volpath, dbname, _dbmt_error))
     {
       return ERR_WITH_MSG;
+    }
+  if (volname != NULL && volname[0] != '\0')
+    {
+      char vol_full_path[PATH_MAX];
+
+      /* the volume is created as volpath/volname: a "../" in volname must not leave volpath */
+      if (!join_db_path (vol_full_path, sizeof (vol_full_path), volpath, volname, _dbmt_error)
+	  || !is_authorized_db_path (vol_full_path, dbname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
 
   if (access (volpath, F_OK) < 0)
@@ -4134,9 +4216,14 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
-  if (is_invalid_filename_with_msg (logpath, _dbmt_error) ||
-      (destdbpath != NULL && is_invalid_filename_with_msg (destdbpath, _dbmt_error)) ||
-      (exvolpath != NULL && is_invalid_filename_with_msg (exvolpath, _dbmt_error)))
+  /*
+   * The copy is a new database: its paths must be under allowed_db_dirs
+   * (NULL dbname). destdbpath and exvolpath are used only without advanced;
+   * with it, each volume path is checked below.
+   */
+  if (!is_authorized_db_path (logpath, NULL, _dbmt_error)
+      || (adv_flag == 0 && !is_authorized_db_path (destdbpath, NULL, _dbmt_error))
+      || (adv_flag == 0 && !is_authorized_db_path (exvolpath, NULL, _dbmt_error)))
     {
       return ERR_WITH_MSG;
     }
@@ -4202,6 +4289,13 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
 	      replace_colon (n);
 	      replace_colon (v);
 #endif
+	      /* the path of a volume of the new database */
+	      if (!is_authorized_db_path (v, NULL, _dbmt_error))
+		{
+		  fclose (outfile);
+		  unlink (tmpfile);
+		  return ERR_WITH_MSG;
+		}
 	      p = strrchr (v, '/');
 	      if (p)
 		{
