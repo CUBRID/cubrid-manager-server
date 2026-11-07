@@ -5256,6 +5256,37 @@ protected_files (void)
   return files;
 }
 
+/*
+ * Admin configuration files.
+ *
+ * cm.conf holds the security settings of CMS (session_ip_check,
+ * token_active_time, max_sessions_per_user, ...) and databases.txt says where
+ * each database lives, which CMS trusts to find the files of a database.
+ * Users who may run the DB tasks (DBC, DBO) must not be able to change what
+ * limits those tasks. Only an admin may write these files, and only through
+ * setsysparam (cmconf, databases); no file task writes, empties or deletes
+ * them, whatever the caller's authority. Unlike the protected files, any task
+ * may still read them.
+ */
+static std::vector<std::string>
+admin_conf_files (void)
+{
+  std::vector<std::string> files;
+  char buf[PATH_MAX];
+
+  buf[0] = '\0';
+  if (conf_get_dbmt_file (FID_DBMT_CONF, buf) != NULL && buf[0] != '\0')
+    {
+      files.push_back (buf);	/* cm.conf */
+    }
+  if (sco.szCubrid_databases != NULL && sco.szCubrid_databases[0] != '\0')
+    {
+      files.push_back (std::string (sco.szCubrid_databases) + "/" + CUBRID_DATABASE_TXT);
+    }
+
+  return files;
+}
+
 #if defined (WINDOWS)
 /*
  * win_final_path () - the name Windows itself gives the existing file or
@@ -5383,11 +5414,10 @@ is_same_path (const std::string &a, const std::string &b)
   return is_subpath (a.c_str (), b.c_str ()) && is_subpath (b.c_str (), a.c_str ());
 }
 
-/* `path` (expanded) is one of the protected files */
+/* `path` (expanded) is one of `files`, compared as written and as resolved */
 static bool
-is_protected_file (const std::string &path)
+is_one_of_files (const std::vector<std::string> &files, const std::string &path)
 {
-  std::vector<std::string> files = protected_files ();
   std::string resolved = resolve_path (path);
 
   for (size_t i = 0; i < files.size (); i++)
@@ -5400,11 +5430,10 @@ is_protected_file (const std::string &path)
   return false;
 }
 
-/* a protected file is `dir` (expanded) itself or somewhere under it */
+/* one of `files` is `dir` (expanded) itself or somewhere under it */
 static bool
-contains_protected_file (const std::string &dir)
+contains_one_of_files (const std::vector<std::string> &files, const std::string &dir)
 {
-  std::vector<std::string> files = protected_files ();
   std::string resolved = resolve_path (dir);
 
   for (size_t i = 0; i < files.size (); i++)
@@ -5416,6 +5445,48 @@ contains_protected_file (const std::string &dir)
 	}
     }
   return false;
+}
+
+/* `path` (expanded) is one of the protected files */
+static bool
+is_protected_file (const std::string &path)
+{
+  return is_one_of_files (protected_files (), path);
+}
+
+/* a protected file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_protected_file (const std::string &dir)
+{
+  return contains_one_of_files (protected_files (), dir);
+}
+
+/* an admin configuration file is `dir` (expanded) itself or somewhere under it */
+static bool
+contains_admin_conf_file (const std::string &dir)
+{
+  return contains_one_of_files (admin_conf_files (), dir);
+}
+
+/*
+ * is_admin_conf_file () - `path` is cm.conf or databases.txt (see
+ *   admin_conf_files ()), also when written another way (a symbolic link,
+ *   "..", repeated separators, and on Windows an 8.3 name, case, trailing dots
+ *   or spaces). setsysparam requires AU_ADMIN for such a path; the file tasks
+ *   refuse it through is_authorized_write_filename () and
+ *   is_authorized_dirname (). False for an invalid file name.
+ */
+bool
+is_admin_conf_file (const char *path)
+{
+  std::string expanded_path;
+
+  if (path == NULL || !is_valid_filename (path, expanded_path))
+    {
+      return false;
+    }
+
+  return is_one_of_files (admin_conf_files (), expanded_path);
 }
 
 /*
@@ -5476,6 +5547,12 @@ overlaps_cubrid_program_dir (const std::string &dir)
   return NULL;
 }
 
+/* reasons for refusing an admin configuration file in a file task */
+#define ADMIN_CONF_FILE_ERROR \
+  "cm.conf and databases.txt can be changed only by an admin with setsysparam"
+#define ADMIN_CONF_DIR_ERROR \
+  "the directory contains cm.conf or databases.txt"
+
 static void
 set_path_error (char *_dbmt_error, const char *reason, const char *path)
 {
@@ -5532,9 +5609,11 @@ is_authorized_filename (const char *path, char *_dbmt_error)
 }
 
 /*
- * is_authorized_write_filename () - as above, and not under a program
- * directory ($CUBRID/bin, lib, java). For tasks that write, truncate or
- * delete a file (writeandsaveconf, writeprivatedata, resetlog, removelog).
+ * is_authorized_write_filename () - as above, not under a program
+ * directory ($CUBRID/bin, lib, java), and not an admin configuration file
+ * (cm.conf, databases.txt; see admin_conf_files ()). For tasks that write,
+ * truncate or delete a file (writeandsaveconf, writeprivatedata, resetlog,
+ * removelog).
  */
 bool
 is_authorized_write_filename (const char *path, char *_dbmt_error)
@@ -5555,14 +5634,21 @@ is_authorized_write_filename (const char *path, char *_dbmt_error)
       return false;
     }
 
+  if (is_one_of_files (admin_conf_files (), expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_FILE_ERROR, path);
+      return false;
+    }
+
   return true;
 }
 
 /*
  * is_authorized_dirname () - as is_authorized_filename (), and no protected
  * file under the directory; with FOR_WRITE, the directory must also not
- * overlap a program directory ($CUBRID/bin, lib, java). For tasks that copy
- * or delete a directory tree.
+ * overlap a program directory ($CUBRID/bin, lib, java) nor hold an admin
+ * configuration file (cm.conf, databases.txt). For tasks that copy or delete
+ * a directory tree.
  */
 bool
 is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
@@ -5586,6 +5672,12 @@ is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error)
       && (program_dir = overlaps_cubrid_program_dir (expanded_path)) != NULL)
     {
       set_program_dir_error (_dbmt_error, program_dir, path);
+      return false;
+    }
+
+  if (access == FOR_WRITE && contains_admin_conf_file (expanded_path))
+    {
+      set_path_error (_dbmt_error, ADMIN_CONF_DIR_ERROR, path);
       return false;
     }
 

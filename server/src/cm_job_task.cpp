@@ -1746,6 +1746,21 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * The task is open to DBC and DBO, but cm.conf (security settings of CMS)
+   * and databases.txt (where each database lives) decide what those users
+   * may do, so only an admin may write them. Checked on the resolved path, so
+   * any confname that names one of them (cmconf, databases, cm.conf, ...) is
+   * covered.
+   */
+  if (is_admin_conf_file (conf_path) && !dbmt_user_has_auth (nv_get_val (req, "_ID"), AU_ADMIN))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "%s",
+		"The user don't have authority to execute the task: setsysparam for cm.conf or "
+		"databases.txt (ADMIN is required)");
+      return ERR_WITH_MSG;
+    }
+
   if (_write_conf_to_file (req, conf_path) < 0)
     {
       return ERR_TMPFILE_OPEN_FAIL;

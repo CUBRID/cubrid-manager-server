@@ -15,6 +15,9 @@ auth_new_admin,success
 file_protected_read,success
 file_protected_write,success
 file_cubrid_bin,success
+// cm.conf and databases.txt: admin only, through setsysparam (CBRD-27832)
+file_admin_conf,success
+auth_admin_conf,success
 
 // Passwords are not returned in responses (run as admin)
 resp_no_user_password,success

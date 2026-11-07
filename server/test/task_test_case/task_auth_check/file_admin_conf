@@ -1,0 +1,80 @@
+[
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/conf/cm.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/conf/../conf//cm.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID_DATABASES/databases.txt/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../conf/cm.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "resetlog",
+  "token": "",
+  "path": "$CUBRID_DATABASES/databases.txt/",
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "removelog",
+  "token": "",
+  "files": [
+   {
+    "path": "$CUBRID/conf/cm.conf/"
+   }
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_nosuchdir",
+  "destdir": "$CUBRID_DATABASES",
+  "test_expect": "failure",
+  "test_note": "the directory contains cm.conf or databases.txt"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "",
+  "confname": "cmconf",
+  "test_expect": "success"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "",
+  "confname": "databases",
+  "test_expect": "success"
+ }
+]

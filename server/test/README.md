@@ -590,6 +590,8 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `file_protected_read` | admin | 보호 파일(cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, SSL 키·인증서)을 `viewlog`·`getfiletotallinenum`·`errortrace`·`runsqlstatement`·`readprivatedata`·`getallsysparam`·`copyfolder`(src)로 읽지 못함. `./`, `//`, `..` 변형 포함. 옆의 일반 파일은 읽힘 |
 | `file_protected_write` | admin | `resetlog`·`writeandsaveconf`·`writeprivatedata`·`removelog`·`copyfolder`(dest)로 보호 파일을 쓰지 못함 |
 | `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못하고, `resetlog`·`removelog`로 비우거나 지우지 못함. 회귀해도 bin 아래 파일이 생기거나 지워지지 않도록 없는 경로를 쓴다 |
+| `file_admin_conf` | admin | admin이라도 `writeandsaveconf`·`writeprivatedata`·`resetlog`·`removelog`로 `cm.conf`·`databases.txt`를 쓰거나 비우거나 지우지 못하고(`..`, `//` 변형 포함), `copyfolder`(dest)로 그 파일이 있는 `$CUBRID_DATABASES`에 쓰지 못함. `getallsysparam`으로는 두 파일을 읽을 수 있음 |
+| `auth_admin_conf` | `_new` API, dbc·dbo yes | `setsysparam`으로 `cm.conf`를 쓰지 못하고(ADMIN 필요), `writeandsaveconf`도 거부. `getallsysparam`으로는 `cm.conf`·`databases.txt`를 읽을 수 있음 |
 | `resp_no_user_password` | admin | `getdbmtuserinfo`·`getdbmtuserinfo_new`와 사용자 관리 task 응답에 CMS 사용자 비밀번호(`@passwd`, 평문)가 없음 |
 | `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
 | `auth_internal_keys` | 기존 API, 권한 none | 최상위·중첩 객체·배열 안에 `_ID: admin`을 넣어 보내도 `getadminloginfo`가 거부됨 |
@@ -607,6 +609,10 @@ python3 test_tasks.py --dump <name> [<name> ...]
 보호 파일 쓰기 케이스는 검사가 회귀하면 실제로 쓰게 되므로, 대상은 지워져도 문제없는 `conlist`만 쓴다.
 `copyfolder`는 존재하지 않는 원본을 주어 회귀해도 아무것도 복사되지 않게 한다. `deletefolder`는
 안전하게 검증할 방법이 없어 넣지 않았다.
+`cm.conf`·`databases.txt` 케이스는 경로 끝에 `/`를 붙여(`$CUBRID/conf/cm.conf/`) 보낸다. 검사는
+같은 파일로 판정해 거부하고, 검사가 회귀해도 파일을 열 수 없어(`ENOTDIR`) 두 파일이 바뀌지 않는다.
+같은 이유로 `setsysparam`의 `confname: cmconf`·`databases`는 보내지 않는다(회귀하면 실제로 덮어씀).
+`/`로 끝나는 경로는 Linux 기준이며, admin의 `setsysparam` 성공은 수동으로 확인한다.
 
 케이스가 중간에 멈춰 사용자가 남아도, 다음 실행의 첫 요청(`deletedbmtuser`, `any`)이
 지운다. 사용자 이름은 `authtest_`로 시작한다.
