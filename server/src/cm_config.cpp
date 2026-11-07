@@ -29,9 +29,14 @@
 #include <errno.h>
 #include <limits.h>
 
+#include <string>
+#include <vector>
+
 #if defined(WINDOWS)
 #include <process.h>
 #include <io.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -141,6 +146,11 @@ static int check_path (char *path, char *pname);
 static int check_max_sessions_per_user (void);
 static int parse_token_active_time (const char *val);
 static T_SESSION_IP_CHECK parse_session_ip_check (const char *val);
+static void parse_allowed_db_dirs (const char *val);
+static void set_default_allowed_db_dirs (void);
+
+/* allowed_db_dirs of cm.conf, expanded; see parse_allowed_db_dirs () */
+static std::vector<std::string> allowed_db_dirs;
 
 void
 sys_config_init (void)
@@ -262,6 +272,8 @@ uReadSystemConfig (void)
 
   snprintf (sco.szAccessLog, PATH_MAX, "%s", access_log_buf);
   snprintf (sco.szErrorLog, PATH_MAX, "%s", error_log_buf);
+
+  allowed_db_dirs.clear ();
 
   while (fgets (cbuf, sizeof (cbuf), conf_file))
     {
@@ -436,6 +448,15 @@ uReadSystemConfig (void)
 	   */
 	  strcpy_limit (sco.szSSLCertSan, token, sizeof (sco.szSSLCertSan));
 	}
+      else if (strcasecmp (ent_name, "allowed_db_dirs") == 0)
+	{
+	  /*
+	   * Taken from token, not ent_val, which is shorter than a list of
+	   * directories may be (a line longer than cbuf is ignored above).
+	   * A later allowed_db_dirs line replaces an earlier one.
+	   */
+	  parse_allowed_db_dirs (token);
+	}
       else if (strcasecmp (ent_name, "http_timeout") == 0 ||
 	       strcasecmp (ent_name, "HttpTimeout") == 0)
 	{
@@ -526,6 +547,11 @@ uReadSystemConfig (void)
 	}
     }
   fclose (conf_file);
+
+  if (allowed_db_dirs.empty ())
+    {
+      set_default_allowed_db_dirs ();
+    }
 
 #ifdef HOST_MONITOR_PROC
   sco.hmtab1 = 1;
@@ -1118,6 +1144,170 @@ parse_session_ip_check (const char *val)
   ut_record_cubrid_utility_log_stderr (err_buf);
 
   return DEFAULT_SESSION_IP_CHECK;
+}
+
+/* log a problem with an allowed_db_dirs entry of cm.conf */
+static void
+log_allowed_db_dirs (const char *reason, const std::string &entry)
+{
+  char err_buf[DBMT_ERROR_MSG_SIZE];
+
+  snprintf (err_buf, DBMT_ERROR_MSG_SIZE, "CUBRID Manager Server : allowed_db_dirs in cm.conf: %s: %s\n",
+	    reason, entry.c_str ());
+  ut_record_cubrid_utility_log_stderr (err_buf);
+}
+
+static bool
+is_env_name_char (char c)
+{
+  return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+/*
+ * expand_conf_dir () - expand the environment variables in `entry` into
+ *   `expanded`. A variable is written $NAME or ${NAME}, NAME made of letters,
+ *   digits and '_', on every platform (the %NAME% of Windows is not expanded).
+ */
+static bool
+expand_conf_dir (const std::string &entry, std::string &expanded, std::string &reason)
+{
+  size_t i = 0;
+
+  expanded.clear ();
+  while (i < entry.size ())
+    {
+      if (entry[i] != '$')
+	{
+	  expanded += entry[i++];
+	  continue;
+	}
+
+      bool braced = (i + 1 < entry.size () && entry[i + 1] == '{');
+      size_t start = i + (braced ? 2 : 1);
+      size_t end = start;
+
+      while (end < entry.size () && is_env_name_char (entry[end]))
+	{
+	  end++;
+	}
+      if (end == start || (braced && (end >= entry.size () || entry[end] != '}')))
+	{
+	  reason = "'$' does not start a variable ($NAME or ${NAME})";
+	  return false;
+	}
+
+      std::string name = entry.substr (start, end - start);
+      const char *value = getenv (name.c_str ());
+
+      if (value == NULL || value[0] == '\0')
+	{
+	  reason = "environment variable " + name + " is not set or empty";
+	  return false;
+	}
+      expanded += value;
+      i = end + (braced ? 1 : 0);
+    }
+
+  return true;
+}
+
+/* `path` is absolute: /dir on Linux; C:\dir, C:/dir or \\server\share on Windows */
+static bool
+is_absolute_dir (const std::string &path)
+{
+#if defined (WINDOWS)
+  if (path.size () >= 3 && isalpha ((unsigned char) path[0]) && path[1] == ':'
+      && (path[2] == '\\' || path[2] == '/'))
+    {
+      return true;
+    }
+  return path.size () >= 2 && (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/');
+#else
+  return !path.empty () && path[0] == '/';
+#endif
+}
+
+/*
+ * parse_allowed_db_dirs () - allowed_db_dirs: the directories under which the
+ *   DB utility tasks (backupdb, restoredb, createdb, addvoldb, copydb,
+ *   renamedb, unloaddb, loaddb, ...) may use paths, separated by ';' (not ':',
+ *   which is part of a Windows drive name), for example
+ *   allowed_db_dirs=$CUBRID_DATABASES;/data/cubrid
+ */
+static void
+parse_allowed_db_dirs (const char *val)
+{
+  std::string list = (val != NULL) ? val : "";
+  size_t pos = 0;
+
+  allowed_db_dirs.clear ();
+  while (pos <= list.size ())
+    {
+      size_t next = list.find (';', pos);
+      std::string entry = list.substr (pos, (next == std::string::npos) ? std::string::npos : next - pos);
+      std::string expanded, reason;
+      struct stat st;
+
+      pos = (next == std::string::npos) ? list.size () + 1 : next + 1;
+
+      size_t first = entry.find_first_not_of (" \t");
+      if (first == std::string::npos)
+	{
+	  continue;		/* empty entry, as in "a;;b" or a trailing ';' */
+	}
+      entry = entry.substr (first, entry.find_last_not_of (" \t") - first + 1);
+
+      if (!expand_conf_dir (entry, expanded, reason))
+	{
+	  log_allowed_db_dirs ((reason + "; the entry is ignored").c_str (), entry);
+	  continue;
+	}
+      if (!is_absolute_dir (expanded))
+	{
+	  log_allowed_db_dirs ("not an absolute path; the entry is ignored", entry);
+	  continue;
+	}
+      if (stat (expanded.c_str (), &st) != 0)
+	{
+	  log_allowed_db_dirs ("the directory does not exist (yet); the entry is kept", entry);
+	}
+      else if ((st.st_mode & S_IFMT) != S_IFDIR)
+	{
+	  log_allowed_db_dirs ("not a directory; the entry is ignored", entry);
+	  continue;
+	}
+
+      allowed_db_dirs.push_back (expanded);
+    }
+
+  if (allowed_db_dirs.empty ())
+    {
+      log_allowed_db_dirs ("no usable directory; the default is used", "$CUBRID_DATABASES");
+    }
+}
+
+/* the default of allowed_db_dirs: $CUBRID_DATABASES */
+static void
+set_default_allowed_db_dirs (void)
+{
+  allowed_db_dirs.clear ();
+  if (sco.szCubrid_databases != NULL && sco.szCubrid_databases[0] != '\0')
+    {
+      allowed_db_dirs.push_back (sco.szCubrid_databases);
+    }
+}
+
+/*
+ * get_allowed_db_dirs () - the directories of allowed_db_dirs, expanded,
+ *   read by uReadSystemConfig () at startup and not changed afterwards; never
+ *   empty once it has run (see parse_allowed_db_dirs ()). The entries are
+ *   kept as written after expansion: the caller resolves them (symbolic
+ *   links, case on Windows) when it compares a path.
+ */
+const std::vector<std::string> &
+get_allowed_db_dirs (void)
+{
+  return allowed_db_dirs;
 }
 
 static int
