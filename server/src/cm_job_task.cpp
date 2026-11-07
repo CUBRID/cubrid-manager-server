@@ -7395,8 +7395,13 @@ ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  /* the auto backup job writes into this directory later; FOR_READ keeps the existing check */
-	  if (!is_authorized_filename (conf_item[i], FOR_READ, _dbmt_error))
+	  /*
+	   * The auto backup job (aj_backupdb ()) creates and writes this
+	   * directory later, as backupdb does: checked the same way, for the
+	   * database (conf_item[0], read before "path"). Checked again when the
+	   * job runs.
+	   */
+	  if (!is_authorized_db_path (conf_item[i], conf_item[0], _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
@@ -7537,8 +7542,13 @@ ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
       if (strcmp (autobackup_conf_entry[i], "path") == 0)
 	{
-	  /* the auto backup job writes into this directory later; FOR_READ keeps the existing check */
-	  if (!is_authorized_filename (conf_item[i], FOR_READ, _dbmt_error))
+	  /*
+	   * The auto backup job (aj_backupdb ()) creates and writes this
+	   * directory later, as backupdb does: checked the same way, for the
+	   * database (conf_item[0], read before "path"). Checked again when the
+	   * job runs.
+	   */
+	  if (!is_authorized_db_path (conf_item[i], conf_item[0], _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }

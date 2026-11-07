@@ -25,6 +25,7 @@ path_db_backup,success
 path_db_volume,success
 path_db_unload,success
 path_db_load,success
+path_db_autobackup,success
 
 // Passwords are not returned in responses (run as admin)
 resp_no_user_password,success

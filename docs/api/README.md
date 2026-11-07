@@ -143,7 +143,7 @@ Tasks that take a file or directory path accept only paths under `$CUBRID` and `
 
 ### DB Utility Task Paths
 
-The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md), [createdb](createdb.md), [addvoldb](addvoldb.md), [copydb](copydb.md), [renamedb](renamedb.md), [unloaddb](unloaddb.md), [loaddb](loaddb.md)) follow their own rule instead of the one above:
+The paths given to the DB utility tasks that create, write or read database volumes, logs, backups and unload or load files ([backupdb](backupdb.md), [restoredb](restoredb.md), [backupvolinfo](backupvolinfo.md), [createdb](createdb.md), [addvoldb](addvoldb.md), [copydb](copydb.md), [renamedb](renamedb.md), [unloaddb](unloaddb.md), [loaddb](loaddb.md), and the auto backup plans of [addbackupinfo](addbackupinfo.md) and [setbackupinfo](setbackupinfo.md), checked again when each backup runs) follow their own rule instead of the one above:
 
 - The path must be absolute once its environment variables are expanded (`path must be an absolute path`).
 - It must be shorter than the platform path limit (`PATH_MAX`), as given and once expanded (`path is too long`); a longer path is refused rather than cut.

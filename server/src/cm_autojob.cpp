@@ -1575,6 +1575,26 @@ aj_backupdb (autobackupdb_node *n)
       return;
     }
 
+  /*
+   * The path comes from autobackupdb.conf, which may have been written before
+   * the path policy, or allowed_db_dirs and databases.txt may have changed
+   * since: check it now, as backupdb does, before anything is created or
+   * removed under it. Both the directory of the setting and the one created
+   * for this backup (its name holds the database name) are checked. A refused
+   * run is logged each time it is attempted.
+   */
+  {
+    char err[DBMT_ERROR_MSG_SIZE];
+
+    err[0] = '\0';
+    if (!is_authorized_db_path (n->path, n->dbname, err) || !is_authorized_db_path (bkpath, n->dbname, err))
+      {
+	snprintf (buf, sizeof (buf), "Failed to execute backupdb: %s", err);
+	_aj_autobackupdb_error_log (n, buf);
+	return;
+      }
+  }
+
   db_mode = cms_database_mode (n->dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
