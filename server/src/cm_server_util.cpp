@@ -1911,14 +1911,15 @@ err_return:
 int
 uCreateDir (char *new_dir)
 {
-  char *p, path[1024];
+  char *p, path[COMPOSED_PATH_MAX];
 
-  if (new_dir == NULL)
+  /* a path that does not fit fails: a cut one is not the directory the caller checked */
+  if (new_dir == NULL || strlen (new_dir) >= sizeof (path))
     {
       return ERR_DIR_CREATE_FAIL;
     }
-  memset (path, 0, 1024);
-  strncpy (path, new_dir, 1023);
+  memset (path, 0, sizeof (path));
+  strncpy (path, new_dir, sizeof (path) - 1);
   ut_trim (path);
 
 #if defined(WINDOWS)
@@ -5990,6 +5991,17 @@ is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
   if (path == NULL || !is_valid_filename (path, expanded_path))
     {
       set_path_error (_dbmt_error, "filename is not authorized", path);
+      return false;
+    }
+
+  /*
+   * The tasks copy the path as given, and use it expanded, into PATH_MAX
+   * buffers: a path that does not fit either way is refused here, before any
+   * copy, rather than cut later into one that was not checked.
+   */
+  if (strlen (path) >= PATH_MAX || expanded_path.size () >= PATH_MAX)
+    {
+      set_path_error (_dbmt_error, "path is too long", path);
       return false;
     }
 

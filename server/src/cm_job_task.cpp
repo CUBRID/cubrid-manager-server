@@ -2654,6 +2654,12 @@ is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
 	{
 	  continue;
 	}
+      /* createdb reads the value into a buffer of the same size: a longer one is refused, not cut */
+      if (strlen (tv) >= sizeof (buf))
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s", tn);
+	  return false;
+	}
       strcpy_limit (buf, tv, sizeof (buf));
       if (string_tokenize2 (buf, val, 3, ';') < 0)
 	{
@@ -2986,7 +2992,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
@@ -3110,7 +3116,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
@@ -3148,7 +3154,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	    {
 	      continue;
 	    }
-	  strcpy (buf, tv);
+	  strcpy_limit (buf, tv, sizeof (buf));
 	  if (string_tokenize2 (buf, val, 3, ';') < 0)
 	    {
 	      continue;
