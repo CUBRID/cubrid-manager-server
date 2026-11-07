@@ -441,6 +441,7 @@ typedef enum
   FOR_WRITE = 1			/* the tree is written (copied into, deleted) */
 } T_DIR_ACCESS;
 bool is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error);
+bool is_admin_conf_file (const char *path);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string &name);
 std::string expand_env_path (const std::string &path);

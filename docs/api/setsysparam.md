@@ -5,6 +5,7 @@ Update configuration files.
 Permissions required to run this task: one of DBC, DBO
 
 * `confname` other than the listed names writes `$CUBRID/conf/<confname>`; a protected file such as `cm.pass` is refused (see [File Access](README.md#file-access)).
+* Writing `cm.conf` or `databases.txt` (`confname` `cmconf` or `databases`, or any other `confname` that names one of them) requires ADMIN. Other users get `The user don't have authority to execute the task: setsysparam for cm.conf or databases.txt (ADMIN is required)`. Reading them with `getallsysparam` is not changed.
 
 ## Request JSON Syntax
 

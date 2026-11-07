@@ -1,0 +1,77 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_conf",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_conf",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "yes",
+   "dbo": "yes",
+   "brk": "no",
+   "mon": "no",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_conf",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "setsysparam",
+  "token": "$CASE_LOGIN_TOKEN",
+  "confname": "cm.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "denied",
+  "test_note": "setsysparam for cm.conf or databases.txt (ADMIN is required)"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "confpath": "$CUBRID/conf/cm.conf/",
+  "confdata": [
+   "authtest"
+  ],
+  "test_expect": "failure",
+  "test_note": "can be changed only by an admin with setsysparam"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "$CASE_LOGIN_TOKEN",
+  "confname": "cmconf",
+  "test_expect": "success"
+ },
+ {
+  "task": "getallsysparam",
+  "token": "$CASE_LOGIN_TOKEN",
+  "confname": "databases",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_conf"
+ }
+]
