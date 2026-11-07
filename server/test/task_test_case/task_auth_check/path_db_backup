@@ -57,6 +57,16 @@
   "test_note": "path is not under allowed_db_dirs"
  },
  {
+  "task": "restoredb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "level": "0",
+  "pathname": "none",
+  "recoverypath": "$CUBRID_DATABASES/authtest_nodb\\..\\..\\..\\tmp\\cms_authtest_bs",
+  "test_expect": "failure",
+  "test_note": "path is not under allowed_db_dirs"
+ },
+ {
   "task": "backupvolinfo",
   "token": "",
   "dbname": "authtest_nodb",

@@ -2765,16 +2765,15 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      /* a new database: its paths must be under allowed_db_dirs (NULL dbname) */
+      /* check_dbpath () turns '\\' into '/', so it comes first. */
+      if ((retval = check_dbpath (genvolpath, _dbmt_error)) != ERR_NO_ERROR)
+	{
+	  return retval;
+	}
       if (!is_authorized_db_path (genvolpath, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
-    }
-
-  if ((retval = check_dbpath (genvolpath, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
     }
 
   if (logvolpath != NULL)
@@ -2785,17 +2784,16 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       else
 	{
+	  /* as genvolpath */
+	  if ((retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
+	    {
+	      return retval;
+	    }
 	  if (!is_authorized_db_path (logvolpath, NULL, _dbmt_error))
 	    {
 	      return ERR_WITH_MSG;
 	    }
 	}
-    }
-
-  if (logvolpath != NULL
-      && (retval = check_dbpath (logvolpath, _dbmt_error)) != ERR_NO_ERROR)
-    {
-      return retval;
     }
 
   if (!is_authorized_exvol_paths (req, _dbmt_error))
@@ -6419,12 +6417,11 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
   if (recovery_path != NULL && !uStringEqual (recovery_path, "")
       && !uStringEqual (recovery_path, "none"))
     {
-      /*
-       * A new location of the database: it is created here and becomes the
-       * database's path in databases.txt (alter_dblocation ()), so it must be
-       * under allowed_db_dirs; the database's current directories do not
-       * count (NULL dbname).
-       */
+      /* check_dbpath () turns '\\' into '/', so it comes first */
+      if ((retval = check_dbpath (recovery_path, _dbmt_error)) != ERR_NO_ERROR)
+	{
+	  return retval;
+	}
       if (!is_authorized_db_path (recovery_path, NULL, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
@@ -6432,12 +6429,6 @@ ts_restoredb (nvplist *req, nvplist *res, char *_dbmt_error)
 
       /* use -u option to specify restore database path */
       argv[argc++] = "--" RESTORE_USE_DATABASE_LOCATION_PATH_L;
-
-      if ((retval =
-		   check_dbpath (recovery_path, _dbmt_error)) != ERR_NO_ERROR)
-	{
-	  return retval;
-	}
       if (access (recovery_path, F_OK) < 0)
 	{
 	  retval = uCreateDir (recovery_path);
