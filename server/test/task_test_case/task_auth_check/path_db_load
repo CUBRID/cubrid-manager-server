@@ -118,5 +118,25 @@
   "delete_orignal_files": "n",
   "test_expect": "failure",
   "test_note": "path is not under allowed_db_dirs"
+ },
+ {
+  "task": "loaddb",
+  "token": "",
+  "dbname": "authtest_nodb",
+  "checkoption": "both",
+  "period": "none",
+  "user": "dba",
+  "estimated": "none",
+  "oiduse": "yes",
+  "nolog": "no",
+  "schema": "${CUBRID_DATABASES}/cms_authtest_schema",
+  "object": "none",
+  "index": "none",
+  "errorcontrolfile": "none",
+  "ignoreclassfile": "none",
+  "schema-file-list": "none",
+  "delete_orignal_files": "n",
+  "test_expect": "failure",
+  "test_note": "path must not contain an environment variable"
  }
 ]

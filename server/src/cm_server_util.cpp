@@ -6002,11 +6002,25 @@ is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error)
     }
 
   /*
-   * The tasks copy the path as given, and use it expanded, into PATH_MAX
-   * buffers: a path that does not fit either way is refused here, before any
-   * copy, rather than cut later into one that was not checked.
+   * The tasks pass the path as given to uCreateDir (), fopen () and the
+   * utilities (execv (), no shell), which do not expand environment
+   * variables: "$CUBRID_DATABASES/bk" would be checked expanded but used as
+   * a relative path under the current directory of CMS. A path with an
+   * environment variable ($NAME, ${NAME}, on Windows %NAME%) is refused, so
+   * that the path checked below is the one the task uses.
    */
-  if (strlen (path) >= PATH_MAX || expanded_path.size () >= PATH_MAX)
+  if (expanded_path != path)
+    {
+      set_path_error (_dbmt_error, "path must not contain an environment variable", path);
+      return false;
+    }
+
+  /*
+   * The tasks copy the path into PATH_MAX buffers: a path that does not fit
+   * is refused here, before any copy, rather than cut later into one that was
+   * not checked.
+   */
+  if (expanded_path.size () >= PATH_MAX)
     {
       set_path_error (_dbmt_error, "path is too long", path);
       return false;
