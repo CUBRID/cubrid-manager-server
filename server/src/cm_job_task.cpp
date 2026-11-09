@@ -5455,6 +5455,7 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
 
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
+  int fullpath_len;
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char cubrid_err_file[PATH_MAX];
   FILE *infile, *outfile;
@@ -5515,23 +5516,30 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  /*
+   * "+D" is the files directory of the web manager (web_manager_path of
+   * cm.conf, default $CUBRID/share/webmanager), left over from the web
+   * manager removed in 2017.
+   */
   if (strcmp (targetdir, "+D") == 0)
     {
-      /* the files directory of the web manager, set by the server (cm.conf, admin only): not checked */
-      snprintf (fullpath, sizeof (fullpath), "%s/files/", sco.szCWMPath);
+      fullpath_len = snprintf (fullpath, sizeof (fullpath), "%s/files/", sco.szCWMPath);
     }
   else
     {
-      /*
-       * written by unloaddb; dbname allows its registered directories. The
-       * request value is checked before it is copied: it is shorter than
-       * PATH_MAX once checked, so the copy below is never cut.
-       */
-      if (!is_authorized_db_path (targetdir, dbname, _dbmt_error))
-	{
-	  return ERR_WITH_MSG;
-	}
-      snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
+      fullpath_len = snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
+    }
+
+  if (fullpath_len < 0 || fullpath_len >= (int) sizeof (fullpath))
+    {
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s", targetdir);
+      return ERR_WITH_MSG;
+    }
+
+  /* written by unloaddb; dbname allows its registered directories */
+  if (!is_authorized_db_path (fullpath, dbname, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
     }
 
   if (prefix != NULL && !uStringEqual (prefix, "none") && !is_plain_file_name (prefix))

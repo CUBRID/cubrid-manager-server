@@ -57,7 +57,7 @@
   "prefix": "none",
   "targetdir": "+D",
   "test_expect": "failure",
-  "test_note": "Invalid password or missing password"
+  "test_note": "path is not under allowed_db_dirs"
  },
  {
   "task": "unloaddb",
