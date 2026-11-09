@@ -5309,13 +5309,18 @@ ts_backupdb (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_PARAM_MISSING;
     }
 
+  /* a backup directory that does not fit is refused, not cut */
   if (volname != NULL)
     {
-      snprintf (backupfilepath, PATH_MAX - 1, "%s/%s", backupdir, volname);
+      if (!join_db_path (backupfilepath, sizeof (backupfilepath), backupdir, volname, _dbmt_error))
+	{
+	  return ERR_WITH_MSG;
+	}
     }
-  else
+  else if (snprintf (backupfilepath, sizeof (backupfilepath), "%s", backupdir) >= (int) sizeof (backupfilepath))
     {
-      snprintf (backupfilepath, PATH_MAX - 1, "%s", backupdir);
+      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE, "path is too long: %s", backupdir);
+      return ERR_WITH_MSG;
     }
 
   /* the backup directory (with volname) is created and written; dbname allows its registered directories */
@@ -5517,12 +5522,16 @@ ts_unloaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   else
     {
-      /* written by unloaddb; dbname allows its registered directories */
-      snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
-      if (!is_authorized_db_path (fullpath, dbname, _dbmt_error))
+      /*
+       * written by unloaddb; dbname allows its registered directories. The
+       * request value is checked before it is copied: it is shorter than
+       * PATH_MAX once checked, so the copy below is never cut.
+       */
+      if (!is_authorized_db_path (targetdir, dbname, _dbmt_error))
 	{
 	  return ERR_WITH_MSG;
 	}
+      snprintf (fullpath, sizeof (fullpath), "%s", targetdir);
     }
 
   if (prefix != NULL && !uStringEqual (prefix, "none") && !is_plain_file_name (prefix))
