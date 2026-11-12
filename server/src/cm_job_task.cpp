@@ -367,8 +367,8 @@ static bool loaddb_path_given (const char *path);
 static bool read_schema_file_list (const char *list_file, std::vector<std::string> &entries, char *_dbmt_error);
 static bool is_authorized_loaddb_files (char *const files[], int count, const char *schema_file_list,
 					const char *dbname, char *_dbmt_error);
-static void delete_loaddb_file (const char *path, const char *dbname);
-static void delete_schema_files (const char *schema_list_file, const char *dbname);
+static void delete_loaddb_file (const char *path, const char *dbname, std::string &kept);
+static void delete_schema_files (const char *schema_list_file, const char *dbname, std::string &kept);
 
 static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
@@ -6219,13 +6219,24 @@ ts_loaddb (nvplist *req, nvplist *res, char *_dbmt_error)
     {
       unlink (cubrid_err_file);
     }
-  if (uStringEqualIgnoreCase (nv_get_val (req, "delete_orignal_files"), "y"))
+  /*
+   * The original files are deleted only after a successful load. A file that
+   * is not loaddb input, such as a volume or log of another database under
+   * the same allowed directory, makes loaddb fail and so is never deleted.
+   * A file the re-check refuses is kept, and the response note says so.
+   */
+  if (exit_status == 0 && uStringEqualIgnoreCase (nv_get_val (req, "delete_orignal_files"), "y"))
     {
-      /* order and timing as before: also when loaddb failed (checked below) */
-      delete_loaddb_file (schema, dbname);
-      delete_loaddb_file (object, dbname);
-      delete_loaddb_file (index, dbname);
-      delete_schema_files (schema_file_list, dbname);
+      std::string kept;
+
+      delete_loaddb_file (schema, dbname, kept);
+      delete_loaddb_file (object, dbname, kept);
+      delete_loaddb_file (index, dbname, kept);
+      delete_schema_files (schema_file_list, dbname, kept);
+      if (!kept.empty ())
+	{
+	  nv_update_val (res, "note", ("loaded, but the original files are not deleted: " + kept).c_str ());
+	}
     }
 
   if (exit_status != 0)
@@ -6344,13 +6355,15 @@ is_authorized_loaddb_files (char *const files[], int count, const char *schema_f
 
 /*
  * delete_loaddb_file () - delete_orignal_files: delete the loaddb file
- *   `path`, if given. It passed is_authorized_db_path () before loaddb ran;
- *   it is checked again here, as a link on the way may have changed since,
- *   and a file that no longer passes is kept and logged. The file deleted is
- *   the one checked: `path` with its environment variables expanded.
+ *   `path`, if given, after a successful load. It passed
+ *   is_authorized_db_path () before loaddb ran; it is checked again here, as
+ *   a link on the way may have changed since, and a file that no longer
+ *   passes is kept, logged and added to `kept` ("<path> (<reason>)", "; "
+ *   between files) for the response note. The file deleted is the one
+ *   checked.
  */
 static void
-delete_loaddb_file (const char *path, const char *dbname)
+delete_loaddb_file (const char *path, const char *dbname, std::string &kept)
 {
   char err[DBMT_ERROR_MSG_SIZE];
   std::string expanded;
@@ -6364,6 +6377,7 @@ delete_loaddb_file (const char *path, const char *dbname)
   if (!is_authorized_db_path (path, dbname, err) || !is_valid_filename (path, expanded))
     {
       LOG_WARN ("loaddb of %s: the original file is not deleted: %s", dbname, err);
+      kept += (kept.empty () ? "" : "; ") + std::string (path) + " (" + err + ")";
       return;
     }
   unlink (expanded.c_str ());
@@ -6375,7 +6389,7 @@ delete_loaddb_file (const char *path, const char *dbname)
  *   delete_loaddb_file ().
  */
 static void
-delete_schema_files (const char *schema_list_file, const char *dbname)
+delete_schema_files (const char *schema_list_file, const char *dbname, std::string &kept)
 {
   std::vector<std::string> entries;
   char err[DBMT_ERROR_MSG_SIZE];
@@ -6390,10 +6404,10 @@ delete_schema_files (const char *schema_list_file, const char *dbname)
     {
       for (size_t i = 0; i < entries.size (); i++)
 	{
-	  delete_loaddb_file (entries[i].c_str (), dbname);
+	  delete_loaddb_file (entries[i].c_str (), dbname, kept);
 	}
     }
-  delete_loaddb_file (schema_list_file, dbname);
+  delete_loaddb_file (schema_list_file, dbname, kept);
 }
 
 int
