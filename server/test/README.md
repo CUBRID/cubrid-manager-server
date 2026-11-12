@@ -460,11 +460,15 @@ task_test_case/task_result_check/11_4/<case>.result
 | 호스트 이름 | `$HOSTNAME`으로 환원 |
 | `VOLATILE_KEYS`의 키 | 값을 `<volatile>`로 치환 |
 | `VOLATILE_PATTERNS`에 걸리는 문자열 | `<timestamp>` / `<date>` / `_<tmpid>`로 치환 |
+| `UNORDERED_LISTS`의 목록 | 정해진 항목으로 정렬 (`getlogfileinfo`의 `logfile`, `dbspaceinfo`의 로그 볼륨, `classinfo`의 `class`) |
+| `compactdb`의 `log.line` | 각 pass의 클래스 줄을 이름순으로 정렬하고 `<n> instances.`, `<n> objects processed.`의 수를 `<count>`로 치환 |
 
 `VOLATILE_KEYS`는 **키 이름**으로 가린다. 값 전체가 실행마다 바뀌는 것들이다:
 `pid`, `as_pid`, `as_psize`, `as_lat`, `time`, `tran_time`, `tranindex`,
 `cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`, `sizelock`
 (`lockdb`의 락 테이블 메모리. 실행 중 잡은 락의 양과 엔진 빌드에 따라 달라진다).
+
+`classinfo`와 `compactdb`는 엔진이 카탈로그 힙에서 클래스를 찾는 순서대로 나열하고, `compactdb`는 카탈로그 크기를 센다. 둘 다 시스템 클래스에 컬럼이 하나 추가되는 엔진 변경만으로 바뀌므로(예: CUBRID CBRD-26076이 `_db_trigger`에 컬럼 두 개 추가) 순서와 수는 비교하지 않고, 어떤 클래스가 보고되는지만 비교한다.
 
 `VOLATILE_PATTERNS`는 **모양**으로 가린다. 긴 문자열 안에 박혀 있어서 키 단위로는
 못 거르는 것들이다.
