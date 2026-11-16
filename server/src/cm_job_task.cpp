@@ -1262,21 +1262,25 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", access_logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", access_logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
@@ -1304,25 +1308,29 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      else if (strstr (cur_file, "err") != NULL)
-		{
-		  nv_add_nvp (out, "type", "error");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", err_logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", err_logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  else if (strstr (cur_file, "err") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "error");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
@@ -1350,25 +1358,29 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      else if (strstr (cur_file, "log") != NULL)
-		{
-		  nv_add_nvp (out, "type", "script");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  else if (strstr (cur_file, "log") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "script");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
