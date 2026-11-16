@@ -1306,6 +1306,67 @@ def copy_extra_files():
             shutil.copy(os.path.join(root, name), destdir)
 
 
+# Decoys for the log file name matching of getlogfileinfo, getloginfo and
+# getdberrorlog (CBRD-26446). A broker or database name can hold '_', which is
+# also the separator after the name in its log file names, so each decoy
+# starts with the name of an instance the suite uses (query_editor, demodb)
+# but belongs to another one, or is a directory named like a log file.
+#
+# getlogfileinfo is compared against its .answer, which must not list them.
+# getloginfo grows with every run and is checked for status only, so the
+# database side is checked through getdberrorlog, which filters by mtime: every
+# file here gets NAME_MATCH_MTIME, and getdberrorlog_name_match asks for that
+# day only, which leaves out the live logs of demodb. Of the server logs only
+# the "own" file belongs to demodb and is to be listed.
+NAME_MATCH_DECOYS = (
+    # (path under $CUBRID, kind)
+    ("log/broker/query_editor_a.access", "file"),
+    ("log/broker/error_log/query_editor_a_1.err", "file"),
+    ("log/broker/sql_log/query_editor_a_1.sql.log", "file"),
+    ("log/broker/sql_log/query_editor_9.sql.log", "dir"),
+    ("log/server/demodb_20010101_1200.err", "own"),
+    ("log/server/demodb_a_20010101_1200.err", "file"),
+    ("log/server/demodbx_20010101_1200.err", "file"),
+    ("log/server/demodb_20010101_1201.err", "dir"),
+)
+NAME_MATCH_MTIME = time.mktime((2001, 1, 1, 12, 0, 0, 0, 0, -1))
+
+
+def make_name_match_decoys():
+    """Lay NAME_MATCH_DECOYS under $CUBRID (see there)."""
+    remove_name_match_decoys()
+    for rel, kind in NAME_MATCH_DECOYS:
+        path = os.path.join(CUBRID, rel)
+        parent = os.path.dirname(path)
+        if not os.path.isdir(parent):
+            os.makedirs(parent)
+        if kind == "dir":
+            os.makedirs(path)
+        else:
+            with open(path, "w") as f:
+                if kind == "own":
+                    f.write("own error log of demodb for getdberrorlog_name_match\n")
+                else:
+                    f.write("decoy that must not be listed (CBRD-26446)\n")
+        os.utime(path, (NAME_MATCH_MTIME, NAME_MATCH_MTIME))
+
+
+def remove_name_match_decoys():
+    """Remove what make_name_match_decoys() laid, and nothing else."""
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    for rel, kind in NAME_MATCH_DECOYS:
+        path = os.path.join(CUBRID, rel)
+        if os.path.islink(path):
+            continue
+        if kind == "dir":
+            if os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+        elif os.path.isfile(path):
+            os.remove(path)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1341,6 +1402,8 @@ def build_env():
         os.makedirs(folder)
     make_loaddb_input(CUBRID_DATABASES)
     copy_extra_files()
+    # Decoys for the log file name matching cases (CBRD-26446).
+    make_name_match_decoys()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1353,6 +1416,7 @@ def clean_env():
     """Remove what this run created. Runs from the finally block."""
     stop_kill_targets()
     reset_test_dbs()
+    remove_name_match_decoys()
 
 
 def reset_leftovers():
@@ -1379,6 +1443,7 @@ def reset_leftovers():
     print("cleaning up after any earlier run ...")
     sweep_stale_helpers()
     reset_test_dbs()
+    remove_name_match_decoys()
 
 
 def xml_escape(text):
