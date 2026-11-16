@@ -1294,7 +1294,7 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #endif
   struct stat statbuf;
   char *fname;
-  int fname_len = 0, logsize = 0;
+  int logsize = 0;
   Json::Value logitem;
   FILE *fd;
   JSON_FIND_V (request, "dbname",
@@ -1339,18 +1339,12 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #else
       fname = dp->d_name;
 #endif
-      fname_len = (int) strlen (fname);
-      /* the "4" is the size of ".err" */
-      if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
-	{
-	  continue;
-	}
-      if (memcmp (fname, dbname.c_str(), dbname.size()))
+      if (!ut_is_db_server_err_log (fname, dbname.c_str ()))
 	{
 	  continue;
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,    CUBRID_ERROR_LOG_DIR, fname);
-      if (stat (buf, &statbuf) == 0)
+      if (stat (buf, &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode))
 	{
 	  time_to_str (statbuf.st_mtime, "%4d/%02d/%02d %02d:%02d:%02d", format_time, TIME_STR_FMT_DATE_TIME);
 	  if (!start_d.empty() && strcmp (start_d.c_str(), format_time) > 0)
