@@ -1330,41 +1330,92 @@ NAME_MATCH_DECOYS = (
     ("log/server/demodb_20010101_1201.err", "dir"),
 )
 NAME_MATCH_MTIME = time.mktime((2001, 1, 1, 12, 0, 0, 0, 0, -1))
+# What the suite writes into each decoy. The decoy paths can also be the real
+# logs of a broker or database of the host (a broker named query_editor_a),
+# so a path is only ever overwritten or removed when it holds exactly this:
+# a file with this content, or a directory holding only NAME_MATCH_MARKER.
+NAME_MATCH_CONTENT = {
+    "own": "own error log of demodb for getdberrorlog_name_match\n",
+    "file": "decoy that must not be listed (CBRD-26446)\n",
+    "dir": "decoy directory laid by test_tasks.py (CBRD-26446)\n",
+}
+NAME_MATCH_MARKER = ".cbrd26446_decoy"
+
+
+def is_name_match_decoy(path, kind):
+    """Tell whether path is a decoy this suite laid, not a file of the host."""
+    if os.path.islink(path):
+        return False
+    if kind == "dir":
+        if not os.path.isdir(path):
+            return False
+        try:
+            if os.listdir(path) != [NAME_MATCH_MARKER]:
+                return False
+            path = os.path.join(path, NAME_MATCH_MARKER)
+        except OSError:
+            return False
+        if os.path.islink(path):
+            return False
+    if not os.path.isfile(path):
+        return False
+    expected = NAME_MATCH_CONTENT[kind]
+    try:
+        if os.path.getsize(path) != len(expected.encode()):
+            return False
+        with open(path, "r") as f:
+            return f.read() == expected
+    except (OSError, UnicodeDecodeError):
+        return False
 
 
 def make_name_match_decoys():
-    """Lay NAME_MATCH_DECOYS under $CUBRID (see there)."""
+    """Lay NAME_MATCH_DECOYS under $CUBRID (see there).
+
+    A path that already holds something other than a decoy of this suite is
+    left alone: it is a real log of the host, and it stays as it is.
+    """
     remove_name_match_decoys()
     for rel, kind in NAME_MATCH_DECOYS:
         path = os.path.join(CUBRID, rel)
+        if os.path.lexists(path):
+            print("warning: %s already exists and is not a decoy of this "
+                  "suite; left as it is" % path)
+            continue
         parent = os.path.dirname(path)
         if not os.path.isdir(parent):
             os.makedirs(parent)
         if kind == "dir":
-            os.makedirs(path)
+            os.mkdir(path)
+            with open(os.path.join(path, NAME_MATCH_MARKER), "w") as f:
+                f.write(NAME_MATCH_CONTENT[kind])
         else:
             with open(path, "w") as f:
-                if kind == "own":
-                    f.write("own error log of demodb for getdberrorlog_name_match\n")
-                else:
-                    f.write("decoy that must not be listed (CBRD-26446)\n")
+                f.write(NAME_MATCH_CONTENT[kind])
         os.utime(path, (NAME_MATCH_MTIME, NAME_MATCH_MTIME))
 
 
 def remove_name_match_decoys():
-    """Remove what make_name_match_decoys() laid, and nothing else."""
+    """Remove the decoys make_name_match_decoys() laid, and nothing else.
+
+    A path is removed only when it still holds what the suite wrote
+    (is_name_match_decoy()), so a real log that shares a decoy name survives.
+    """
     if not CUBRID:
         # Not known yet: the paths would resolve against the current directory.
         return
     for rel, kind in NAME_MATCH_DECOYS:
         path = os.path.join(CUBRID, rel)
-        if os.path.islink(path):
+        if not is_name_match_decoy(path, kind):
             continue
-        if kind == "dir":
-            if os.path.isdir(path):
-                shutil.rmtree(path, ignore_errors=True)
-        elif os.path.isfile(path):
-            os.remove(path)
+        try:
+            if kind == "dir":
+                os.remove(os.path.join(path, NAME_MATCH_MARKER))
+                os.rmdir(path)
+            else:
+                os.remove(path)
+        except OSError:
+            pass
 
 
 def build_env():
