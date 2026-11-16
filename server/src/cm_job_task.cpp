@@ -370,7 +370,6 @@ static bool is_authorized_loaddb_files (char *const files[], int count, const ch
 static void delete_loaddb_file (const char *path, const char *dbname, std::string &kept);
 static void delete_schema_files (const char *schema_list_file, const char *dbname, std::string &kept);
 
-static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
 static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
 static int expand_path (const char *src, char *dst, int dest_len);
@@ -18099,17 +18098,6 @@ get_statdump_daemon_list (void)
     }
 
   return result;
-}
-
-static int
-is_filename_matched (const char *fname, const char *pattern)
-{
-  if (fname == NULL || pattern == NULL || memcmp (fname, pattern, strlen (pattern)) || isalnum (fname[strlen (pattern)]))
-    {
-      return 0;
-    }
-
-  return 1;
 }
 
 static int
