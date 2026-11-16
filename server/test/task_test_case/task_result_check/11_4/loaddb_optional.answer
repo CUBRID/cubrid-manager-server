@@ -3,7 +3,7 @@
       "",
       "Start schema loading.",
       "Total       48 statements executed.",
-      "Schema loading from $CUBRID/tmp/test_loaddb_schema finished.",
+      "Schema loading from $CUBRID_DATABASES/test_loaddb_schema finished.",
       "Statistics for Catalog classes have been updated.",
       "",
       "",

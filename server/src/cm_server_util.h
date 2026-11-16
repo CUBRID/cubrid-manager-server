@@ -427,20 +427,19 @@ void write_manager_error_log (const char *protocol_str, const char *msg);
 bool ut_child_exited_ok (int exit_code);
 
 bool is_valid_filename (const char *filename);
-bool is_invalid_filename (const char *filename);
 bool is_valid_filename (const char *filename, std::string &expanded_path);
-bool is_invalid_filename_with_msg (const char *filename, char *dbmt_error);
 bool is_invalid_schema_file_lists (char *path, char *_dbmt_error);
 bool is_subpath (const char *allowd_path, const char *path);
-bool is_authorized_filename (const char *path, char *_dbmt_error);
-bool is_authorized_write_filename (const char *path, char *_dbmt_error);
-/* how a file task uses a directory tree, for is_authorized_dirname () */
 typedef enum
 {
-  FOR_READ = 0,			/* the tree is read (copied from) */
-  FOR_WRITE = 1			/* the tree is written (copied into, deleted) */
-} T_DIR_ACCESS;
-bool is_authorized_dirname (const char *path, T_DIR_ACCESS access, char *_dbmt_error);
+  FOR_READ = 0,
+  FOR_WRITE = 1
+} T_PATH_ACCESS_PURPOSE;
+bool is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error);
+bool is_authorized_dirname (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error);
+bool is_admin_conf_file (const char *path);
+bool is_absolute_path (const std::string &path);
+bool is_authorized_db_path (const char *path, const char *dbname, char *_dbmt_error);
 bool attempt_to_access_parent_dir (const char *path);
 bool is_allowed_script_env (const std::string &name);
 std::string expand_env_path (const std::string &path);

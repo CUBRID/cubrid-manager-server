@@ -259,13 +259,13 @@ void
 aj_add_volume (char *dbname, const char *type, int increase,
 	       int pagesize)
 {
-  char dbloca[512];
+  char dbloca[PATH_MAX];
   char strbuf[1024];
   char volname[512] = { '\0' };
   FILE *outfile;
   time_t mytime;
   int retval;
-  char log_file_name[512];
+  char log_file_name[PATH_MAX];
   char cmd_name[CUBRID_CMD_NAME_LEN];
   char inc_str[128];
   const char *argv[16];
@@ -595,7 +595,7 @@ aj_load_autoaddvoldb_config (ajob *ajp)
 	}
 
       memset (curr, 0, sizeof (autoaddvoldb_node));
-      strcpy (curr->dbname, conf_item[0]);
+      strcpy_limit (curr->dbname, conf_item[0], sizeof (curr->dbname));
 
       if (strcmp (conf_item[1], "ON") == 0)
 	{
@@ -1534,9 +1534,9 @@ aj_backupdb (autobackupdb_node *n)
 {
   char dbname_at_hostname[MAXHOSTNAMELEN + DB_NAME_LEN];
   int ha_mode = 0;
-  char bkpath[512];
-  char inputfilepath[512];
-  char buf[2048], dbdir[512];
+  char bkpath[COMPOSED_PATH_MAX];
+  char inputfilepath[PATH_MAX];
+  char buf[2048], dbdir[PATH_MAX];
   char backup_vol_name[128];
   const char *opt_mode;
   char db_start_flag = 0;
@@ -1553,7 +1553,7 @@ aj_backupdb (autobackupdb_node *n)
 
   cubrid_err_file[0] = '\0';
 
-  sprintf (buf, "backupdb(%s): auto job start", n->dbname);
+  snprintf (buf, sizeof (buf), "backupdb(%s): auto job start", n->dbname);
   _aj_autobackupdb_error_log (n, buf);
 
   n->lbt = time (NULL);
@@ -1565,19 +1565,46 @@ aj_backupdb (autobackupdb_node *n)
     }
   time_to_str (n->lbt, "%04d%02d%02d_%02d%02d%02d", strtime,
 	       TIME_STR_FMT_DATE_TIME);
-  sprintf (backup_vol_name, "%s_auto_backup_lv%d", n->dbname, n->level);
-  sprintf (bkpath, "%s/%s_%s", n->path, strtime, backup_vol_name);
+  /* dbname and path come from autobackupdb.conf: a name or path that does not fit is refused, not cut */
+  if (snprintf (backup_vol_name, sizeof (backup_vol_name), "%s_auto_backup_lv%d", n->dbname, n->level)
+      >= (int) sizeof (backup_vol_name)
+      || snprintf (bkpath, sizeof (bkpath), "%s/%s_%s", n->path, strtime, backup_vol_name) >= (int) sizeof (bkpath))
+    {
+      snprintf (buf, sizeof (buf), "Failed to execute backupdb: path is too long: %s", n->path);
+      _aj_autobackupdb_error_log (n, buf);
+      return;
+    }
+
+  /*
+   * The path comes from autobackupdb.conf, which may have been written before
+   * the path policy, or allowed_db_dirs and databases.txt may have changed
+   * since: check it now, as backupdb does, before anything is created or
+   * removed under it. Both the directory of the setting and the one created
+   * for this backup (its name holds the database name) are checked. A refused
+   * run is logged each time it is attempted.
+   */
+  {
+    char err[DBMT_ERROR_MSG_SIZE];
+
+    err[0] = '\0';
+    if (!is_authorized_db_path (n->path, n->dbname, err) || !is_authorized_db_path (bkpath, n->dbname, err))
+      {
+	snprintf (buf, sizeof (buf), "Failed to execute backupdb: %s", err);
+	_aj_autobackupdb_error_log (n, buf);
+	return;
+      }
+  }
 
   db_mode = cms_database_mode (n->dbname, &ha_mode);
   if (db_mode == DB_SERVICE_MODE_SA)
     {
-      sprintf (buf, "Failed to execute backupdb: %s is in standalone mode", n->dbname);
+      snprintf (buf, sizeof (buf), "Failed to execute backupdb: %s is in standalone mode", n->dbname);
       _aj_autobackupdb_error_log (n, buf);
       return;
     }
   if (n->onoff == 1 && db_mode == DB_SERVICE_MODE_NONE)
     {
-      sprintf (buf, "Failed to execute backupdb: %s is offline", n->dbname);
+      snprintf (buf, sizeof (buf), "Failed to execute backupdb: %s is offline", n->dbname);
       _aj_autobackupdb_error_log (n, buf);
       return;
     }
@@ -1586,7 +1613,7 @@ aj_backupdb (autobackupdb_node *n)
     {
       if (uCreateDir (n->path) != ERR_NO_ERROR)
 	{
-	  sprintf (buf, "Directory creation failed: %s", n->path);
+	  snprintf (buf, sizeof (buf), "Directory creation failed: %s", n->path);
 	  _aj_autobackupdb_error_log (n, buf);
 	  return;
 	}
@@ -1598,7 +1625,7 @@ aj_backupdb (autobackupdb_node *n)
     {
       if (uCreateDir (bkpath) != ERR_NO_ERROR)
 	{
-	  sprintf (buf, "Directory creation failed: %s", bkpath);
+	  snprintf (buf, sizeof (buf), "Directory creation failed: %s", bkpath);
 	  _aj_autobackupdb_error_log (n, buf);
 	  return;
 	}
@@ -1665,8 +1692,8 @@ aj_backupdb (autobackupdb_node *n)
   snprintf (cubrid_err_file, PATH_MAX, "%s/%s.%u.err.tmp",
 	    sco.dbmt_tmp_dir, "aj_backupdb", getpid ());
 
-  sprintf (inputfilepath, "%s/DBMT_task_%d.%d", sco.dbmt_tmp_dir, TS_BACKUPDB,
-	   (int) getpid ());
+  snprintf (inputfilepath, sizeof (inputfilepath), "%s/DBMT_task_%d.%d", sco.dbmt_tmp_dir, TS_BACKUPDB,
+	    (int) getpid ());
   inputfile = fopen (inputfilepath, "w");
   if (inputfile)
     {
@@ -1675,7 +1702,7 @@ aj_backupdb (autobackupdb_node *n)
     }
   else
     {
-      sprintf (buf, "Failed to write file: %s", inputfilepath);
+      snprintf (buf, sizeof (buf), "Failed to write file: %s", inputfilepath);
       _aj_autobackupdb_error_log (n, buf);
       return;
     }
@@ -1699,12 +1726,12 @@ aj_backupdb (autobackupdb_node *n)
   if (retval < 0)
     {
       /* backupdb */
-      sprintf (buf, "Failed to execute backupdb: %s", argv[0]);
+      snprintf (buf, sizeof (buf), "Failed to execute backupdb: %s", argv[0]);
       _aj_autobackupdb_error_log (n, buf);
       return;
     }
 
-  sprintf (buf, "backupdb(%s): success", n->dbname);
+  snprintf (buf, sizeof (buf), "backupdb(%s): success", n->dbname);
   _aj_autobackupdb_error_log (n, buf);    /* log success info to notify cubrid manager user */
 
   /* update statistics */

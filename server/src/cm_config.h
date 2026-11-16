@@ -27,6 +27,8 @@
 
 #include <stdio.h>
 #include <limits.h>
+#include <string>
+#include <vector>
 #include "cm_porting.h"
 #include "cm_session_ip.h"
 
@@ -634,6 +636,7 @@ void sys_config_init (void);
 int uReadEnvVariables (char *progname);
 int uCheckSystemConfig (char *progname);
 int uReadSystemConfig (void);
+const std::vector<std::string> &get_allowed_db_dirs (void);
 
 char *conf_get_dbmt_file (T_DBMT_FILE_ID dbmt_fid, char *buf);
 char *conf_get_dbmt_file2 (T_DBMT_FILE_ID dbmt_fid, char *buf);

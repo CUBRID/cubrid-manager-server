@@ -136,6 +136,10 @@ VOLATILE_KEYS = frozenset((
 UNORDERED_LISTS = {
     "logfile": ("path", None),
     "spaceinfo": ("spacename", {"type": ("Active_log", "Archive_log")}),
+    # classinfo lists the classes in the order the engine finds them in the
+    # catalog heap. That order moves when a catalog record grows or shrinks
+    # (an engine change adding a column to a system class), not with CMS.
+    "class": ("classname", None),
 }
 
 
@@ -188,6 +192,42 @@ VOLATILE_PATTERNS = (
 )
 
 
+# compactdb -verbose prints, for each pass, "Class <name>" lines, each in pass
+# 1 followed by "<n> instances.", and ends pass 1 with "<n> objects
+# processed.". The order of the classes is the catalog heap order and the counts
+# are the size of the catalog, both of which change with the engine build (a
+# column added to a system class), not with CMS. The classes of each run are
+# ordered by name and the counts masked, so the comparison is about the passes
+# and the classes reported.
+COMPACTDB_COUNT = re.compile(r"^\d+ (instances|objects processed)\.$")
+
+
+def normalize_compactdb_log(lines):
+    """Order the class entries of a compactdb log by name and mask counts."""
+    out = []
+    run = []
+
+    def flush():
+        run.sort(key=lambda group: group[0])
+        for group in run:
+            out.extend(group)
+        del run[:]
+
+    for line in lines:
+        if isinstance(line, str) and COMPACTDB_COUNT.match(line):
+            line = COMPACTDB_COUNT.sub(r"<count> \1.", line)
+            if run and line.endswith(" instances.") and len(run[-1]) == 1:
+                run[-1].append(line)
+                continue
+        if isinstance(line, str) and line.startswith("Class "):
+            run.append([line])
+            continue
+        flush()
+        out.append(line)
+    flush()
+    return out
+
+
 def normalize_response(body):
     """Reduce a response to the part that must not change between runs.
 
@@ -213,6 +253,9 @@ def normalize_response(body):
                 out[key] = walk(value)
                 if key in UNORDERED_LISTS and isinstance(out[key], list):
                     sort_unordered(out[key], *UNORDERED_LISTS[key])
+                if (key == "line" and isinstance(out[key], list)
+                        and "Pass 1" in out[key]):
+                    out[key] = normalize_compactdb_log(out[key])
             return out
         if isinstance(node, list):
             return [walk(v) for v in node]
@@ -1187,7 +1230,10 @@ def make_loaddb_input(tmpdir):
     pointed at. It used to be pointed at demodb's own dump, which the unloaddb
     case (much later in the list) regenerates -- meaning loaddb was really
     reading the *previous* run's output, and a run that died in between broke
-    the next one with "file does not exists". Its input is now produced here.
+    the next one with "file does not exists". Its input is now produced here,
+    in $CUBRID_DATABASES: loaddb reads only files under allowed_db_dirs of
+    cm.conf (default $CUBRID_DATABASES), and with delete_orignal_files=y it
+    really deletes them.
     """
     for suffix in ("schema", "objects", "indexes", "trigger"):
         try:
@@ -1293,7 +1339,7 @@ def build_env():
     folder = os.path.join(tmpdir, "test_result_folder")
     if not os.path.isdir(folder):
         os.makedirs(folder)
-    make_loaddb_input(tmpdir)
+    make_loaddb_input(CUBRID_DATABASES)
     copy_extra_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser

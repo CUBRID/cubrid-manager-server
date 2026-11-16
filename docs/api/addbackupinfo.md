@@ -4,7 +4,8 @@ Add a backup schedule.
 
 Permissions required to run this task: one of DBC, DBO, JOB
 
-* Paths are limited as described in [File Access](README.md#file-access): only under `$CUBRID` and `$CUBRID_DATABASES`, and never a protected file such as `conf/cm.pass`.
+* `path` must be under `allowed_db_dirs` of `cm.conf` or under a directory registered for `dbname` in `databases.txt`, as for [backupdb](backupdb.md); see [DB Utility Task Paths](README.md#db-utility-task-paths).
+* The auto backup job checks `path` again each time it runs, because `allowed_db_dirs` or `databases.txt` may have changed, or the plan was registered before this rule: a run whose path is refused does not back up and is logged in the auto backup error log ([getautobackupdberrlog](getautobackupdberrlog.md)).
 
 ## Request JSON Syntax
 

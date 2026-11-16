@@ -1529,7 +1529,7 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
   confname= request["confname"].asString();
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
-  if (!is_authorized_write_filename (conf_path, _dbmt_error))
+  if (!is_authorized_filename (conf_path, FOR_WRITE, _dbmt_error))
     {
       return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
     }
@@ -1563,7 +1563,7 @@ int ext_read_private_data (Json::Value &request, Json::Value &response)
 
   snprintf (conf_path, PATH_MAX, "%s/%s/%s", sco.szCubrid, DBMT_LOG_DIR, confname.c_str());
 
-  if (!is_authorized_filename (conf_path, _dbmt_error))
+  if (!is_authorized_filename (conf_path, FOR_READ, _dbmt_error))
     {
       return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
     }
@@ -1954,7 +1954,7 @@ int ext_get_ha_apply_info (Json::Value &request, Json::Value &response)
   gen_tempfile_path (stderr_log_file, sco.dbmt_tmp_dir, "cmhastop_err", TS_HA_STOP, PATH_MAX);
 
   copy_log_path = request["copylogpath"].asString();
-  if (!is_authorized_filename (copy_log_path.c_str (), _dbmt_error))
+  if (!is_authorized_filename (copy_log_path.c_str (), FOR_READ, _dbmt_error))
     {
       return build_server_header (response, ERR_FILE_OPEN_FAIL, _dbmt_error);
     }

@@ -15,6 +15,17 @@ auth_new_admin,success
 file_protected_read,success
 file_protected_write,success
 file_cubrid_bin,success
+// cm.conf and databases.txt: admin only, through setsysparam (CBRD-27832)
+file_admin_conf,success
+auth_admin_conf,success
+// automatic job settings: protected files (CBRD-27832)
+file_auto_conf,success
+// DB utility task paths: allowed_db_dirs (CBRD-27832)
+path_db_backup,success
+path_db_volume,success
+path_db_unload,success
+path_db_load,success
+path_db_autobackup,success
 
 // Passwords are not returned in responses (run as admin)
 resp_no_user_password,success
