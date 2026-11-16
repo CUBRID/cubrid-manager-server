@@ -7715,7 +7715,6 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *dbname, log_dir[PATH_MAX], buf[COMPOSED_PATH_MAX];
   char *error_log_param;
   struct stat statbuf;
-  int fname_len = 0;
 #if defined(WINDOWS)
   WIN32_FIND_DATA data;
   HANDLE handle;
@@ -7811,23 +7810,13 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
       fname = dp->d_name;
 #endif
-      fname_len = (int) strlen (fname);
-      /* the "4" is the size of ".err" */
-      if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
-	{
-	  continue;
-	}
-      if (memcmp (fname, dbname, strlen (dbname)))
-	{
-	  continue;
-	}
-      if (isalnum (fname[strlen (dbname)]))
+      if (!ut_is_db_server_err_log (fname, dbname))
 	{
 	  continue;
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (stat (buf, &statbuf) == 0)
+      if (stat (buf, &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode))
 	{
 	  nv_add_nvp (res, "open", "log");
 	  nv_add_nvp (res, "path", buf);
