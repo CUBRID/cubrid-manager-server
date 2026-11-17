@@ -1312,7 +1312,13 @@ def copy_extra_files():
 # starts with the name of an instance the suite uses (query_editor, demodb)
 # but belongs to another one, or is a directory named like a log file.
 #
-# getlogfileinfo is compared against its .answer, which must not list them.
+# The "listed" files are the other way round: logs of query_editor that the
+# engine names otherwise than "<name>_<cas>.*" (the broker error log, the
+# backups, the query replace log), which a rule that is too strict would
+# drop. The SHARD=ON names of query_editor (a SHARD=OFF broker) are decoys.
+#
+# getlogfileinfo is compared against its .answer, which must list the
+# "listed" files and none of the decoys.
 # getloginfo grows with every run and is checked for status only, so the
 # database side is checked through getdberrorlog, which filters by mtime: every
 # file here gets NAME_MATCH_MTIME, and getdberrorlog_name_match asks for that
@@ -1324,6 +1330,14 @@ NAME_MATCH_DECOYS = (
     ("log/broker/error_log/query_editor_a_1.err", "file"),
     ("log/broker/sql_log/query_editor_a_1.sql.log", "file"),
     ("log/broker/sql_log/query_editor_9.sql.log", "dir"),
+    # names of a SHARD=ON broker: proxy access log, <proxy>_<shard>_<cas>
+    ("log/broker/query_editor_1.access", "file"),
+    ("log/broker/sql_log/query_editor_1_0_1.sql.log", "file"),
+    # logs of query_editor that have no "_<cas>"
+    ("log/broker/query_editor.err", "listed"),
+    ("log/broker/query_editor.err.1261117.1030", "listed"),
+    ("log/broker/query_editor.access.01261117103000", "listed"),
+    ("log/broker/error_log/query_editor_qr_rule.err", "listed"),
     ("log/server/demodb_20010101_1200.err", "own"),
     ("log/server/demodb_a_20010101_1200.err", "file"),
     ("log/server/demodbx_20010101_1200.err", "file"),
@@ -1337,6 +1351,7 @@ NAME_MATCH_MTIME = time.mktime((2001, 1, 1, 12, 0, 0, 0, 0, -1))
 NAME_MATCH_CONTENT = {
     "own": "own error log of demodb for getdberrorlog_name_match\n",
     "file": "decoy that must not be listed (CBRD-26446)\n",
+    "listed": "log of query_editor laid by test_tasks.py (CBRD-26446)\n",
     "dir": "decoy directory laid by test_tasks.py (CBRD-26446)\n",
 }
 NAME_MATCH_MARKER = ".cbrd26446_decoy"
