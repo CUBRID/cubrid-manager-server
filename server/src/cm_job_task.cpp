@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Search Solution Corporation. All rights reserved by Search Solution.
+ * Copyright (C) 2016 Search Solution Corporation. All rights reserved by Search Solution.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -62,6 +62,7 @@
 #include "cm_stat.h"
 #include "cm_porting.h"
 #include "cm_server_util.h"
+#include "cm_log_name.h"
 #include "cm_job_task.h"
 #include "cm_auto_task.h"
 #include "cm_dep.h"
