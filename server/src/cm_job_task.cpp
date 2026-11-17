@@ -1207,6 +1207,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
   char *bname, *from, buf[COMPOSED_PATH_MAX];
   char *cur_file;
   T_CM_ERROR error;
+  bool shard;
 
   bname = nv_get_val (in, "broker");
   from = nv_get_val (in, "from");
@@ -1238,6 +1239,10 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
     }
   cm_get_abs_file_path (v, logdir, sizeof (err_logdir));
 
+  /* the names of the CAS logs depend on it, see ut_is_broker_log_file () */
+  v = cm_br_conf_get_value (cm_conf_find_broker (&uc_conf, bname), "SHARD");
+  shard = (v != NULL && uStringEqualIgnoreCase (v, "ON"));
+
   cm_get_abs_file_path (BROKER_LOG_DIR, access_logdir, sizeof (access_logdir));
 
   cm_broker_conf_free (&uc_conf);
@@ -1262,7 +1267,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (!ut_is_broker_log_file (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
 	      continue;
 	    }
@@ -1275,6 +1280,11 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 	  if (strstr (cur_file, "access") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "access");
+	    }
+	  else if (strstr (cur_file, "err") != NULL)
+	    {
+	      /* <bname>.err, the broker error log */
+	      nv_add_nvp (out, "type", "error");
 	    }
 	  nv_add_nvp (out, "path", buf);
 	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
@@ -1308,7 +1318,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (!ut_is_broker_log_file (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
 	      continue;
 	    }
@@ -1358,7 +1368,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (!ut_is_broker_log_file (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
 	      continue;
 	    }

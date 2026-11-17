@@ -32,7 +32,7 @@
 #ifndef _CM_LOG_NAME_H_
 #define _CM_LOG_NAME_H_
 
-bool ut_is_broker_log_file (const char *fname, const char *bname);
+bool ut_is_broker_log_file (const char *fname, const char *bname, bool shard);
 bool ut_is_db_server_err_log (const char *fname, const char *dbname);
 bool ut_is_regular_file_mode (unsigned int st_mode);
 

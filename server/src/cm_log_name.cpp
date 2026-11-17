@@ -29,17 +29,66 @@
 #include "cm_log_name.h"
 
 /*
- * Check that fname is a log file of the broker bname.
- * A broker name can hold '_', the separator after the name in its log file
- * names, so the whole suffix after the name is checked:
- *   <bname>.access, <bname>.access.*        (access log)
- *   <bname>_<digits>.*                       (error_log, sql_log, slow log)
+ * Skip "." <digits>, the suffix the engine adds to a log file it backs up.
+ * Returns what follows, or NULL when p does not start with it.
+ */
+static const char *
+skip_dot_digits (const char *p)
+{
+  if (*p != '.' || !isdigit ((unsigned char) p[1]))
+    {
+      return NULL;
+    }
+  for (p++; isdigit ((unsigned char) *p); p++)
+    {
+      ;
+    }
+  return p;
+}
+
+/* "access" or "access.<digits>" (a backup, cas_log.c) */
+static bool
+is_access_ext (const char *ext)
+{
+  if (strncmp (ext, "access", 6) != 0)
+    {
+      return false;
+    }
+  ext += 6;
+  if (*ext == '\0')
+    {
+      return true;
+    }
+  ext = skip_dot_digits (ext);
+  return ext != NULL && *ext == '\0';
+}
+
+/*
+ * Check that fname is a log file of the broker bname, whose SHARD parameter
+ * is shard. What follows bname has to be one of the names the engine gives
+ * the log files of a broker:
+ *
+ *   any broker      <bname>.access[.<digits>]        access log
+ *                   <bname>.err[.<digits>.<digits>]  broker error log
+ *                   <bname>_qr_rule.err              query replace rules
+ *   SHARD=OFF       <bname>_<cas>.<ext>              CAS sql, slow, error log
+ *   SHARD=ON        <bname>_<proxy>.access[.<digits>]           proxy access log
+ *                   <bname>_<proxy>_<shard>_<cas>.<ext>          CAS logs
+ *
+ * The number of "_<digits>" groups is what tells the instance apart, so it
+ * comes from the SHARD parameter and not from the file name: the CAS log
+ * "b_1_0_1.sql.log" of a SHARD broker "b" and the CAS log of a broker
+ * "b_1_0" have the same name, and only the parameter says which one is
+ * meant. The names that hold no group belong to bname alone, so they are
+ * accepted whatever the parameter, which keeps the logs written before it
+ * was changed.
  */
 bool
-ut_is_broker_log_file (const char *fname, const char *bname)
+ut_is_broker_log_file (const char *fname, const char *bname, bool shard)
 {
   size_t len;
   const char *p;
+  int groups;
 
   if (fname == NULL || bname == NULL)
     {
@@ -53,21 +102,54 @@ ut_is_broker_log_file (const char *fname, const char *bname)
     }
   p = fname + len;
 
-  if (strncmp (p, ".access", 7) == 0 && (p[7] == '\0' || p[7] == '.'))
+  if (*p == '.')
+    {
+      if (is_access_ext (p + 1))
+	{
+	  return true;
+	}
+      if (strncmp (p, ".err", 4) == 0)
+	{
+	  p += 4;
+	  if (*p == '\0')
+	    {
+	      return true;
+	    }
+	  /* a backup, broker_admin_pub.c rename_error_log_file_name () */
+	  p = skip_dot_digits (p);
+	  if (p == NULL)
+	    {
+	      return false;
+	    }
+	  p = skip_dot_digits (p);
+	  return p != NULL && *p == '\0';
+	}
+      return false;
+    }
+
+  if (strcmp (p, "_qr_rule.err") == 0)
     {
       return true;
     }
 
-  if (*p != '_' || !isdigit ((unsigned char) p[1]))
+  for (groups = 0; *p == '_' && isdigit ((unsigned char) p[1]); groups++)
+    {
+      for (p++; isdigit ((unsigned char) *p); p++)
+	{
+	  ;
+	}
+    }
+  if (groups == 0 || *p != '.' || p[1] == '\0')
     {
       return false;
     }
-  for (p++; isdigit ((unsigned char) *p); p++)
-    {
-      ;
-    }
+  p++;
 
-  return *p == '.';
+  if (shard)
+    {
+      return (groups == 1 && is_access_ext (p)) || (groups == 3 && !is_access_ext (p));
+    }
+  return groups == 1 && !is_access_ext (p);
 }
 
 /*
