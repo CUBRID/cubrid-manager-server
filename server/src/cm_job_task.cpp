@@ -6727,6 +6727,180 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+#if !defined(WINDOWS)
+/*
+ * Parse the value part of an os-release "KEY=VALUE" line (shell-like syntax).
+ * Supports unquoted, '...' and "..." values (with \" \\ \$ \` escapes in
+ * double quotes). Only printable ASCII characters are kept so that the value
+ * cannot inject control characters (e.g. newline) into the response.
+ * Returns 0 on success (non-empty value), -1 otherwise.
+ */
+static int
+parse_os_release_value (const char *src, char *dst, size_t dst_size)
+{
+  size_t len = 0;
+  char quote = '\0';
+  const char *p = src;
+
+  if (dst == NULL || dst_size == 0)
+    {
+      return -1;
+    }
+  dst[0] = '\0';
+
+  if (*p == '"' || *p == '\'')
+    {
+      quote = *p++;
+    }
+
+  for (; *p != '\0'; p++)
+    {
+      unsigned char c = (unsigned char) *p;
+
+      if (quote != '\0')
+	{
+	  if (c == (unsigned char) quote)
+	    {
+	      quote = '\0';
+	      break;		/* closing quote */
+	    }
+	  if (quote == '"' && c == '\\' && p[1] != '\0'
+	      && strchr ("\"\\$`", p[1]) != NULL)
+	    {
+	      c = (unsigned char) * (++p);
+	    }
+	}
+      else if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '#')
+	{
+	  break;		/* end of unquoted value */
+	}
+
+      if (c < 0x20 || c > 0x7E)
+	{
+	  continue;		/* drop control and non-ASCII characters */
+	}
+      if (len + 1 >= dst_size)
+	{
+	  continue;		/* truncate, but keep scanning for the closing quote */
+	}
+      dst[len++] = (char) c;
+    }
+
+  if (quote != '\0')
+    {
+      dst[0] = '\0';		/* unterminated quote: malformed */
+      return -1;
+    }
+
+  dst[len] = '\0';
+  ut_trim (dst);
+
+  return (dst[0] != '\0') ? 0 : -1;
+}
+#endif
+
+/*
+ * Build "NAME VERSION" from /etc/os-release.
+ * If the file is not available or NAME or VERSION is missing/empty,
+ * "Unknown" is returned.
+ */
+static void
+get_os_info_detail (char *buf, size_t buf_size)
+{
+#if defined(WINDOWS)
+  snprintf (buf, buf_size, "Unknown");
+#else
+  const long max_file_size = 64 * BYTES_IN_K;	/* os-release is a few hundred bytes */
+  char line[LINE_MAX];
+  char name[BUFFER_MAX_LEN] = "";
+  char version[BUFFER_MAX_LEN] = "";
+  struct stat st;
+  FILE *fp = NULL;
+  int fd;
+  int skip_rest = 0;
+  long total = 0;
+  int flags = O_RDONLY | O_NONBLOCK;
+
+  snprintf (buf, buf_size, "Unknown");
+
+#if defined(O_CLOEXEC)
+  flags |= O_CLOEXEC;
+#endif
+#if defined(O_NOCTTY)
+  flags |= O_NOCTTY;
+#endif
+
+  /*
+   * /etc/os-release is usually a symlink to /usr/lib/os-release, so the link
+   * is followed. O_NONBLOCK prevents blocking on a FIFO and fstat() below
+   * makes sure that only a regular file of sane size is read.
+   */
+  fd = open ("/etc/os-release", flags);
+  if (fd < 0)
+    {
+      return;
+    }
+
+  if (fstat (fd, &st) != 0 || !S_ISREG (st.st_mode)
+      || st.st_size <= 0 || st.st_size > max_file_size)
+    {
+      close (fd);
+      return;
+    }
+
+  fp = fdopen (fd, "r");
+  if (fp == NULL)
+    {
+      close (fd);
+      return;
+    }
+
+  while (fgets (line, sizeof (line), fp) != NULL)
+    {
+      size_t line_len = strlen (line);
+      int has_newline = (line_len > 0 && line[line_len - 1] == '\n');
+
+      total += (long) line_len;
+      if (total > max_file_size)
+	{
+	  break;		/* the file grew while reading */
+	}
+
+      if (skip_rest)
+	{
+	  /* remainder of an over-long line; ignore it */
+	  skip_rest = !has_newline;
+	  continue;
+	}
+      if (!has_newline && !feof (fp))
+	{
+	  /* over-long line is ignored entirely */
+	  skip_rest = 1;
+	  continue;
+	}
+
+      ut_trim (line);
+
+      /* the last assignment wins, as in shell */
+      if (strncmp (line, "NAME=", 5) == 0)
+	{
+	  parse_os_release_value (line + 5, name, sizeof (name));
+	}
+      else if (strncmp (line, "VERSION=", 8) == 0)
+	{
+	  parse_os_release_value (line + 8, version, sizeof (version));
+	}
+    }
+
+  fclose (fp);			/* also closes fd */
+
+  if (name[0] != '\0' && version[0] != '\0')
+    {
+      snprintf (buf, buf_size, "%s %s", name, version);
+    }
+#endif
+}
+
 int
 tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -6839,6 +7013,9 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
   nv_add_nvp (res, "osinfo", "unknown");
 #endif
+
+  get_os_info_detail (strbuf, sizeof (strbuf));
+  nv_add_nvp (res, "osinfo_detail", strbuf);
 
   if (rc == ERR_WITH_MSG)
     {

@@ -125,6 +125,9 @@ VOLATILE_KEYS = frozenset((
     # resources times their struct sizes. It grows with the locks the run has
     # held so far and changes with the engine build.
     "sizelock",
+    # getenv: "NAME VERSION" of /etc/os-release on the host of the server under
+    # test, which need not be the host that runs this suite.
+    "osinfo_detail",
 ))
 
 # Lists the server builds from readdir(), whose order depends on the file

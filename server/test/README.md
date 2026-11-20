@@ -466,7 +466,9 @@ task_test_case/task_result_check/11_4/<case>.result
 `VOLATILE_KEYS`는 **키 이름**으로 가린다. 값 전체가 실행마다 바뀌는 것들이다:
 `pid`, `as_pid`, `as_psize`, `as_lat`, `time`, `tran_time`, `tranindex`,
 `cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`, `sizelock`
-(`lockdb`의 락 테이블 메모리. 실행 중 잡은 락의 양과 엔진 빌드에 따라 달라진다).
+(`lockdb`의 락 테이블 메모리. 실행 중 잡은 락의 양과 엔진 빌드에 따라 달라진다),
+`osinfo_detail`(`getenv`가 돌려주는 서버 호스트의 `/etc/os-release` NAME, VERSION. 테스트를 돌리는
+호스트와 서버 호스트가 다를 수 있다).
 
 `classinfo`와 `compactdb`는 엔진이 카탈로그 힙에서 클래스를 찾는 순서대로 나열하고, `compactdb`는 카탈로그 크기를 센다. 둘 다 시스템 클래스에 컬럼이 하나 추가되는 엔진 변경만으로 바뀌므로(예: CUBRID CBRD-26076이 `_db_trigger`에 컬럼 두 개 추가) 순서와 수는 비교하지 않고, 어떤 클래스가 보고되는지만 비교한다.
 
