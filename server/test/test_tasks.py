@@ -125,10 +125,15 @@ VOLATILE_KEYS = frozenset((
     # resources times their struct sizes. It grows with the locks the run has
     # held so far and changes with the engine build.
     "sizelock",
-    # getenv: "NAME VERSION" of /etc/os-release on the host of the server under
-    # test, which need not be the host that runs this suite.
-    "osinfo_detail",
 ))
+
+# getenv: osinfo_detail is "NAME VERSION" of /etc/os-release on the host of the
+# server. A set that sets up its server locally runs on that host, so the value
+# read here is the one the server must answer and it is compared as
+# "$OSINFO_DETAIL", like $HOSTNAME. For any other set it stays None and the
+# value is masked as <volatile>.
+OS_RELEASE_FILE = "/etc/os-release"
+OSINFO_DETAIL = None
 
 # Lists the server builds from readdir(), whose order depends on the file
 # system rather than on the server: the name of the list, the field that orders
@@ -253,6 +258,15 @@ def normalize_response(body):
                 if key in VOLATILE_KEYS:
                     out[key] = "<volatile>"
                     continue
+                if key == "osinfo_detail" and isinstance(value, str):
+                    # A different value stays as it is and fails the case.
+                    if OSINFO_DETAIL is None:
+                        out[key] = "<volatile>"
+                    elif value == OSINFO_DETAIL:
+                        out[key] = "$OSINFO_DETAIL"
+                    else:
+                        out[key] = value
+                    continue
                 out[key] = walk(value)
                 if key in UNORDERED_LISTS and isinstance(out[key], list):
                     sort_unordered(out[key], *UNORDERED_LISTS[key])
@@ -268,6 +282,58 @@ def normalize_response(body):
 
     text = json.dumps(walk(data), indent=3, sort_keys=True, ensure_ascii=False)
     return text + "\n"
+
+
+def os_release_value(raw):
+    """The value of an os-release(5) "KEY=VALUE" line, or None if malformed.
+
+    Written from the os-release(5) rules rather than from the server code, so
+    that the two are not wrong in the same way: unquoted (ends at white space
+    or "#"), '...' taken literally, "..." with \\" \\\\ \\$ \\` escapes.
+    Anything after the closing quote is ignored, and white space around the
+    value is trimmed.
+    """
+    if not raw or raw[0] not in "\"'":
+        return re.split(r"[ \t\r\n#]", raw, 1)[0].strip()
+    quote = raw[0]
+    out = []
+    i = 1
+    while i < len(raw):
+        c = raw[i]
+        if c == quote:
+            return "".join(out).strip()
+        if quote == '"' and c == "\\" and i + 1 < len(raw) and raw[i + 1] in '"\\$`':
+            i += 1
+            c = raw[i]
+        out.append(c)
+        i += 1
+    return None  # unterminated quote
+
+
+def local_os_info_detail(path=OS_RELEASE_FILE):
+    """ "NAME VERSION" from the os-release file on this host, as getenv
+    answers osinfo_detail: "Unknown" when the file cannot be read or NAME or
+    VERSION is missing or empty. The last assignment of a key wins.
+    """
+    values = {}
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                line = line.strip(" \t\r\n")
+                for key in ("NAME", "VERSION"):
+                    if line.startswith(key + "="):
+                        values[key] = os_release_value(line[len(key) + 1:])
+    except (IOError, OSError):
+        return "Unknown"
+    # The server keeps printable ASCII and valid UTF-8 only: control
+    # characters (C0, DEL and C1) and bytes that are not UTF-8 are dropped.
+    for key, value in values.items():
+        if value is not None:
+            values[key] = "".join(c for c in value
+                                  if not (ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F)).strip()
+    if values.get("NAME") and values.get("VERSION"):
+        return "%s %s" % (values["NAME"], values["VERSION"])
+    return "Unknown"
 
 
 def mask_paths(value):
@@ -1939,6 +2005,9 @@ if not dump_mode:
 LIST_FILE, CASE_DIR, REPORT_BASE = resolve_test_set(listarg)
 HOSTNAME = socket.gethostname()
 local_env = REPORT_BASE not in NO_LOCAL_ENV_SETS
+if local_env:
+    OSINFO_DETAIL = local_os_info_detail()
+    print("osinfo_detail of this host: %s" % OSINFO_DETAIL)
 
 if not dump_mode:
     if not os.path.isfile(LIST_FILE):

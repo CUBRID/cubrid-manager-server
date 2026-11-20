@@ -6729,10 +6729,75 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
 
 #if !defined(WINDOWS)
 /*
+ * Length of the valid UTF-8 sequence of a non-ASCII character at p, or 0 if
+ * the bytes there are not one. Overlong forms, surrogates, code points past
+ * U+10FFFF and the C1 control characters U+0080..U+009F are not valid here.
+ */
+static int
+utf8_char_len (const unsigned char *p)
+{
+  unsigned char lo = 0x80, hi = 0xBF;
+  int n, i;
+
+  if (p[0] >= 0xC2 && p[0] <= 0xDF)
+    {
+      n = 2;
+      if (p[0] == 0xC2)
+	{
+	  lo = 0xA0;		/* U+0080..U+009F are the C1 controls */
+	}
+    }
+  else if (p[0] >= 0xE0 && p[0] <= 0xEF)
+    {
+      n = 3;
+      if (p[0] == 0xE0)
+	{
+	  lo = 0xA0;		/* overlong */
+	}
+      else if (p[0] == 0xED)
+	{
+	  hi = 0x9F;		/* surrogates */
+	}
+    }
+  else if (p[0] >= 0xF0 && p[0] <= 0xF4)
+    {
+      n = 4;
+      if (p[0] == 0xF0)
+	{
+	  lo = 0x90;		/* overlong */
+	}
+      else if (p[0] == 0xF4)
+	{
+	  hi = 0x8F;		/* past U+10FFFF */
+	}
+    }
+  else
+    {
+      return 0;
+    }
+
+  if (p[1] < lo || p[1] > hi)
+    {
+      return 0;
+    }
+  for (i = 2; i < n; i++)
+    {
+      if (p[i] < 0x80 || p[i] > 0xBF)
+	{
+	  return 0;		/* also stops at the terminating '\0' */
+	}
+    }
+
+  return n;
+}
+
+/*
  * Parse the value part of an os-release "KEY=VALUE" line (shell-like syntax).
  * Supports unquoted, '...' and "..." values (with \" \\ \$ \` escapes in
- * double quotes). Only printable ASCII characters are kept so that the value
- * cannot inject control characters (e.g. newline) into the response.
+ * double quotes). Printable ASCII and valid UTF-8 characters are kept;
+ * control characters (e.g. newline) and bytes that are not valid UTF-8 are
+ * dropped, so the value cannot inject them into the response. A value longer
+ * than dst_size - 1 bytes is cut at a character boundary.
  * Returns 0 on success (non-empty value), -1 otherwise.
  */
 static int
@@ -6741,6 +6806,7 @@ parse_os_release_value (const char *src, char *dst, size_t dst_size)
   size_t len = 0;
   char quote = '\0';
   const char *p = src;
+  bool full = false;
 
   if (dst == NULL || dst_size == 0)
     {
@@ -6756,6 +6822,7 @@ parse_os_release_value (const char *src, char *dst, size_t dst_size)
   for (; *p != '\0'; p++)
     {
       unsigned char c = (unsigned char) *p;
+      int n;
 
       if (quote != '\0')
 	{
@@ -6775,15 +6842,34 @@ parse_os_release_value (const char *src, char *dst, size_t dst_size)
 	  break;		/* end of unquoted value */
 	}
 
-      if (c < 0x20 || c > 0x7E)
+      if (c < 0x80)
 	{
-	  continue;		/* drop control and non-ASCII characters */
+	  if (c < 0x20 || c == 0x7F)
+	    {
+	      continue;		/* drop control characters */
+	    }
+	  n = 1;
 	}
-      if (len + 1 >= dst_size)
+      else
 	{
-	  continue;		/* truncate, but keep scanning for the closing quote */
+	  n = utf8_char_len ((const unsigned char *) p);
+	  if (n == 0)
+	    {
+	      continue;		/* drop a byte that is not valid UTF-8 */
+	    }
 	}
-      dst[len++] = (char) c;
+
+      /* truncate, but keep scanning for the closing quote */
+      if (!full && len + n < dst_size)
+	{
+	  memcpy (dst + len, p, n);
+	  len += n;
+	}
+      else
+	{
+	  full = true;		/* nothing after a character that did not fit */
+	}
+      p += n - 1;
     }
 
   if (quote != '\0')

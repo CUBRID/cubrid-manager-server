@@ -38,7 +38,7 @@ Permissions required to run this task: none (any logged-in user)
 | HOSTMONTAB2 | ON or OFF, the third host monitoring flag of cm.conf |
 | HOSTMONTAB3 | ON or OFF, the fourth host monitoring flag of cm.conf |
 | osinfo | the operating system of the host: NT, LINUX, AIX, HPUX, UNIXWARE7, SOLARIS or unknown |
-| osinfo_detail | "NAME VERSION" from /etc/os-release of the host (e.g. "Rocky Linux 8.10 (Green Obsidian)"). Unknown if the file is not available or NAME or VERSION is missing (always Unknown on Windows) |
+| osinfo_detail | "NAME VERSION" from /etc/os-release of the host (e.g. "Rocky Linux 8.10 (Green Obsidian)"). Unknown if the file is not available or NAME or VERSION is missing (always Unknown on Windows). The value is UTF-8; control characters and bytes that are not valid UTF-8 are dropped |
 
 ## Response Sample
 
