@@ -1208,6 +1208,7 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
   char *cur_file;
   T_CM_ERROR error;
   bool shard;
+  size_t bname_len;
 
   bname = nv_get_val (in, "broker");
   from = nv_get_val (in, "from");
@@ -1220,6 +1221,12 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       strcpy (_dbmt_error, "broker");
       return ERR_PARAM_MISSING;
     }
+  /*
+   * The type of a log file is told from what follows the broker name: the
+   * name itself can hold "access", "err" or "log" (a broker "myaccess").
+   * ut_is_broker_log_file () has checked that the file name starts with it.
+   */
+  bname_len = strlen (bname);
   if (cm_get_broker_conf (&uc_conf, NULL, &error) < 0)
     {
       strcpy (_dbmt_error, error.err_msg);
@@ -1277,11 +1284,11 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 	      continue;
 	    }
 	  nv_add_nvp (out, "open", "logfile");
-	  if (strstr (cur_file, "access") != NULL)
+	  if (strstr (cur_file + bname_len, "access") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "access");
 	    }
-	  else if (strstr (cur_file, "err") != NULL)
+	  else if (strstr (cur_file + bname_len, "err") != NULL)
 	    {
 	      /* <bname>.err, the broker error log */
 	      nv_add_nvp (out, "type", "error");
@@ -1328,11 +1335,11 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 	      continue;
 	    }
 	  nv_add_nvp (out, "open", "logfile");
-	  if (strstr (cur_file, "access") != NULL)
+	  if (strstr (cur_file + bname_len, "access") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "access");
 	    }
-	  else if (strstr (cur_file, "err") != NULL)
+	  else if (strstr (cur_file + bname_len, "err") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "error");
 	    }
@@ -1378,11 +1385,11 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 	      continue;
 	    }
 	  nv_add_nvp (out, "open", "logfile");
-	  if (strstr (cur_file, "access") != NULL)
+	  if (strstr (cur_file + bname_len, "access") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "access");
 	    }
-	  else if (strstr (cur_file, "log") != NULL)
+	  else if (strstr (cur_file + bname_len, "log") != NULL)
 	    {
 	      nv_add_nvp (out, "type", "script");
 	    }
