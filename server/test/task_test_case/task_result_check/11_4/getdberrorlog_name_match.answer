@@ -1,0 +1,16 @@
+{
+   "dbname": "demodb",
+   "end_time": "<timestamp>",
+   "note": "none",
+   "result": [
+      {
+         "file": "$CUBRID/log/server/demodb_<timestamp>.err",
+         "logs": [
+            "own error log of demodb for getdberrorlog_name_match"
+         ]
+      }
+   ],
+   "start_time": "<timestamp>",
+   "status": "success",
+   "task": "getdberrorlog"
+}
