@@ -14,7 +14,14 @@
             {
                "lastupdate": "<date>",
                "owner": "cubrid",
-               "path": "$CUBRID/log/broker/query_editor.access.01261117103000",
+               "path": "$CUBRID/log/broker/query_editor.access.20261117103000",
+               "size": "<volatile>",
+               "type": "access"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
+               "path": "$CUBRID/log/broker/query_editor.access.denied",
                "size": "<volatile>",
                "type": "access"
             },

@@ -46,7 +46,12 @@ skip_dot_digits (const char *p)
   return p;
 }
 
-/* "access" or "access.<digits>" (a backup, cas_log.c) */
+/*
+ * "access", "access.denied" or either followed by ".<digits>", a backup.
+ * The connections the ACL of the broker (ACCESS_CONTROL) rejects are logged
+ * to "<access log>.denied", and both are backed up the same way, cas_log.c
+ * cas_access_log () and access_log_backup ().
+ */
 static bool
 is_access_ext (const char *ext)
 {
@@ -55,6 +60,10 @@ is_access_ext (const char *ext)
       return false;
     }
   ext += 6;
+  if (strncmp (ext, ".denied", 7) == 0)
+    {
+      ext += 7;
+    }
   if (*ext == '\0')
     {
       return true;
@@ -68,11 +77,12 @@ is_access_ext (const char *ext)
  * is shard. What follows bname has to be one of the names the engine gives
  * the log files of a broker:
  *
- *   any broker      <bname>.access[.<digits>]        access log
+ *   any broker      <bname>.access[.denied][.<digits>]  access log (".denied":
+ *                                                        rejected by the ACL)
  *                   <bname>.err[.<digits>.<digits>]  broker error log
  *                   <bname>_qr_rule.err              query replace rules
  *   SHARD=OFF       <bname>_<cas>.<ext>              CAS sql, slow, error log
- *   SHARD=ON        <bname>_<proxy>.access[.<digits>]           proxy access log
+ *   SHARD=ON        <bname>_<proxy>.access[.denied][.<digits>]  proxy access log
  *                   <bname>_<proxy>_<shard>_<cas>.<ext>          CAS logs
  *
  * The number of "_<digits>" groups is what tells the instance apart, so it

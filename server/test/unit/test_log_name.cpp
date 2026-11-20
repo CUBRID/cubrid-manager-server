@@ -89,6 +89,9 @@ test_broker_own_logs (void)
   /* the logs of a SHARD=OFF broker */
   broker ("query_editor.access", "query_editor", OFF, true);
   broker ("query_editor.access.20261117103000", "query_editor", OFF, true);
+  /* the connections the ACL rejects, and its backup */
+  broker ("query_editor.access.denied", "query_editor", OFF, true);
+  broker ("query_editor.access.denied.20261117103000", "query_editor", OFF, true);
   broker ("query_editor.err", "query_editor", OFF, true);
   broker ("query_editor.err.1261117.1030", "query_editor", OFF, true);
   broker ("query_editor_qr_rule.err", "query_editor", OFF, true);
@@ -108,6 +111,7 @@ test_broker_own_logs (void)
   broker ("shard1_qr_rule.err", "shard1", ON, true);
   /* written before SHARD was turned on, and named after the broker alone */
   broker ("shard1.access", "shard1", ON, true);
+  broker ("shard1.access.denied", "shard1", ON, true);
 }
 
 static void
@@ -116,6 +120,7 @@ test_broker_shard_parameter (void)
   /* the CAS logs of the other SHARD value are not this broker's */
   broker ("query_editor_1_0_1.sql.log", "query_editor", OFF, false);
   broker ("query_editor_1.access", "query_editor", OFF, false);
+  broker ("query_editor_1.access.denied", "query_editor", OFF, false);
   broker ("shard1_1.sql.log", "shard1", ON, false);
   broker ("shard1_1.err", "shard1", ON, false);
   broker ("shard1_1_0.sql.log", "shard1", ON, false);
@@ -144,6 +149,7 @@ test_broker_other_instances (void)
 
       /* another broker whose name starts with "broker1" */
       broker ("broker1_a.access", "broker1", s, false);
+      broker ("broker1_a.access.denied", "broker1", s, false);
       broker ("broker1_a.err", "broker1", s, false);
       broker ("broker1_a_1.err", "broker1", s, false);
       broker ("broker1_a_1.sql.log", "broker1", s, false);
@@ -164,6 +170,11 @@ test_broker_other_instances (void)
       broker ("broker1_.err", "broker1", s, false);
       broker ("broker1.accessx", "broker1", s, false);
       broker ("broker1.access.x", "broker1", s, false);
+      broker ("broker1.access.deniedx", "broker1", s, false);
+      broker ("broker1.access.denied.", "broker1", s, false);
+      broker ("broker1.access.denied.x", "broker1", s, false);
+      broker ("broker1.access.denied.denied", "broker1", s, false);
+      broker ("broker1.access.20261117103000.denied", "broker1", s, false);
       broker ("broker1.errx", "broker1", s, false);
       broker ("broker1.err.1261117", "broker1", s, false);
       broker ("broker1.err.x.1030", "broker1", s, false);

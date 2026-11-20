@@ -1314,8 +1314,8 @@ def copy_extra_files():
 #
 # The "listed" files are the other way round: logs of query_editor that the
 # engine names otherwise than "<name>_<cas>.*" (the broker error log, the
-# backups, the query replace log), which a rule that is too strict would
-# drop. The SHARD=ON names of query_editor (a SHARD=OFF broker) are decoys.
+# log of the connections the ACL rejects, the backups, the query replace
+# log), which a rule that is too strict would drop. The SHARD=ON names of query_editor (a SHARD=OFF broker) are decoys.
 #
 # getlogfileinfo is compared against its .answer, which must list the
 # "listed" files and none of the decoys.
@@ -1336,7 +1336,8 @@ NAME_MATCH_DECOYS = (
     # logs of query_editor that have no "_<cas>"
     ("log/broker/query_editor.err", "listed"),
     ("log/broker/query_editor.err.1261117.1030", "listed"),
-    ("log/broker/query_editor.access.01261117103000", "listed"),
+    ("log/broker/query_editor.access.20261117103000", "listed"),
+    ("log/broker/query_editor.access.denied", "listed"),
     ("log/broker/error_log/query_editor_qr_rule.err", "listed"),
     ("log/server/demodb_20010101_1200.err", "own"),
     ("log/server/demodb_a_20010101_1200.err", "file"),
