@@ -14,7 +14,7 @@ CXX=clang++ ./run_unit_tests.sh  # 다른 컴파일러
 | 테스트 | 대상 | 확인하는 것 |
 | --- | --- | --- |
 | `test_session_ip` | `server/src/cm_session_ip.cpp` | `session_ip_check`의 주소 비교. 같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략·대소문자, link-local의 scope)는 같은 주소, 다른 주소는 다른 주소, 해석할 수 없는 값은 알 수 없음. 모드(`off`/`log`/`enforce`)와 비교 결과별 처리(허용, 경고 후 허용, 거부) |
-| `test_log_name` | `server/src/cm_log_name.cpp` | `getlogfileinfo`, `getloginfo`, `getdberrorlog`가 로그 파일을 인스턴스별로 구분하는 이름 규칙(CBRD-26446). 엔진이 만드는 로그 이름(access와 `.access.denied`, 그 백업, broker `.err`와 그 백업, `_qr_rule.err`, CAS 로그)은 그 인스턴스의 것으로, 이름이 그 인스턴스 이름으로 시작하는 다른 인스턴스(`<name>_...`, `<name>x...`)의 로그는 아닌 것으로 판정. SHARD=ON broker의 이름(`_<proxy>.access`, `_<proxy>_<shard>_<cas>.*`)과, broker `b`(SHARD=ON)와 `b_1_0`의 CAS 로그가 같은 이름이 되는 경우 SHARD 값으로 구분하는 것 |
+| `test_log_name` | `server/src/cm_log_name.cpp` | `getlogfileinfo`, `getloginfo`, `getdberrorlog`가 로그 파일을 인스턴스별로 구분하는 이름 규칙(CBRD-26446). 엔진이 만드는 로그 이름(access와 `.access.denied`, 그 백업, `_qr_rule.err`, CAS 로그)은 그 인스턴스의 것으로, 엔진이 쓰지 않는 `<b>.err`는 아닌 것으로(broker `<b>_<n>`을 요청했을 때 다른 broker의 CAS 오류 로그 `<b>_<n>.err`가 섞이지 않게), 이름이 그 인스턴스 이름으로 시작하는 다른 인스턴스(`<name>_...`, `<name>x...`)의 로그는 아닌 것으로 판정. SHARD=ON broker의 이름(`_<proxy>.access`, `_<proxy>_<shard>_<cas>.*`)과, broker `b`(SHARD=ON)와 `b_1_0`의 CAS 로그가 같은 이름이 되는 경우 SHARD 값으로 구분하는 것 |
 
 API 테스트는 SHARD=OFF broker(`query_editor`)로만 돌므로 SHARD=ON의 로그 이름은 `test_log_name`이
 확인한다(`../README.md` 4.11).

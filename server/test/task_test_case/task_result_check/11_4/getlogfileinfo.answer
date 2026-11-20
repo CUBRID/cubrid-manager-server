@@ -7,6 +7,13 @@
             {
                "lastupdate": "<date>",
                "owner": "cubrid",
+               "path": "$CUBRID/log/broker/error_log/query_editor_1.err",
+               "size": "<volatile>",
+               "type": "error"
+            },
+            {
+               "lastupdate": "<date>",
+               "owner": "cubrid",
                "path": "$CUBRID/log/broker/error_log/query_editor_qr_rule.err",
                "size": "<volatile>",
                "type": "error"
@@ -24,20 +31,6 @@
                "path": "$CUBRID/log/broker/query_editor.access.denied",
                "size": "<volatile>",
                "type": "access"
-            },
-            {
-               "lastupdate": "<date>",
-               "owner": "cubrid",
-               "path": "$CUBRID/log/broker/query_editor.err",
-               "size": "<volatile>",
-               "type": "error"
-            },
-            {
-               "lastupdate": "<date>",
-               "owner": "cubrid",
-               "path": "$CUBRID/log/broker/query_editor.err.1261117.1030",
-               "size": "<volatile>",
-               "type": "error"
             },
             {
                "lastupdate": "<date>",

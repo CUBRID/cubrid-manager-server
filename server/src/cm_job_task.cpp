@@ -1288,11 +1288,6 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 	    {
 	      nv_add_nvp (out, "type", "access");
 	    }
-	  else if (strstr (cur_file + bname_len, "err") != NULL)
-	    {
-	      /* <bname>.err, the broker error log */
-	      nv_add_nvp (out, "type", "error");
-	    }
 	  nv_add_nvp (out, "path", buf);
 	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
 	  nv_add_nvp_int (out, "size", statbuf.st_size);

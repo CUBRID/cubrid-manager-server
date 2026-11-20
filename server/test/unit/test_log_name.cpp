@@ -92,8 +92,6 @@ test_broker_own_logs (void)
   /* the connections the ACL rejects, and its backup */
   broker ("query_editor.access.denied", "query_editor", OFF, true);
   broker ("query_editor.access.denied.20261117103000", "query_editor", OFF, true);
-  broker ("query_editor.err", "query_editor", OFF, true);
-  broker ("query_editor.err.1261117.1030", "query_editor", OFF, true);
   broker ("query_editor_qr_rule.err", "query_editor", OFF, true);
   broker ("query_editor_1.err", "query_editor", OFF, true);
   broker ("query_editor_12.sql.log", "query_editor", OFF, true);
@@ -106,12 +104,33 @@ test_broker_own_logs (void)
   broker ("shard1_1_0_1.sql.log", "shard1", ON, true);
   broker ("shard1_1_0_1.slow.log", "shard1", ON, true);
   broker ("shard1_2_3_10.err", "shard1", ON, true);
-  broker ("shard1.err", "shard1", ON, true);
-  broker ("shard1.err.1261117.1030", "shard1", ON, true);
   broker ("shard1_qr_rule.err", "shard1", ON, true);
   /* written before SHARD was turned on, and named after the broker alone */
   broker ("shard1.access", "shard1", ON, true);
   broker ("shard1.access.denied", "shard1", ON, true);
+}
+
+/*
+ * "<b>.err" is not a log of b: the engine writes nothing to the broker error
+ * log path, and the name is the CAS error log of another broker.
+ */
+static void
+test_broker_err (void)
+{
+  const bool both[] = { OFF, ON };
+  size_t i;
+
+  for (i = 0; i < sizeof (both) / sizeof (both[0]); i++)
+    {
+      bool s = both[i];
+
+      /* the CAS 1 error log of the broker query_editor */
+      broker ("query_editor_1.err", "query_editor_1", s, false);
+      broker ("query_editor.err", "query_editor", s, false);
+      broker ("query_editor.err.1261117.1030", "query_editor", s, false);
+      broker ("shard1.err", "shard1", s, false);
+    }
+  broker ("query_editor_1.err", "query_editor", OFF, true);
 }
 
 static void
@@ -234,6 +253,7 @@ int
 main (void)
 {
   test_broker_own_logs ();
+  test_broker_err ();
   test_broker_shard_parameter ();
   test_broker_other_instances ();
   test_db_server_err_log ();

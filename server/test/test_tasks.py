@@ -1313,12 +1313,16 @@ def copy_extra_files():
 # but belongs to another one, or is a directory named like a log file.
 #
 # The "listed" files are the other way round: logs of query_editor that the
-# engine names otherwise than "<name>_<cas>.*" (the broker error log, the
-# log of the connections the ACL rejects, the backups, the query replace
-# log), which a rule that is too strict would drop. The SHARD=ON names of query_editor (a SHARD=OFF broker) are decoys.
+# engine names otherwise than "<name>_<cas>.*" (the log of the connections
+# the ACL rejects, the backups, the query replace log), which a rule that is
+# too strict would drop. The SHARD=ON names of query_editor (a SHARD=OFF
+# broker) are decoys, and so is "<name>.err": the engine writes nothing to
+# the broker error log path.
 #
 # getlogfileinfo is compared against its .answer, which must list the
-# "listed" files and none of the decoys.
+# "listed" files and none of the decoys. getlogfileinfo_query_editor_1 asks
+# for a broker "query_editor_1": the CAS 1 logs of query_editor, its
+# error log "query_editor_1.err" included, must not be listed for it.
 # getloginfo grows with every run and is checked for status only, so the
 # database side is checked through getdberrorlog, which filters by mtime: every
 # file here gets NAME_MATCH_MTIME, and getdberrorlog_name_match asks for that
@@ -1331,11 +1335,14 @@ NAME_MATCH_DECOYS = (
     ("log/broker/sql_log/query_editor_a_1.sql.log", "file"),
     ("log/broker/sql_log/query_editor_9.sql.log", "dir"),
     # names of a SHARD=ON broker: proxy access log, <proxy>_<shard>_<cas>
-    ("log/broker/query_editor_1.access", "file"),
+    ("log/broker/query_editor_7.access", "file"),
     ("log/broker/sql_log/query_editor_1_0_1.sql.log", "file"),
+    # the broker error log path, which the engine does not write
+    ("log/broker/query_editor.err", "file"),
+    ("log/broker/query_editor.err.1261117.1030", "file"),
+    # the CAS 1 error log of query_editor, not a log of "query_editor_1"
+    ("log/broker/error_log/query_editor_1.err", "listed"),
     # logs of query_editor that have no "_<cas>"
-    ("log/broker/query_editor.err", "listed"),
-    ("log/broker/query_editor.err.1261117.1030", "listed"),
     ("log/broker/query_editor.access.20261117103000", "listed"),
     ("log/broker/query_editor.access.denied", "listed"),
     ("log/broker/error_log/query_editor_qr_rule.err", "listed"),

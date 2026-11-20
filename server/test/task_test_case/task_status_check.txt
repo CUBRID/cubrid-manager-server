@@ -167,6 +167,7 @@ getlogfileinfo
 // CBRD-26446: a log file is listed only when its name matches the
 // instance name exactly. build_env() lays the decoys (README 4.11).
 getlogfileinfo_query
+getlogfileinfo_query_editor_1
 getdberrorlog_name_match
 getloginfo,success
 // viewlog reads the manager log this suite is writing to, from line 1,

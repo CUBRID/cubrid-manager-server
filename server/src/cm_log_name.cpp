@@ -79,7 +79,6 @@ is_access_ext (const char *ext)
  *
  *   any broker      <bname>.access[.denied][.<digits>]  access log (".denied":
  *                                                        rejected by the ACL)
- *                   <bname>.err[.<digits>.<digits>]  broker error log
  *                   <bname>_qr_rule.err              query replace rules
  *   SHARD=OFF       <bname>_<cas>.<ext>              CAS sql, slow, error log
  *   SHARD=ON        <bname>_<proxy>.access[.denied][.<digits>]  proxy access log
@@ -92,6 +91,11 @@ is_access_ext (const char *ext)
  * meant. The names that hold no group belong to bname alone, so they are
  * accepted whatever the parameter, which keeps the logs written before it
  * was changed.
+ *
+ * "<bname>.err" is not accepted. The engine keeps a path for it
+ * (broker_shm.c get_error_log_file_name ()) but writes nothing there, and
+ * it is the CAS error log "<b>_<cas>.err" of a broker <b> when bname is
+ * "<b>_<cas>".
  */
 bool
 ut_is_broker_log_file (const char *fname, const char *bname, bool shard)
@@ -114,27 +118,7 @@ ut_is_broker_log_file (const char *fname, const char *bname, bool shard)
 
   if (*p == '.')
     {
-      if (is_access_ext (p + 1))
-	{
-	  return true;
-	}
-      if (strncmp (p, ".err", 4) == 0)
-	{
-	  p += 4;
-	  if (*p == '\0')
-	    {
-	      return true;
-	    }
-	  /* a backup, broker_admin_pub.c rename_error_log_file_name () */
-	  p = skip_dot_digits (p);
-	  if (p == NULL)
-	    {
-	      return false;
-	    }
-	  p = skip_dot_digits (p);
-	  return p != NULL && *p == '\0';
-	}
-      return false;
+      return is_access_ext (p + 1);
     }
 
   if (strcmp (p, "_qr_rule.err") == 0)

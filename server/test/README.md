@@ -682,7 +682,7 @@ listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표�
 때만** 돌려줘야 한다. broker 이름과 DB 이름에는 `_`를 쓸 수 있는데, `_`는 로그 파일 이름에서
 이름 뒤에 오는 구분자이기도 하다. 그래서 이름 바로 다음 한 글자만 보면 `<name>_...`이라는
 다른 인스턴스의 로그까지 섞인다. 반대로 규칙이 지나치게 엄격하면 `<name>_<숫자>.*`가 아닌
-자기 로그(broker `.err`, `.access.denied`, 백업, `_qr_rule.err`)가 빠진다. 이를 확인하기 위해 `build_env()`의
+자기 로그(`.access.denied`, 백업, `_qr_rule.err`)가 빠진다. 이를 확인하기 위해 `build_env()`의
 `make_name_match_decoys()`가 아래 미끼와 나와야 하는 파일을 만들고, `clean_env()`와 `reset_leftovers()`의
 `remove_name_match_decoys()`가 지운다. 미끼의 mtime은 모두 `2001-01-01 12:00`이다.
 
@@ -702,10 +702,11 @@ listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표�
 | `log/broker/error_log/query_editor_a_1.err` | 파일 | 다른 broker `query_editor_a` |
 | `log/broker/sql_log/query_editor_a_1.sql.log` | 파일 | 다른 broker `query_editor_a` |
 | `log/broker/sql_log/query_editor_9.sql.log` | 디렉터리 | 로그 파일이 아님 |
-| `log/broker/query_editor_1.access` | 파일 | SHARD=ON broker의 proxy access 로그 이름. `query_editor`는 SHARD=OFF |
+| `log/broker/query_editor_7.access` | 파일 | SHARD=ON broker의 proxy access 로그 이름. `query_editor`는 SHARD=OFF |
 | `log/broker/sql_log/query_editor_1_0_1.sql.log` | 파일 | SHARD=ON broker의 CAS 로그 이름(`_<proxy>_<shard>_<cas>`). broker `query_editor_1_0`의 로그 이름이기도 하다 |
-| `log/broker/query_editor.err` | 파일 | **query_editor** broker 오류 로그 (나와야 하는 파일) |
-| `log/broker/query_editor.err.1261117.1030` | 파일 | **query_editor** 그 백업 (나와야 하는 파일) |
+| `log/broker/query_editor.err` | 파일 | broker 오류 로그 경로. 엔진이 쓰지 않으므로 로그가 아님 |
+| `log/broker/query_editor.err.1261117.1030` | 파일 | 그 백업 이름. 로그가 아님 |
+| `log/broker/error_log/query_editor_1.err` | 파일 | **query_editor** CAS 1 오류 로그 (나와야 하는 파일). broker `query_editor_1`의 로그는 아님 |
 | `log/broker/query_editor.access.20261117103000` | 파일 | **query_editor** access 로그 백업 (나와야 하는 파일) |
 | `log/broker/query_editor.access.denied` | 파일 | **query_editor** ACL이 거부한 접속의 access 로그 (나와야 하는 파일) |
 | `log/broker/error_log/query_editor_qr_rule.err` | 파일 | **query_editor** query replace 로그 (나와야 하는 파일) |
@@ -716,7 +717,8 @@ listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표�
 
 | 케이스 | 확인하는 것 |
 | --- | --- |
-| `getlogfileinfo` (`query_editor`) | 실제 CAS 로그와 나와야 하는 파일 5개가 있고, broker 쪽 미끼는 없어야 한다 |
+| `getlogfileinfo` (`query_editor`) | 실제 CAS 로그와 나와야 하는 파일 4개가 있고, broker 쪽 미끼는 없어야 한다 |
+| `getlogfileinfo_query_editor_1` (`query_editor_1`) | 목록이 비어 있어야 한다. `query_editor`의 CAS 1 로그(`query_editor_1.sql.log`, `error_log/query_editor_1.err` 등)가 broker `query_editor_1`의 로그로 걸리지 않는지 본다 |
 | `getlogfileinfo_query` (`query`) | 목록이 비어 있어야 한다. `cubrid broker start`가 만드는 `sql_log/query` 디렉터리와 `query_editor_*` 로그가 걸리지 않는지 본다 |
 | `getdberrorlog_name_match` (`demodb`) | `start_time`/`end_time`을 미끼의 날짜(2001-01-01)로 한정해 실제 demodb 로그를 뺀다. `demodb_20010101_1200.err` 하나만 나와야 한다 |
 
