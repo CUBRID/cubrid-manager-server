@@ -62,6 +62,7 @@
 #include "cm_stat.h"
 #include "cm_porting.h"
 #include "cm_server_util.h"
+#include "cm_log_name.h"
 #include "cm_job_task.h"
 #include "cm_auto_task.h"
 #include "cm_dep.h"
@@ -370,7 +371,6 @@ static bool is_authorized_loaddb_files (char *const files[], int count, const ch
 static void delete_loaddb_file (const char *path, const char *dbname, std::string &kept);
 static void delete_schema_files (const char *schema_list_file, const char *dbname, std::string &kept);
 
-static int is_filename_matched (const char *fname, const char *pattern);
 static int file_not_exist (char *path, char *skip_code, char *_dbmt_error);
 static int schema_file_not_exist (const char *schema_list_file, char *_dbmt_error);
 static int expand_path (const char *src, char *dst, int dest_len);
@@ -1207,6 +1207,8 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
   char *bname, *from, buf[COMPOSED_PATH_MAX];
   char *cur_file;
   T_CM_ERROR error;
+  bool shard;
+  size_t bname_len;
 
   bname = nv_get_val (in, "broker");
   from = nv_get_val (in, "from");
@@ -1219,6 +1221,12 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       strcpy (_dbmt_error, "broker");
       return ERR_PARAM_MISSING;
     }
+  /*
+   * The type of a log file is told from what follows the broker name: the
+   * name itself can hold "access", "err" or "log" (a broker "myaccess").
+   * ut_is_broker_log_file () has checked that the file name starts with it.
+   */
+  bname_len = strlen (bname);
   if (cm_get_broker_conf (&uc_conf, NULL, &error) < 0)
     {
       strcpy (_dbmt_error, error.err_msg);
@@ -1237,6 +1245,10 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
       v = BROKER_LOG_DIR "/sql_log";
     }
   cm_get_abs_file_path (v, logdir, sizeof (err_logdir));
+
+  /* the names of the CAS logs depend on it, see ut_is_broker_log_file () */
+  v = cm_br_conf_get_value (cm_conf_find_broker (&uc_conf, bname), "SHARD");
+  shard = (v != NULL && uStringEqualIgnoreCase (v, "ON"));
 
   cm_get_abs_file_path (BROKER_LOG_DIR, access_logdir, sizeof (access_logdir));
 
@@ -1262,21 +1274,25 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", access_logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", access_logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file + bname_len, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
@@ -1304,25 +1320,29 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      else if (strstr (cur_file, "err") != NULL)
-		{
-		  nv_add_nvp (out, "type", "error");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", err_logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", err_logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file + bname_len, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  else if (strstr (cur_file + bname_len, "err") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "error");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
@@ -1350,25 +1370,29 @@ ts2_get_logfile_info (nvplist *in, nvplist *out, char *_dbmt_error)
 #else
 	  cur_file = dirp->d_name;
 #endif
-	  if (is_filename_matched (cur_file, bname))
+	  if (!ut_is_broker_log_file (cur_file, bname, shard))
 	    {
-	      nv_add_nvp (out, "open", "logfile");
-	      if (strstr (cur_file, "access") != NULL)
-		{
-		  nv_add_nvp (out, "type", "access");
-		}
-	      else if (strstr (cur_file, "log") != NULL)
-		{
-		  nv_add_nvp (out, "type", "script");
-		}
-	      snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
-	      nv_add_nvp (out, "path", buf);
-	      stat (buf, &statbuf);
-	      nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
-	      nv_add_nvp_int (out, "size", statbuf.st_size);
-	      ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
-	      nv_add_nvp (out, "close", "logfile");
+	      continue;
 	    }
+	  snprintf (buf, sizeof (buf) - 1, "%s/%s", logdir, cur_file);
+	  if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
+	    {
+	      continue;
+	    }
+	  nv_add_nvp (out, "open", "logfile");
+	  if (strstr (cur_file + bname_len, "access") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "access");
+	    }
+	  else if (strstr (cur_file + bname_len, "log") != NULL)
+	    {
+	      nv_add_nvp (out, "type", "script");
+	    }
+	  nv_add_nvp (out, "path", buf);
+	  nv_add_nvp (out, "owner", get_user_name (statbuf.st_uid, buf));
+	  nv_add_nvp_int (out, "size", statbuf.st_size);
+	  ts_add_nvp_time (out, "lastupdate", statbuf.st_mtime, "%04d.%02d.%02d", NV_ADD_DATE);
+	  nv_add_nvp (out, "close", "logfile");
 	}
 #if defined(WINDOWS)
       FindClose (handle);
@@ -7703,7 +7727,6 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
   char *dbname, log_dir[PATH_MAX], buf[COMPOSED_PATH_MAX];
   char *error_log_param;
   struct stat statbuf;
-  int fname_len = 0;
 #if defined(WINDOWS)
   WIN32_FIND_DATA data;
   HANDLE handle;
@@ -7799,23 +7822,13 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
       fname = dp->d_name;
 #endif
-      fname_len = (int) strlen (fname);
-      /* the "4" is the size of ".err" */
-      if (fname_len < 4 || (strcmp (fname + fname_len - 4, ".err") != 0))
-	{
-	  continue;
-	}
-      if (memcmp (fname, dbname, strlen (dbname)))
-	{
-	  continue;
-	}
-      if (isalnum (fname[strlen (dbname)]))
+      if (!ut_is_db_server_err_log (fname, dbname))
 	{
 	  continue;
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (stat (buf, &statbuf) == 0)
+      if (stat (buf, &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode))
 	{
 	  nv_add_nvp (res, "open", "log");
 	  nv_add_nvp (res, "path", buf);
@@ -18098,17 +18111,6 @@ get_statdump_daemon_list (void)
     }
 
   return result;
-}
-
-static int
-is_filename_matched (const char *fname, const char *pattern)
-{
-  if (fname == NULL || pattern == NULL || memcmp (fname, pattern, strlen (pattern)) || isalnum (fname[strlen (pattern)]))
-    {
-      return 0;
-    }
-
-  return 1;
 }
 
 static int
