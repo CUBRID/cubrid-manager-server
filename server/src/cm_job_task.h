@@ -417,7 +417,9 @@ int ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_run_sql_statement (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_folders_with_keyword (nvplist *req, nvplist *res,
 				 char *_dbmt_error);
+#if !defined (NDEBUG)
 int ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error);
+#endif
 int ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_delete_folder (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_file_total_line_num (nvplist *req, nvplist *res,

@@ -62,7 +62,8 @@
  {
   "task": "runscript",
   "token": "$CASE_LOGIN_TOKEN",
-  "test_expect": "denied"
+  "test_expect": "denied",
+  "test_debug_only": true
  },
  {
   "task": "getadminloginfo",

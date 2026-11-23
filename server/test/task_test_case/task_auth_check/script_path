@@ -3,70 +3,80 @@
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_ok.sh",
-  "test_expect": "success"
+  "test_expect": "success",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_sub/sub.sh",
   "test_expect": "failure",
-  "test_note": "only a script directly under"
+  "test_note": "only a script directly under",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/tmp/authtest_script_tmp.sh",
   "test_expect": "failure",
-  "test_note": "only a script directly under"
+  "test_note": "only a script directly under",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID_DATABASES/authtest_script_db.sh",
   "test_expect": "failure",
-  "test_note": "only a script directly under"
+  "test_note": "only a script directly under",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/bin/cubrid",
   "test_expect": "failure",
-  "test_note": "only a script directly under"
+  "test_note": "only a script directly under",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_link.sh",
   "test_expect": "failure",
-  "test_note": "only a script directly under"
+  "test_note": "only a script directly under",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_sub",
   "test_expect": "failure",
-  "test_note": "the script is not a regular file"
+  "test_note": "the script is not a regular file",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_nosuch.sh",
   "test_expect": "failure",
-  "test_note": "the script does not exist"
+  "test_note": "the script does not exist",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_group_w.sh",
   "test_expect": "failure",
-  "test_note": "the script must not be writable by the group or others"
+  "test_note": "the script must not be writable by the group or others",
+  "test_debug_only": true
  },
  {
   "task": "runscript",
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_others_w.sh",
   "test_expect": "failure",
-  "test_note": "the script must not be writable by the group or others"
+  "test_note": "the script must not be writable by the group or others",
+  "test_debug_only": true
  },
  {
   "task": "writeandsaveconf",
@@ -86,6 +96,7 @@
   "token": "",
   "script_path": "$CUBRID/conf/authtest_script_new.sh",
   "test_expect": "failure",
-  "test_note": "the script is not executable"
+  "test_note": "the script is not executable",
+  "test_debug_only": true
  }
 ]

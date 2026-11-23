@@ -597,6 +597,9 @@ owned_and_not_shared (const struct stat &st, unsigned int cms_uid, const char *w
  *   - Windows: the owner, write and execute checks are not done (ACLs; left
  *     for later), only the directory.
  *
+ *   Only debug builds offer runscript; this is built in every build so that
+ *   the unit test (test_script_path.cpp) covers the rule.
+ *
  *   Each refusal sets its own reason in err_buf and returns false.
  */
 bool

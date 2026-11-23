@@ -12650,6 +12650,15 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
   return retval;
 }
 
+#if !defined (NDEBUG)
+/*
+ * ts_run_script () - runscript, debug builds only
+ *
+ *   Runs a script as the user CMS runs as (root in the official docker
+ *   image). Even limited to a script directly under $CUBRID/conf that only
+ *   that user and root can change (ut_check_script_path ()), a remote request
+ *   that runs a program on the server is not offered by release builds.
+ */
 int
 ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -12768,6 +12777,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 
   return retval;
 }
+#endif
 
 int
 ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)

@@ -401,7 +401,7 @@ document of their own yet.
 | removecasrunnertmpfile | socket, http | DBC, DBO, BRK, MON |
 | removefiles | socket, http | DBC, DBO |
 | [rolechange](rolechange.md) | socket, http | DBC, DBO |
-| [runscript](runscript.md) | socket, http | ADMIN |
+| [runscript](runscript.md) | socket, http | ADMIN (debug builds only) |
 | runsqlstatement | socket, http | DBC, DBO |
 | sendmail | http | DBC, DBO, MON |
 | [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |

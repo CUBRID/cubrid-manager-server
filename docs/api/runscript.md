@@ -1,5 +1,10 @@
 # runscript
 
+> **Debug builds only.** Release builds do not offer this task and answer
+> `Undefined request - runscript`: a remote request that runs a program on the server, as the user
+> CMS runs as (root in the official docker image), is left out of release builds like
+> [generatecert](generatecert.md). Run the script on the server instead.
+
 Run a script on the server as the user CMS runs as, and answer whether it succeeded. The output of
 the script is not returned.
 
@@ -23,7 +28,7 @@ Only a script that nobody but the user CMS runs as and root can change is run:
 - The path must also pass the [File Access](README.md#file-access) checks, and only `LANG`, `TZ` and
   `CUBRID_TMP` can be passed with `envvar`.
 
-Permissions required to run this task: ADMIN
+Permissions required to run this task: ADMIN (debug builds only)
 
 ## Request JSON Syntax
 

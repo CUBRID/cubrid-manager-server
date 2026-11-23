@@ -348,6 +348,9 @@ timeout_fallbacks = []
 # Placeholders whose value is only known once the run has started, see
 # start_kill_targets().
 runtime_vars = {}
+# Whether the manager server is a debug build; asked by debug_build () on the
+# first "test_debug_only" request, None until then.
+DEBUG_BUILD = None
 helper_procs = []
 
 # Authorization checks (task_auth_check): a request of a case can run as a
@@ -387,6 +390,13 @@ helper_procs = []
 #                                  (removed before sending), so that the
 #                                  manager sees another client; see
 #                                  exec_task ()
+#   "test_debug_only": true        the task is built only in debug builds
+#                                  (removed before sending). Against a release
+#                                  build the request must fail with
+#                                  "Undefined request - <task>" instead, the
+#                                  other test_* checks of the request are not
+#                                  made, and the case is judged by status
+#                                  only (no baseline); see debug_build ()
 #   "test_file_mode": {"<path>": "<octal>"}
 #                                  after the response, each file on this host
 #                                  (the target, for a link) must have that
@@ -556,6 +566,30 @@ def judged_status(data, expected, note_text=None, no_text=None, body="",
 # The manager server serves cm_port over TLS with a self signed certificate,
 # so the certificate of the host under test is not verified here.
 ssl_context = ssl._create_unverified_context()
+
+
+def debug_build():
+    """Whether the manager server is a debug build, asked once.
+
+    Only debug builds serve /upload: a request to it without a token cookie
+    gets {"failure" : true}. A release build answers every path but /cm_api
+    with {"error" : "Not Found"}. Asking this does not depend on the debug
+    only tasks themselves, so a debug build that lost one of them still fails
+    its cases instead of passing them as a release build.
+    """
+    global DEBUG_BUILD
+    if DEBUG_BUILD is None:
+        body = exec_task(cmsip, port, "/upload", "").decode("utf-8", "replace")
+        if '"failure"' in body:
+            DEBUG_BUILD = True
+        elif '"error"' in body:
+            DEBUG_BUILD = False
+        else:
+            print("\033[31mcannot tell whether the manager server is a debug "
+                  "build: /upload answered %r.\033[0m" % body[:200])
+            sys.exit(1)
+        print("manager server: %s build" % ("debug" if DEBUG_BUILD else "release"))
+    return DEBUG_BUILD
 
 
 def exec_task(ip, port, url, body, source_ip=None):
@@ -845,8 +879,11 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     # Tokens of the successful "login" requests of this case, in order, for
     # the requests that ask for one with "$CASE_LOGIN_TOKEN[#n]".
     case_tokens = []
+    # a "test_debug_only" request against a release build: judged by status
+    undefined_in_release = False
     requests = request if isinstance(request, list) else [request]
     for index, req in enumerate(requests):
+        req_debug_only = req.pop("test_debug_only", False)
         req_expected = req.pop("test_expect", expected)
         req_note = req.pop("test_note", None)
         req_no_text = req.pop("test_no_text", None)
@@ -870,6 +907,12 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
+        if req_debug_only and not debug_build():
+            # A release build does not have the task at all, whoever asks.
+            req_expected = "failure"
+            req_note = "Undefined request - %s" % req.get("task")
+            req_no_text = req_no_key = req_values = req_file_modes = None
+            undefined_in_release = True
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
         if req_sleep:
@@ -889,8 +932,10 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     task = entries[0].get("task", name) if entries else name
     if record_files:
         slot = answer_base(result_slot(name))
-        if status_only:
+        if status_only or undefined_in_release:
             # The status verdict already recorded is the whole answer here.
+            # The baseline of a debug only task is the answer of a debug
+            # build, so a release build is not compared with it.
             if file_check:
                 report_status_only(name, entries)
         elif file_check:
