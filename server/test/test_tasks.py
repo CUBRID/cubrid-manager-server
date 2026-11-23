@@ -8,6 +8,7 @@ import shutil
 import signal
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -386,6 +387,15 @@ helper_procs = []
 #                                  (removed before sending), so that the
 #                                  manager sees another client; see
 #                                  exec_task ()
+#   "test_file_mode": {"<path>": "<octal>"}
+#                                  after the response, each file on this host
+#                                  (the target, for a link) must have that
+#                                  mode, e.g. "0755" (removed before sending);
+#                                  checks that a refused write left the file
+#                                  as it was, or the mode of a new file. Only
+#                                  for sets that run on the CMS host; an
+#                                  empty object or a value that is not octal
+#                                  stops the run
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -499,9 +509,25 @@ def value_mismatch(data, values):
     return None
 
 
+def file_mode_mismatch(modes):
+    """The first test_file_mode entry the files on this host do not satisfy."""
+    for path, want in modes.items():
+        try:
+            got = stat.S_IMODE(os.stat(path).st_mode)
+        except OSError as e:
+            return "cannot stat %s: %s" % (path, e.strerror)
+        if got != int(want, 8):
+            return "mode of %s is %04o, not %s" % (path, got, want)
+    return None
+
+
 def judged_status(data, expected, note_text=None, no_text=None, body="",
-                  no_key=None, values=None):
+                  no_key=None, values=None, file_modes=None):
     """The value compared with `expected` for a response `data`."""
+    if file_modes:
+        mismatch = file_mode_mismatch(file_modes)
+        if mismatch is not None:
+            return "%s (%s)" % (data.get("status"), mismatch)
     if values:
         mismatch = value_mismatch(data, values)
         if mismatch is not None:
@@ -717,7 +743,7 @@ def follow_job(name, data, token):
 
 def send_one(name, req, token, expected="success", casefile="",
              must_be_sync=False, note_text=None, no_text=None, no_key=None,
-             values=None, source_ip=None):
+             values=None, source_ip=None, file_modes=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -763,7 +789,7 @@ def send_one(name, req, token, expected="success", casefile="",
             # prints that verdict instead of this status line.
             record(name, casefile, task,
                    judged_status(data, expected, note_text, no_text, body,
-                                 no_key, values),
+                                 no_key, values, file_modes),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
@@ -772,7 +798,7 @@ def send_one(name, req, token, expected="success", casefile="",
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task,
            judged_status(data, expected, note_text, no_text, body,
-                         no_key, values),
+                         no_key, values, file_modes),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -827,6 +853,15 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             print("\033[31m%s: \"test_value\" must be a non-empty object of "
                   "key path to value.\033[0m" % taskfile)
             sys.exit(1)
+        req_file_modes = req.pop("test_file_mode", None)
+        if req_file_modes is not None and (
+                not isinstance(req_file_modes, dict) or not req_file_modes
+                or not all(isinstance(v, str) and re.match(r"^0?[0-7]{3,4}$", v)
+                           for v in req_file_modes.values())):
+            # an empty object would check nothing and always pass
+            print("\033[31m%s: \"test_file_mode\" must be a non-empty object "
+                  "of path to octal mode.\033[0m" % taskfile)
+            sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
         req_token = case_login_token(req.get("token"), case_tokens, token)
@@ -836,7 +871,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key,
-                        req_values, req_source_ip)
+                        req_values, req_source_ip, req_file_modes)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_tokens.append(data["token"])
@@ -1484,6 +1519,58 @@ def remove_name_match_decoys():
             pass
 
 
+# Files of the file_exec_write case of task_auth_check (CBRD-27831), under
+# $CUBRID/tmp: executable files with each execute bit on its own, a link to
+# one, and a file that is not executable. (name, mode); a mode of None is the
+# link to authtest_exec_0755.sh.
+EXEC_WRITE_FILES = (("authtest_exec_0755.sh", 0o755),
+                    ("authtest_exec_0700.sh", 0o700),
+                    ("authtest_exec_0744.sh", 0o744),
+                    ("authtest_exec_0654.sh", 0o654),
+                    ("authtest_exec_0645.sh", 0o645),
+                    ("authtest_exec_link.conf", None),
+                    ("authtest_noexec_0640.conf", 0o640))
+EXEC_WRITE_TEXT = "#!/bin/sh\necho authtest exec fixture\n"
+# what the case writes and must find created without an execute bit
+EXEC_WRITE_NEW_FILE = "authtest_exec_new.conf"
+
+
+def remove_exec_write_files():
+    """Remove the files of make_exec_write_files() and what the case wrote.
+
+    writeandsaveconf backs a file up to <file>.bak before writing it, so the
+    backups go as well.
+    """
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    tmpdir = os.path.join(CUBRID, "tmp")
+    names = [name for name, _mode in EXEC_WRITE_FILES] + [EXEC_WRITE_NEW_FILE]
+    for name in names:
+        for path in (os.path.join(tmpdir, name),
+                     os.path.join(tmpdir, name + ".bak")):
+            try:
+                if os.path.lexists(path):
+                    os.remove(path)
+            except OSError:
+                pass
+
+
+def make_exec_write_files():
+    """Lay EXEC_WRITE_FILES under $CUBRID/tmp (see there)."""
+    remove_exec_write_files()
+    tmpdir = os.path.join(CUBRID, "tmp")
+    for name, mode in EXEC_WRITE_FILES:
+        path = os.path.join(tmpdir, name)
+        if mode is None:
+            os.symlink("authtest_exec_0755.sh", path)
+            continue
+        with open(path, "w") as f:
+            f.write(EXEC_WRITE_TEXT)
+        # chmod, not the mode of open(): the umask must not take bits away
+        os.chmod(path, mode)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1521,6 +1608,8 @@ def build_env():
     copy_extra_files()
     # Decoys for the log file name matching cases (CBRD-26446).
     make_name_match_decoys()
+    # Files writeandsaveconf must refuse to write (CBRD-27831).
+    make_exec_write_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1534,6 +1623,7 @@ def clean_env():
     stop_kill_targets()
     reset_test_dbs()
     remove_name_match_decoys()
+    remove_exec_write_files()
 
 
 def reset_leftovers():
@@ -1561,6 +1651,7 @@ def reset_leftovers():
     sweep_stale_helpers()
     reset_test_dbs()
     remove_name_match_decoys()
+    remove_exec_write_files()
 
 
 def xml_escape(text):

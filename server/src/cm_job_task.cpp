@@ -63,6 +63,7 @@
 #include "cm_porting.h"
 #include "cm_server_util.h"
 #include "cm_log_name.h"
+#include "cm_file_write.h"
 #include "cm_job_task.h"
 #include "cm_auto_task.h"
 #include "cm_dep.h"
@@ -340,7 +341,7 @@ static int _op_get_session_from_broker (char *broker_list,
 					T_CM_CAS_INFO_ALL *cas_info_all);
 static void _op_print_br_diagdata_to_res (nvplist *res,
     T_BROKER_DIAGDATA br_diagdata);
-static int _write_conf_to_file (nvplist *req, char *conf_path);
+static int _write_conf_to_file (nvplist *req, char *conf_path, char *_dbmt_error);
 static int _get_folders_with_keyword (char *search_folder_path,
 				      const char *keyword, nvplist *res, char *_dbmt_error);
 static int _get_block_from_log (FILE *fp, char *block_buf, int len);
@@ -1745,6 +1746,7 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char conf_path[PATH_MAX];
   char *conf_name;
+  int retval;
 
   conf_name = nv_get_val (req, "confname");
   if (conf_name == NULL)
@@ -1782,12 +1784,13 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if (_write_conf_to_file (req, conf_path) < 0)
+  retval = _write_conf_to_file (req, conf_path, _dbmt_error);
+  if (retval == ERR_FILE_OPEN_FAIL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
     }
 
-  return ERR_NO_ERROR;
+  return retval;
 }
 
 int
@@ -1893,16 +1896,32 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
   return retval;
 }
 
+/*
+ * _write_conf_to_file () - replace the contents of conf_path with the
+ *   "confdata" values of req, one per line.
+ *
+ *   An executable file is refused and left as it is (CBRD-27831, see
+ *   ut_open_for_content_write ()), and a new file is not created executable.
+ *
+ *   return: ERR_NO_ERROR; ERR_WITH_MSG for an executable file, the reason in
+ *     _dbmt_error; ERR_FILE_OPEN_FAIL if the file cannot be opened, with
+ *     _dbmt_error not changed, so that each caller reports it as before.
+ */
 static int
-_write_conf_to_file (nvplist *req, char *conf_path)
+_write_conf_to_file (nvplist *req, char *conf_path, char *_dbmt_error)
 {
   char *conf, *conf_data;
   int nv_len, i;
   FILE *outfile = NULL;
 
-  if ((outfile = fopen (conf_path, "w")) == NULL)
+  switch (ut_open_for_content_write (conf_path, &outfile, _dbmt_error, DBMT_ERROR_MSG_SIZE))
     {
-      return -1;
+    case CONTENT_WRITE_OK:
+      break;
+    case CONTENT_WRITE_EXECUTABLE:
+      return ERR_WITH_MSG;
+    default:
+      return ERR_FILE_OPEN_FAIL;
     }
 
   nv_len = req->nvplist_leng;
@@ -1924,7 +1943,7 @@ _write_conf_to_file (nvplist *req, char *conf_path)
 
   fclose (outfile);
 
-  return 0;
+  return ERR_NO_ERROR;
 }
 
 int
@@ -12467,6 +12486,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *conf_path;
   char conf_backup_path[PATH_MAX];
+  int retval;
 
   if ((conf_path = nv_get_val (req, "confpath")) == NULL)
     {
@@ -12494,14 +12514,15 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* create a new conf file from request. */
-  if (_write_conf_to_file (req, conf_path) < 0)
+  retval = _write_conf_to_file (req, conf_path, _dbmt_error);
+  if (retval == ERR_FILE_OPEN_FAIL)
     {
       strcpy_limit (_dbmt_error, "write config file error.",
 		    DBMT_ERROR_MSG_SIZE);
       return ERR_WITH_MSG;
     }
 
-  return ERR_NO_ERROR;
+  return retval;
 }
 
 int

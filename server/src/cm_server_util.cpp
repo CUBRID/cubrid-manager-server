@@ -5804,6 +5804,9 @@ check_base_path (const char *path, std::string &expanded_path, char *_dbmt_error
  *     configuration file (cm.conf, databases.txt; see admin_conf_files ()).
  *     No file task writes those two files; setsysparam does, for an admin
  *     only, and checks that itself.
+ *     Whether the file is executable is not checked here, as it can change
+ *     before the task opens the file: a task that replaces the contents of a
+ *     file checks the file it has opened (ut_open_for_content_write ()).
  */
 bool
 is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)

@@ -15,6 +15,9 @@ auth_new_admin,success
 file_protected_read,success
 file_protected_write,success
 file_cubrid_bin,success
+// executable files are not rewritten (CBRD-27831); assumes the umask of CMS
+// is 022 (default), for the mode of the new file
+file_exec_write,success
 // cm.conf and databases.txt: admin only, through setsysparam (CBRD-27832)
 file_admin_conf,success
 auth_admin_conf,success

@@ -142,6 +142,7 @@ server/test/
    - `reset_test_dbs()`로 테스트가 만든 DB 디렉터리 · `databases.txt` 항목 ·
      살아남은 `cub_server <db>` 프로세스 정리
    - `remove_name_match_decoys()`로 로그 파일 이름 매칭 미끼 정리 (4.11 참고)
+   - `remove_exec_write_files()`로 `file_exec_write` 케이스의 파일 정리 (4.8 참고)
    - 마지막의 `clean_env()`와 같은 일을 **시작 시점에 먼저** 한 번 더 한다.
      `SIGKILL`로 죽은 실행은 `finally`에 도달하지 못해 잔재를 남기는데, 그것이
      다음 실행까지 번지지 않게 하려는 것이다.
@@ -172,6 +173,8 @@ server/test/
      `analyzecaslog`용 CAS 로그 픽스처와 `getfolderswithkeyword`가 찾을 디렉터리
    - `make_name_match_decoys()`가 로그 파일 이름 매칭 케이스의 미끼를 `$CUBRID/log`에
      만든다 (4.11 참고)
+   - `make_exec_write_files()`가 `file_exec_write` 케이스가 쓰려는 실행 파일, 그 링크,
+     실행 권한이 없는 파일을 `$CUBRID/tmp`에 만든다 (4.8 참고)
    - 중단된 실행이 남긴 dbmt 사용자 `yifan`을 best-effort로 제거
    - `wait_for_mon_data()`가 첫 모니터링 수집이 끝날 때까지 대기
      (그 전에는 `vol_mon`이 없어 `set_mon_interval`이 실패한다)
@@ -569,6 +572,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"test_note": "<문자열>"` | 응답 `note`에 이 문자열이 있어야 통과. 러너가 지우고 보낸다. 같은 `failure`라도 원하는 이유로 거부됐는지 구분할 때 쓴다 |
 | `"test_no_text": "<문자열>"` | 응답 원문에 이 문자열이 없어야 통과. 러너가 지우고 보낸다. 비밀번호가 응답에 나오지 않는지 확인할 때 쓴다 |
 | `"test_source_ip": "<주소>"` | 이 요청을 이 호스트의 그 주소에서 보낸다. 러너가 지우고 보낸다. 서버가 다른 클라이언트의 요청으로 보게 할 때 쓴다. `cmsip`가 `127.0.0.1`이면 Linux에서는 `127.0.0.2`처럼 `127.x.x.x` 아무 주소나 쓸 수 있다 |
+| `"test_file_mode": {"<경로>": "<8진수>", ...}` | 응답을 받은 뒤 이 호스트의 각 파일(링크면 대상)의 모드가 그 값이어야 통과. 러너가 지우고 보낸다. 예: `{"$CUBRID/tmp/a.sh": "0755"}`. 거부된 쓰기가 파일을 그대로 두었는지, 새 파일의 모드를 확인할 때 쓴다. 러너가 CMS 호스트에서 돌 때만 쓸 수 있다. 빈 객체나 8진수가 아닌 값은 오류로 실행을 멈춘다 |
 | `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
 | `"test_value": {"<a.b.c>": <값>, ...}` | 응답 JSON의 각 key 경로 값이 `<값>`과 같아야 통과. 러너가 지우고 보낸다. 경로는 `test_no_key`와 같고, 경로 중간의 배열은 원소 하나라도 같으면 통과. JSON 타입까지 비교한다(`2`와 `"2"`, `true`와 `1`은 다르다). 기대값이 배열·객체이면 원소와 key까지 같은 방식으로 비교한다. 빈 객체(`{}`)는 아무것도 비교하지 않으므로 오류로 실행을 멈춘다. 예: `{"closed_sessions": 2}` |
 
@@ -596,6 +600,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `auth_new_admin` | `_new` API, `admin:yes` | 사용자 관리 task, `getadminloginfo`, 다른 사용자 비밀번호 변경 가능 |
 | `file_protected_read` | admin | 보호 파일(cm.pass, cmdb.pass, conlist, autojobs.conf, autoexecquery.conf, SSL 키·인증서)을 `viewlog`·`getfiletotallinenum`·`errortrace`·`runsqlstatement`·`readprivatedata`·`getallsysparam`·`copyfolder`(src)로 읽지 못함. `./`, `//`, `..` 변형 포함. 옆의 일반 파일은 읽힘 |
 | `file_protected_write` | admin | `resetlog`·`writeandsaveconf`·`writeprivatedata`·`removelog`·`copyfolder`(dest)로 보호 파일을 쓰지 못함 |
+| `file_exec_write` | admin | `writeandsaveconf`가 실행 권한이 있는 기존 파일(0755, 0700, 그리고 owner·group·others 비트 하나씩만 있는 0744·0654·0645)과 실행 파일을 가리키는 심볼릭 링크를 `writing to an executable file is not allowed`로 거부하고, 파일의 내용(`viewlog`)과 모드(`test_file_mode`)가 그대로임. 실행 권한이 없는 기존 파일(0640)은 쓰이고 모드가 유지되며, 새 파일은 0644로 만들어짐. 새 파일의 모드는 CMS의 umask가 022(기본)라고 전제한다. umask 0에서 실행 권한 없이 만들어지는 것은 단위 테스트(`unit/test_file_write`)가 확인한다. 파일은 `build_env()`가 `$CUBRID/tmp`에 만든다(CBRD-27831) |
 | `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못하고, `resetlog`·`removelog`로 비우거나 지우지 못함. 회귀해도 bin 아래 파일이 생기거나 지워지지 않도록 없는 경로를 쓴다 |
 | `file_admin_conf` | admin | admin이라도 `writeandsaveconf`·`writeprivatedata`·`resetlog`·`removelog`로 `cm.conf`·`databases.txt`를 쓰거나 비우거나 지우지 못하고(`..`, `//` 변형 포함), `copyfolder`(dest)로 그 파일이 있는 `$CUBRID_DATABASES`에 쓰지 못함. `getallsysparam`으로는 두 파일을 읽을 수 있음 |
 | `auth_admin_conf` | `_new` API, dbc·dbo yes | `setsysparam`으로 `cm.conf`를 쓰지 못하고(ADMIN 필요), `writeandsaveconf`도 거부. `getallsysparam`으로는 `cm.conf`·`databases.txt`를 읽을 수 있음 |

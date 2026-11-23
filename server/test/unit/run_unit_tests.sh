@@ -34,6 +34,7 @@ flags="-std=gnu++11 -Wall -W -I$src"
 tests=(
   "test_session_ip:cm_session_ip.cpp"
   "test_log_name:cm_log_name.cpp"
+  "test_file_write:cm_file_write.cpp"
 )
 
 status=0
