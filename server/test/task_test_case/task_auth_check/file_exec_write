@@ -9,7 +9,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0755.sh": "0755"
+   "$CUBRID/tmp/authtest_exec_0755.sh": "0755",
+   "$CUBRID/tmp/authtest_exec_0755.sh.bak": "none"
   }
  },
  {
@@ -22,7 +23,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0700.sh": "0700"
+   "$CUBRID/tmp/authtest_exec_0700.sh": "0700",
+   "$CUBRID/tmp/authtest_exec_0700.sh.bak": "none"
   }
  },
  {
@@ -35,7 +37,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0744.sh": "0744"
+   "$CUBRID/tmp/authtest_exec_0744.sh": "0744",
+   "$CUBRID/tmp/authtest_exec_0744.sh.bak": "none"
   }
  },
  {
@@ -48,7 +51,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0654.sh": "0654"
+   "$CUBRID/tmp/authtest_exec_0654.sh": "0654",
+   "$CUBRID/tmp/authtest_exec_0654.sh.bak": "none"
   }
  },
  {
@@ -61,7 +65,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0645.sh": "0645"
+   "$CUBRID/tmp/authtest_exec_0645.sh": "0645",
+   "$CUBRID/tmp/authtest_exec_0645.sh.bak": "none"
   }
  },
  {
@@ -74,7 +79,8 @@
   "test_expect": "failure",
   "test_note": "writing to an executable file is not allowed",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_exec_0755.sh": "0755"
+   "$CUBRID/tmp/authtest_exec_0755.sh": "0755",
+   "$CUBRID/tmp/authtest_exec_link.conf.bak": "none"
   }
  },
  {
@@ -115,7 +121,22 @@
   ],
   "test_expect": "success",
   "test_file_mode": {
-   "$CUBRID/tmp/authtest_noexec_0640.conf": "0640"
+   "$CUBRID/tmp/authtest_noexec_0640.conf": "0640",
+   "$CUBRID/tmp/authtest_noexec_0640.conf.bak": "0640"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_noexec_0640.conf.bak",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
   }
  },
  {

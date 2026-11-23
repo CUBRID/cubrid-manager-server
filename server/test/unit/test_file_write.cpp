@@ -19,13 +19,16 @@
 
 /*
  * test_file_write.cpp - unit tests of server/src/cm_file_write.cpp, how
- *   writeandsaveconf and setsysparam open the file they rewrite
- *   (CBRD-27831).
+ *   writeandsaveconf, setsysparam and writeprivatedata open the file they
+ *   rewrite, and how writeandsaveconf writes its backup (CBRD-27831).
  *
  *   An executable file is refused and left as it was, whichever execute bit
  *   it has, also through a symbolic link; a file that is not executable is
  *   rewritten and keeps its mode; a new file is never created executable,
  *   even with umask 0, which the API test cannot set for a running CMS.
+ *   The backup is written under the same rules: never into an executable
+ *   file, and a new backup gets the mode of the original without its
+ *   execute bits.
  *
  *   Build and run with run_unit_tests.sh in this directory; it needs no
  *   CUBRID build.
@@ -247,6 +250,98 @@ test_written (void)
   check (err[0] == '\0', "an open failure sets no reason");
 }
 
+static void
+test_executable_file (void)
+{
+  char err[512] = "";
+  std::string expect_err = "writing to an executable file is not allowed: " + work_path ("exec_0755.sh");
+
+  /* the files test_refused () laid */
+  check (ut_is_executable_file (work_path ("exec_0755.sh").c_str (), err, sizeof (err)), "0755 is an executable file");
+  check (expect_err == err, "an executable file: the reason is given");
+  check (ut_is_executable_file (work_path ("exec_0645.sh").c_str (), NULL, 0), "0645 is an executable file");
+  check (ut_is_executable_file (work_path ("link.conf").c_str (), NULL, 0), "a link to 0755 is an executable file");
+
+  err[0] = '\0';
+  make_file ("plain_check.conf", 0640);
+  check (!ut_is_executable_file (work_path ("plain_check.conf").c_str (), err, sizeof (err)), "0640 is not executable");
+  check (err[0] == '\0', "not executable: no reason is set");
+  check (!ut_is_executable_file (work_path ("no_such_file").c_str (), NULL, 0), "a missing file is not executable");
+  check (!ut_is_executable_file (work_dir, NULL, 0), "a directory is not an executable file");
+  check (!ut_is_executable_file (NULL, NULL, 0), "NULL is not an executable file");
+}
+
+/* ut_copy_to_backup () from `src` to `dest`, both under work_dir */
+static T_CONTENT_WRITE_RESULT
+backup (const char *src, const char *dest, char *err_buf, size_t err_size)
+{
+  return ut_copy_to_backup (work_path (src).c_str (), work_path (dest).c_str (), err_buf, err_size);
+}
+
+static void
+test_backup (void)
+{
+  char err[512] = "";
+  std::string expect_err;
+  std::string src = work_path ("bak_src.conf");
+  FILE *fp;
+
+  /* bytes as they are: no trailing newline added, none dropped */
+  fp = fopen (src.c_str (), "w");
+  fputs ("line 1\nline 2 without newline", fp);
+  fclose (fp);
+  chmod (src.c_str (), 0600);
+
+  umask (0);
+  check (backup ("bak_src.conf", "bak_new.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK, "a new backup is written");
+  check (file_text (work_path ("bak_new.conf.bak")) == "line 1\nline 2 without newline",
+	 "a new backup has the same bytes");
+  check (file_mode (work_path ("bak_new.conf.bak")) == 0600, "a new backup of 0600 is 0600 (umask 0)");
+
+  /* the original is executable: the new backup is not */
+  make_file ("bak_exec_src.sh", 0755);
+  check (backup ("bak_exec_src.sh", "bak_exec_src.sh.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
+	 "a backup of 0755 is written");
+  check (file_mode (work_path ("bak_exec_src.sh.bak")) == 0644, "a new backup of 0755 is 0644, not executable");
+  umask (022);
+
+  /* an existing backup that is not executable is replaced and keeps its mode */
+  make_file ("bak_old.conf.bak", 0640);
+  check (backup ("bak_src.conf", "bak_old.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
+	 "an existing 0640 backup is written");
+  check (file_text (work_path ("bak_old.conf.bak")) == "line 1\nline 2 without newline",
+	 "an existing backup is replaced, not appended to");
+  check (file_mode (work_path ("bak_old.conf.bak")) == 0640, "an existing backup keeps its mode");
+  check (err[0] == '\0', "a written backup sets no reason");
+
+  /* an executable backup is refused and left as it was */
+  make_file ("bak_exec.conf.bak", 0755);
+  expect_err = "writing to an executable file is not allowed: " + work_path ("bak_exec.conf.bak");
+  check (backup ("bak_src.conf", "bak_exec.conf.bak", err, sizeof (err)) == CONTENT_WRITE_EXECUTABLE,
+	 "an executable backup is refused");
+  check (expect_err == err, "an executable backup: the reason names the backup");
+  check (file_text (work_path ("bak_exec.conf.bak")) == FIXTURE_TEXT, "an executable backup: contents not changed");
+  check (file_mode (work_path ("bak_exec.conf.bak")) == 0755, "an executable backup: mode not changed");
+
+  /* a backup that is a link to an executable file is refused too */
+  make_file ("bak_link_target.sh", 0700);
+  if (symlink (work_path ("bak_link_target.sh").c_str (), work_path ("bak_link.conf.bak").c_str ()) != 0)
+    {
+      perror ("symlink");
+      exit (2);
+    }
+  check (backup ("bak_src.conf", "bak_link.conf.bak", NULL, 0) == CONTENT_WRITE_EXECUTABLE,
+	 "a backup linked to 0700 is refused");
+  check (file_text (work_path ("bak_link_target.sh")) == FIXTURE_TEXT, "a backup linked to 0700: target not changed");
+
+  /* nothing to copy: no backup is made, no reason is set */
+  err[0] = '\0';
+  check (backup ("no_such_file", "bak_missing.bak", err, sizeof (err)) == CONTENT_WRITE_OPEN_FAIL,
+	 "a missing original fails");
+  check (access (work_path ("bak_missing.bak").c_str (), F_OK) != 0, "a missing original: no backup is created");
+  check (err[0] == '\0', "a missing original: no reason is set");
+}
+
 int
 main (void)
 {
@@ -260,6 +355,8 @@ main (void)
   test_executable_extension ();
   test_refused ();
   test_written ();
+  test_executable_file ();
+  test_backup ();
 
   if (failures == 0)
     {

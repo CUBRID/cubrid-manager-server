@@ -392,10 +392,11 @@ helper_procs = []
 #                                  (the target, for a link) must have that
 #                                  mode, e.g. "0755" (removed before sending);
 #                                  checks that a refused write left the file
-#                                  as it was, or the mode of a new file. Only
-#                                  for sets that run on the CMS host; an
-#                                  empty object or a value that is not octal
-#                                  stops the run
+#                                  as it was, or the mode of a new file.
+#                                  "none" instead of a mode: the path must not
+#                                  exist. Only for sets that run on the CMS
+#                                  host; an empty object or a value that is
+#                                  neither octal nor "none" stops the run
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -512,6 +513,10 @@ def value_mismatch(data, values):
 def file_mode_mismatch(modes):
     """The first test_file_mode entry the files on this host do not satisfy."""
     for path, want in modes.items():
+        if want == "none":
+            if os.path.lexists(path):
+                return "%s exists" % path
+            continue
         try:
             got = stat.S_IMODE(os.stat(path).st_mode)
         except OSError as e:
@@ -856,11 +861,12 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         req_file_modes = req.pop("test_file_mode", None)
         if req_file_modes is not None and (
                 not isinstance(req_file_modes, dict) or not req_file_modes
-                or not all(isinstance(v, str) and re.match(r"^0?[0-7]{3,4}$", v)
+                or not all(isinstance(v, str)
+                           and (v == "none" or re.match(r"^0?[0-7]{3,4}$", v))
                            for v in req_file_modes.values())):
             # an empty object would check nothing and always pass
             print("\033[31m%s: \"test_file_mode\" must be a non-empty object "
-                  "of path to octal mode.\033[0m" % taskfile)
+                  "of path to octal mode or \"none\".\033[0m" % taskfile)
             sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
@@ -1519,20 +1525,24 @@ def remove_name_match_decoys():
             pass
 
 
-# Files of the file_exec_write case of task_auth_check (CBRD-27831), under
+# Files of the file_exec_* cases of task_auth_check (CBRD-27831), under
 # $CUBRID/tmp: executable files with each execute bit on its own, a link to
-# one, and a file that is not executable. (name, mode); a mode of None is the
-# link to authtest_exec_0755.sh.
+# one, files that are not executable, and a file whose backup (.bak) is
+# executable. (name, mode); a mode of None is the link to
+# authtest_exec_0755.sh.
 EXEC_WRITE_FILES = (("authtest_exec_0755.sh", 0o755),
                     ("authtest_exec_0700.sh", 0o700),
                     ("authtest_exec_0744.sh", 0o744),
                     ("authtest_exec_0654.sh", 0o654),
                     ("authtest_exec_0645.sh", 0o645),
                     ("authtest_exec_link.conf", None),
-                    ("authtest_noexec_0640.conf", 0o640))
+                    ("authtest_noexec_0640.conf", 0o640),
+                    ("authtest_noexec_0600.conf", 0o600),
+                    ("authtest_bak_target.conf", 0o640),
+                    ("authtest_bak_target.conf.bak", 0o755))
 EXEC_WRITE_TEXT = "#!/bin/sh\necho authtest exec fixture\n"
-# what the case writes and must find created without an execute bit
-EXEC_WRITE_NEW_FILE = "authtest_exec_new.conf"
+# what the cases write and must find created without an execute bit
+EXEC_WRITE_NEW_FILES = ("authtest_exec_new.conf", "authtest_exec_new_private.conf")
 
 
 def remove_exec_write_files():
@@ -1545,7 +1555,7 @@ def remove_exec_write_files():
         # Not known yet: the paths would resolve against the current directory.
         return
     tmpdir = os.path.join(CUBRID, "tmp")
-    names = [name for name, _mode in EXEC_WRITE_FILES] + [EXEC_WRITE_NEW_FILE]
+    names = [name for name, _mode in EXEC_WRITE_FILES] + list(EXEC_WRITE_NEW_FILES)
     for name in names:
         for path in (os.path.join(tmpdir, name),
                      os.path.join(tmpdir, name + ".bak")):

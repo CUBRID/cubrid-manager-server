@@ -1,0 +1,148 @@
+[
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_0755.sh",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0755.sh": "0755"
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_0700.sh",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0700.sh": "0700"
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_0744.sh",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0744.sh": "0744"
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_0654.sh",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0654.sh": "0654"
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_0645.sh",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0645.sh": "0645"
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_link.conf",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_0755.sh": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_exec_0700.sh",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_exec_0645.sh",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_noexec_0600.conf",
+  "confdata": [
+   "authtest",
+   "private"
+  ],
+  "test_expect": "success",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_noexec_0600.conf": "0600"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_noexec_0600.conf",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "authtest",
+    "private"
+   ]
+  }
+ },
+ {
+  "task": "writeprivatedata",
+  "token": "",
+  "confname": "../../tmp/authtest_exec_new_private.conf",
+  "confdata": [
+   "authtest",
+   "new"
+  ],
+  "test_expect": "success",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_exec_new_private.conf": "0644"
+  }
+ }
+]

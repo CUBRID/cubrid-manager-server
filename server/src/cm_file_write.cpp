@@ -145,19 +145,17 @@ set_executable_error (char *err_buf, size_t err_size, const char *path)
 
 #if defined (WINDOWS)
 /*
- * win_opened_file_is_executable () - the file open on `fd` has an executable
+ * handle_is_executable () - the file open on `h` has an executable
  *   extension under the name Windows gives it, which covers a link, an 8.3
  *   short name (ABCDEF~1.BAT) and anything else that reaches a file by
  *   another name. Returns 1 if so, 0 if not, -1 if the name is not known.
  */
 static int
-win_opened_file_is_executable (int fd)
+handle_is_executable (HANDLE h)
 {
   char buf[FINAL_PATH_BUF_SIZE];
-  HANDLE h;
   DWORD n;
 
-  h = (HANDLE) _get_osfhandle (fd);
   if (h == INVALID_HANDLE_VALUE)
     {
       return -1;
@@ -172,21 +170,25 @@ win_opened_file_is_executable (int fd)
 #endif
 
 /*
- * ut_open_for_content_write () - open `path` for a task that replaces its
- *   contents, like fopen (path, "w"), unless it is an executable file.
+ * open_non_executable_for_write () - open `path` to replace its contents unless it is an
+ *   executable file; the common part of ut_open_for_content_write () and
+ *   ut_copy_to_backup ().
  *
- *   An existing file keeps its inode and mode when it is rewritten, so
- *   writing an executable file would leave the new contents executable. It
- *   is refused, and left as it is (CONTENT_WRITE_EXECUTABLE, with the reason
- *   in err_buf). The execute bits are not dropped instead: that would break
- *   a script that is meant to be executable.
+ *   Linux: the file (the target, if `path` is a symbolic link) is opened
+ *   without O_TRUNC and judged by fstat () on that descriptor, then
+ *   truncated. Judging the path first and opening it afterwards would leave
+ *   a gap in which the file could be replaced. A new file is created with
+ *   `create_mode` without its execute bits (the umask can only take more
+ *   away), so a task never creates an executable file. An existing file that
+ *   is not executable keeps its mode.
  *
- *   CONTENT_WRITE_OPEN_FAIL: the file could not be opened or truncated;
- *   err_buf is not changed, so the caller reports it as before. On
- *   CONTENT_WRITE_OK, *fp is open for writing and the file is empty.
+ *   Windows: the extension decides (executable_extensions[]). It is checked
+ *   on `path` before opening, so that no executable file is created, and on
+ *   the name of the opened file, before it is truncated. `create_mode` is
+ *   not used. `binary` opens in binary instead of text mode.
  */
-T_CONTENT_WRITE_RESULT
-ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size)
+static T_CONTENT_WRITE_RESULT
+open_non_executable_for_write (const char *path, unsigned int create_mode, bool binary, FILE **fp, char *err_buf, size_t err_size)
 {
   int fd;
   FILE *outfile;
@@ -200,20 +202,20 @@ ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t er
 #if defined (WINDOWS)
   int executable;
 
+  (void) create_mode;
   if (ut_has_executable_extension (path))
     {
       set_executable_error (err_buf, err_size, path);
       return CONTENT_WRITE_EXECUTABLE;
     }
 
-  /* text mode, as fopen (path, "w") opens it */
-  fd = _open (path, _O_WRONLY | _O_CREAT | _O_TEXT, _S_IREAD | _S_IWRITE);
+  fd = _open (path, _O_WRONLY | _O_CREAT | (binary ? _O_BINARY : _O_TEXT), _S_IREAD | _S_IWRITE);
   if (fd < 0)
     {
       return CONTENT_WRITE_OPEN_FAIL;
     }
 
-  executable = win_opened_file_is_executable (fd);
+  executable = handle_is_executable ((HANDLE) _get_osfhandle (fd));
   if (executable != 0)
     {
       _close (fd);
@@ -231,7 +233,7 @@ ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t er
       return CONTENT_WRITE_OPEN_FAIL;
     }
 
-  outfile = _fdopen (fd, "w");
+  outfile = _fdopen (fd, binary ? "wb" : "w");
   if (outfile == NULL)
     {
       _close (fd);
@@ -240,7 +242,8 @@ ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t er
 #else
   struct stat st;
 
-  fd = open (path, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  (void) binary;
+  fd = open (path, O_WRONLY | O_CREAT, (mode_t) (create_mode & 0666));
   if (fd < 0)
     {
       return CONTENT_WRITE_OPEN_FAIL;
@@ -275,5 +278,159 @@ ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t er
 #endif
 
   *fp = outfile;
+  return CONTENT_WRITE_OK;
+}
+
+/*
+ * ut_open_for_content_write () - open `path` for a task that replaces its
+ *   contents, like fopen (path, "w"), unless it is an executable file.
+ *
+ *   An existing file keeps its inode and mode when it is rewritten, so
+ *   writing an executable file would leave the new contents executable. It
+ *   is refused, and left as it is (CONTENT_WRITE_EXECUTABLE, with the reason
+ *   in err_buf). The execute bits are not dropped instead: that would break
+ *   a script that is meant to be executable. A new file is created with at
+ *   most 0644. See open_non_executable_for_write () for how the file is judged.
+ *
+ *   CONTENT_WRITE_OPEN_FAIL: the file could not be opened or truncated;
+ *   err_buf is not changed, so the caller reports it as before. On
+ *   CONTENT_WRITE_OK, *fp is open for writing and the file is empty.
+ */
+T_CONTENT_WRITE_RESULT
+ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size)
+{
+  return open_non_executable_for_write (path, 0644, false, fp, err_buf, err_size);
+}
+
+/*
+ * ut_is_executable_file () - the existing regular file `path` is
+ *   executable, judged as open_non_executable_for_write () judges it: on Linux an execute bit
+ *   (of the target, for a symbolic link), on Windows the extension of `path`
+ *   or of the name Windows gives the file. If so, the reason is set in
+ *   err_buf. false for a file that does not exist or cannot be examined.
+ *
+ *   Only for refusing before work that should not be done for a file that
+ *   will be refused, such as the backup of writeandsaveconf. The file can
+ *   change afterwards, so the write itself still has to go through
+ *   ut_open_for_content_write ().
+ */
+bool
+ut_is_executable_file (const char *path, char *err_buf, size_t err_size)
+{
+  bool executable = false;
+
+  if (path == NULL)
+    {
+      return false;
+    }
+
+#if defined (WINDOWS)
+  if (ut_has_executable_extension (path))
+    {
+      executable = true;
+    }
+  else
+    {
+      /* access 0: only query the name; FILE_FLAG_BACKUP_SEMANTICS opens directories */
+      HANDLE h = CreateFileA (path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+			      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+
+      if (h != INVALID_HANDLE_VALUE)
+	{
+	  executable = (handle_is_executable (h) == 1);
+	  CloseHandle (h);
+	}
+    }
+#else
+  struct stat st;
+
+  executable = (stat (path, &st) == 0 && S_ISREG (st.st_mode) && ut_is_executable_mode (st.st_mode));
+#endif
+
+  if (executable)
+    {
+      set_executable_error (err_buf, err_size, path);
+    }
+  return executable;
+}
+
+/*
+ * ut_copy_to_backup () - copy `src` to `dest`, its backup, writing `dest`
+ *   as ut_open_for_content_write () writes a file: an executable `dest` is
+ *   refused and left as it is (CONTENT_WRITE_EXECUTABLE, with the reason in
+ *   err_buf), so that the contents of `src`, which a task may have written,
+ *   never land in an executable file.
+ *
+ *   A new `dest` gets the mode of `src` without its execute bits (Linux), so
+ *   that the backup of a private file stays private and is never
+ *   executable; an existing `dest` keeps its mode. The bytes are copied as
+ *   they are (binary mode on Windows).
+ *
+ *   CONTENT_WRITE_OPEN_FAIL: `src` could not be read or `dest` could not be
+ *   written; err_buf is not changed. A `dest` that was written only in part
+ *   is removed, as file_copy () does.
+ */
+T_CONTENT_WRITE_RESULT
+ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_size)
+{
+  FILE *infile, *outfile;
+  char buf[8192];
+  size_t n;
+  unsigned int mode = 0644;
+  bool ok = true;
+  T_CONTENT_WRITE_RESULT result;
+
+  if (src == NULL || dest == NULL)
+    {
+      return CONTENT_WRITE_OPEN_FAIL;
+    }
+
+#if !defined (WINDOWS)
+  struct stat st;
+
+  if (stat (src, &st) == 0)
+    {
+      mode = st.st_mode & 0666;
+    }
+#endif
+
+  infile = fopen (src, "rb");
+  if (infile == NULL)
+    {
+      return CONTENT_WRITE_OPEN_FAIL;
+    }
+
+  result = open_non_executable_for_write (dest, mode, true, &outfile, err_buf, err_size);
+  if (result != CONTENT_WRITE_OK)
+    {
+      fclose (infile);
+      return result;
+    }
+
+  while ((n = fread (buf, 1, sizeof (buf), infile)) > 0)
+    {
+      if (fwrite (buf, 1, n, outfile) != n)
+	{
+	  ok = false;
+	  break;
+	}
+    }
+  if (ferror (infile))
+    {
+      ok = false;
+    }
+  fclose (infile);
+
+  /* a write error can show up only when the file is closed */
+  if (fclose (outfile) != 0)
+    {
+      ok = false;
+    }
+
+  if (!ok)
+    {
+      remove (dest);
+      return CONTENT_WRITE_OPEN_FAIL;
+    }
   return CONTENT_WRITE_OK;
 }

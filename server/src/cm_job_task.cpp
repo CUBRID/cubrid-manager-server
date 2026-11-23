@@ -1900,7 +1900,7 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
  * _write_conf_to_file () - replace the contents of conf_path with the
  *   "confdata" values of req, one per line.
  *
- *   An executable file is refused and left as it is (CBRD-27831, see
+ *   An executable file is refused and left as it is, see
  *   ut_open_for_content_write ()), and a new file is not created executable.
  *
  *   return: ERR_NO_ERROR; ERR_WITH_MSG for an executable file, the reason in
@@ -12499,14 +12499,39 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * An executable file is refused before it is backed up, so that a refused
+   * request does not touch <conf_path>.bak. _write_conf_to_file () checks the
+   * file it opens again, as it can change in between.
+   */
+  if (ut_is_executable_file (conf_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+    {
+      return ERR_WITH_MSG;
+    }
+
   /* if conf_path exsit, backup it at the current path. */
   if (access (conf_path, F_OK) == 0)
     {
       snprintf (conf_backup_path, sizeof (conf_backup_path) - 1,
 		"%s.bak", conf_path);
 
-      if (file_copy (conf_path, conf_backup_path) != 0)
+      /*
+       * The backup is a file the task writes too, with contents an earlier
+       * request may have written: under the same rules as conf_path, and
+       * never into an executable file.
+       */
+      if (!is_authorized_filename (conf_backup_path, FOR_WRITE, _dbmt_error))
 	{
+	  return ERR_WITH_MSG;
+	}
+
+      switch (ut_copy_to_backup (conf_path, conf_backup_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+	{
+	case CONTENT_WRITE_OK:
+	  break;
+	case CONTENT_WRITE_EXECUTABLE:
+	  return ERR_WITH_MSG;
+	default:
 	  strcpy_limit (_dbmt_error, "backup file error.",
 			DBMT_ERROR_MSG_SIZE);
 	  return ERR_WITH_MSG;
