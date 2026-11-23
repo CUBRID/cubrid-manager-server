@@ -73,13 +73,14 @@ ut_is_executable_mode (unsigned int st_mode)
 #endif
 }
 
-#if defined (WINDOWS)
 /*
  * ut_has_executable_extension () - the last part of `path` ends with one of
  *   executable_extensions[], in any case. Trailing dots and spaces are
  *   dropped first, as Windows drops them when it opens the file ("a.bat."
  *   opens "a.bat"). Both '/' and '\' separate the parts, so that the result
  *   does not depend on the platform it is tested on.
+ *   Only Windows uses it, but it is built on every platform so that the unit
+ *   test, which runs on Linux (test_file_write.cpp), covers the rule.
  */
 bool
 ut_has_executable_extension (const char *path)
@@ -123,7 +124,6 @@ ut_has_executable_extension (const char *path)
     }
   return false;
 }
-#endif
 
 /*
  * set_executable_error () - "writing to an executable file is not allowed:

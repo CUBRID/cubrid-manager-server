@@ -38,9 +38,7 @@ typedef enum
 } T_CONTENT_WRITE_RESULT;
 
 bool ut_is_executable_mode (unsigned int st_mode);
-#if defined (WINDOWS)
 bool ut_has_executable_extension (const char *path);
-#endif
 T_CONTENT_WRITE_RESULT ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size);
 
 #endif /* _CM_FILE_WRITE_H_ */
