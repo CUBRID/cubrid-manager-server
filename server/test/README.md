@@ -143,6 +143,7 @@ server/test/
      살아남은 `cub_server <db>` 프로세스 정리
    - `remove_name_match_decoys()`로 로그 파일 이름 매칭 미끼 정리 (4.11 참고)
    - `remove_exec_write_files()`로 `file_exec_*` 케이스의 파일 정리 (4.8 참고)
+   - `remove_script_files()`로 `runscript` 스크립트와 `script_path` 케이스의 파일 정리 (4.8 참고)
    - 마지막의 `clean_env()`와 같은 일을 **시작 시점에 먼저** 한 번 더 한다.
      `SIGKILL`로 죽은 실행은 `finally`에 도달하지 못해 잔재를 남기는데, 그것이
      다음 실행까지 번지지 않게 하려는 것이다.
@@ -165,7 +166,10 @@ server/test/
    - `reset_test_dbs()` 재실행 (2번 참고: 이번에는 `getenv`가 알려준 경로로)
    - `copydb_advance`가 복사할 `destinationdb1` 디렉터리 생성
    - `getcaslogtopresult` / `removecasrunnertmpfile`가 읽을 픽스처를 `$CUBRID/tmp`로 복사
-   - `removelog`용 일회용 파일과 `runscript`용 스크립트(`$CUBRID/tmp/test_runscript.sh`) 생성
+   - `removelog`용 일회용 파일과 `runscript`용 스크립트(`$CUBRID/conf/test_runscript.sh`, 0700) 생성.
+     `runscript`는 `$CUBRID/conf` 바로 아래의, CMS 실행 사용자나 root만 바꿀 수 있는 스크립트만
+     실행하므로 러너는 CMS와 같은 사용자로 돌아야 하고 `$CUBRID/conf`는 group/others 쓰기 권한이
+     없어야 한다
    - `make_loaddb_input()`이 `loaddb`가 소비할 일회용 덤프를 만든다
      (`loaddb`는 `delete_orignal_files:"y"`라 입력을 지운다. 예전에는 demodb의 원본
      덤프를 가리켜서 직전 실행의 `unloaddb` 결과에 의존했다)
@@ -175,6 +179,8 @@ server/test/
      만든다 (4.11 참고)
    - `make_exec_write_files()`가 `file_exec_*` 케이스가 쓰려는 실행 파일, 그 링크,
      실행 권한이 없는 파일, 백업(`.bak`)이 실행 파일인 파일을 `$CUBRID/tmp`에 만든다 (4.8 참고)
+   - `make_script_path_files()`가 `script_path` 케이스의 스크립트를 `$CUBRID/conf`(정상, group·others
+     쓰기 가능, 바깥을 가리키는 링크, 하위 디렉터리), `$CUBRID/tmp`, `$CUBRID_DATABASES`에 만든다 (4.8 참고)
    - 중단된 실행이 남긴 dbmt 사용자 `yifan`을 best-effort로 제거
    - `wait_for_mon_data()`가 첫 모니터링 수집이 끝날 때까지 대기
      (그 전에는 `vol_mon`이 없어 `set_mon_interval`이 실패한다)
@@ -603,6 +609,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `file_exec_write` | admin | `writeandsaveconf`가 실행 권한이 있는 기존 파일(0755, 0700, 그리고 owner·group·others 비트 하나씩만 있는 0744·0654·0645)과 실행 파일을 가리키는 심볼릭 링크를 `writing to an executable file is not allowed`로 거부하고, 파일의 내용(`viewlog`)과 모드(`test_file_mode`)가 그대로임. 실행 권한이 없는 기존 파일(0640)은 쓰이고 모드가 유지되며, 새 파일은 0644로 만들어짐. 새 파일의 모드는 CMS의 umask가 022(기본)라고 전제한다. umask 0에서 실행 권한 없이 만들어지는 것은 단위 테스트(`unit/test_file_write`)가 확인한다. 거부된 요청은 백업(`.bak`)을 만들지 않고, 0640 파일의 새 백업은 0640에 원래 내용을 가짐. 파일은 `build_env()`가 `$CUBRID/tmp`에 만든다(CBRD-27831) |
 | `file_exec_backup` | admin | 실행 권한이 없는 파일(0640)이라도 그 백업 `<file>.bak`이 실행 파일(0755)이면 `writeandsaveconf`가 백업 경로를 담은 `writing to an executable file is not allowed: <file>.bak`로 거부하고, 파일과 백업의 내용·모드가 그대로임(CBRD-27831) |
 | `file_exec_private` | admin | `writeprivatedata`(`confname: ../../tmp/...`)가 `file_exec_write`와 같은 실행 파일과 링크를 거부하고 내용·모드가 그대로임. 실행 권한이 없는 파일(0600)은 쓰이고 모드가 유지되며, 새 파일은 0644로 만들어짐(CBRD-27831) |
+| `script_path` | admin | `runscript`가 `$CUBRID/conf` 바로 아래의 0700 스크립트는 실행하고, 하위 디렉터리·`$CUBRID/tmp`·`$CUBRID_DATABASES`·`$CUBRID/bin`의 파일과 바깥을 가리키는 `$CUBRID/conf` 안의 링크(`only a script directly under`), 디렉터리(`not a regular file`), 없는 파일, group·others 쓰기 가능(0775, 0757) 스크립트를 사유별 문구로 거부. `writeandsaveconf`로 `$CUBRID/conf`에 만든 스크립트는 0644라 `the script is not executable`로 거부. 다른 소유자와 `$CUBRID/conf` 디렉터리 검사는 대상 서버를 바꿔야 해서 단위 테스트(`unit/test_script_path`)가 확인한다. 러너가 CMS와 같은 사용자로 돈다고 전제한다(CBRD-27831) |
 | `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못하고, `resetlog`·`removelog`로 비우거나 지우지 못함. 회귀해도 bin 아래 파일이 생기거나 지워지지 않도록 없는 경로를 쓴다 |
 | `file_admin_conf` | admin | admin이라도 `writeandsaveconf`·`writeprivatedata`·`resetlog`·`removelog`로 `cm.conf`·`databases.txt`를 쓰거나 비우거나 지우지 못하고(`..`, `//` 변형 포함), `copyfolder`(dest)로 그 파일이 있는 `$CUBRID_DATABASES`에 쓰지 못함. `getallsysparam`으로는 두 파일을 읽을 수 있음 |
 | `auth_admin_conf` | `_new` API, dbc·dbo yes | `setsysparam`으로 `cm.conf`를 쓰지 못하고(ADMIN 필요), `writeandsaveconf`도 거부. `getallsysparam`으로는 `cm.conf`·`databases.txt`를 읽을 수 있음 |

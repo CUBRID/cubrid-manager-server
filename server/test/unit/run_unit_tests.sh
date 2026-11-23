@@ -35,6 +35,7 @@ tests=(
   "test_session_ip:cm_session_ip.cpp"
   "test_log_name:cm_log_name.cpp"
   "test_file_write:cm_task_file.cpp"
+  "test_script_path:cm_task_file.cpp"
 )
 
 status=0

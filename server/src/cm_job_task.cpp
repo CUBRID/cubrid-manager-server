@@ -12665,6 +12665,9 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret;
   int envc = 0;
   const char **extra_envp = NULL;
+  char script_dir[PATH_MAX];
+  std::string script_real_path;
+  unsigned int cms_uid;
 
   if ((script_path = nv_get_val (req, "script_path")) == NULL)
     {
@@ -12676,6 +12679,27 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
   if (!is_authorized_filename (script_path, FOR_READ, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
+  /*
+   * Only a script directly under $CUBRID/conf that nobody but the user CMS
+   * runs as and root can change (see ut_check_script_path ()). The script is
+   * run by the path checked, with links resolved.
+   */
+#if !defined (DO_NOT_USE_CUBRIDENV)
+  snprintf (script_dir, sizeof (script_dir), "%s/%s", sco.szCubrid, DBMT_CONF_DIR);
+#else
+  snprintf (script_dir, sizeof (script_dir), "%s", DBMT_CONF_DIR);
+#endif
+#if defined (WINDOWS)
+  cms_uid = 0;
+#else
+  cms_uid = (unsigned int) geteuid ();
+#endif
+  if (!ut_check_script_path (script_path, script_dir, cms_uid, script_real_path, _dbmt_error,
+			     DBMT_ERROR_MSG_SIZE))
     {
       return ERR_WITH_MSG;
     }
@@ -12724,7 +12748,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       extra_envp[envc] = NULL;
     }
 
-  argv[argc++] = script_path;
+  argv[argc++] = script_real_path.c_str ();
   argv[argc++] = NULL;
 
   ret = run_child_env (argv, RUN_FOREGROUND, NULL, outfile, errfile, &status, extra_envp);

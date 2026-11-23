@@ -1,0 +1,91 @@
+[
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_ok.sh",
+  "test_expect": "success"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_sub/sub.sh",
+  "test_expect": "failure",
+  "test_note": "only a script directly under"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/tmp/authtest_script_tmp.sh",
+  "test_expect": "failure",
+  "test_note": "only a script directly under"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID_DATABASES/authtest_script_db.sh",
+  "test_expect": "failure",
+  "test_note": "only a script directly under"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/bin/cubrid",
+  "test_expect": "failure",
+  "test_note": "only a script directly under"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_link.sh",
+  "test_expect": "failure",
+  "test_note": "only a script directly under"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_sub",
+  "test_expect": "failure",
+  "test_note": "the script is not a regular file"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_nosuch.sh",
+  "test_expect": "failure",
+  "test_note": "the script does not exist"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_group_w.sh",
+  "test_expect": "failure",
+  "test_note": "the script must not be writable by the group or others"
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_others_w.sh",
+  "test_expect": "failure",
+  "test_note": "the script must not be writable by the group or others"
+ },
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/conf/authtest_script_new.sh",
+  "confdata": [
+   "#!/bin/sh",
+   "echo runscript test"
+  ],
+  "test_expect": "success",
+  "test_file_mode": {
+   "$CUBRID/conf/authtest_script_new.sh": "0644"
+  }
+ },
+ {
+  "task": "runscript",
+  "token": "",
+  "script_path": "$CUBRID/conf/authtest_script_new.sh",
+  "test_expect": "failure",
+  "test_note": "the script is not executable"
+ }
+]

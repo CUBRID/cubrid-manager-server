@@ -1581,6 +1581,78 @@ def make_exec_write_files():
         os.chmod(path, mode)
 
 
+# The script of the runscript cases of task_status_check and
+# task_result_check, in $CUBRID/conf.
+RUNSCRIPT_FILE = "test_runscript.sh"
+# Files of the script_path case of task_auth_check: (path, mode), the path
+# relative to $CUBRID, or to $CUBRID_DATABASES when it starts with "@db/". A
+# mode of None makes a link to tmp/authtest_script_tmp.sh instead.
+SCRIPT_PATH_FILES = (("conf/authtest_script_ok.sh", 0o700),
+                     ("conf/authtest_script_group_w.sh", 0o775),
+                     ("conf/authtest_script_others_w.sh", 0o757),
+                     ("conf/authtest_script_link.sh", None),
+                     ("conf/authtest_script_sub/sub.sh", 0o700),
+                     ("tmp/authtest_script_tmp.sh", 0o700),
+                     ("@db/authtest_script_db.sh", 0o700))
+# what the case creates with writeandsaveconf
+SCRIPT_PATH_NEW_FILE = "conf/authtest_script_new.sh"
+SCRIPT_PATH_SUBDIR = "conf/authtest_script_sub"
+
+
+def make_script(path, mode):
+    """A script that only prints a line, with `mode` whatever the umask."""
+    if os.path.lexists(path):
+        os.remove(path)
+    with open(path, "w") as f:
+        f.write("#!/bin/sh\necho runscript test\n")
+    os.chmod(path, mode)
+
+
+def script_path_file(rel):
+    """The path of an entry of SCRIPT_PATH_FILES."""
+    if rel.startswith("@db/"):
+        return os.path.join(CUBRID_DATABASES, rel[len("@db/"):])
+    return os.path.join(CUBRID, rel)
+
+
+def remove_script_files():
+    """Remove the runscript scripts, of the script_path case too."""
+    if not CUBRID or not CUBRID_DATABASES:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    paths = [os.path.join(CUBRID, "conf", RUNSCRIPT_FILE),
+             os.path.join(CUBRID, SCRIPT_PATH_NEW_FILE)]
+    paths += [script_path_file(rel) for rel, _mode in SCRIPT_PATH_FILES]
+    for path in paths:
+        try:
+            if os.path.lexists(path):
+                os.remove(path)
+        except OSError:
+            pass
+    try:
+        os.rmdir(os.path.join(CUBRID, SCRIPT_PATH_SUBDIR))
+    except OSError:
+        pass
+
+
+def make_script_path_files():
+    """Lay SCRIPT_PATH_FILES (see there)."""
+    new_file = os.path.join(CUBRID, SCRIPT_PATH_NEW_FILE)
+    if os.path.lexists(new_file):
+        os.remove(new_file)
+    subdir = os.path.join(CUBRID, SCRIPT_PATH_SUBDIR)
+    if not os.path.isdir(subdir):
+        os.makedirs(subdir)
+    for rel, mode in SCRIPT_PATH_FILES:
+        path = script_path_file(rel)
+        if mode is not None:
+            make_script(path, mode)
+            continue
+        if os.path.lexists(path):
+            os.remove(path)
+        os.symlink(os.path.join(CUBRID, "tmp", "authtest_script_tmp.sh"), path)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1598,12 +1670,9 @@ def build_env():
     # removelog deletes the file it is given, so give it a disposable one.
     with open(os.path.join(tmpdir, "test_removelog.log"), "w") as f:
         f.write("dummy log line for removelog test\n")
-    # runscript only accepts a path under $CUBRID or $CUBRID_DATABASES, so the
-    # script it runs has to be created there.
-    script = os.path.join(tmpdir, "test_runscript.sh")
-    with open(script, "w") as f:
-        f.write("#!/bin/sh\necho runscript test\n")
-    os.chmod(script, 0o755)
+    # runscript runs only a script directly under $CUBRID/conf that only the
+    # user CMS runs as (this suite runs as that user) and root can change.
+    make_script(os.path.join(CUBRID, "conf", RUNSCRIPT_FILE), 0o700)
     # analyzecaslog runs broker_log_top over a broker SQL log. Pointed at a live
     # CAS log it answers "resultlist": null, because nothing in this suite sends
     # SQL through a broker and broker_log_top then writes an empty report. This
@@ -1620,6 +1689,8 @@ def build_env():
     make_name_match_decoys()
     # Files writeandsaveconf must refuse to write (CBRD-27831).
     make_exec_write_files()
+    # Scripts runscript must refuse to run, and one it runs.
+    make_script_path_files()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1634,6 +1705,7 @@ def clean_env():
     reset_test_dbs()
     remove_name_match_decoys()
     remove_exec_write_files()
+    remove_script_files()
 
 
 def reset_leftovers():
@@ -1662,6 +1734,7 @@ def reset_leftovers():
     reset_test_dbs()
     remove_name_match_decoys()
     remove_exec_write_files()
+    remove_script_files()
 
 
 def xml_escape(text):

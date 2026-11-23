@@ -17,8 +17,9 @@
  */
 
 /*
- * cm_task_file.h - open a file to replace its contents through a task,
- *   refusing an executable file.
+ * cm_task_file.h - the files a task writes or runs: a task does not
+ *   rewrite an executable file nor create one, and runscript runs only a
+ *   script that nobody but the user CMS runs as and root can change.
  *
  *   No CUBRID or CMS dependency, so that it can be tested on its own
  *   (server/test/unit/test_file_write.cpp).
@@ -29,6 +30,8 @@
 
 #include <stddef.h>
 #include <stdio.h>
+
+#include <string>
 
 typedef enum
 {
@@ -42,5 +45,7 @@ bool ut_has_executable_extension (const char *path);
 T_CONTENT_WRITE_RESULT ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size);
 bool ut_is_executable_file (const char *path, char *err_buf, size_t err_size);
 T_CONTENT_WRITE_RESULT ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_size);
+bool ut_check_script_path (const char *script_path, const char *script_dir, unsigned int cms_uid,
+			   std::string &real_path, char *err_buf, size_t err_size);
 
 #endif /* _CM_TASK_FILE_H_ */

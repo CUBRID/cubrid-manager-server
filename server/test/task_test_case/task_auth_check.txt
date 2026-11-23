@@ -21,6 +21,9 @@ file_exec_write,success
 // the backup of writeandsaveconf and writeprivatedata (CBRD-27831)
 file_exec_backup,success
 file_exec_private,success
+// runscript: only a script directly under $CUBRID/conf that only the user CMS
+// runs as and root can change (CBRD-27831); assumes the suite runs as that user
+script_path,success
 // cm.conf and databases.txt: admin only, through setsysparam (CBRD-27832)
 file_admin_conf,success
 auth_admin_conf,success

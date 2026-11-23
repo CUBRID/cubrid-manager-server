@@ -22,6 +22,7 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -126,24 +127,57 @@ ut_has_executable_extension (const char *path)
 }
 
 /*
- * set_executable_error () - "writing to an executable file is not allowed:
- *   <path>", in the form the path checks of cm_server_util.cpp use ('%' in
- *   the path shown as '*').
+ * set_path_reason () - "<reason>: <path>" in err_buf, in the form the path
+ *   checks of cm_server_util.cpp use ('%' in the path shown as '*').
  */
 static void
-set_executable_error (char *err_buf, size_t err_size, const char *path)
+set_path_reason (char *err_buf, size_t err_size, const char *reason, const char *path)
 {
-  std::string shown = path;
+  std::string shown = (path != NULL) ? path : "(NULL)";
 
   if (err_buf == NULL || err_size == 0)
     {
       return;
     }
   std::replace (shown.begin (), shown.end (), '%', '*');
-  snprintf (err_buf, err_size, "%s: %s", EXECUTABLE_FILE_ERROR, shown.c_str ());
+  snprintf (err_buf, err_size, "%s: %s", reason, shown.c_str ());
 }
 
 #if defined (WINDOWS)
+/*
+ * win_final_path () - the name Windows gives the file or directory open on
+ *   `h`: long names instead of 8.3 short names, the real case, and links and
+ *   junctions resolved. Without the "\\?\" prefix GetFinalPathNameByHandle ()
+ *   adds. false if the name is not known.
+ */
+static bool
+win_final_path (HANDLE h, std::string &final_path)
+{
+  char buf[FINAL_PATH_BUF_SIZE];
+  DWORD n;
+
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      return false;
+    }
+  n = GetFinalPathNameByHandleA (h, buf, sizeof (buf), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+  if (n == 0 || n >= sizeof (buf))
+    {
+      return false;
+    }
+
+  final_path = buf;
+  if (final_path.compare (0, 8, "\\\\?\\UNC\\") == 0)
+    {
+      final_path = "\\" + final_path.substr (7);
+    }
+  else if (final_path.compare (0, 4, "\\\\?\\") == 0)
+    {
+      final_path = final_path.substr (4);
+    }
+  return true;
+}
+
 /*
  * handle_is_executable () - the file open on `h` has an executable
  *   extension under the name Windows gives it, which covers a link, an 8.3
@@ -153,19 +187,13 @@ set_executable_error (char *err_buf, size_t err_size, const char *path)
 static int
 handle_is_executable (HANDLE h)
 {
-  char buf[FINAL_PATH_BUF_SIZE];
-  DWORD n;
+  std::string final_path;
 
-  if (h == INVALID_HANDLE_VALUE)
+  if (!win_final_path (h, final_path))
     {
       return -1;
     }
-  n = GetFinalPathNameByHandleA (h, buf, sizeof (buf), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-  if (n == 0 || n >= sizeof (buf))
-    {
-      return -1;
-    }
-  return ut_has_executable_extension (buf) ? 1 : 0;
+  return ut_has_executable_extension (final_path.c_str ()) ? 1 : 0;
 }
 #endif
 
@@ -217,7 +245,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, T_WRI
   (void) create_mode;
   if (ut_has_executable_extension (path))
     {
-      set_executable_error (err_buf, err_size, path);
+      set_path_reason (err_buf, err_size, EXECUTABLE_FILE_ERROR, path);
       return CONTENT_WRITE_EXECUTABLE;
     }
 
@@ -235,7 +263,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, T_WRI
 	{
 	  return CONTENT_WRITE_OPEN_FAIL;
 	}
-      set_executable_error (err_buf, err_size, path);
+      set_path_reason (err_buf, err_size, EXECUTABLE_FILE_ERROR, path);
       return CONTENT_WRITE_EXECUTABLE;
     }
 
@@ -270,7 +298,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, T_WRI
   if (ut_is_executable_mode (st.st_mode))
     {
       close (fd);
-      set_executable_error (err_buf, err_size, path);
+      set_path_reason (err_buf, err_size, EXECUTABLE_FILE_ERROR, path);
       return CONTENT_WRITE_EXECUTABLE;
     }
 
@@ -361,7 +389,7 @@ ut_is_executable_file (const char *path, char *err_buf, size_t err_size)
 
   if (executable)
     {
-      set_executable_error (err_buf, err_size, path);
+      set_path_reason (err_buf, err_size, EXECUTABLE_FILE_ERROR, path);
     }
   return executable;
 }
@@ -445,4 +473,207 @@ ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_
       return CONTENT_WRITE_OPEN_FAIL;
     }
   return CONTENT_WRITE_OK;
+}
+
+/*
+ * real_path_of () - the path the operating system really opens for the
+ *   existing file or directory `path`: on Linux realpath (), with symbolic
+ *   links resolved; on Windows win_final_path (). false if it does not
+ *   exist or cannot be resolved.
+ */
+static bool
+real_path_of (const char *path, std::string &real)
+{
+#if defined (WINDOWS)
+  HANDLE h;
+  bool ok;
+
+  /* access 0: only query the name; FILE_FLAG_BACKUP_SEMANTICS opens directories */
+  h = CreateFileA (path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+		   FILE_FLAG_BACKUP_SEMANTICS, NULL);
+  if (h == INVALID_HANDLE_VALUE)
+    {
+      return false;
+    }
+  ok = win_final_path (h, real);
+  CloseHandle (h);
+  return ok;
+#else
+  char *resolved = realpath (path, NULL);
+
+  if (resolved == NULL)
+    {
+      return false;
+    }
+  real = resolved;
+  free (resolved);
+  return true;
+#endif
+}
+
+/*
+ * parent_of () - `path` without its last part, for a path real_path_of ()
+ *   gave ("/a/b/c" -> "/a/b", "/a" -> "/").
+ */
+static std::string
+parent_of (const std::string &path)
+{
+  size_t pos = path.find_last_of ("/\\");
+
+  if (pos == std::string::npos)
+    {
+      return "";
+    }
+  if (pos == 0)
+    {
+      return path.substr (0, 1);
+    }
+  return path.substr (0, pos);
+}
+
+/* the same directory: case does not matter on Windows */
+static bool
+same_dir (const std::string &a, const std::string &b)
+{
+#if defined (WINDOWS)
+  return a.size () == b.size () && std::equal (a.begin (), a.end (), b.begin (), [] (char x, char y)
+  {
+    return tolower ((unsigned char) x) == tolower ((unsigned char) y);
+  });
+#else
+  return a == b;
+#endif
+}
+
+#if !defined (WINDOWS)
+/*
+ * owned_and_not_shared () - `st` belongs to the user CMS runs as (cms_uid)
+ *   or to root, and neither the group nor the others may write it. Only
+ *   those two could then change it, and they could run anything anyway.
+ *   Sets the reason and returns false otherwise. `what` names the file or
+ *   directory in the reason.
+ */
+static bool
+owned_and_not_shared (const struct stat &st, unsigned int cms_uid, const char *what, const char *path,
+		      char *err_buf, size_t err_size)
+{
+  std::string reason;
+
+  if (st.st_uid != cms_uid && st.st_uid != 0)
+    {
+      reason = std::string (what) + " must be owned by the user CMS runs as or by root";
+      set_path_reason (err_buf, err_size, reason.c_str (), path);
+      return false;
+    }
+  if ((st.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+    {
+      reason = std::string (what) + " must not be writable by the group or others";
+      set_path_reason (err_buf, err_size, reason.c_str (), path);
+      return false;
+    }
+  return true;
+}
+#endif
+
+/*
+ * ut_check_script_path () - runscript may run `script_path`: a file directly
+ *   under `script_dir` ($CUBRID/conf), which nobody but the user CMS runs as
+ *   (`cms_uid`) and root can change. On success `real_path` holds the path
+ *   to run, with links resolved, so that the file checked is the file run.
+ *
+ *   - The file must be directly under script_dir, not in a subdirectory.
+ *     Both are compared by their real paths (real_path_of ()), so a link in
+ *     script_dir that points outside it is refused, and a link that points
+ *     to a file in script_dir is that file.
+ *   - It must be a regular file.
+ *   - Linux: the file and script_dir must be owned by cms_uid or root, and
+ *     neither may be writable by the group or others. script_dir is checked
+ *     too, as whoever can write it can replace the file after the check.
+ *     The file must be executable (ut_is_executable_mode ()), so that what a
+ *     task wrote is refused with a clear reason rather than failing to run:
+ *     a task never creates an executable file, nor rewrites one
+ *     (ut_open_for_content_write ()), so a task alone cannot make a script
+ *     that runs.
+ *   - Windows: the owner, write and execute checks are not done (ACLs; left
+ *     for later), only the directory.
+ *
+ *   Each refusal sets its own reason in err_buf and returns false.
+ */
+bool
+ut_check_script_path (const char *script_path, const char *script_dir, unsigned int cms_uid,
+		      std::string &real_path, char *err_buf, size_t err_size)
+{
+  std::string real_dir;
+  std::string real_file;
+  std::string reason;
+
+  real_path.clear ();
+  if (script_path == NULL || script_dir == NULL)
+    {
+      set_path_reason (err_buf, err_size, "the script does not exist", script_path);
+      return false;
+    }
+
+  if (!real_path_of (script_dir, real_dir))
+    {
+      set_path_reason (err_buf, err_size, "the script directory does not exist", script_dir);
+      return false;
+    }
+
+  if (!real_path_of (script_path, real_file))
+    {
+      set_path_reason (err_buf, err_size, "the script does not exist", script_path);
+      return false;
+    }
+
+  if (!same_dir (parent_of (real_file), real_dir))
+    {
+      reason = std::string ("only a script directly under ") + script_dir + " can be run";
+      set_path_reason (err_buf, err_size, reason.c_str (), script_path);
+      return false;
+    }
+
+#if defined (WINDOWS)
+  (void) cms_uid;
+  DWORD attr = GetFileAttributesA (real_file.c_str ());
+
+  if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY) != 0)
+    {
+      set_path_reason (err_buf, err_size, "the script is not a regular file", script_path);
+      return false;
+    }
+#else
+  struct stat file_st, dir_st;
+
+  if (stat (real_file.c_str (), &file_st) != 0 || !S_ISREG (file_st.st_mode))
+    {
+      set_path_reason (err_buf, err_size, "the script is not a regular file", script_path);
+      return false;
+    }
+
+  if (!owned_and_not_shared (file_st, cms_uid, "the script", script_path, err_buf, err_size))
+    {
+      return false;
+    }
+
+  if (stat (real_dir.c_str (), &dir_st) != 0)
+    {
+      set_path_reason (err_buf, err_size, "the script directory does not exist", script_dir);
+      return false;
+    }
+
+  if (!owned_and_not_shared (dir_st, cms_uid, "the script directory", script_dir, err_buf, err_size))
+    {
+      return false;
+    }
+
+  if (!ut_is_executable_mode (file_st.st_mode))
+    {
+      set_path_reason (err_buf, err_size, "the script is not executable", script_path);
+      return false;
+    }
+#endif
+
+  real_path = real_file;
+  return true;
 }
