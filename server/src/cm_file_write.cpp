@@ -170,9 +170,20 @@ handle_is_executable (HANDLE h)
 #endif
 
 /*
- * open_non_executable_for_write () - open `path` to replace its contents unless it is an
- *   executable file; the common part of ut_open_for_content_write () and
- *   ut_copy_to_backup ().
+ * How open_non_executable_for_write () writes the file on Windows: text mode
+ * turns "\n" into "\r\n", as fopen (path, "w") does; a copy needs the bytes
+ * as they are. Linux makes no difference.
+ */
+typedef enum
+{
+  WRITE_AS_TEXT,
+  WRITE_AS_BINARY
+} T_WRITE_FORMAT;
+
+/*
+ * open_non_executable_for_write () - open `path` to replace its contents
+ *   unless it is an executable file; the common part of
+ *   ut_open_for_content_write () and ut_copy_to_backup ().
  *
  *   Linux: the file (the target, if `path` is a symbolic link) is opened
  *   without O_TRUNC and judged by fstat () on that descriptor, then
@@ -185,10 +196,11 @@ handle_is_executable (HANDLE h)
  *   Windows: the extension decides (executable_extensions[]). It is checked
  *   on `path` before opening, so that no executable file is created, and on
  *   the name of the opened file, before it is truncated. `create_mode` is
- *   not used. `binary` opens in binary instead of text mode.
+ *   not used. `format` picks text or binary mode (T_WRITE_FORMAT).
  */
 static T_CONTENT_WRITE_RESULT
-open_non_executable_for_write (const char *path, unsigned int create_mode, bool binary, FILE **fp, char *err_buf, size_t err_size)
+open_non_executable_for_write (const char *path, unsigned int create_mode, T_WRITE_FORMAT format, FILE **fp,
+			       char *err_buf, size_t err_size)
 {
   int fd;
   FILE *outfile;
@@ -209,7 +221,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, bool 
       return CONTENT_WRITE_EXECUTABLE;
     }
 
-  fd = _open (path, _O_WRONLY | _O_CREAT | (binary ? _O_BINARY : _O_TEXT), _S_IREAD | _S_IWRITE);
+  fd = _open (path, _O_WRONLY | _O_CREAT | (format == WRITE_AS_BINARY ? _O_BINARY : _O_TEXT), _S_IREAD | _S_IWRITE);
   if (fd < 0)
     {
       return CONTENT_WRITE_OPEN_FAIL;
@@ -233,7 +245,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, bool 
       return CONTENT_WRITE_OPEN_FAIL;
     }
 
-  outfile = _fdopen (fd, binary ? "wb" : "w");
+  outfile = _fdopen (fd, format == WRITE_AS_BINARY ? "wb" : "w");
   if (outfile == NULL)
     {
       _close (fd);
@@ -242,7 +254,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, bool 
 #else
   struct stat st;
 
-  (void) binary;
+  (void) format;
   fd = open (path, O_WRONLY | O_CREAT, (mode_t) (create_mode & 0666));
   if (fd < 0)
     {
@@ -299,7 +311,7 @@ open_non_executable_for_write (const char *path, unsigned int create_mode, bool 
 T_CONTENT_WRITE_RESULT
 ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size)
 {
-  return open_non_executable_for_write (path, 0644, false, fp, err_buf, err_size);
+  return open_non_executable_for_write (path, 0644, WRITE_AS_TEXT, fp, err_buf, err_size);
 }
 
 /*
@@ -400,7 +412,7 @@ ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_
       return CONTENT_WRITE_OPEN_FAIL;
     }
 
-  result = open_non_executable_for_write (dest, mode, true, &outfile, err_buf, err_size);
+  result = open_non_executable_for_write (dest, mode, WRITE_AS_BINARY, &outfile, err_buf, err_size);
   if (result != CONTENT_WRITE_OK)
     {
       fclose (infile);

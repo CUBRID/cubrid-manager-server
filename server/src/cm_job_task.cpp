@@ -1900,7 +1900,7 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
  * _write_conf_to_file () - replace the contents of conf_path with the
  *   "confdata" values of req, one per line.
  *
- *   An executable file is refused and left as it is, see
+ *   An executable file is refused and left as it is (see
  *   ut_open_for_content_write ()), and a new file is not created executable.
  *
  *   return: ERR_NO_ERROR; ERR_WITH_MSG for an executable file, the reason in
