@@ -311,16 +311,18 @@ def os_release_value(raw):
 
 
 def local_os_info_detail(path=OS_RELEASE_FILE):
-    """ "NAME VERSION" from the os-release file on this host, as getenv
-    answers osinfo_detail: "Unknown" when the file cannot be read or NAME or
-    VERSION is missing or empty. The last assignment of a key wins.
+    """osinfo_detail as getenv answers it, from the os-release file on this
+    host: the first of "NAME VERSION", PRETTY_NAME, "NAME VERSION_ID" and NAME
+    whose fields are all present and non-empty, or "Unknown" when the file
+    cannot be read or none of them can be made. The last assignment of a key
+    wins.
     """
     values = {}
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 line = line.strip(" \t\r\n")
-                for key in ("NAME", "VERSION"):
+                for key in ("NAME", "VERSION", "PRETTY_NAME", "VERSION_ID"):
                     if line.startswith(key + "="):
                         values[key] = os_release_value(line[len(key) + 1:])
     except (IOError, OSError):
@@ -331,8 +333,10 @@ def local_os_info_detail(path=OS_RELEASE_FILE):
         if value is not None:
             values[key] = "".join(c for c in value
                                   if not (ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F)).strip()
-    if values.get("NAME") and values.get("VERSION"):
-        return "%s %s" % (values["NAME"], values["VERSION"])
+    for keys in (("NAME", "VERSION"), ("PRETTY_NAME",),
+                 ("NAME", "VERSION_ID"), ("NAME",)):
+        if all(values.get(key) for key in keys):
+            return " ".join(values[key] for key in keys)
     return "Unknown"
 
 

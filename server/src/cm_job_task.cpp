@@ -6886,9 +6886,12 @@ parse_os_release_value (const char *src, char *dst, size_t dst_size)
 #endif
 
 /*
- * Build "NAME VERSION" from /etc/os-release.
- * If the file is not available or NAME or VERSION is missing/empty,
- * "Unknown" is returned.
+ * Describe the host OS from /etc/os-release, taking the first of these whose
+ * fields are all present and non-empty:
+ *   "NAME VERSION", PRETTY_NAME, "NAME VERSION_ID", NAME
+ * Not every host has VERSION (Arch Linux, Debian testing/sid, some minimal
+ * images), so the rest are fallbacks. "Unknown" is returned if the file is
+ * not available or none of them can be made.
  */
 static void
 get_os_info_detail (char *buf, size_t buf_size)
@@ -6900,6 +6903,8 @@ get_os_info_detail (char *buf, size_t buf_size)
   char line[LINE_MAX];
   char name[BUFFER_MAX_LEN] = "";
   char version[BUFFER_MAX_LEN] = "";
+  char pretty_name[BUFFER_MAX_LEN] = "";
+  char version_id[BUFFER_MAX_LEN] = "";
   struct stat st;
   FILE *fp = NULL;
   int fd;
@@ -6976,6 +6981,14 @@ get_os_info_detail (char *buf, size_t buf_size)
 	{
 	  parse_os_release_value (line + 8, version, sizeof (version));
 	}
+      else if (strncmp (line, "PRETTY_NAME=", 12) == 0)
+	{
+	  parse_os_release_value (line + 12, pretty_name, sizeof (pretty_name));
+	}
+      else if (strncmp (line, "VERSION_ID=", 11) == 0)
+	{
+	  parse_os_release_value (line + 11, version_id, sizeof (version_id));
+	}
     }
 
   fclose (fp);			/* also closes fd */
@@ -6983,6 +6996,18 @@ get_os_info_detail (char *buf, size_t buf_size)
   if (name[0] != '\0' && version[0] != '\0')
     {
       snprintf (buf, buf_size, "%s %s", name, version);
+    }
+  else if (pretty_name[0] != '\0')
+    {
+      snprintf (buf, buf_size, "%s", pretty_name);
+    }
+  else if (name[0] != '\0' && version_id[0] != '\0')
+    {
+      snprintf (buf, buf_size, "%s %s", name, version_id);
+    }
+  else if (name[0] != '\0')
+    {
+      snprintf (buf, buf_size, "%s", name);
     }
 #endif
 }
