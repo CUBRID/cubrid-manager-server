@@ -32,6 +32,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <ftw.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +52,16 @@
 static int failures = 0;
 static int checks = 0;
 static char tmp_dir[PATH_MAX];
+
+/* nftw() callback for removing tmp_dir; no shell, so any path works */
+static int
+remove_entry (const char *path, const struct stat *sb, int type, struct FTW *ftw)
+{
+  (void) sb;
+  (void) type;
+  (void) ftw;
+  return remove (path);
+}
 
 static void
 check (bool ok, const char *what)
@@ -441,14 +452,11 @@ main (void)
   test_detail ();
   test_fallback ();
 
-  {
-    std::string cmd = std::string ("rm -rf '") + tmp_dir + "'";
-
-    if (system (cmd.c_str ()) != 0)
-      {
-	printf ("could not remove %s\n", tmp_dir);
-      }
-  }
+  /* FTW_DEPTH: entries before their directory; FTW_PHYS: remove links, not their targets */
+  if (nftw (tmp_dir, remove_entry, 16, FTW_DEPTH | FTW_PHYS) != 0)
+    {
+      printf ("could not remove %s\n", tmp_dir);
+    }
 
   printf ("%d of %d checks failed\n", failures, checks);
   return (failures == 0) ? 0 : 1;
