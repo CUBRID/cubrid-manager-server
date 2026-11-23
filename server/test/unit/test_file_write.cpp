@@ -18,7 +18,7 @@
  */
 
 /*
- * test_file_write.cpp - unit tests of server/src/cm_file_write.cpp, how
+ * test_file_write.cpp - unit tests of server/src/cm_task_file.cpp, how
  *   writeandsaveconf, setsysparam and writeprivatedata open the file they
  *   rewrite, and how writeandsaveconf writes its backup (CBRD-27831).
  *
@@ -43,7 +43,7 @@
 
 #include <string>
 
-#include "cm_file_write.h"
+#include "cm_task_file.h"
 
 #define FIXTURE_TEXT "#!/bin/sh\necho fixture\n"
 #define NEW_TEXT "new contents\n"
