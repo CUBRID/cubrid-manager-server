@@ -1390,6 +1390,184 @@ def copy_extra_files():
             shutil.copy(os.path.join(root, name), destdir)
 
 
+# Decoys for the log file name matching of getlogfileinfo, getloginfo and
+# getdberrorlog (CBRD-26446). A broker or database name can hold '_', which is
+# also the separator after the name in its log file names, so each decoy
+# starts with the name of an instance the suite uses (query_editor, demodb)
+# but belongs to another one, or is a directory named like a log file.
+#
+# The "listed" files are the other way round: logs of query_editor that the
+# engine names otherwise than "<name>_<cas>.*" (the log of the connections
+# the ACL rejects, the backups, the query replace log), which a rule that is
+# too strict would drop. The SHARD=ON names of query_editor (a SHARD=OFF
+# broker) are decoys, and so is "<name>.err": the engine writes nothing to
+# the broker error log path.
+#
+# getlogfileinfo is compared against its .answer, which must list the
+# "listed" files and none of the decoys. getlogfileinfo_query_editor_1 asks
+# for a broker "query_editor_1": the CAS 1 logs of query_editor, its
+# error log "query_editor_1.err" included, must not be listed for it.
+# getloginfo grows with every run and is checked for status only, so the
+# database side is checked through getdberrorlog, which filters by mtime: every
+# file here gets NAME_MATCH_MTIME, and getdberrorlog_name_match asks for that
+# day only, which leaves out the live logs of demodb. Of the server logs only
+# the "own" file belongs to demodb and is to be listed.
+NAME_MATCH_DECOYS = (
+    # (path under $CUBRID, kind)
+    ("log/broker/query_editor_a.access", "file"),
+    ("log/broker/error_log/query_editor_a_1.err", "file"),
+    ("log/broker/sql_log/query_editor_a_1.sql.log", "file"),
+    ("log/broker/sql_log/query_editor_9.sql.log", "dir"),
+    # names of a SHARD=ON broker: proxy access log, <proxy>_<shard>_<cas>
+    ("log/broker/query_editor_7.access", "file"),
+    ("log/broker/sql_log/query_editor_1_0_1.sql.log", "file"),
+    # the broker error log path, which the engine does not write
+    ("log/broker/query_editor.err", "file"),
+    ("log/broker/query_editor.err.1261117.1030", "file"),
+    # the CAS 1 error log of query_editor, not a log of "query_editor_1"
+    ("log/broker/error_log/query_editor_1.err", "listed"),
+    # logs of query_editor that have no "_<cas>"
+    ("log/broker/query_editor.access.20261117103000", "listed"),
+    ("log/broker/query_editor.access.denied", "listed"),
+    ("log/broker/error_log/query_editor_qr_rule.err", "listed"),
+    ("log/server/demodb_20010101_1200.err", "own"),
+    ("log/server/demodb_a_20010101_1200.err", "file"),
+    ("log/server/demodbx_20010101_1200.err", "file"),
+    ("log/server/demodb_20010101_1201.err", "dir"),
+)
+NAME_MATCH_MTIME = time.mktime((2001, 1, 1, 12, 0, 0, 0, 0, -1))
+# What the suite writes into each decoy. The decoy paths can also be the real
+# logs of a broker or database of the host (a broker named query_editor_a),
+# so a path is only ever overwritten or removed when it holds exactly this:
+# a file with this content, or a directory holding only NAME_MATCH_MARKER.
+NAME_MATCH_CONTENT = {
+    "own": "own error log of demodb for getdberrorlog_name_match\n",
+    "file": "decoy that must not be listed (CBRD-26446)\n",
+    "listed": "log of query_editor laid by test_tasks.py (CBRD-26446)\n",
+    "dir": "decoy directory laid by test_tasks.py (CBRD-26446)\n",
+}
+NAME_MATCH_MARKER = ".cbrd26446_decoy"
+# Temporary name of a decoy being laid, "<prefix><pid>.<decoy name>". It
+# starts with '.', so no instance name matches it as a log file name.
+NAME_MATCH_TMP_PREFIX = ".cbrd26446_decoy_tmp."
+
+
+def is_name_match_decoy(path, kind):
+    """Tell whether path is a decoy this suite laid, not a file of the host."""
+    if os.path.islink(path):
+        return False
+    if kind == "dir":
+        if not os.path.isdir(path):
+            return False
+        try:
+            if os.listdir(path) != [NAME_MATCH_MARKER]:
+                return False
+            path = os.path.join(path, NAME_MATCH_MARKER)
+        except OSError:
+            return False
+        if os.path.islink(path):
+            return False
+    if not os.path.isfile(path):
+        return False
+    expected = NAME_MATCH_CONTENT[kind]
+    try:
+        if os.path.getsize(path) != len(expected.encode()):
+            return False
+        with open(path, "r") as f:
+            return f.read() == expected
+    except (OSError, UnicodeDecodeError):
+        return False
+
+
+def make_name_match_decoys():
+    """Lay NAME_MATCH_DECOYS under $CUBRID (see there).
+
+    A path that already holds something other than a decoy of this suite is
+    left alone: it is a real log of the host, and it stays as it is.
+
+    Each decoy is completed under a temporary name (NAME_MATCH_TMP_PREFIX) and
+    then renamed to its path, so a run killed half way leaves a temporary
+    entry, which the next run removes, never a partial decoy at the path. A
+    partial decoy would not pass is_name_match_decoy(), so it would block the
+    path for every later run.
+    """
+    remove_name_match_decoys()
+    for rel, kind in NAME_MATCH_DECOYS:
+        path = os.path.join(CUBRID, rel)
+        if os.path.lexists(path):
+            print("warning: %s already exists and is not a decoy of this "
+                  "suite; left as it is" % path)
+            continue
+        parent = os.path.dirname(path)
+        if not os.path.isdir(parent):
+            os.makedirs(parent)
+        tmp = os.path.join(parent, "%s%d.%s" % (NAME_MATCH_TMP_PREFIX,
+                                                os.getpid(),
+                                                os.path.basename(path)))
+        if kind == "dir":
+            os.mkdir(tmp)
+            with open(os.path.join(tmp, NAME_MATCH_MARKER), "w") as f:
+                f.write(NAME_MATCH_CONTENT[kind])
+        else:
+            with open(tmp, "w") as f:
+                f.write(NAME_MATCH_CONTENT[kind])
+        if os.path.lexists(path):
+            # Appeared while the decoy was being written: keep it, drop ours.
+            remove_name_match_tmp(tmp)
+            continue
+        os.rename(tmp, path)
+        # After the rename: a run killed before this leaves a complete decoy
+        # with the wrong mtime, which the next run removes and lays again.
+        os.utime(path, (NAME_MATCH_MTIME, NAME_MATCH_MTIME))
+
+
+def remove_name_match_tmp(tmp):
+    """Remove a temporary entry of make_name_match_decoys()."""
+    try:
+        if os.path.isdir(tmp) and not os.path.islink(tmp):
+            marker = os.path.join(tmp, NAME_MATCH_MARKER)
+            if os.path.lexists(marker):
+                os.remove(marker)
+            os.rmdir(tmp)
+        else:
+            os.remove(tmp)
+    except OSError:
+        pass
+
+
+def remove_name_match_decoys():
+    """Remove the decoys make_name_match_decoys() laid, and nothing else.
+
+    A path is removed only when it still holds what the suite wrote
+    (is_name_match_decoy()), so a real log that shares a decoy name survives.
+    """
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    # Temporary entries of a run killed while laying the decoys.
+    for parent in sorted(set(os.path.dirname(os.path.join(CUBRID, rel))
+                             for rel, _kind in NAME_MATCH_DECOYS)):
+        try:
+            names = os.listdir(parent)
+        except OSError:
+            continue
+        for name in names:
+            if name.startswith(NAME_MATCH_TMP_PREFIX):
+                remove_name_match_tmp(os.path.join(parent, name))
+    for rel, kind in NAME_MATCH_DECOYS:
+        path = os.path.join(CUBRID, rel)
+        if not is_name_match_decoy(path, kind):
+            continue
+        try:
+            if kind == "dir":
+                os.remove(os.path.join(path, NAME_MATCH_MARKER))
+                os.rmdir(path)
+            else:
+                os.remove(path)
+        except OSError:
+            pass
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1425,6 +1603,8 @@ def build_env():
         os.makedirs(folder)
     make_loaddb_input(CUBRID_DATABASES)
     copy_extra_files()
+    # Decoys for the log file name matching cases (CBRD-26446).
+    make_name_match_decoys()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1437,6 +1617,7 @@ def clean_env():
     """Remove what this run created. Runs from the finally block."""
     stop_kill_targets()
     reset_test_dbs()
+    remove_name_match_decoys()
 
 
 def reset_leftovers():
@@ -1463,6 +1644,7 @@ def reset_leftovers():
     print("cleaning up after any earlier run ...")
     sweep_stale_helpers()
     reset_test_dbs()
+    remove_name_match_decoys()
 
 
 def xml_escape(text):

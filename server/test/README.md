@@ -141,6 +141,7 @@ server/test/
    - `sweep_stale_helpers()`로 남아 있는 보조 프로세스 회수
    - `reset_test_dbs()`로 테스트가 만든 DB 디렉터리 · `databases.txt` 항목 ·
      살아남은 `cub_server <db>` 프로세스 정리
+   - `remove_name_match_decoys()`로 로그 파일 이름 매칭 미끼 정리 (4.11 참고)
    - 마지막의 `clean_env()`와 같은 일을 **시작 시점에 먼저** 한 번 더 한다.
      `SIGKILL`로 죽은 실행은 `finally`에 도달하지 못해 잔재를 남기는데, 그것이
      다음 실행까지 번지지 않게 하려는 것이다.
@@ -169,13 +170,15 @@ server/test/
      덤프를 가리켜서 직전 실행의 `unloaddb` 결과에 의존했다)
    - **`null` 응답을 피하기 위한 사전 데이터**를 만든다 (4.7 참고):
      `analyzecaslog`용 CAS 로그 픽스처와 `getfolderswithkeyword`가 찾을 디렉터리
+   - `make_name_match_decoys()`가 로그 파일 이름 매칭 케이스의 미끼를 `$CUBRID/log`에
+     만든다 (4.11 참고)
    - 중단된 실행이 남긴 dbmt 사용자 `yifan`을 best-effort로 제거
    - `wait_for_mon_data()`가 첫 모니터링 수집이 끝날 때까지 대기
      (그 전에는 `vol_mon`이 없어 `set_mon_interval`이 실패한다)
    - `start_kill_targets()`가 `killprocess` / `killtransaction`의 대상을 만들고
      실제 id를 플레이스홀더에 채운다 (4.3 참고)
 6. **본 실행** — `do_all_jobs()`가 세트의 목록 파일을 순서대로 처리
-7. **정리** — `clean_env()`가 보조 프로세스를 종료하고 임시 DB를 정리
+7. **정리** — `clean_env()`가 보조 프로세스를 종료하고 임시 DB와 4.11의 미끼를 정리
    (`finally` + `atexit` + `SIGTERM`/`SIGHUP` 핸들러로 비정상 종료에서도 실행)
 8. **리포트** — JUnit XML 기록, 실패 수만큼 종료 코드 반영
    - 세트 이름으로 **두 개**가 나온다. `log/<세트>.xml`은 통과/실패만 담은 간단한
@@ -685,6 +688,58 @@ API는 없으므로, `enforce` 케이스는 DB 로그인을 저장한 세션이 
 같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략과 대소문자, scope)는 CMS가 IPv4로만
 listen하므로 이 세트로 만들 수 없다. 이것과 모드별 처리 표는 단위 테스트(`unit/test_session_ip.cpp`)가
 확인한다. `off`와 `log`는 경고 로그만 다르므로, 둘을 구분하는 것도 단위 테스트다.
+
+### 4.11 로그 파일 이름 매칭 (CBRD-26446)
+
+`getlogfileinfo`, `getloginfo`, `getdberrorlog`는 broker나 DB의 로그를 **이름이 정확히 일치할
+때만** 돌려줘야 한다. broker 이름과 DB 이름에는 `_`를 쓸 수 있는데, `_`는 로그 파일 이름에서
+이름 뒤에 오는 구분자이기도 하다. 그래서 이름 바로 다음 한 글자만 보면 `<name>_...`이라는
+다른 인스턴스의 로그까지 섞인다. 반대로 규칙이 지나치게 엄격하면 `<name>_<숫자>.*`가 아닌
+자기 로그(`.access.denied`, 백업, `_qr_rule.err`)가 빠진다. 이를 확인하기 위해 `build_env()`의
+`make_name_match_decoys()`가 아래 미끼와 나와야 하는 파일을 만들고, `clean_env()`와 `reset_leftovers()`의
+`remove_name_match_decoys()`가 지운다. 미끼의 mtime은 모두 `2001-01-01 12:00`이다.
+
+미끼 경로는 호스트의 실제 로그와 겹칠 수 있다(예: `query_editor_a`라는 broker를 쓰는 호스트).
+그래서 **테스트가 쓴 내용 그대로인 것만** 미끼로 보고 덮어쓰거나 지운다. 파일은 내용이
+`NAME_MATCH_CONTENT`와 같아야 하고, 디렉터리는 표식 파일 `.cbrd26446_decoy` 하나만 담고
+있어야 한다. 그 경로에 다른 것이 있으면 경고만 출력하고 손대지 않는다. 미끼 파일에 나중에
+로그가 덧붙은 경우도 실제 로그로 보고 남긴다.
+
+미끼는 임시 이름(`.cbrd26446_decoy_tmp.<pid>.<미끼 이름>`)으로 내용을 다 쓴 뒤 원래 경로로
+옮긴다. 실행이 중간에 죽어도 원래 경로에는 덜 쓴 미끼가 남지 않고, 남은 임시 항목은 다음
+실행이 지운다. 임시 이름은 `.`으로 시작하므로 어떤 인스턴스의 로그 파일 이름과도 맞지 않는다.
+
+| 경로 (`$CUBRID/` 아래) | 종류 | 속한 인스턴스 |
+| --- | --- | --- |
+| `log/broker/query_editor_a.access` | 파일 | 다른 broker `query_editor_a` |
+| `log/broker/error_log/query_editor_a_1.err` | 파일 | 다른 broker `query_editor_a` |
+| `log/broker/sql_log/query_editor_a_1.sql.log` | 파일 | 다른 broker `query_editor_a` |
+| `log/broker/sql_log/query_editor_9.sql.log` | 디렉터리 | 로그 파일이 아님 |
+| `log/broker/query_editor_7.access` | 파일 | SHARD=ON broker의 proxy access 로그 이름. `query_editor`는 SHARD=OFF |
+| `log/broker/sql_log/query_editor_1_0_1.sql.log` | 파일 | SHARD=ON broker의 CAS 로그 이름(`_<proxy>_<shard>_<cas>`). broker `query_editor_1_0`의 로그 이름이기도 하다 |
+| `log/broker/query_editor.err` | 파일 | broker 오류 로그 경로. 엔진이 쓰지 않으므로 로그가 아님 |
+| `log/broker/query_editor.err.1261117.1030` | 파일 | 그 백업 이름. 로그가 아님 |
+| `log/broker/error_log/query_editor_1.err` | 파일 | **query_editor** CAS 1 오류 로그 (나와야 하는 파일). broker `query_editor_1`의 로그는 아님 |
+| `log/broker/query_editor.access.20261117103000` | 파일 | **query_editor** access 로그 백업 (나와야 하는 파일) |
+| `log/broker/query_editor.access.denied` | 파일 | **query_editor** ACL이 거부한 접속의 access 로그 (나와야 하는 파일) |
+| `log/broker/error_log/query_editor_qr_rule.err` | 파일 | **query_editor** query replace 로그 (나와야 하는 파일) |
+| `log/server/demodb_20010101_1200.err` | 파일 | **demodb** (나와야 하는 파일) |
+| `log/server/demodb_a_20010101_1200.err` | 파일 | 다른 DB `demodb_a` |
+| `log/server/demodbx_20010101_1200.err` | 파일 | 다른 DB `demodbx` |
+| `log/server/demodb_20010101_1201.err` | 디렉터리 | 로그 파일이 아님 |
+
+| 케이스 | 확인하는 것 |
+| --- | --- |
+| `getlogfileinfo` (`query_editor`) | 실제 CAS 로그와 나와야 하는 파일 4개가 있고, broker 쪽 미끼는 없어야 한다 |
+| `getlogfileinfo_query_editor_1` (`query_editor_1`) | 목록이 비어 있어야 한다. `query_editor`의 CAS 1 로그(`query_editor_1.sql.log`, `error_log/query_editor_1.err` 등)가 broker `query_editor_1`의 로그로 걸리지 않는지 본다 |
+| `getlogfileinfo_query` (`query`) | 목록이 비어 있어야 한다. `cubrid broker start`가 만드는 `sql_log/query` 디렉터리와 `query_editor_*` 로그가 걸리지 않는지 본다 |
+| `getdberrorlog_name_match` (`demodb`) | `start_time`/`end_time`을 미끼의 날짜(2001-01-01)로 한정해 실제 demodb 로그를 뺀다. `demodb_20010101_1200.err` 하나만 나와야 한다 |
+
+`getloginfo`는 실행마다 목록이 자라서 status만 보므로(4.5), DB 쪽은 같은 이름 규칙을 쓰는
+`getdberrorlog`로 확인한다. 수정 전 빌드에서는 세 케이스가 모두 기준값과 달라 실패한다.
+
+API 테스트의 broker는 SHARD=OFF인 `query_editor`뿐이다. SHARD=ON broker의 로그 이름과 이름 규칙
+전체는 단위 테스트 `unit/test_log_name.cpp`가 확인한다(`unit/README.md`).
 
 ---
 
