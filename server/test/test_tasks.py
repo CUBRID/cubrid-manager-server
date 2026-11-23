@@ -127,12 +127,16 @@ VOLATILE_KEYS = frozenset((
     "sizelock",
 ))
 
-# getenv: osinfo_detail is "NAME VERSION" of /etc/os-release on the host of the
-# server. A set that sets up its server locally runs on that host, so the value
+# getenv: osinfo_detail is the OS of the host of the server, from its
+# os-release file: /etc/os-release, or /usr/lib/os-release if that does not
+# exist (os-release(5)). A set that sets up its server locally runs on that host, so the value
 # read here is the one the server must answer and it is compared as
 # "$OSINFO_DETAIL", like $HOSTNAME. For any other set it stays None and the
 # value is masked as <volatile>.
-OS_RELEASE_FILE = "/etc/os-release"
+# Inputs a host file cannot give (escapes, unterminated quotes, invalid UTF-8,
+# truncation, over-long lines, the /usr/lib fallback) are checked by the unit
+# test unit/test_os_release.
+OS_RELEASE_FILES = ("/etc/os-release", "/usr/lib/os-release")
 OSINFO_DETAIL = None
 
 # Lists the server builds from readdir(), whose order depends on the file
@@ -310,22 +314,29 @@ def os_release_value(raw):
     return None  # unterminated quote
 
 
-def local_os_info_detail(path=OS_RELEASE_FILE):
+def local_os_info_detail(paths=OS_RELEASE_FILES):
     """osinfo_detail as getenv answers it, from the os-release file on this
-    host: the first of "NAME VERSION", PRETTY_NAME, "NAME VERSION_ID" and NAME
+    host (the first of paths that exists; a later one is read only when the
+    one before it does not exist, as os-release(5) says): the first of "NAME VERSION", PRETTY_NAME, "NAME VERSION_ID" and NAME
     whose fields are all present and non-empty, or "Unknown" when the file
     cannot be read or none of them can be made. The last assignment of a key
     wins.
     """
     values = {}
-    try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            for line in f:
-                line = line.strip(" \t\r\n")
-                for key in ("NAME", "VERSION", "PRETTY_NAME", "VERSION_ID"):
-                    if line.startswith(key + "="):
-                        values[key] = os_release_value(line[len(key) + 1:])
-    except (IOError, OSError):
+    for path in paths:
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip(" \t\r\n")
+                    for key in ("NAME", "VERSION", "PRETTY_NAME", "VERSION_ID"):
+                        if line.startswith(key + "="):
+                            values[key] = os_release_value(line[len(key) + 1:])
+            break
+        except FileNotFoundError:
+            continue  # missing (or a dangling link): try the next one
+        except (IOError, OSError):
+            return "Unknown"
+    else:
         return "Unknown"
     # The server keeps printable ASCII and valid UTF-8 only: control
     # characters (C0, DEL and C1) and bytes that are not UTF-8 are dropped.

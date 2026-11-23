@@ -458,7 +458,7 @@ task_test_case/task_result_check/11_4/<case>.result
 | CUBRID 설치 경로 | `$CUBRID`로 환원 |
 | databases 경로 | `$CUBRID_DATABASES`로 환원 |
 | 호스트 이름 | `$HOSTNAME`으로 환원 |
-| `getenv`의 `osinfo_detail` | 이 호스트의 `/etc/os-release`로 만든 기대값과 같으면 `$OSINFO_DETAIL`로 환원 (아래 설명) |
+| `getenv`의 `osinfo_detail` | 이 호스트의 os-release로 만든 기대값과 같으면 `$OSINFO_DETAIL`로 환원 (아래 설명) |
 | `VOLATILE_KEYS`의 키 | 값을 `<volatile>`로 치환 |
 | `VOLATILE_PATTERNS`에 걸리는 문자열 | `<timestamp>` / `<date>` / `_<tmpid>`로 치환 |
 | `UNORDERED_LISTS`의 목록 | 정해진 항목으로 정렬 (`getlogfileinfo`의 `logfile`, `dbspaceinfo`의 로그 볼륨, `classinfo`의 `class`) |
@@ -469,13 +469,16 @@ task_test_case/task_result_check/11_4/<case>.result
 `cpu_*`, `mem_*`, `free_size`, `freespace`, `size`, `total`, `token`, `uuid`, `sizelock`
 (`lockdb`의 락 테이블 메모리. 실행 중 잡은 락의 양과 엔진 빌드에 따라 달라진다).
 
-`getenv`의 `osinfo_detail`은 서버 호스트의 `/etc/os-release`로 만든 OS 정보다. "NAME VERSION"을 쓰고,
+`getenv`의 `osinfo_detail`은 서버 호스트의 os-release로 만든 OS 정보다. os-release(5)대로
+`/etc/os-release`를 읽고, 그 파일이 없을 때만 `/usr/lib/os-release`를 읽는다. "NAME VERSION"을 쓰고,
 VERSION이 없으면 PRETTY_NAME, "NAME VERSION_ID", NAME 순으로 대신한다. 서버를 로컬에서
 준비하는 세트(`NO_LOCAL_ENV_SETS`가 아닌 세트)는 서버와 같은 호스트에서 돌므로, `test_tasks.py`가
-시작할 때 이 호스트의 `/etc/os-release`를 직접 읽어 기대값을 만들고(`osinfo_detail of this host: ...`로
+시작할 때 이 호스트의 os-release를 같은 규칙으로 직접 읽어 기대값을 만들고(`osinfo_detail of this host: ...`로
 출력) 응답 값이 그와 같으면 `$OSINFO_DETAIL`로 환원한다. 다르면 실제 값이 남아 케이스가 실패한다.
 서버가 값을 읽지 못해 `Unknown`을 돌려주는 경우도 여기서 잡힌다. 기대값을 만드는 파서는 서버 코드가
-아니라 os-release(5) 규칙대로 따로 작성했다. 그 밖의 세트(HA)는 서버가 다른 호스트에 있으므로
+아니라 os-release(5) 규칙대로 따로 작성했다. 호스트 파일 하나로는 만들 수 없는 입력(이스케이프, 닫히지 않은
+따옴표, 잘못된 UTF-8, 자르기, 너무 긴 줄, `/usr/lib/os-release` 폴백)은 단위 테스트
+`unit/test_os_release`가 확인한다. 그 밖의 세트(HA)는 서버가 다른 호스트에 있으므로
 `<volatile>`로 가린다.
 
 `classinfo`와 `compactdb`는 엔진이 카탈로그 힙에서 클래스를 찾는 순서대로 나열하고, `compactdb`는 카탈로그 크기를 센다. 둘 다 시스템 클래스에 컬럼이 하나 추가되는 엔진 변경만으로 바뀌므로(예: CUBRID CBRD-26076이 `_db_trigger`에 컬럼 두 개 추가) 순서와 수는 비교하지 않고, 어떤 클래스가 보고되는지만 비교한다.

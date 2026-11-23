@@ -33,6 +33,7 @@ flags="-std=gnu++11 -Wall -W -I$src"
 # test name and the server sources it needs
 tests=(
   "test_session_ip:cm_session_ip.cpp"
+  "test_os_release:cm_os_release.cpp"
 )
 
 status=0
