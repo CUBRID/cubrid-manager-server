@@ -14,6 +14,7 @@ CXX=clang++ ./run_unit_tests.sh  # 다른 컴파일러
 | 테스트 | 대상 | 확인하는 것 |
 | --- | --- | --- |
 | `test_session_ip` | `server/src/cm_session_ip.cpp` | `session_ip_check`의 주소 비교. 같은 주소의 다른 표기(IPv4-mapped IPv6, IPv6의 0 생략·대소문자, link-local의 scope)는 같은 주소, 다른 주소는 다른 주소, 해석할 수 없는 값은 알 수 없음. 모드(`off`/`log`/`enforce`)와 비교 결과별 처리(허용, 경고 후 허용, 거부) |
+| `test_os_release` | `server/src/cm_os_release.cpp` | `getenv`의 `osinfo_detail`. `ut_utf8_char_len`: 2~4바이트 UTF-8, C1 제어 문자, overlong, surrogate, U+10FFFF 초과, 잘린 시퀀스. `ut_parse_os_release_value`: 따옴표 없는 값과 주석, `'...'`, `"..."`의 이스케이프(`\"` `\\` `\$` `` \` ``), 닫히지 않은 따옴표, 제어 문자·잘못된 UTF-8 제거, UTF-8 보존, 문자 경계에서 자르기. `ut_get_os_release_detail`: "NAME VERSION"과 VERSION이 없을 때의 폴백(PRETTY_NAME, "NAME VERSION_ID", NAME), 마지막 대입 우선, 너무 긴 줄 무시, 읽지 않는 파일(빈 파일, 디렉터리, FIFO, 크기 초과), `/usr/lib/os-release` 폴백(첫 파일이 없거나 깨진 링크일 때만) |
 | `test_log_name` | `server/src/cm_log_name.cpp` | `getlogfileinfo`, `getloginfo`, `getdberrorlog`가 로그 파일을 인스턴스별로 구분하는 이름 규칙(CBRD-26446). 엔진이 만드는 로그 이름(access와 `.access.denied`, 그 백업, `_qr_rule.err`, CAS 로그)은 그 인스턴스의 것으로, 엔진이 쓰지 않는 `<b>.err`는 아닌 것으로(broker `<b>_<n>`을 요청했을 때 다른 broker의 CAS 오류 로그 `<b>_<n>.err`가 섞이지 않게), 이름이 그 인스턴스 이름으로 시작하는 다른 인스턴스(`<name>_...`, `<name>x...`)의 로그는 아닌 것으로 판정. SHARD=ON broker의 이름(`_<proxy>.access`, `_<proxy>_<shard>_<cas>.*`)과, broker `b`(SHARD=ON)와 `b_1_0`의 CAS 로그가 같은 이름이 되는 경우 SHARD 값으로 구분하는 것 |
 
 API 테스트는 SHARD=OFF broker(`query_editor`)로만 돌므로 SHARD=ON의 로그 이름은 `test_log_name`이
@@ -21,6 +22,9 @@ API 테스트는 SHARD=OFF broker(`query_editor`)로만 돌므로 SHARD=ON의 �
 
 CMS는 IPv4로만 listen하므로 IPv6 표기는 API 테스트로 만들 수 없다. 실제 세션이 유지되거나
 삭제되는지는 API 테스트 세트 `task_session_ip_check`가 확인한다(`../README.md` 4.10).
+
+API 테스트는 `osinfo_detail`을 테스트 호스트의 os-release 하나로만 비교하므로(`../README.md`), 그 파일로는
+만들 수 없는 입력은 `test_os_release`가 입력 표로 확인한다.
 
 ## 테스트 추가
 

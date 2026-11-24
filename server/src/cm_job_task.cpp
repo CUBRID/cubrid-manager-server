@@ -73,6 +73,9 @@
 #include "cm_connect_info.h"
 #include "cm_server_autoupdate.h"
 #include "cm_ssl_cert.h"
+#if !defined(WINDOWS)
+#include "cm_os_release.h"
+#endif
 
 #include <list>
 #include <map>
@@ -6751,6 +6754,19 @@ ts_get_dbsize (nvplist *req, nvplist *res, char *_dbmt_error)
   return ERR_NO_ERROR;
 }
 
+/*
+ * OS of the host from os-release(5), or "Unknown"; see cm_os_release.h.
+ */
+static void
+get_os_info_detail (char *buf, size_t buf_size)
+{
+#if defined(WINDOWS)
+  snprintf (buf, buf_size, "Unknown");
+#else
+  ut_get_os_release_detail (OS_RELEASE_PATH, OS_RELEASE_FALLBACK_PATH, buf, buf_size);
+#endif
+}
+
 int
 tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -6863,6 +6879,9 @@ tsGetEnvironment (nvplist *req, nvplist *res, char *_dbmt_error)
 #else
   nv_add_nvp (res, "osinfo", "unknown");
 #endif
+
+  get_os_info_detail (strbuf, sizeof (strbuf));
+  nv_add_nvp (res, "osinfo_detail", strbuf);
 
   if (rc == ERR_WITH_MSG)
     {
