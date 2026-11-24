@@ -44,7 +44,7 @@ bool ut_is_executable_mode (unsigned int st_mode);
 bool ut_has_executable_extension (const char *path);
 T_CONTENT_WRITE_RESULT ut_open_for_content_write (const char *path, FILE **fp, char *err_buf, size_t err_size);
 bool ut_is_executable_file (const char *path, char *err_buf, size_t err_size);
-T_CONTENT_WRITE_RESULT ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_size);
+T_CONTENT_WRITE_RESULT ut_copy_file (const char *src, const char *dest, char *err_buf, size_t err_size);
 bool ut_check_script_path (const char *script_path, const char *script_dir, unsigned int cms_uid,
 			   std::string &real_path, char *err_buf, size_t err_size);
 

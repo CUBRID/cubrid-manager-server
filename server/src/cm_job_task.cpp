@@ -12438,10 +12438,15 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if (folder_copy (src_dir, dest_dir) < 0)
+  /* folder_copy () gives the reason when it refuses to overwrite an executable file */
+  _dbmt_error[0] = '\0';
+  if (folder_copy (src_dir, dest_dir, _dbmt_error) < 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE - 1,
-		"Failed when copying %s to %s.", src_dir, dest_dir);
+      if (_dbmt_error[0] == '\0')
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE - 1,
+		    "Failed when copying %s to %s.", src_dir, dest_dir);
+	}
       return ERR_WITH_MSG;
     }
 
@@ -12525,7 +12530,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
 	  return ERR_WITH_MSG;
 	}
 
-      switch (ut_copy_to_backup (conf_path, conf_backup_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+      switch (ut_copy_file (conf_path, conf_backup_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
 	{
 	case CONTENT_WRITE_OK:
 	  break;

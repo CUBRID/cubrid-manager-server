@@ -351,7 +351,7 @@ class file_resource_guard
     file_resource_guard &operator= (const file_resource_guard &);
 };
 int uCreateDir (char *path);
-int folder_copy (const char *src_dir, const char *dest_dir);
+int folder_copy (const char *src_dir, const char *dest_dir, char *_dbmt_error);
 int uRemoveDir (char *dir, int remove_file_in_dir);
 int string_tokenize_accept_laststring_space (char *str, char *tok[],
     int num_tok);

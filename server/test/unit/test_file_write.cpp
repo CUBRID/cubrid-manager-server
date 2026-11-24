@@ -20,15 +20,15 @@
 /*
  * test_file_write.cpp - unit tests of server/src/cm_task_file.cpp, how
  *   writeandsaveconf, setsysparam and writeprivatedata open the file they
- *   rewrite, and how writeandsaveconf writes its backup (CBRD-27831).
+ *   rewrite, and how a file is copied (ut_copy_file (): the backup of
+ *   writeandsaveconf, each file of copyfolder) (CBRD-27831).
  *
  *   An executable file is refused and left as it was, whichever execute bit
  *   it has, also through a symbolic link; a file that is not executable is
  *   rewritten and keeps its mode; a new file is never created executable,
  *   even with umask 0, which the API test cannot set for a running CMS.
- *   The backup is written under the same rules: never into an executable
- *   file, and a new backup gets the mode of the original without its
- *   execute bits.
+ *   A copy is written under the same rules: never into an executable file,
+ *   and a new copy gets the mode of the original without its execute bits.
  *
  *   Build and run with run_unit_tests.sh in this directory; it needs no
  *   CUBRID build.
@@ -274,15 +274,15 @@ test_executable_file (void)
   check (!ut_is_executable_file (NULL, NULL, 0), "NULL is not an executable file");
 }
 
-/* ut_copy_to_backup () from `src` to `dest`, both under work_dir */
+/* ut_copy_file () from `src` to `dest`, both under work_dir */
 static T_CONTENT_WRITE_RESULT
-backup (const char *src, const char *dest, char *err_buf, size_t err_size)
+copy_file (const char *src, const char *dest, char *err_buf, size_t err_size)
 {
-  return ut_copy_to_backup (work_path (src).c_str (), work_path (dest).c_str (), err_buf, err_size);
+  return ut_copy_file (work_path (src).c_str (), work_path (dest).c_str (), err_buf, err_size);
 }
 
 static void
-test_backup (void)
+test_copy_file (void)
 {
   char err[512] = "";
   std::string expect_err;
@@ -296,21 +296,22 @@ test_backup (void)
   chmod (src.c_str (), 0600);
 
   umask (0);
-  check (backup ("bak_src.conf", "bak_new.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK, "a new backup is written");
+  check (copy_file ("bak_src.conf", "bak_new.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
+	 "a new backup is written");
   check (file_text (work_path ("bak_new.conf.bak")) == "line 1\nline 2 without newline",
 	 "a new backup has the same bytes");
   check (file_mode (work_path ("bak_new.conf.bak")) == 0600, "a new backup of 0600 is 0600 (umask 0)");
 
   /* the original is executable: the new backup is not */
   make_file ("bak_exec_src.sh", 0755);
-  check (backup ("bak_exec_src.sh", "bak_exec_src.sh.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
+  check (copy_file ("bak_exec_src.sh", "bak_exec_src.sh.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
 	 "a backup of 0755 is written");
   check (file_mode (work_path ("bak_exec_src.sh.bak")) == 0644, "a new backup of 0755 is 0644, not executable");
   umask (022);
 
   /* an existing backup that is not executable is replaced and keeps its mode */
   make_file ("bak_old.conf.bak", 0640);
-  check (backup ("bak_src.conf", "bak_old.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
+  check (copy_file ("bak_src.conf", "bak_old.conf.bak", err, sizeof (err)) == CONTENT_WRITE_OK,
 	 "an existing 0640 backup is written");
   check (file_text (work_path ("bak_old.conf.bak")) == "line 1\nline 2 without newline",
 	 "an existing backup is replaced, not appended to");
@@ -320,7 +321,7 @@ test_backup (void)
   /* an executable backup is refused and left as it was */
   make_file ("bak_exec.conf.bak", 0755);
   expect_err = "writing to an executable file is not allowed: " + work_path ("bak_exec.conf.bak");
-  check (backup ("bak_src.conf", "bak_exec.conf.bak", err, sizeof (err)) == CONTENT_WRITE_EXECUTABLE,
+  check (copy_file ("bak_src.conf", "bak_exec.conf.bak", err, sizeof (err)) == CONTENT_WRITE_EXECUTABLE,
 	 "an executable backup is refused");
   check (expect_err == err, "an executable backup: the reason names the backup");
   check (file_text (work_path ("bak_exec.conf.bak")) == FIXTURE_TEXT, "an executable backup: contents not changed");
@@ -333,13 +334,13 @@ test_backup (void)
       perror ("symlink");
       exit (2);
     }
-  check (backup ("bak_src.conf", "bak_link.conf.bak", NULL, 0) == CONTENT_WRITE_EXECUTABLE,
+  check (copy_file ("bak_src.conf", "bak_link.conf.bak", NULL, 0) == CONTENT_WRITE_EXECUTABLE,
 	 "a backup linked to 0700 is refused");
   check (file_text (work_path ("bak_link_target.sh")) == FIXTURE_TEXT, "a backup linked to 0700: target not changed");
 
   /* nothing to copy: no backup is made, no reason is set */
   err[0] = '\0';
-  check (backup ("no_such_file", "bak_missing.bak", err, sizeof (err)) == CONTENT_WRITE_OPEN_FAIL,
+  check (copy_file ("no_such_file", "bak_missing.bak", err, sizeof (err)) == CONTENT_WRITE_OPEN_FAIL,
 	 "a missing original fails");
   check (access (work_path ("bak_missing.bak").c_str (), F_OK) != 0, "a missing original: no backup is created");
   check (err[0] == '\0', "a missing original: no reason is set");
@@ -359,7 +360,7 @@ main (void)
   test_refused ();
   test_written ();
   test_executable_file ();
-  test_backup ();
+  test_copy_file ();
 
   if (failures == 0)
     {

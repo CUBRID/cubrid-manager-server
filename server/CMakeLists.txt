@@ -177,6 +177,7 @@ set(CM_ADMIN_SOURCES
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_cmd_task.cpp
   ${CMS_SRC_DIR}/cm_server_status.cpp
+  ${CMS_SRC_DIR}/cm_task_file.cpp
   )
 
 set(CUB_MANAGER_SOURCES

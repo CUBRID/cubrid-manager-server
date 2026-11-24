@@ -1698,6 +1698,41 @@ def make_script_path_files():
         os.symlink(os.path.join(CUBRID, "tmp", "authtest_script_tmp.sh"), path)
 
 
+# Directories of the file_exec_copy case of task_auth_check, under
+# $CUBRID/tmp: {directory: {file: mode}}. copyfolder must not overwrite the
+# executable job.sh of authtest_copy_dest with job.sh of authtest_copy_src,
+# and copies run.sh of authtest_copy_exec_src without its execute bits.
+COPY_DIRS = {"authtest_copy_src": {"job.sh": 0o644},
+             "authtest_copy_dest": {"job.sh": 0o755},
+             "authtest_copy_exec_src": {"run.sh": 0o755}}
+# what the case creates with copyfolder
+COPY_NEW_DIRS = ("authtest_copy_new_exec", "authtest_copy_new_plain")
+
+
+def remove_copy_dirs():
+    """Remove the directories of make_copy_dirs() and what the case copied."""
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    for name in list(COPY_DIRS) + list(COPY_NEW_DIRS):
+        shutil.rmtree(os.path.join(CUBRID, "tmp", name), ignore_errors=True)
+
+
+def make_copy_dirs():
+    """Lay COPY_DIRS under $CUBRID/tmp (see there)."""
+    remove_copy_dirs()
+    for name, files in COPY_DIRS.items():
+        directory = os.path.join(CUBRID, "tmp", name)
+        os.makedirs(directory)
+        for filename, mode in files.items():
+            path = os.path.join(directory, filename)
+            with open(path, "w") as f:
+                f.write(EXEC_WRITE_TEXT if mode & 0o111
+                        else "#!/bin/sh\necho authtest copied\n")
+            # chmod, not the mode of open(): the umask must not take bits away
+            os.chmod(path, mode)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1736,6 +1771,8 @@ def build_env():
     make_exec_write_files()
     # Scripts runscript must refuse to run, and one it runs.
     make_script_path_files()
+    # Executable files copyfolder must not overwrite.
+    make_copy_dirs()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1751,6 +1788,7 @@ def clean_env():
     remove_name_match_decoys()
     remove_exec_write_files()
     remove_script_files()
+    remove_copy_dirs()
 
 
 def reset_leftovers():
@@ -1780,6 +1818,7 @@ def reset_leftovers():
     remove_name_match_decoys()
     remove_exec_write_files()
     remove_script_files()
+    remove_copy_dirs()
 
 
 def xml_escape(text):

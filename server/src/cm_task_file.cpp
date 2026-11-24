@@ -214,7 +214,7 @@ typedef enum
 /*
  * open_non_executable_for_write () - open `path` to replace its contents
  *   unless it is an executable file; the common part of
- *   ut_open_for_content_write () and ut_copy_to_backup ().
+ *   ut_open_for_content_write () and ut_copy_file ().
  *
  *   Linux: the file (the target, if `path` is a symbolic link) is opened
  *   without O_TRUNC and judged by fstat () on that descriptor, then
@@ -398,23 +398,25 @@ ut_is_executable_file (const char *path, char *err_buf, size_t err_size)
 }
 
 /*
- * ut_copy_to_backup () - copy `src` to `dest`, its backup, writing `dest`
- *   as ut_open_for_content_write () writes a file: an executable `dest` is
+ * ut_copy_file () - copy `src` to `dest` for a task (the backup of
+ *   writeandsaveconf, each file copyfolder copies), writing `dest` as
+ *   ut_open_for_content_write () writes a file: an executable `dest` is
  *   refused and left as it is (CONTENT_WRITE_EXECUTABLE, with the reason in
  *   err_buf), so that the contents of `src`, which a task may have written,
  *   never land in an executable file.
  *
  *   A new `dest` gets the mode of `src` without its execute bits (Linux), so
- *   that the backup of a private file stays private and is never
- *   executable; an existing `dest` keeps its mode. The bytes are copied as
- *   they are (binary mode on Windows).
+ *   that a copy of a private file stays private and a task never creates an
+ *   executable file, not even by copying one: a copied script has to be made
+ *   executable on the server. An existing `dest` keeps its mode. The bytes
+ *   are copied as they are (binary mode on Windows).
  *
  *   CONTENT_WRITE_OPEN_FAIL: `src` could not be read or `dest` could not be
  *   written; err_buf is not changed. A `dest` that was written only in part
  *   is removed, as file_copy () does.
  */
 T_CONTENT_WRITE_RESULT
-ut_copy_to_backup (const char *src, const char *dest, char *err_buf, size_t err_size)
+ut_copy_file (const char *src, const char *dest, char *err_buf, size_t err_size)
 {
   FILE *infile, *outfile;
   char buf[8192];

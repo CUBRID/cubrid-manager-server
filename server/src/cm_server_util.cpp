@@ -88,6 +88,7 @@
 #include "cm_connect_info.h"
 #include "cm_porting.h"
 #include "cm_server_util.h"
+#include "cm_task_file.h"
 #include "cm_dep.h"
 #include "cm_config.h"
 #include "cm_job_task.h"
@@ -1628,8 +1629,21 @@ win_is_reparse_point (const char *path)
   return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT);
 }
 
+/*
+ * folder_copy () - copy the tree `src_folder` into `dest_folder`, creating
+ *   it if needed, for copyfolder.
+ *
+ *   Each file is copied with ut_copy_file (): a file that already exists in
+ *   the destination and is executable is not overwritten, and the copy fails
+ *   with the reason in _dbmt_error; a new file is created without execute
+ *   bits. On any other failure _dbmt_error is not changed. Files copied
+ *   before a failure stay; dest_folder is removed only if this call created
+ *   it.
+ *
+ *   return: 0, or -1 on failure
+ */
 int
-folder_copy (const char *src_folder, const char *dest_folder)
+folder_copy (const char *src_folder, const char *dest_folder, char *_dbmt_error)
 {
   WIN32_FIND_DATA FileData;
   HANDLE hSearch = INVALID_HANDLE_VALUE;
@@ -1710,14 +1724,15 @@ folder_copy (const char *src_folder, const char *dest_folder)
       if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
 
-	  if (folder_copy (src_path, dest_path) < 0)
+	  if (folder_copy (src_path, dest_path, _dbmt_error) < 0)
 	    {
 	      goto err_clean_return;
 	    }
 	  continue;
 	}
 
-      if (file_copy (src_path, dest_path) == 0)
+      /* never into an executable file, see ut_copy_file () */
+      if (ut_copy_file (src_path, dest_path, _dbmt_error, DBMT_ERROR_MSG_SIZE) == CONTENT_WRITE_OK)
 	{
 	  dwAttrs = GetFileAttributes (dest_path);
 	  if (dwAttrs == INVALID_FILE_ATTRIBUTES)
@@ -1760,8 +1775,9 @@ err_return:
   return -1;
 }
 #else
+/* folder_copy () - see the Windows version above */
 int
-folder_copy (const char *src_folder, const char *dest_folder)
+folder_copy (const char *src_folder, const char *dest_folder, char *_dbmt_error)
 {
   char src_dir[PATH_MAX];
   char dest_dir[PATH_MAX];
@@ -1867,14 +1883,15 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	}
       else if (S_ISDIR (statbuf.st_mode))
 	{
-	  if (folder_copy (src_path, dest_path) < 0)
+	  if (folder_copy (src_path, dest_path, _dbmt_error) < 0)
 	    {
 	      goto err_clean_return;
 	    }
 	}
       else
 	{
-	  if (file_copy (src_path, dest_path) < 0)
+	  /* never into an executable file, see ut_copy_file () */
+	  if (ut_copy_file (src_path, dest_path, _dbmt_error, DBMT_ERROR_MSG_SIZE) != CONTENT_WRITE_OK)
 	    {
 	      goto err_clean_return;
 	    }
