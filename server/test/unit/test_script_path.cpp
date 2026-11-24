@@ -26,9 +26,15 @@
  *   and root can change, in a directory only they can change. Every refusal
  *   gives its own reason.
  *
+ *   Every directory above the script directory must be changeable only by
+ *   those two as well, unless it has the sticky bit (/tmp, above the work
+ *   directory of this test, is one).
+ *
  *   The owner checks need a file of another user, which only root can make;
  *   here the user CMS runs as is passed as another uid instead. Run as root,
- *   those checks are skipped, as every file then belongs to root.
+ *   those checks are skipped, as every file then belongs to root, and the
+ *   owner check of a parent directory is made instead, by giving one to
+ *   nobody (65534); run as another user, that one is skipped.
  *
  *   Build and run with run_unit_tests.sh in this directory; it needs no
  *   CUBRID build.
@@ -250,6 +256,73 @@ test_dir (void)
     }
 }
 
+/* `top` (under work_dir, mode `top_mode`) holding conf/a.sh: a script whose parent is `top` */
+static std::string
+make_tree_under (const std::string &top, mode_t top_mode)
+{
+  make_dir (top, 0755);
+  make_dir (top + "/conf", 0755);
+  make_script (top + "/conf/a.sh", 0700);
+  /* the mode of `top` last, once what is in it has been made */
+  chmod (work_path (top).c_str (), top_mode);
+  return work_path (top + "/conf");
+}
+
+static void
+test_parents (void)
+{
+  const char *writable = "a parent of the script directory must not be writable by the group or others";
+  std::string dir;
+
+  /* whoever can write a parent could put another conf in place of this one */
+  dir = make_tree_under ("parent_group_w", 0775);
+  expect_in (dir + "/a.sh", dir, me, writable);
+  dir = make_tree_under ("parent_others_w", 0757);
+  expect_in (dir + "/a.sh", dir, me, writable);
+  dir = make_tree_under ("parent_group_w_only", 0770);
+  expect_in (dir + "/a.sh", dir, me, writable);
+
+  /* the sticky bit: nobody but the owner of conf can rename it */
+  dir = make_tree_under ("parent_sticky", 01777);
+  expect_in (dir + "/a.sh", dir, me, NULL);
+  dir = make_tree_under ("parent_sticky_group", 01775);
+  expect_in (dir + "/a.sh", dir, me, NULL);
+
+  /* a parent further up, not the direct one */
+  make_dir ("upper_w", 0755);
+  dir = make_tree_under ("upper_w/mid", 0755);
+  chmod (work_path ("upper_w").c_str (), 0777);
+  expect_in (dir + "/a.sh", dir, me, writable);
+  chmod (work_path ("upper_w").c_str (), 0755);
+  expect_in (dir + "/a.sh", dir, me, NULL);
+
+  /* the reason names the parent */
+  {
+    char err[1024] = "";
+    std::string real;
+
+    dir = work_path ("parent_others_w/conf");
+    ut_check_script_path ((dir + "/a.sh").c_str (), dir.c_str (), me, real, err, sizeof (err));
+    check (strstr (err, (work_path ("parent_others_w")).c_str ()) != NULL, "the reason names the parent directory");
+  }
+
+  if (me == 0)
+    {
+      /* a parent of another user: root can make one */
+      dir = make_tree_under ("parent_nobody", 0755);
+      if (chown (work_path ("parent_nobody").c_str (), 65534, 65534) != 0)
+	{
+	  perror ("chown");
+	  exit (2);
+	}
+      expect_in (dir + "/a.sh", dir, me, "a parent of the script directory must be owned by the user CMS runs as or by root");
+    }
+  else
+    {
+      printf ("skipped: the owner of a parent directory (not running as root)\n");
+    }
+}
+
 static void
 test_reason_format (void)
 {
@@ -279,6 +352,7 @@ main (void)
   test_place ();
   test_file ();
   test_dir ();
+  test_parents ();
   test_reason_format ();
 
   if (failures == 0)

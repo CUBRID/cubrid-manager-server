@@ -578,6 +578,59 @@ owned_and_not_shared (const struct stat &st, unsigned int cms_uid, const char *w
     }
   return true;
 }
+
+/*
+ * parents_owned_and_not_shared () - every directory above `real_dir` (a real
+ *   path, from real_path_of ()), up to "/", belongs to the user CMS runs as
+ *   (cms_uid) or to root, and is not writable by the group or others.
+ *   Whoever can write one of them can rename real_dir, or a directory on the
+ *   way to it, away and put another in its place between the check and the
+ *   run, as the script is run again by its path.
+ *
+ *   A directory with the sticky bit (/tmp) may be writable by the group or
+ *   others: there only the owner of an entry can rename or remove it, and
+ *   the entry below it on the way to real_dir belongs to cms_uid or root
+ *   (checked here, or as real_dir itself). This is the rule of the
+ *   StrictModes check of OpenSSH.
+ *
+ *   Sets the reason, naming the directory, and returns false otherwise.
+ */
+static bool
+parents_owned_and_not_shared (const std::string &real_dir, unsigned int cms_uid, char *err_buf, size_t err_size)
+{
+  std::string dir = real_dir;
+  struct stat st;
+
+  while (dir.size () > 1)
+    {
+      dir = parent_of (dir);
+      if (dir.empty ())
+	{
+	  break;
+	}
+
+      if (stat (dir.c_str (), &st) != 0)
+	{
+	  set_path_reason (err_buf, err_size, "a parent of the script directory cannot be examined", dir.c_str ());
+	  return false;
+	}
+      if (st.st_uid != cms_uid && st.st_uid != 0)
+	{
+	  set_path_reason (err_buf, err_size,
+			   "a parent of the script directory must be owned by the user CMS runs as or by root",
+			   dir.c_str ());
+	  return false;
+	}
+      if ((st.st_mode & (S_IWGRP | S_IWOTH)) != 0 && (st.st_mode & S_ISVTX) == 0)
+	{
+	  set_path_reason (err_buf, err_size,
+			   "a parent of the script directory must not be writable by the group or others",
+			   dir.c_str ());
+	  return false;
+	}
+    }
+  return true;
+}
 #endif
 
 /*
@@ -593,7 +646,9 @@ owned_and_not_shared (const struct stat &st, unsigned int cms_uid, const char *w
  *   - It must be a regular file.
  *   - Linux: the file and script_dir must be owned by cms_uid or root, and
  *     neither may be writable by the group or others. script_dir is checked
- *     too, as whoever can write it can replace the file after the check.
+ *     too, as whoever can write it can replace the file after the check, and
+ *     so is every directory above it (parents_owned_and_not_shared ()), as
+ *     whoever can write one of them can replace script_dir itself.
  *     The file must be executable (ut_is_executable_mode ()), so that what a
  *     task wrote is refused with a clear reason rather than failing to run:
  *     a task never creates an executable file, nor rewrites one
@@ -671,6 +726,11 @@ ut_check_script_path (const char *script_path, const char *script_dir, unsigned 
     }
 
   if (!owned_and_not_shared (dir_st, cms_uid, "the script directory", script_dir, err_buf, err_size))
+    {
+      return false;
+    }
+
+  if (!parents_owned_and_not_shared (real_dir, cms_uid, err_buf, err_size))
     {
       return false;
     }

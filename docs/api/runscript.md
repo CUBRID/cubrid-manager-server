@@ -21,6 +21,12 @@ Only a script that nobody but the user CMS runs as and root can change is run:
   - Neither may be writable by the group or others (`the script must not be writable by the
     group or others`, `the script directory must not be writable by the group or others`).
     Whoever can write the directory could replace the script after it is checked.
+  - The same holds for every directory above `$CUBRID/conf`, up to `/`: each must be owned by the
+    user CMS runs as or by root and not be writable by the group or others, unless it has the
+    sticky bit, as `/tmp` does (`a parent of the script directory must be owned by ...`,
+    `a parent of the script directory must not be writable by the group or others`, with that
+    directory). Whoever can write one of them could put another `$CUBRID/conf` in place of the
+    one checked. This is how OpenSSH checks the files of `StrictModes`.
   - The script must be executable (`the script is not executable`). A file created with
     `writeandsaveconf` or another task has no execute bit, and an existing
     executable file cannot be rewritten by a task, so a task alone cannot make a script that runs.
