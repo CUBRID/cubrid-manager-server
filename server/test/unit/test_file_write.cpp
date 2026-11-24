@@ -186,6 +186,9 @@ test_executable_extension (void)
   check (!ut_has_executable_extension ("C:\\CUBRID\\conf\\bat"), "no extension");
   check (!ut_has_executable_extension ("C:\\CUBRID\\conf\\..."), "dots only");
   check (!ut_has_executable_extension (NULL), "NULL");
+  /* bytes of a non-ASCII name are negative as a char; they go to tolower () as unsigned char */
+  check (!ut_has_executable_extension ("C:\\CUBRID\\conf\\a.\xed\x95\x9c\xea\xb8\x80"), "a non-ASCII extension");
+  check (ut_has_executable_extension ("C:\\CUBRID\\\xed\x95\x9c\xea\xb8\x80\\a.BAT"), "a.BAT in a non-ASCII directory");
 }
 
 static void

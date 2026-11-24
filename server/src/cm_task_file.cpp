@@ -114,7 +114,10 @@ ut_has_executable_extension (const char *path)
       return false;
     }
   name = name.substr (pos);
-  std::transform (name.begin (), name.end (), name.begin (), (int (*) (int)) tolower);
+  std::transform (name.begin (), name.end (), name.begin (), [] (char c)
+  {
+    return (char) tolower ((unsigned char) c);
+  });
 
   for (int i = 0; executable_extensions[i] != NULL; i++)
     {
