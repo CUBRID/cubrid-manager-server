@@ -4467,10 +4467,20 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   snprintf (dest_conf_file, sizeof (dest_conf_file), "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
 
-  /* Doesn't copy if src and desc is same */
+  /*
+   * Doesn't copy if src and desc is same. As before, a failed copy of
+   * cubrid.conf does not fail copydb, whose database is already copied; an
+   * executable cubrid.conf in the destination is not overwritten either
+   * (see ut_copy_file ()), and that is logged.
+   */
   if (strcmp (src_conf_file, dest_conf_file) != 0)
     {
-      file_copy (src_conf_file, dest_conf_file);
+      char copy_error[DBMT_ERROR_MSG_SIZE];
+
+      if (ut_copy_file (src_conf_file, dest_conf_file, copy_error, sizeof (copy_error)) == CONTENT_WRITE_EXECUTABLE)
+	{
+	  ut_error_log (req, copy_error);
+	}
     }
 
   /* if move, delete exist database */
