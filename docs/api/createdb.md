@@ -25,6 +25,7 @@ Permissions required to run this task: DBC
 
 * The status of a task running in asynchronous mode can be checked using the 'gettaskstatus' api
 * `genvolpath`, `logvolpath`, and for each `exvol` volume both PATH and PATH/NAME are a new database, so they must be under `allowed_db_dirs` of `cm.conf`; see [DB Utility Task Paths](README.md#db-utility-task-paths). They are all checked before any directory or file is created.
+* Before the database is created, CMS writes `cubrid.conf` (unless `overwrite_config_file` is `n`) and `extvol.spec` into `genvolpath`. If either of them is already there and executable, it is not written and the task fails with `writing to an executable file is not allowed: <file>` before the database is created; see [File Access](README.md#file-access). A new file has no execute bit.
 * Only one of these database tasks — addvoldb, backupdb, checkdb, compactdb, copydb, createdb, deletedb, loaddb, optimizedb, renamedb, restoredb, startdb, stopdb, unloaddb — can run against the same `dbname` at a time, whether or not `async` is used; a request is rejected immediately if another one of them is already running on that database
 
 ## Request Sample

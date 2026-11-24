@@ -145,6 +145,7 @@ server/test/
    - `remove_exec_write_files()`로 `file_exec_*` 케이스의 파일 정리 (4.8 참고)
    - `remove_script_files()`로 `runscript` 스크립트와 `script_path` 케이스의 파일 정리 (4.8 참고)
    - `remove_copy_dirs()`로 `file_exec_copy` 케이스의 디렉터리 정리 (4.8 참고)
+   - `remove_createdb_dirs()`로 `file_exec_createdb` 케이스의 디렉터리 정리 (4.8 참고)
    - 마지막의 `clean_env()`와 같은 일을 **시작 시점에 먼저** 한 번 더 한다.
      `SIGKILL`로 죽은 실행은 `finally`에 도달하지 못해 잔재를 남기는데, 그것이
      다음 실행까지 번지지 않게 하려는 것이다.
@@ -184,6 +185,8 @@ server/test/
      쓰기 가능, 바깥을 가리키는 링크, 하위 디렉터리), `$CUBRID/tmp`, `$CUBRID_DATABASES`에 만든다 (4.8 참고)
    - `make_copy_dirs()`가 `file_exec_copy` 케이스의 복사 원본과 실행 파일이 있는 대상 디렉터리를
      `$CUBRID/tmp`에 만든다 (4.8 참고)
+   - `make_createdb_dirs()`가 `file_exec_createdb` 케이스의 실행 가능한 `cubrid.conf`, `extvol.spec`이 든
+     디렉터리를 `$CUBRID_DATABASES`에 만든다 (4.8 참고)
    - 중단된 실행이 남긴 dbmt 사용자 `yifan`을 best-effort로 제거
    - `wait_for_mon_data()`가 첫 모니터링 수집이 끝날 때까지 대기
      (그 전에는 `vol_mon`이 없어 `set_mon_interval`이 실패한다)
@@ -613,6 +616,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `file_exec_write` | admin | `writeandsaveconf`가 실행 권한이 있는 기존 파일(0755, 0700, 그리고 owner·group·others 비트 하나씩만 있는 0744·0654·0645)과 실행 파일을 가리키는 심볼릭 링크를 `writing to an executable file is not allowed`로 거부하고, 파일의 내용(`viewlog`)과 모드(`test_file_mode`)가 그대로임. 실행 권한이 없는 기존 파일(0640)은 쓰이고 모드가 유지되며, 새 파일은 0644로 만들어짐. 새 파일의 모드는 CMS의 umask가 022(기본)라고 전제한다. umask 0에서 실행 권한 없이 만들어지는 것은 단위 테스트(`unit/test_file_write`)가 확인한다. 거부된 요청은 백업(`.bak`)을 만들지 않고, 0640 파일의 새 백업은 0640에 원래 내용을 가짐. 파일은 `build_env()`가 `$CUBRID/tmp`에 만든다(CBRD-27831) |
 | `file_exec_backup` | admin | 실행 권한이 없는 파일(0640)이라도 그 백업 `<file>.bak`이 실행 파일(0755)이면 `writeandsaveconf`가 백업 경로를 담은 `writing to an executable file is not allowed: <file>.bak`로 거부하고, 파일과 백업의 내용·모드가 그대로임(CBRD-27831) |
 | `file_exec_copy` | admin | `copyfolder`가 대상 디렉터리의 실행 파일(0755 `job.sh`)을 덮어쓰지 않고 `writing to an executable file is not allowed: <file>`로 실패하며, 그 파일의 내용·모드가 그대로임. 실행 파일(0755)을 새 위치로 복사하면 실행 비트가 빠진 0644가 되고(원본은 0755 그대로), 일반 파일은 기존처럼 복사됨. 새 복사본의 모드는 CMS의 umask가 022(기본)라고 전제한다(CBRD-27831) |
+| `file_exec_createdb` | admin | `createdb`가 `genvolpath`의 실행 가능한 `cubrid.conf`(0755)와, `overwrite_config_file: NO`일 때 실행 가능한 `extvol.spec`(0755)에 쓰지 않고 `writing to an executable file is not allowed: <file>`로 실패하며, 파일의 내용·모드가 그대로임. 디렉터리는 `build_env()`가 `$CUBRID_DATABASES`에 만든다. `numpage`·`logsize` 1이라 회귀해도 DB가 만들어지지 않음(CBRD-27831) |
 | `file_exec_private` | admin | `writeprivatedata`(`confname: ../../tmp/...`)가 `file_exec_write`와 같은 실행 파일과 링크를 거부하고 내용·모드가 그대로임. 실행 권한이 없는 파일(0600)은 쓰이고 모드가 유지되며, 새 파일은 0644로 만들어짐(CBRD-27831) |
 | `script_path` | admin | `runscript`가 `$CUBRID/conf` 바로 아래의 0700 스크립트는 실행하고, 하위 디렉터리·`$CUBRID/tmp`·`$CUBRID_DATABASES`·`$CUBRID/bin`의 파일과 바깥을 가리키는 `$CUBRID/conf` 안의 링크(`only a script directly under`), 디렉터리(`not a regular file`), 없는 파일, group·others 쓰기 가능(0775, 0757) 스크립트를 사유별 문구로 거부. `writeandsaveconf`로 `$CUBRID/conf`에 만든 스크립트는 0644라 `the script is not executable`로 거부. 다른 소유자와 `$CUBRID/conf` 디렉터리 검사는 대상 서버를 바꿔야 해서 단위 테스트(`unit/test_script_path`)가 확인한다. 러너가 CMS와 같은 사용자로 돌고, `$CUBRID/conf`와 그 위의 디렉터리가 CMS 사용자나 root 소유이며 group/others 쓰기 권한이 없다고(sticky bit는 예외) 전제한다. `runscript`는 디버그 빌드 전용이라 요청마다 `test_debug_only`가 있고, release 빌드(CI)에서는 모두 `Undefined request - runscript`로 실패해야 통과한다(CBRD-27831) |
 | `file_cubrid_bin` | admin | `writeandsaveconf`·`writeprivatedata`·`copyfolder`(dest)로 `$CUBRID/bin` 아래에 쓰지 못하고, `resetlog`·`removelog`로 비우거나 지우지 못함. 회귀해도 bin 아래 파일이 생기거나 지워지지 않도록 없는 경로를 쓴다 |

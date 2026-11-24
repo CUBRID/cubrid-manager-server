@@ -1733,6 +1733,35 @@ def make_copy_dirs():
             os.chmod(path, mode)
 
 
+# Directories of the file_exec_createdb case of task_auth_check, under
+# $CUBRID_DATABASES: {directory: executable file in it}. createdb must not
+# write cubrid.conf or extvol.spec there while they are executable.
+CREATEDB_DIRS = {"authtest_exec_conf": "cubrid.conf",
+                 "authtest_exec_spec": "extvol.spec"}
+
+
+def remove_createdb_dirs():
+    """Remove the directories of make_createdb_dirs()."""
+    if not CUBRID_DATABASES:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    for name in CREATEDB_DIRS:
+        shutil.rmtree(os.path.join(CUBRID_DATABASES, name), ignore_errors=True)
+
+
+def make_createdb_dirs():
+    """Lay CREATEDB_DIRS under $CUBRID_DATABASES (see there)."""
+    remove_createdb_dirs()
+    for name, filename in CREATEDB_DIRS.items():
+        directory = os.path.join(CUBRID_DATABASES, name)
+        os.makedirs(directory)
+        path = os.path.join(directory, filename)
+        with open(path, "w") as f:
+            f.write(EXEC_WRITE_TEXT)
+        # chmod, not the mode of open(): the umask must not take bits away
+        os.chmod(path, 0o755)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1773,6 +1802,8 @@ def build_env():
     make_script_path_files()
     # Executable files copyfolder must not overwrite.
     make_copy_dirs()
+    # Executable files createdb must not write.
+    make_createdb_dirs()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1789,6 +1820,7 @@ def clean_env():
     remove_exec_write_files()
     remove_script_files()
     remove_copy_dirs()
+    remove_createdb_dirs()
 
 
 def reset_leftovers():
@@ -1819,6 +1851,7 @@ def reset_leftovers():
     remove_exec_write_files()
     remove_script_files()
     remove_copy_dirs()
+    remove_createdb_dirs()
 
 
 def xml_escape(text):

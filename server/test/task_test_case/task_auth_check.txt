@@ -23,6 +23,9 @@ file_exec_backup,success
 file_exec_private,success
 // copyfolder: never over an executable file, copies without execute bits (CBRD-27831)
 file_exec_copy,success
+// createdb: cubrid.conf and extvol.spec in genvolpath, never into an executable file;
+// numpage and logsize 1, so that a regression does not create a database (CBRD-27831)
+file_exec_createdb,success
 // runscript: only a script directly under $CUBRID/conf that only the user CMS
 // runs as and root can change (CBRD-27831); assumes the suite runs as that user
 script_path,success

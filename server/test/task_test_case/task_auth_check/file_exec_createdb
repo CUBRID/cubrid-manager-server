@@ -1,0 +1,68 @@
+[
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_exec_confdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "YES",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_exec_conf",
+  "logvolpath": "$CUBRID_DATABASES/authtest_exec_conf",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed: $CUBRID_DATABASES/authtest_exec_conf/cubrid.conf",
+  "test_file_mode": {
+   "$CUBRID_DATABASES/authtest_exec_conf/cubrid.conf": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID_DATABASES/authtest_exec_conf/cubrid.conf",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "createdb",
+  "token": "",
+  "dbname": "authtest_exec_specdb",
+  "numpage": "1",
+  "pagesize": "4096",
+  "logsize": "1",
+  "logpagesize": "4096",
+  "overwrite_config_file": "NO",
+  "charset": "en_US",
+  "genvolpath": "$CUBRID_DATABASES/authtest_exec_spec",
+  "logvolpath": "$CUBRID_DATABASES/authtest_exec_spec",
+  "exvol": [],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed: $CUBRID_DATABASES/authtest_exec_spec/extvol.spec",
+  "test_file_mode": {
+   "$CUBRID_DATABASES/authtest_exec_spec/extvol.spec": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID_DATABASES/authtest_exec_spec/extvol.spec",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ }
+]

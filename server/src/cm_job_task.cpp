@@ -2718,6 +2718,31 @@ is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
   return true;
 }
 
+/*
+ * open_db_dir_file_for_write () - open `path`, a file createdb writes in a
+ *   directory the request names, with ut_open_for_content_write (): an
+ *   executable file there is refused and left as it is, as the contents
+ *   written come from the request and from files a task can write.
+ *
+ *   return: ERR_NO_ERROR with *fp open; ERR_WITH_MSG for an executable file,
+ *     the reason in _dbmt_error; ERR_FILE_OPEN_FAIL with `path` in
+ *     _dbmt_error, as before, if it cannot be opened.
+ */
+static int
+open_db_dir_file_for_write (const char *path, FILE **fp, char *_dbmt_error)
+{
+  switch (ut_open_for_content_write (path, fp, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+    {
+    case CONTENT_WRITE_OK:
+      return ERR_NO_ERROR;
+    case CONTENT_WRITE_EXECUTABLE:
+      return ERR_WITH_MSG;
+    default:
+      strcpy_limit (_dbmt_error, path, DBMT_ERROR_MSG_SIZE);
+      return ERR_FILE_OPEN_FAIL;
+    }
+}
+
 int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -2911,6 +2936,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       FILE *infile = NULL;
       FILE *outfile = NULL;
       char dstrbuf[COMPOSED_PATH_MAX];
+      int open_err;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
       snprintf (dstrbuf, sizeof (dstrbuf), "%s/conf/%s", sco.szCubrid,
@@ -2927,12 +2953,11 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
 
       snprintf (dstrbuf, sizeof (dstrbuf), "%s/%s", targetdir, CUBRID_CUBRID_CONF);
-      outfile = fopen (dstrbuf, "w");
-      if (outfile == NULL)
+      open_err = open_db_dir_file_for_write (dstrbuf, &outfile, _dbmt_error);
+      if (open_err != ERR_NO_ERROR)
 	{
 	  fclose (infile);
-	  strcpy (_dbmt_error, dstrbuf);
-	  return ERR_FILE_OPEN_FAIL;
+	  return open_err;
 	}
 
       while (fgets (strbuf, sizeof (strbuf), infile))
@@ -3018,13 +3043,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       char val2_buf[1024];
 #endif
       char extvol_path[PATH_MAX];
+      int open_err;
 
       snprintf (extvolfile, sizeof (extvolfile), "%s/extvol.spec", targetdir);
-      outfile = fopen (extvolfile, "w");
-      if (outfile == NULL)
+      open_err = open_db_dir_file_for_write (extvolfile, &outfile, _dbmt_error);
+      if (open_err != ERR_NO_ERROR)
 	{
-	  strcpy (_dbmt_error, extvolfile);
-	  return ERR_FILE_OPEN_FAIL;
+	  return open_err;
 	}
 
       nv_locate (req, "exvol", &pos, &len);
