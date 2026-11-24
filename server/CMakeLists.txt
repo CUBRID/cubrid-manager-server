@@ -200,6 +200,7 @@ set(CUB_MANAGER_SOURCES
   ${CMS_SRC_DIR}/cm_server_autoupdate.cpp
   ${CMS_SRC_DIR}/cm_ssl_cert.cpp
   ${CMS_SRC_DIR}/cm_session_ip.cpp
+  ${CMS_SRC_DIR}/cm_os_release.cpp
   ${CMS_SRC_DIR}/cm_log_name.cpp
   ${CMS_SRC_DIR}/cm_task_file.cpp
   )

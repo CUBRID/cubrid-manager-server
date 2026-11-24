@@ -10,6 +10,7 @@
    "HOSTMONTAB3": "OFF",
    "note": "none",
    "osinfo": "LINUX",
+   "osinfo_detail": "$OSINFO_DETAIL",
    "status": "success",
    "task": "getenv"
 }
