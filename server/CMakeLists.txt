@@ -177,6 +177,7 @@ set(CM_ADMIN_SOURCES
   ${CMS_SRC_DIR}/cm_connect_info.cpp
   ${CMS_SRC_DIR}/cm_cmd_task.cpp
   ${CMS_SRC_DIR}/cm_server_status.cpp
+  ${CMS_SRC_DIR}/cm_task_file.cpp
   )
 
 set(CUB_MANAGER_SOURCES
@@ -201,6 +202,7 @@ set(CUB_MANAGER_SOURCES
   ${CMS_SRC_DIR}/cm_session_ip.cpp
   ${CMS_SRC_DIR}/cm_os_release.cpp
   ${CMS_SRC_DIR}/cm_log_name.cpp
+  ${CMS_SRC_DIR}/cm_task_file.cpp
   )
 
 add_executable(cm_admin ${CM_ADMIN_SOURCES})

@@ -88,6 +88,7 @@
 #include "cm_connect_info.h"
 #include "cm_porting.h"
 #include "cm_server_util.h"
+#include "cm_task_file.h"
 #include "cm_dep.h"
 #include "cm_config.h"
 #include "cm_job_task.h"
@@ -389,7 +390,6 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"runsqlstatement", TS_RUN_SQL_STATEMENT, 0, DEF_TASK_FUNC (ts_run_sql_statement), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"writeandsaveconf", TS_WRITE_AND_SAVE_CONF, 0, DEF_TASK_FUNC (ts_write_and_save_conf), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"getfiletotallinenum", TS_GET_FILE_TOTAL_LINE_NUM, 0, DEF_TASK_FUNC (ts_get_file_total_line_num), FSVR_SA_CS, AU_ANY},
-  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, AU_ADMIN},
   {"copyfolder", TS_COPY_FOLDER, 0, DEF_TASK_FUNC (ts_copy_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {"deletefolder", TS_DELETE_FOLDER, 0, DEF_TASK_FUNC (ts_delete_folder), FSVR_SA_CS, AU_DBC | AU_DBO},
   {
@@ -420,6 +420,7 @@ static T_FSERVER_TASK_INFO task_info[] =
   {"isupdatesuccess", TS_IS_UPDATE_SUCCESS, 0, DEF_TASK_FUNC (ts_is_update_success), FSVR_NONE, AU_ADMIN},
   {"monitorprocess", TS_MONITOR_PROCESS, 0, DEF_TASK_FUNC (ts_monitor_process), FSVR_NONE, AU_ANY},
 #if !defined (NDEBUG)
+  {"runscript", TS_RUN_SCRIPT, 0, DEF_TASK_FUNC (ts_run_script), FSVR_SA_CS, AU_ADMIN},
   {"generatecert", TS_GENERATE_CERT, 0, DEF_TASK_FUNC (ts_generate_cert), FSVR_NONE, AU_ADMIN},
 #endif
   {"start_statdump", TS_START_STATDUMP, 0, DEF_TASK_FUNC (ts_start_statdump), FSVR_CS, AU_DBC | AU_DBO | AU_MON},
@@ -1628,8 +1629,21 @@ win_is_reparse_point (const char *path)
   return attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT);
 }
 
+/*
+ * folder_copy () - copy the tree `src_folder` into `dest_folder`, creating
+ *   it if needed, for copyfolder.
+ *
+ *   Each file is copied with ut_copy_file (): a file that already exists in
+ *   the destination and is executable is not overwritten, and the copy fails
+ *   with the reason in _dbmt_error; a new file is created without execute
+ *   bits. On any other failure _dbmt_error is not changed. Files copied
+ *   before a failure stay; dest_folder is removed only if this call created
+ *   it.
+ *
+ *   return: 0, or -1 on failure
+ */
 int
-folder_copy (const char *src_folder, const char *dest_folder)
+folder_copy (const char *src_folder, const char *dest_folder, char *_dbmt_error)
 {
   WIN32_FIND_DATA FileData;
   HANDLE hSearch = INVALID_HANDLE_VALUE;
@@ -1710,14 +1724,15 @@ folder_copy (const char *src_folder, const char *dest_folder)
       if (FileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 	{
 
-	  if (folder_copy (src_path, dest_path) < 0)
+	  if (folder_copy (src_path, dest_path, _dbmt_error) < 0)
 	    {
 	      goto err_clean_return;
 	    }
 	  continue;
 	}
 
-      if (file_copy (src_path, dest_path) == 0)
+      /* never into an executable file, see ut_copy_file () */
+      if (ut_copy_file (src_path, dest_path, _dbmt_error, DBMT_ERROR_MSG_SIZE) == CONTENT_WRITE_OK)
 	{
 	  dwAttrs = GetFileAttributes (dest_path);
 	  if (dwAttrs == INVALID_FILE_ATTRIBUTES)
@@ -1760,8 +1775,9 @@ err_return:
   return -1;
 }
 #else
+/* folder_copy () - see the Windows version above */
 int
-folder_copy (const char *src_folder, const char *dest_folder)
+folder_copy (const char *src_folder, const char *dest_folder, char *_dbmt_error)
 {
   char src_dir[PATH_MAX];
   char dest_dir[PATH_MAX];
@@ -1867,14 +1883,15 @@ folder_copy (const char *src_folder, const char *dest_folder)
 	}
       else if (S_ISDIR (statbuf.st_mode))
 	{
-	  if (folder_copy (src_path, dest_path) < 0)
+	  if (folder_copy (src_path, dest_path, _dbmt_error) < 0)
 	    {
 	      goto err_clean_return;
 	    }
 	}
       else
 	{
-	  if (file_copy (src_path, dest_path) < 0)
+	  /* never into an executable file, see ut_copy_file () */
+	  if (ut_copy_file (src_path, dest_path, _dbmt_error, DBMT_ERROR_MSG_SIZE) != CONTENT_WRITE_OK)
 	    {
 	      goto err_clean_return;
 	    }
@@ -5804,6 +5821,9 @@ check_base_path (const char *path, std::string &expanded_path, char *_dbmt_error
  *     configuration file (cm.conf, databases.txt; see admin_conf_files ()).
  *     No file task writes those two files; setsysparam does, for an admin
  *     only, and checks that itself.
+ *     Whether the file is executable is not checked here, as it can change
+ *     before the task opens the file: a task that replaces the contents of a
+ *     file checks the file it has opened (ut_open_for_content_write ()).
  */
 bool
 is_authorized_filename (const char *path, T_PATH_ACCESS_PURPOSE purpose, char *_dbmt_error)

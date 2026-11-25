@@ -39,7 +39,8 @@ cm_admin_SOURCES = \
 	$(DBMT_DIR)/cm_cmd_util.cpp \
 	$(DBMT_DIR)/cm_connect_info.cpp \
 	$(DBMT_DIR)/cm_cmd_task.cpp \
-	$(DBMT_DIR)/cm_server_status.cpp
+	$(DBMT_DIR)/cm_server_status.cpp \
+	$(DBMT_DIR)/cm_task_file.cpp
 cm_admin_CFLAGS = -D_FILE_OFFSET_BITS=64
 cm_admin_CPPFLAGS = $(AM_CPPFLAGS) @EXTERNAL_INC@
 cm_admin_LDFLAGS =  @CMDEP_LIB@ -D_FILE_OFFSET_BITS=64
@@ -64,6 +65,7 @@ cub_manager_SOURCES = \
 		$(DBMT_DIR)/cm_server_autoupdate.cpp \
         $(DBMT_DIR)/cm_ssl_cert.cpp \
         $(DBMT_DIR)/cm_session_ip.cpp \
+        $(DBMT_DIR)/cm_task_file.cpp \
         $(DBMT_DIR)/cm_os_release.cpp \
         $(DBMT_DIR)/cm_log_name.cpp
 cub_manager_CPPFLAGS = $(AM_CFLAGS) -DFSERVER_SLAVE -DJSON_SUPPORT -DEVENT__HAVE_OPENSSL -D_FILE_OFFSET_BITS=64 @EXTERNAL_INC@

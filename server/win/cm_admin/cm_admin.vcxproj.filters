@@ -59,6 +59,9 @@
     <ClCompile Include="..\..\src\cm_server_status.cpp">
       <Filter>cmserver</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cm_task_file.cpp">
+      <Filter>cmserver</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\cm_text_encryption.cpp">
       <Filter>cmserver</Filter>
     </ClCompile>

@@ -1,0 +1,76 @@
+[
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_copy_src",
+  "destdir": "$CUBRID/tmp/authtest_copy_dest",
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed: $CUBRID/tmp/authtest_copy_dest/job.sh",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_copy_dest/job.sh": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_copy_dest/job.sh",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_copy_exec_src",
+  "destdir": "$CUBRID/tmp/authtest_copy_new_exec",
+  "test_expect": "success",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_copy_new_exec/run.sh": "0644",
+   "$CUBRID/tmp/authtest_copy_exec_src/run.sh": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_copy_new_exec/run.sh",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "copyfolder",
+  "token": "",
+  "srcdir": "$CUBRID/tmp/authtest_copy_src",
+  "destdir": "$CUBRID/tmp/authtest_copy_new_plain",
+  "test_expect": "success",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_copy_new_plain/job.sh": "0644"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_copy_new_plain/job.sh",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest copied"
+   ]
+  }
+ }
+]

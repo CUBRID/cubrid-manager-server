@@ -36,6 +36,7 @@
 #include "cm_cmd_exec.h"
 #include "cm_server_util.h"
 #include "cm_log_name.h"
+#include "cm_task_file.h"
 #include "cm_text_encryption.h"
 #include "cm_server_extend_interface.h"
 #include "cm_mailer.h"
@@ -1529,9 +1530,14 @@ int ext_write_private_data (Json::Value &request, Json::Value &response)
       return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
     }
 
-  outfile = fopen (conf_path, "w");
-  if (outfile == NULL)
+  /* an executable file is refused and left as it is. */
+  switch (ut_open_for_content_write (conf_path, &outfile, _dbmt_error, DBMT_ERROR_MSG_SIZE))
     {
+    case CONTENT_WRITE_OK:
+      break;
+    case CONTENT_WRITE_EXECUTABLE:
+      return build_server_header (response, ERR_WITH_MSG, _dbmt_error);
+    default:
       return build_server_header (response, ERR_FILE_OPEN_FAIL, string ("open " + string (conf_path) + " failed!").c_str());
     }
   confdata = request["confdata"];

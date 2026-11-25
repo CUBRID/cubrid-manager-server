@@ -8,6 +8,7 @@ import shutil
 import signal
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import tempfile
@@ -431,6 +432,9 @@ timeout_fallbacks = []
 # Placeholders whose value is only known once the run has started, see
 # start_kill_targets().
 runtime_vars = {}
+# Whether the manager server is a debug build; asked by debug_build () on the
+# first "test_debug_only" request, None until then.
+DEBUG_BUILD = None
 helper_procs = []
 
 # Authorization checks (task_auth_check): a request of a case can run as a
@@ -470,6 +474,23 @@ helper_procs = []
 #                                  (removed before sending), so that the
 #                                  manager sees another client; see
 #                                  exec_task ()
+#   "test_debug_only": true        the task is built only in debug builds
+#                                  (removed before sending). Against a release
+#                                  build the request must fail with
+#                                  "Undefined request - <task>" instead, the
+#                                  other test_* checks of the request are not
+#                                  made, and the case is judged by status
+#                                  only (no baseline); see debug_build ()
+#   "test_file_mode": {"<path>": "<octal>"}
+#                                  after the response, each file on this host
+#                                  (the target, for a link) must have that
+#                                  mode, e.g. "0755" (removed before sending);
+#                                  checks that a refused write left the file
+#                                  as it was, or the mode of a new file.
+#                                  "none" instead of a mode: the path must not
+#                                  exist. Only for sets that run on the CMS
+#                                  host; an empty object or a value that is
+#                                  neither octal nor "none" stops the run
 #
 # Besides "success" and "failure", the verdict can be
 #   denied   refused by the authority check (the note below)
@@ -583,9 +604,29 @@ def value_mismatch(data, values):
     return None
 
 
+def file_mode_mismatch(modes):
+    """The first test_file_mode entry the files on this host do not satisfy."""
+    for path, want in modes.items():
+        if want == "none":
+            if os.path.lexists(path):
+                return "%s exists" % path
+            continue
+        try:
+            got = stat.S_IMODE(os.stat(path).st_mode)
+        except OSError as e:
+            return "cannot stat %s: %s" % (path, e.strerror)
+        if got != int(want, 8):
+            return "mode of %s is %04o, not %s" % (path, got, want)
+    return None
+
+
 def judged_status(data, expected, note_text=None, no_text=None, body="",
-                  no_key=None, values=None):
+                  no_key=None, values=None, file_modes=None):
     """The value compared with `expected` for a response `data`."""
+    if file_modes:
+        mismatch = file_mode_mismatch(file_modes)
+        if mismatch is not None:
+            return "%s (%s)" % (data.get("status"), mismatch)
     if values:
         mismatch = value_mismatch(data, values)
         if mismatch is not None:
@@ -609,6 +650,30 @@ def judged_status(data, expected, note_text=None, no_text=None, body="",
 # The manager server serves cm_port over TLS with a self signed certificate,
 # so the certificate of the host under test is not verified here.
 ssl_context = ssl._create_unverified_context()
+
+
+def debug_build():
+    """Whether the manager server is a debug build, asked once.
+
+    Only debug builds serve /upload: a request to it without a token cookie
+    gets {"failure" : true}. A release build answers every path but /cm_api
+    with {"error" : "Not Found"}. Asking this does not depend on the debug
+    only tasks themselves, so a debug build that lost one of them still fails
+    its cases instead of passing them as a release build.
+    """
+    global DEBUG_BUILD
+    if DEBUG_BUILD is None:
+        body = exec_task(cmsip, port, "/upload", "").decode("utf-8", "replace")
+        if '"failure"' in body:
+            DEBUG_BUILD = True
+        elif '"error"' in body:
+            DEBUG_BUILD = False
+        else:
+            print("\033[31mcannot tell whether the manager server is a debug "
+                  "build: /upload answered %r.\033[0m" % body[:200])
+            sys.exit(1)
+        print("manager server: %s build" % ("debug" if DEBUG_BUILD else "release"))
+    return DEBUG_BUILD
 
 
 def exec_task(ip, port, url, body, source_ip=None):
@@ -801,7 +866,7 @@ def follow_job(name, data, token):
 
 def send_one(name, req, token, expected="success", casefile="",
              must_be_sync=False, note_text=None, no_text=None, no_key=None,
-             values=None, source_ip=None):
+             values=None, source_ip=None, file_modes=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
@@ -847,7 +912,7 @@ def send_one(name, req, token, expected="success", casefile="",
             # prints that verdict instead of this status line.
             record(name, casefile, task,
                    judged_status(data, expected, note_text, no_text, body,
-                                 no_key, values),
+                                 no_key, values, file_modes),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
@@ -856,7 +921,7 @@ def send_one(name, req, token, expected="success", casefile="",
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task,
            judged_status(data, expected, note_text, no_text, body,
-                         no_key, values),
+                         no_key, values, file_modes),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -898,8 +963,11 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     # Tokens of the successful "login" requests of this case, in order, for
     # the requests that ask for one with "$CASE_LOGIN_TOKEN[#n]".
     case_tokens = []
+    # a "test_debug_only" request against a release build: judged by status
+    undefined_in_release = False
     requests = request if isinstance(request, list) else [request]
     for index, req in enumerate(requests):
+        req_debug_only = req.pop("test_debug_only", False)
         req_expected = req.pop("test_expect", expected)
         req_note = req.pop("test_note", None)
         req_no_text = req.pop("test_no_text", None)
@@ -911,8 +979,24 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             print("\033[31m%s: \"test_value\" must be a non-empty object of "
                   "key path to value.\033[0m" % taskfile)
             sys.exit(1)
+        req_file_modes = req.pop("test_file_mode", None)
+        if req_file_modes is not None and (
+                not isinstance(req_file_modes, dict) or not req_file_modes
+                or not all(isinstance(v, str)
+                           and (v == "none" or re.match(r"^0?[0-7]{3,4}$", v))
+                           for v in req_file_modes.values())):
+            # an empty object would check nothing and always pass
+            print("\033[31m%s: \"test_file_mode\" must be a non-empty object "
+                  "of path to octal mode or \"none\".\033[0m" % taskfile)
+            sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
+        if req_debug_only and not debug_build():
+            # A release build does not have the task at all, whoever asks.
+            req_expected = "failure"
+            req_note = "Undefined request - %s" % req.get("task")
+            req_no_text = req_no_key = req_values = req_file_modes = None
+            undefined_in_release = True
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
         if req_sleep:
@@ -920,7 +1004,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key,
-                        req_values, req_source_ip)
+                        req_values, req_source_ip, req_file_modes)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_tokens.append(data["token"])
@@ -932,8 +1016,10 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     task = entries[0].get("task", name) if entries else name
     if record_files:
         slot = answer_base(result_slot(name))
-        if status_only:
+        if status_only or undefined_in_release:
             # The status verdict already recorded is the whole answer here.
+            # The baseline of a debug only task is the answer of a debug
+            # build, so a release build is not compared with it.
             if file_check:
                 report_status_only(name, entries)
         elif file_check:
@@ -1568,6 +1654,198 @@ def remove_name_match_decoys():
             pass
 
 
+# Files of the file_exec_* cases of task_auth_check (CBRD-27831), under
+# $CUBRID/tmp: executable files with each execute bit on its own, a link to
+# one, files that are not executable, and a file whose backup (.bak) is
+# executable. (name, mode); a mode of None is the link to
+# authtest_exec_0755.sh.
+EXEC_WRITE_FILES = (("authtest_exec_0755.sh", 0o755),
+                    ("authtest_exec_0700.sh", 0o700),
+                    ("authtest_exec_0744.sh", 0o744),
+                    ("authtest_exec_0654.sh", 0o654),
+                    ("authtest_exec_0645.sh", 0o645),
+                    ("authtest_exec_link.conf", None),
+                    ("authtest_noexec_0640.conf", 0o640),
+                    ("authtest_noexec_0600.conf", 0o600),
+                    ("authtest_bak_target.conf", 0o640),
+                    ("authtest_bak_target.conf.bak", 0o755))
+EXEC_WRITE_TEXT = "#!/bin/sh\necho authtest exec fixture\n"
+# what the cases write and must find created without an execute bit
+EXEC_WRITE_NEW_FILES = ("authtest_exec_new.conf", "authtest_exec_new_private.conf")
+
+
+def remove_exec_write_files():
+    """Remove the files of make_exec_write_files() and what the case wrote.
+
+    writeandsaveconf backs a file up to <file>.bak before writing it, so the
+    backups go as well.
+    """
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    tmpdir = os.path.join(CUBRID, "tmp")
+    names = [name for name, _mode in EXEC_WRITE_FILES] + list(EXEC_WRITE_NEW_FILES)
+    for name in names:
+        for path in (os.path.join(tmpdir, name),
+                     os.path.join(tmpdir, name + ".bak")):
+            try:
+                if os.path.lexists(path):
+                    os.remove(path)
+            except OSError:
+                pass
+
+
+def make_exec_write_files():
+    """Lay EXEC_WRITE_FILES under $CUBRID/tmp (see there)."""
+    remove_exec_write_files()
+    tmpdir = os.path.join(CUBRID, "tmp")
+    for name, mode in EXEC_WRITE_FILES:
+        path = os.path.join(tmpdir, name)
+        if mode is None:
+            os.symlink("authtest_exec_0755.sh", path)
+            continue
+        with open(path, "w") as f:
+            f.write(EXEC_WRITE_TEXT)
+        # chmod, not the mode of open(): the umask must not take bits away
+        os.chmod(path, mode)
+
+
+# The script of the runscript cases of task_status_check and
+# task_result_check, in $CUBRID/conf.
+RUNSCRIPT_FILE = "test_runscript.sh"
+# Files of the script_path case of task_auth_check: (path, mode), the path
+# relative to $CUBRID, or to $CUBRID_DATABASES when it starts with "@db/". A
+# mode of None makes a link to tmp/authtest_script_tmp.sh instead.
+SCRIPT_PATH_FILES = (("conf/authtest_script_ok.sh", 0o700),
+                     ("conf/authtest_script_group_w.sh", 0o775),
+                     ("conf/authtest_script_others_w.sh", 0o757),
+                     ("conf/authtest_script_link.sh", None),
+                     ("conf/authtest_script_sub/sub.sh", 0o700),
+                     ("tmp/authtest_script_tmp.sh", 0o700),
+                     ("@db/authtest_script_db.sh", 0o700))
+# what the case creates with writeandsaveconf
+SCRIPT_PATH_NEW_FILE = "conf/authtest_script_new.sh"
+SCRIPT_PATH_SUBDIR = "conf/authtest_script_sub"
+
+
+def make_script(path, mode):
+    """A script that only prints a line, with `mode` whatever the umask."""
+    if os.path.lexists(path):
+        os.remove(path)
+    with open(path, "w") as f:
+        f.write("#!/bin/sh\necho runscript test\n")
+    os.chmod(path, mode)
+
+
+def script_path_file(rel):
+    """The path of an entry of SCRIPT_PATH_FILES."""
+    if rel.startswith("@db/"):
+        return os.path.join(CUBRID_DATABASES, rel[len("@db/"):])
+    return os.path.join(CUBRID, rel)
+
+
+def remove_script_files():
+    """Remove the runscript scripts, of the script_path case too."""
+    if not CUBRID or not CUBRID_DATABASES:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    paths = [os.path.join(CUBRID, "conf", RUNSCRIPT_FILE),
+             os.path.join(CUBRID, SCRIPT_PATH_NEW_FILE)]
+    paths += [script_path_file(rel) for rel, _mode in SCRIPT_PATH_FILES]
+    for path in paths:
+        try:
+            if os.path.lexists(path):
+                os.remove(path)
+        except OSError:
+            pass
+    try:
+        os.rmdir(os.path.join(CUBRID, SCRIPT_PATH_SUBDIR))
+    except OSError:
+        pass
+
+
+def make_script_path_files():
+    """Lay SCRIPT_PATH_FILES (see there)."""
+    new_file = os.path.join(CUBRID, SCRIPT_PATH_NEW_FILE)
+    if os.path.lexists(new_file):
+        os.remove(new_file)
+    subdir = os.path.join(CUBRID, SCRIPT_PATH_SUBDIR)
+    if not os.path.isdir(subdir):
+        os.makedirs(subdir)
+    for rel, mode in SCRIPT_PATH_FILES:
+        path = script_path_file(rel)
+        if mode is not None:
+            make_script(path, mode)
+            continue
+        if os.path.lexists(path):
+            os.remove(path)
+        os.symlink(os.path.join(CUBRID, "tmp", "authtest_script_tmp.sh"), path)
+
+
+# Directories of the file_exec_copy case of task_auth_check, under
+# $CUBRID/tmp: {directory: {file: mode}}. copyfolder must not overwrite the
+# executable job.sh of authtest_copy_dest with job.sh of authtest_copy_src,
+# and copies run.sh of authtest_copy_exec_src without its execute bits.
+COPY_DIRS = {"authtest_copy_src": {"job.sh": 0o644},
+             "authtest_copy_dest": {"job.sh": 0o755},
+             "authtest_copy_exec_src": {"run.sh": 0o755}}
+# what the case creates with copyfolder
+COPY_NEW_DIRS = ("authtest_copy_new_exec", "authtest_copy_new_plain")
+
+
+def remove_copy_dirs():
+    """Remove the directories of make_copy_dirs() and what the case copied."""
+    if not CUBRID:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    for name in list(COPY_DIRS) + list(COPY_NEW_DIRS):
+        shutil.rmtree(os.path.join(CUBRID, "tmp", name), ignore_errors=True)
+
+
+def make_copy_dirs():
+    """Lay COPY_DIRS under $CUBRID/tmp (see there)."""
+    remove_copy_dirs()
+    for name, files in COPY_DIRS.items():
+        directory = os.path.join(CUBRID, "tmp", name)
+        os.makedirs(directory)
+        for filename, mode in files.items():
+            path = os.path.join(directory, filename)
+            with open(path, "w") as f:
+                f.write(EXEC_WRITE_TEXT if mode & 0o111
+                        else "#!/bin/sh\necho authtest copied\n")
+            # chmod, not the mode of open(): the umask must not take bits away
+            os.chmod(path, mode)
+
+
+# Directories of the file_exec_createdb case of task_auth_check, under
+# $CUBRID_DATABASES: {directory: executable file in it}. createdb must not
+# write cubrid.conf or extvol.spec there while they are executable.
+CREATEDB_DIRS = {"authtest_exec_conf": "cubrid.conf",
+                 "authtest_exec_spec": "extvol.spec"}
+
+
+def remove_createdb_dirs():
+    """Remove the directories of make_createdb_dirs()."""
+    if not CUBRID_DATABASES:
+        # Not known yet: the paths would resolve against the current directory.
+        return
+    for name in CREATEDB_DIRS:
+        shutil.rmtree(os.path.join(CUBRID_DATABASES, name), ignore_errors=True)
+
+
+def make_createdb_dirs():
+    """Lay CREATEDB_DIRS under $CUBRID_DATABASES (see there)."""
+    remove_createdb_dirs()
+    for name, filename in CREATEDB_DIRS.items():
+        directory = os.path.join(CUBRID_DATABASES, name)
+        os.makedirs(directory)
+        path = os.path.join(directory, filename)
+        with open(path, "w") as f:
+            f.write(EXEC_WRITE_TEXT)
+        # chmod, not the mode of open(): the umask must not take bits away
+        os.chmod(path, 0o755)
+
+
 def build_env():
     """Create what the test cases expect to find on the host."""
     # reset_leftovers() already did this with the paths from the environment;
@@ -1585,12 +1863,9 @@ def build_env():
     # removelog deletes the file it is given, so give it a disposable one.
     with open(os.path.join(tmpdir, "test_removelog.log"), "w") as f:
         f.write("dummy log line for removelog test\n")
-    # runscript only accepts a path under $CUBRID or $CUBRID_DATABASES, so the
-    # script it runs has to be created there.
-    script = os.path.join(tmpdir, "test_runscript.sh")
-    with open(script, "w") as f:
-        f.write("#!/bin/sh\necho runscript test\n")
-    os.chmod(script, 0o755)
+    # runscript runs only a script directly under $CUBRID/conf that only the
+    # user CMS runs as (this suite runs as that user) and root can change.
+    make_script(os.path.join(CUBRID, "conf", RUNSCRIPT_FILE), 0o700)
     # analyzecaslog runs broker_log_top over a broker SQL log. Pointed at a live
     # CAS log it answers "resultlist": null, because nothing in this suite sends
     # SQL through a broker and broker_log_top then writes an empty report. This
@@ -1605,6 +1880,14 @@ def build_env():
     copy_extra_files()
     # Decoys for the log file name matching cases (CBRD-26446).
     make_name_match_decoys()
+    # Files writeandsaveconf must refuse to write (CBRD-27831).
+    make_exec_write_files()
+    # Scripts runscript must refuse to run, and one it runs.
+    make_script_path_files()
+    # Executable files copyfolder must not overwrite.
+    make_copy_dirs()
+    # Executable files createdb must not write.
+    make_createdb_dirs()
     # adddbmtuser creates "yifan" and deletedbmtuser drops it again. A run that
     # died between the two leaves the user behind, and the next adddbmtuser
     # then fails with "already exist"; this is a no-op when it is not there.
@@ -1618,6 +1901,10 @@ def clean_env():
     stop_kill_targets()
     reset_test_dbs()
     remove_name_match_decoys()
+    remove_exec_write_files()
+    remove_script_files()
+    remove_copy_dirs()
+    remove_createdb_dirs()
 
 
 def reset_leftovers():
@@ -1645,6 +1932,10 @@ def reset_leftovers():
     sweep_stale_helpers()
     reset_test_dbs()
     remove_name_match_decoys()
+    remove_exec_write_files()
+    remove_script_files()
+    remove_copy_dirs()
+    remove_createdb_dirs()
 
 
 def xml_escape(text):

@@ -63,6 +63,7 @@
 #include "cm_porting.h"
 #include "cm_server_util.h"
 #include "cm_log_name.h"
+#include "cm_task_file.h"
 #include "cm_job_task.h"
 #include "cm_auto_task.h"
 #include "cm_dep.h"
@@ -343,7 +344,7 @@ static int _op_get_session_from_broker (char *broker_list,
 					T_CM_CAS_INFO_ALL *cas_info_all);
 static void _op_print_br_diagdata_to_res (nvplist *res,
     T_BROKER_DIAGDATA br_diagdata);
-static int _write_conf_to_file (nvplist *req, char *conf_path);
+static int _write_conf_to_file (nvplist *req, char *conf_path, char *_dbmt_error);
 static int _get_folders_with_keyword (char *search_folder_path,
 				      const char *keyword, nvplist *res, char *_dbmt_error);
 static int _get_block_from_log (FILE *fp, char *block_buf, int len);
@@ -1748,6 +1749,7 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char conf_path[PATH_MAX];
   char *conf_name;
+  int retval;
 
   conf_name = nv_get_val (req, "confname");
   if (conf_name == NULL)
@@ -1785,12 +1787,13 @@ ts_set_sysparam (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if (_write_conf_to_file (req, conf_path) < 0)
+  retval = _write_conf_to_file (req, conf_path, _dbmt_error);
+  if (retval == ERR_FILE_OPEN_FAIL)
     {
       return ERR_TMPFILE_OPEN_FAIL;
     }
 
-  return ERR_NO_ERROR;
+  return retval;
 }
 
 int
@@ -1896,16 +1899,32 @@ _get_confpath_by_name (const char *conf_name, char *conf_path, int buflen, char 
   return retval;
 }
 
+/*
+ * _write_conf_to_file () - replace the contents of conf_path with the
+ *   "confdata" values of req, one per line.
+ *
+ *   An executable file is refused and left as it is (see
+ *   ut_open_for_content_write ()), and a new file is not created executable.
+ *
+ *   return: ERR_NO_ERROR; ERR_WITH_MSG for an executable file, the reason in
+ *     _dbmt_error; ERR_FILE_OPEN_FAIL if the file cannot be opened, with
+ *     _dbmt_error not changed, so that each caller reports it as before.
+ */
 static int
-_write_conf_to_file (nvplist *req, char *conf_path)
+_write_conf_to_file (nvplist *req, char *conf_path, char *_dbmt_error)
 {
   char *conf, *conf_data;
   int nv_len, i;
   FILE *outfile = NULL;
 
-  if ((outfile = fopen (conf_path, "w")) == NULL)
+  switch (ut_open_for_content_write (conf_path, &outfile, _dbmt_error, DBMT_ERROR_MSG_SIZE))
     {
-      return -1;
+    case CONTENT_WRITE_OK:
+      break;
+    case CONTENT_WRITE_EXECUTABLE:
+      return ERR_WITH_MSG;
+    default:
+      return ERR_FILE_OPEN_FAIL;
     }
 
   nv_len = req->nvplist_leng;
@@ -1927,7 +1946,7 @@ _write_conf_to_file (nvplist *req, char *conf_path)
 
   fclose (outfile);
 
-  return 0;
+  return ERR_NO_ERROR;
 }
 
 int
@@ -2702,6 +2721,31 @@ is_authorized_exvol_paths (nvplist *req, char *_dbmt_error)
   return true;
 }
 
+/*
+ * open_db_dir_file_for_write () - open `path`, a file createdb writes in a
+ *   directory the request names, with ut_open_for_content_write (): an
+ *   executable file there is refused and left as it is, as the contents
+ *   written come from the request and from files a task can write.
+ *
+ *   return: ERR_NO_ERROR with *fp open; ERR_WITH_MSG for an executable file,
+ *     the reason in _dbmt_error; ERR_FILE_OPEN_FAIL with `path` in
+ *     _dbmt_error, as before, if it cannot be opened.
+ */
+static int
+open_db_dir_file_for_write (const char *path, FILE **fp, char *_dbmt_error)
+{
+  switch (ut_open_for_content_write (path, fp, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+    {
+    case CONTENT_WRITE_OK:
+      return ERR_NO_ERROR;
+    case CONTENT_WRITE_EXECUTABLE:
+      return ERR_WITH_MSG;
+    default:
+      strcpy_limit (_dbmt_error, path, DBMT_ERROR_MSG_SIZE);
+      return ERR_FILE_OPEN_FAIL;
+    }
+}
+
 int
 tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -2895,6 +2939,7 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       FILE *infile = NULL;
       FILE *outfile = NULL;
       char dstrbuf[COMPOSED_PATH_MAX];
+      int open_err;
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
       snprintf (dstrbuf, sizeof (dstrbuf), "%s/conf/%s", sco.szCubrid,
@@ -2911,12 +2956,11 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
 
       snprintf (dstrbuf, sizeof (dstrbuf), "%s/%s", targetdir, CUBRID_CUBRID_CONF);
-      outfile = fopen (dstrbuf, "w");
-      if (outfile == NULL)
+      open_err = open_db_dir_file_for_write (dstrbuf, &outfile, _dbmt_error);
+      if (open_err != ERR_NO_ERROR)
 	{
 	  fclose (infile);
-	  strcpy (_dbmt_error, dstrbuf);
-	  return ERR_FILE_OPEN_FAIL;
+	  return open_err;
 	}
 
       while (fgets (strbuf, sizeof (strbuf), infile))
@@ -3002,13 +3046,13 @@ tsCreateDB (nvplist *req, nvplist *res, char *_dbmt_error)
       char val2_buf[1024];
 #endif
       char extvol_path[PATH_MAX];
+      int open_err;
 
       snprintf (extvolfile, sizeof (extvolfile), "%s/extvol.spec", targetdir);
-      outfile = fopen (extvolfile, "w");
-      if (outfile == NULL)
+      open_err = open_db_dir_file_for_write (extvolfile, &outfile, _dbmt_error);
+      if (open_err != ERR_NO_ERROR)
 	{
-	  strcpy (_dbmt_error, extvolfile);
-	  return ERR_FILE_OPEN_FAIL;
+	  return open_err;
 	}
 
       nv_locate (req, "exvol", &pos, &len);
@@ -4451,10 +4495,20 @@ ts_copydb (nvplist *req, nvplist *res, char *_dbmt_error)
     }
   snprintf (dest_conf_file, sizeof (dest_conf_file), "%s/%s", conf_dir, CUBRID_CUBRID_CONF);
 
-  /* Doesn't copy if src and desc is same */
+  /*
+   * Doesn't copy if src and desc is same. As before, a failed copy of
+   * cubrid.conf does not fail copydb, whose database is already copied; an
+   * executable cubrid.conf in the destination is not overwritten either
+   * (see ut_copy_file ()), and that is logged.
+   */
   if (strcmp (src_conf_file, dest_conf_file) != 0)
     {
-      file_copy (src_conf_file, dest_conf_file);
+      char copy_error[DBMT_ERROR_MSG_SIZE];
+
+      if (ut_copy_file (src_conf_file, dest_conf_file, copy_error, sizeof (copy_error)) == CONTENT_WRITE_EXECUTABLE)
+	{
+	  ut_error_log (req, copy_error);
+	}
     }
 
   /* if move, delete exist database */
@@ -12438,10 +12492,15 @@ ts_copy_folder (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
-  if (folder_copy (src_dir, dest_dir) < 0)
+  /* folder_copy () gives the reason when it refuses to overwrite an executable file */
+  _dbmt_error[0] = '\0';
+  if (folder_copy (src_dir, dest_dir, _dbmt_error) < 0)
     {
-      snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE - 1,
-		"Failed when copying %s to %s.", src_dir, dest_dir);
+      if (_dbmt_error[0] == '\0')
+	{
+	  snprintf (_dbmt_error, DBMT_ERROR_MSG_SIZE - 1,
+		    "Failed when copying %s to %s.", src_dir, dest_dir);
+	}
       return ERR_WITH_MSG;
     }
 
@@ -12486,6 +12545,7 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *conf_path;
   char conf_backup_path[PATH_MAX];
+  int retval;
 
   if ((conf_path = nv_get_val (req, "confpath")) == NULL)
     {
@@ -12498,14 +12558,39 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
       return ERR_WITH_MSG;
     }
 
+  /*
+   * An executable file is refused before it is backed up, so that a refused
+   * request does not touch <conf_path>.bak. _write_conf_to_file () checks the
+   * file it opens again, as it can change in between.
+   */
+  if (ut_is_executable_file (conf_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+    {
+      return ERR_WITH_MSG;
+    }
+
   /* if conf_path exsit, backup it at the current path. */
   if (access (conf_path, F_OK) == 0)
     {
       snprintf (conf_backup_path, sizeof (conf_backup_path) - 1,
 		"%s.bak", conf_path);
 
-      if (file_copy (conf_path, conf_backup_path) != 0)
+      /*
+       * The backup is a file the task writes too, with contents an earlier
+       * request may have written: under the same rules as conf_path, and
+       * never into an executable file.
+       */
+      if (!is_authorized_filename (conf_backup_path, FOR_WRITE, _dbmt_error))
 	{
+	  return ERR_WITH_MSG;
+	}
+
+      switch (ut_copy_file (conf_path, conf_backup_path, _dbmt_error, DBMT_ERROR_MSG_SIZE))
+	{
+	case CONTENT_WRITE_OK:
+	  break;
+	case CONTENT_WRITE_EXECUTABLE:
+	  return ERR_WITH_MSG;
+	default:
 	  strcpy_limit (_dbmt_error, "backup file error.",
 			DBMT_ERROR_MSG_SIZE);
 	  return ERR_WITH_MSG;
@@ -12513,14 +12598,15 @@ ts_write_and_save_conf (nvplist *req, nvplist *res, char *_dbmt_error)
     }
 
   /* create a new conf file from request. */
-  if (_write_conf_to_file (req, conf_path) < 0)
+  retval = _write_conf_to_file (req, conf_path, _dbmt_error);
+  if (retval == ERR_FILE_OPEN_FAIL)
     {
       strcpy_limit (_dbmt_error, "write config file error.",
 		    DBMT_ERROR_MSG_SIZE);
       return ERR_WITH_MSG;
     }
 
-  return ERR_NO_ERROR;
+  return retval;
 }
 
 int
@@ -12623,6 +12709,15 @@ ts_get_folders_with_keyword (nvplist *req, nvplist *res, char *_dbmt_error)
   return retval;
 }
 
+#if !defined (NDEBUG)
+/*
+ * ts_run_script () - runscript, debug builds only
+ *
+ *   Runs a script as the user CMS runs as (root in the official docker
+ *   image). Even limited to a script directly under $CUBRID/conf that only
+ *   that user and root can change (ut_check_script_path ()), a remote request
+ *   that runs a program on the server is not offered by release builds.
+ */
 int
 ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 {
@@ -12638,6 +12733,9 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   int ret;
   int envc = 0;
   const char **extra_envp = NULL;
+  char script_dir[PATH_MAX];
+  std::string script_real_path;
+  unsigned int cms_uid;
 
   if ((script_path = nv_get_val (req, "script_path")) == NULL)
     {
@@ -12649,6 +12747,27 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
   gen_tempfile_path (errfile, sco.dbmt_tmp_dir, "DBMT_task_err", TS_RUN_SCRIPT, PATH_MAX);
 
   if (!is_authorized_filename (script_path, FOR_READ, _dbmt_error))
+    {
+      return ERR_WITH_MSG;
+    }
+
+  /*
+   * Only a script directly under $CUBRID/conf that nobody but the user CMS
+   * runs as and root can change (see ut_check_script_path ()). The script is
+   * run by the path checked, with links resolved.
+   */
+#if !defined (DO_NOT_USE_CUBRIDENV)
+  snprintf (script_dir, sizeof (script_dir), "%s/%s", sco.szCubrid, DBMT_CONF_DIR);
+#else
+  snprintf (script_dir, sizeof (script_dir), "%s", DBMT_CONF_DIR);
+#endif
+#if defined (WINDOWS)
+  cms_uid = 0;
+#else
+  cms_uid = (unsigned int) geteuid ();
+#endif
+  if (!ut_check_script_path (script_path, script_dir, cms_uid, script_real_path, _dbmt_error,
+			     DBMT_ERROR_MSG_SIZE))
     {
       return ERR_WITH_MSG;
     }
@@ -12697,7 +12816,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
       extra_envp[envc] = NULL;
     }
 
-  argv[argc++] = script_path;
+  argv[argc++] = script_real_path.c_str ();
   argv[argc++] = NULL;
 
   ret = run_child_env (argv, RUN_FOREGROUND, NULL, outfile, errfile, &status, extra_envp);
@@ -12717,6 +12836,7 @@ ts_run_script (nvplist *req, nvplist *res, char *_dbmt_error)
 
   return retval;
 }
+#endif
 
 int
 ts_get_file_total_line_num (nvplist *req, nvplist *res, char *_dbmt_error)

@@ -1,3 +1,4 @@
 {"task":"runscript",
 "token":"",
-"script_path":"$CUBRID/tmp/test_runscript.sh"}
+"script_path":"$CUBRID/conf/test_runscript.sh",
+"test_debug_only":true}

@@ -1,0 +1,44 @@
+[
+ {
+  "task": "writeandsaveconf",
+  "token": "",
+  "confpath": "$CUBRID/tmp/authtest_bak_target.conf",
+  "confdata": [
+   "echo replaced"
+  ],
+  "test_expect": "failure",
+  "test_note": "writing to an executable file is not allowed: $CUBRID/tmp/authtest_bak_target.conf.bak",
+  "test_file_mode": {
+   "$CUBRID/tmp/authtest_bak_target.conf": "0640",
+   "$CUBRID/tmp/authtest_bak_target.conf.bak": "0755"
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_bak_target.conf",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ },
+ {
+  "task": "viewlog",
+  "token": "",
+  "path": "$CUBRID/tmp/authtest_bak_target.conf.bak",
+  "start": "1",
+  "end": "10",
+  "test_expect": "success",
+  "test_value": {
+   "log.line": [
+    "#!/bin/sh",
+    "echo authtest exec fixture"
+   ]
+  }
+ }
+]
