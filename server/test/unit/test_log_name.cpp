@@ -40,6 +40,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <sstream>
+#include <string>
+
 #include "cm_log_name.h"
 
 #define OFF false
@@ -242,6 +245,89 @@ test_db_server_err_log (void)
   db ("demodb_latest.err", NULL, false);
 }
 
+/* ut_get_db_err_log_param (): error_log of dbname in cubrid.conf text conf gives expect ("": not set) */
+static void
+err_log_param (const char *conf, const char *dbname, const std::string &expect)
+{
+  char what[512];
+  std::istringstream in (conf);
+  std::string value;
+  bool got = ut_get_db_err_log_param (in, dbname, value);
+
+  snprintf (what, sizeof (what), "error_log of \"%s\" -> \"%s\" (got \"%s\")\n%s", dbname, expect.c_str (),
+	    got ? value.c_str () : "", conf);
+  check (expect.empty () ? !got : (got && value == expect), what);
+}
+
+/* ut_resolve_err_log_param (): param under $CUBRID/log gives expect ("": not resolvable) */
+static void
+err_log_path (const char *param, const std::string &expect)
+{
+  char what[512];
+  std::string path;
+  bool got = ut_resolve_err_log_param (param, "/home/cubrid/CUBRID/log", path);
+
+  snprintf (what, sizeof (what), "error_log \"%s\" -> \"%s\" (got \"%s\")", param, expect.c_str (),
+	    got ? path.c_str () : "");
+  check (expect.empty () ? !got : (got && path == expect), what);
+}
+
+static void
+test_db_err_log_param (void)
+{
+  /* [@<db>] over [common], whatever the order; other sections do not apply */
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=server/demodb.err\n",
+		 "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\n[common]\nerror_log=server/common.err\n",
+		 "demodb", "server/demodb.err");
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=server/demodb.err\n",
+		 "testdb", "server/common.err");
+  err_log_param ("[@otherdb]\nerror_log=server/otherdb.err\n[common]\ndata_buffer_size=512M\n", "demodb", "");
+  err_log_param ("[service]\nerror_log=server/service.err\n", "demodb", "");
+  err_log_param ("[standalone]\nerror_log=server/sa.err\n", "demodb", "");
+  /* [@demodb_a] is another database, and "@<db>" is case-sensitive as in the engine */
+  err_log_param ("[@demodb_a]\nerror_log=server/demodb_a.err\n", "demodb", "");
+  err_log_param ("[@DemoDB]\nerror_log=server/DemoDB.err\n", "demodb", "");
+  err_log_param ("[ @demodb ]\nerror_log=server/demodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[COMMON]\nERROR_LOG=server/common.err\n", "demodb", "server/common.err");
+  /* before any section, as [common] */
+  err_log_param ("error_log=server/top.err\n", "demodb", "server/top.err");
+  /* the last one wins */
+  err_log_param ("[@demodb]\nerror_log=server/first.err\nerror_log=server/last.err\n", "demodb",
+		 "server/last.err");
+  err_log_param ("[@demodb]\nerror_log=server/a.err\n[common]\n[@demodb]\nerror_log=server/b.err\n", "demodb",
+		 "server/b.err");
+  /* the value: spaces, quotes, comments, a line that goes on */
+  err_log_param ("[@demodb]\n  error_log = server/demodb.err  \n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=\"server/demo db.err\"\n", "demodb", "server/demo db.err");
+  err_log_param ("[@demodb]\nerror_log='server/demodb.err' # memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err # memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err;memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/\\\ndemodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\r\nerror_log=server/demodb.err\r\n", "demodb", "server/demodb.err");
+  /* not set */
+  err_log_param ("[@demodb]\n#error_log=server/commented.err\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log=\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log=\"\"\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log_size=1000\n", "demodb", "");
+  /* an empty [@<db>] value still wins over [common], as in the engine */
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=\n", "demodb", "");
+  err_log_param ("", "demodb", "");
+  err_log_param ("error_log=server/top.err\n", "", "");
+
+  /* resolved as er_init () of the engine: relative to $CUBRID/log */
+  err_log_path ("server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.err");
+  err_log_path ("demodb.err", "/home/cubrid/CUBRID/log/demodb.err");
+  err_log_path ("/var/log/cubrid/demodb.err", "/var/log/cubrid/demodb.err");
+  err_log_path ("./demodb.err", "");
+  err_log_path ("", "");
+
+  check (ut_is_same_path ("/home/cubrid/CUBRID/log/server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.err"),
+	 "the same path");
+  check (!ut_is_same_path ("/home/cubrid/CUBRID/log/server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.er"),
+	 "another path");
+}
+
 static void
 test_regular_file_mode (void)
 {
@@ -257,6 +343,7 @@ main (void)
   test_broker_shard_parameter ();
   test_broker_other_instances ();
   test_db_server_err_log ();
+  test_db_err_log_param ();
   test_regular_file_mode ();
 
   printf ("%d of %d checks failed\n", failures, checks);

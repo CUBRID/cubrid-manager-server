@@ -356,6 +356,7 @@ int ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error);
+int ts_get_db_err_log_path (const char *dbname, char *path, size_t size);
 int ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_autostart_db (nvplist *req, nvplist *res, char *_dbmt_error);

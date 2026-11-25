@@ -26,6 +26,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <algorithm>
+
 #include "cm_log_name.h"
 
 /*
@@ -197,5 +199,184 @@ ut_is_regular_file_mode (unsigned int st_mode)
   return (st_mode & _S_IFMT) == _S_IFREG;
 #else
   return S_ISREG (st_mode);
+#endif
+}
+
+namespace
+{
+  std::string
+  trim (const std::string &s)
+  {
+    const char *const spaces = " \t\r\n\v\f";
+    const std::string::size_type begin = s.find_first_not_of (spaces);
+
+    if (begin == std::string::npos)
+      {
+	return "";
+      }
+    return s.substr (begin, s.find_last_not_of (spaces) - begin + 1);
+  }
+
+  std::string
+  to_lower (std::string s)
+  {
+    std::transform (s.begin (), s.end (), s.begin (), [] (unsigned char c)
+    {
+      return static_cast<char> (tolower (c));
+    });
+    return s;
+  }
+
+  /*
+   * The name of a "[...]" line, as ini_parse_line () keeps it: "@<db>" and
+   * "%<host>|<user>" as written, any other section in lower case.
+   */
+  std::string
+  section_name (const std::string &line)
+  {
+    std::string name = trim (line.substr (1, line.find (']') - 1));
+
+    if (!name.empty () && (name[0] == '@' || name[0] == '%'))
+      {
+	return name[0] + trim (name.substr (1));
+      }
+    return to_lower (name);
+  }
+
+  /*
+   * The value of "key = value", as ini_parse_line () reads it: the text
+   * between the quotes when it is quoted, otherwise up to ';' or '#', a
+   * comment.
+   */
+  std::string
+  ini_value (const std::string &text)
+  {
+    const std::string v = trim (text);
+
+    if (!v.empty () && (v[0] == '"' || v[0] == '\''))
+      {
+	const std::string::size_type close = v.find (v[0], 1);
+
+	if (close != std::string::npos)
+	  {
+	    return v.substr (1, close - 1);
+	  }
+      }
+    return trim (v.substr (0, v.find_first_of (";#")));
+  }
+
+  bool
+  is_abs_path (const std::string &path)
+  {
+#if defined(WINDOWS)
+    return (!path.empty () && (path[0] == '/' || path[0] == '\\'))
+	   || (path.size () > 2 && isalpha ((unsigned char) path[0]) && path[1] == ':'
+	       && (path[2] == '/' || path[2] == '\\'));
+#else
+    return !path.empty () && path[0] == '/';
+#endif
+  }
+}
+
+/*
+ * Read error_log of the database dbname from cubrid.conf conf, as the server
+ * of dbname gets it:
+ *   - [common] (and the lines before any section) then [@<dbname>], so the
+ *     value of [@<dbname>] wins; "<dbname>" is compared case-sensitively,
+ *     "common" is not. The other sections ([service], [standalone],
+ *     [@<another db>], ...) do not apply to the server.
+ *   - the last line wins when a section sets it more than once.
+ *   - the key is case-insensitive, a value can be quoted, an unquoted value
+ *     ends at ';' or '#', and a line that ends with '\' goes on in the next.
+ * Returns false when error_log is not set or is empty.
+ */
+bool
+ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value)
+{
+  const std::string db_section = "@" + dbname;
+  std::string line, next, section, common_val, db_val;
+  bool db_set = false;
+
+  value.clear ();
+  if (dbname.empty ())
+    {
+      return false;
+    }
+
+  while (std::getline (conf, line))
+    {
+      line = trim (line);
+      while (!line.empty () && line.back () == '\\' && std::getline (conf, next))
+	{
+	  line.pop_back ();
+	  line = trim (line + next);
+	}
+
+      if (line.empty () || line[0] == '#')
+	{
+	  continue;
+	}
+      if (line[0] == '[' && line.back () == ']')
+	{
+	  section = section_name (line);
+	  continue;
+	}
+
+      const std::string::size_type eq = line.find ('=');
+      if (eq == std::string::npos || to_lower (trim (line.substr (0, eq))) != "error_log")
+	{
+	  continue;
+	}
+      if (section.empty () || section == "common")
+	{
+	  common_val = ini_value (line.substr (eq + 1));
+	}
+      else if (section == db_section)
+	{
+	  db_val = ini_value (line.substr (eq + 1));
+	  db_set = true;
+	}
+    }
+
+  value = db_set ? db_val : common_val;
+  return !value.empty ();
+}
+
+/*
+ * The path of the file the server writes its error log to, for the value
+ * param of error_log, as er_init () of the engine resolves it: an absolute
+ * path as it is, any other path under the log directory log_dir
+ * ($CUBRID/log), so "server/demodb.err" is $CUBRID/log/server/demodb.err.
+ * A path that starts with '.' is relative to the working directory of the
+ * server, which is not known here: false.
+ */
+bool
+ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, std::string &path)
+{
+  path.clear ();
+  if (param.empty () || param[0] == '.' || log_dir.empty ())
+    {
+      return false;
+    }
+  path = is_abs_path (param) ? param : log_dir + "/" + param;
+  return true;
+}
+
+/*
+ * Whether path1 and path2, built from the same $CUBRID, name the same file.
+ * On Windows the case and the separator ('\' or '/') do not matter.
+ */
+bool
+ut_is_same_path (const std::string &path1, const std::string &path2)
+{
+#if defined(WINDOWS)
+  auto normalize = [] (std::string path)
+  {
+    std::replace (path.begin (), path.end (), '\\', '/');
+    return to_lower (path);
+  };
+  return normalize (path1) == normalize (path2);
+#else
+  return path1 == path2;
 #endif
 }

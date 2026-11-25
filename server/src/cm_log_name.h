@@ -32,8 +32,21 @@
 #ifndef _CM_LOG_NAME_H_
 #define _CM_LOG_NAME_H_
 
+#include <istream>
+#include <string>
+
 bool ut_is_broker_log_file (const char *fname, const char *bname, bool shard);
 bool ut_is_db_server_err_log (const char *fname, const char *dbname);
 bool ut_is_regular_file_mode (unsigned int st_mode);
+
+/*
+ * A database can name its server error log itself with error_log in
+ * cubrid.conf, e.g. "server/demodb.err". That file is a log of the database
+ * too, whatever its name. cubrid.conf is read here as the engine reads it
+ * (ini_parser.c, system_parameter.c), without depending on the engine.
+ */
+bool ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value);
+bool ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, std::string &path);
+bool ut_is_same_path (const std::string &path1, const std::string &path2);
 
 #endif /* _CM_LOG_NAME_H_ */
