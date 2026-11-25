@@ -504,10 +504,10 @@ ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
 /*
  * The path of the server error log that error_log in cubrid.conf gives the
  * database dbname, resolved as the engine does (CBRD-26446).
- *   return: 0 resolved to path, 1 error_log is not set,
- *           -1 set but not resolvable here (e.g. "./x.err")
+ *   return: DB_ERR_LOG_PATH_RESOLVED with the path in path,
+ *           DB_ERR_LOG_PATH_NOT_SET or DB_ERR_LOG_PATH_UNRESOLVABLE
  */
-int
+T_DB_ERR_LOG_PATH
 ts_get_db_err_log_path (const char *dbname, char *path, size_t size)
 {
   char dbdir[PATH_MAX];
@@ -515,7 +515,7 @@ ts_get_db_err_log_path (const char *dbname, char *path, size_t size)
 
   if (dbname == NULL || uRetrieveDBDirectory (dbname, dbdir) != ERR_NO_ERROR)
     {
-      return 1;
+      return DB_ERR_LOG_PATH_NOT_SET;
     }
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
@@ -529,17 +529,17 @@ ts_get_db_err_log_path (const char *dbname, char *path, size_t size)
   std::ifstream conf (conf_file.c_str ());
   if (!conf || !ut_get_db_err_log_param (conf, dbname, param))
     {
-      return 1;
+      return DB_ERR_LOG_PATH_NOT_SET;
     }
 #if defined(WINDOWS)
   std::replace (param.begin (), param.end (), '\\', '/');
 #endif
   if (!ut_resolve_err_log_param (param, log_dir, resolved) || resolved.size () >= size)
     {
-      return -1;
+      return DB_ERR_LOG_PATH_UNRESOLVABLE;
     }
   snprintf (path, size, "%s", resolved.c_str ());
-  return 0;
+  return DB_ERR_LOG_PATH_RESOLVED;
 }
 
 int
@@ -7788,7 +7788,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *dbname, log_dir[PATH_MAX], buf[COMPOSED_PATH_MAX];
   char err_log_path[PATH_MAX];
-  int err_log_set;
+  T_DB_ERR_LOG_PATH err_log;
   struct stat statbuf;
 #if defined(WINDOWS)
   WIN32_FIND_DATA data;
@@ -7817,17 +7817,17 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "open", "loginfo");
 
   /* error_log of cubrid.conf: a relative path is under $CUBRID/log, as the engine has it */
-  err_log_set = ts_get_db_err_log_path (dbname, err_log_path, sizeof (err_log_path));
-  if (err_log_set == 1)
+  err_log = ts_get_db_err_log_path (dbname, err_log_path, sizeof (err_log_path));
+  if (err_log == DB_ERR_LOG_PATH_NOT_SET)
     {
       snprintf (buf, sizeof (buf) - 1, "%s/%s.err", log_dir, dbname);
     }
-  else if (err_log_set == 0)
+  else if (err_log == DB_ERR_LOG_PATH_RESOLVED)
     {
       snprintf (buf, sizeof (buf) - 1, "%s", err_log_path);
     }
 
-  if (err_log_set >= 0 && stat (buf, &statbuf) == 0)
+  if (err_log != DB_ERR_LOG_PATH_UNRESOLVABLE && stat (buf, &statbuf) == 0)
     {
       nv_add_nvp (res, "open", "log");
       nv_add_nvp (res, "path", buf);
@@ -7882,7 +7882,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (err_log_set == 0 && ut_is_same_path (buf, err_log_path))
+      if (err_log == DB_ERR_LOG_PATH_RESOLVED && ut_is_same_path (buf, err_log_path))
 	{
 	  /* the error_log of cubrid.conf, listed above */
 	  continue;

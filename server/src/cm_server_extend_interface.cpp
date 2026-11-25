@@ -1323,7 +1323,8 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
     }
 
   /* error_log of cubrid.conf, e.g. server/<dbname>.err: a log of the database whatever its name */
-  has_err_log_path = (ts_get_db_err_log_path (dbname.c_str (), err_log_path, sizeof (err_log_path)) == 0);
+  has_err_log_path = (ts_get_db_err_log_path (dbname.c_str (), err_log_path, sizeof (err_log_path))
+		      == DB_ERR_LOG_PATH_RESOLVED);
 
   snprintf (find_file, PATH_MAX - 1, "%s/%s", sco.szCubrid, CUBRID_ERROR_LOG_DIR);
 #if defined(WINDOWS)

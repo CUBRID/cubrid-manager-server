@@ -356,7 +356,15 @@ int ts_set_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_add_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_delete_backup_info (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error);
-int ts_get_db_err_log_path (const char *dbname, char *path, size_t size);
+/* error_log of cubrid.conf for a database, as ts_get_db_err_log_path () finds it */
+typedef enum
+{
+  DB_ERR_LOG_PATH_RESOLVED,	/* set, and resolved to the path of the file */
+  DB_ERR_LOG_PATH_NOT_SET,	/* not set: the server names its error log itself */
+  DB_ERR_LOG_PATH_UNRESOLVABLE	/* set, but CMS cannot tell the file, e.g. "./x.err" */
+} T_DB_ERR_LOG_PATH;
+
+T_DB_ERR_LOG_PATH ts_get_db_err_log_path (const char *dbname, char *path, size_t size);
 int ts_view_log (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_reset_log (nvplist *req, nvplist *res, char *_dbmt_error);
 int ts_get_autostart_db (nvplist *req, nvplist *res, char *_dbmt_error);
