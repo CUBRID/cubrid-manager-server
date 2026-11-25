@@ -334,13 +334,14 @@ test_db_err_log_param (void)
 }
 
 /*
- * ut_is_same_file (): the same directory entry however it is spelled, and not
- * the <db>_latest.err link to it. Needs a file system: a temporary directory
- * with log/server/demodb.err, the link demodb_latest.err to it, and a link
- * CUBRID_link to the directory, as a $CUBRID that is a symbolic link.
+ * ut_file_entry: the same directory entry however it is spelled, and not the
+ * <db>_latest.err link to it. Needs a file system: a temporary directory with
+ * log/server/demodb.err, the link demodb_latest.err to it, a hard link to it
+ * under another name, and a link CUBRID_link to the directory, as a $CUBRID
+ * that is a symbolic link.
  */
 static void
-test_same_file (void)
+test_file_entry (void)
 {
 #if !defined(WINDOWS)
   char tmpl[] = "/tmp/test_log_name.XXXXXX";
@@ -348,7 +349,7 @@ test_same_file (void)
 
   if (root == NULL)
     {
-      check (false, "mkdtemp () for ut_is_same_file");
+      check (false, "mkdtemp () for ut_file_entry");
       return;
     }
 
@@ -357,6 +358,7 @@ test_same_file (void)
   const std::string server = dir + "/log/server";
   const std::string err = server + "/demodb.err";
   const std::string latest = server + "/demodb_latest.err";
+  const std::string hard = server + "/demodb_hard.err";
   const std::string other = server + "/demodb_20261117_1030.err";
   bool made = mkdir (dir.c_str (), 0700) == 0 && mkdir ((dir + "/log").c_str (), 0700) == 0
 	      && mkdir (server.c_str (), 0700) == 0;
@@ -370,23 +372,35 @@ test_same_file (void)
     {
       fclose (fp);
     }
-  made = made && symlink (err.c_str (), latest.c_str ()) == 0 && symlink (dir.c_str (), link_dir.c_str ()) == 0;
-  check (made, "a log directory for ut_is_same_file");
+  made = made && symlink (err.c_str (), latest.c_str ()) == 0 && link (err.c_str (), hard.c_str ()) == 0
+	 && symlink (dir.c_str (), link_dir.c_str ()) == 0;
+  check (made, "a log directory for ut_file_entry");
 
   if (made)
     {
-      check (ut_is_same_file (err, err), "the same file");
-      check (ut_is_same_file (dir + "//log/server/demodb.err", err), "the same file, \"//\" in the path");
-      check (ut_is_same_file (dir + "/log/server/../server/demodb.err", err), "the same file, \"..\" in the path");
-      check (ut_is_same_file (link_dir + "/log/server/demodb.err", err), "the same file, $CUBRID a symbolic link");
-      check (!ut_is_same_file (latest, err), "not the <db>_latest.err link to the file");
-      check (!ut_is_same_file (other, err), "another file");
+      const ut_file_entry entry (err);
+      /* the configured path spelled another way */
+      const ut_file_entry linked (link_dir + "/log/server/demodb.err");
+
+      check (entry.is (err), "the same file");
+      check (entry.is (dir + "//log/server/demodb.err"), "the same file, \"//\" in the path");
+      check (entry.is (dir + "/log/server/../server/demodb.err"), "the same file, \"..\" in the path");
+      check (entry.is (link_dir + "/log/server/demodb.err"), "the same file, $CUBRID a symbolic link");
+      check (linked.is (err), "the same file, the configured path through the link");
+      check (!entry.is (latest), "not the <db>_latest.err link to the file");
+      check (!entry.is (other), "another file");
+      check (!entry.is (hard), "a hard link under another name is not looked for");
+
       /* a file that is not there: the paths are compared */
-      check (ut_is_same_file (server + "/gone.err", server + "/gone.err"), "a missing file, the same path");
-      check (!ut_is_same_file (server + "/gone.err", err), "a missing file, another path");
+      const ut_file_entry gone (server + "/gone.err");
+      check (gone.is (server + "/gone.err"), "a missing file, the same path");
+      check (!gone.is (dir + "//log/server/gone.err"), "a missing file, the path spelled another way");
+      check (!gone.is (err), "a missing file, another file");
+      check (!ut_file_entry ("").is (err), "no file");
     }
 
   unlink (latest.c_str ());
+  unlink (hard.c_str ());
   unlink (err.c_str ());
   unlink (other.c_str ());
   rmdir (server.c_str ());
@@ -413,7 +427,7 @@ main (void)
   test_broker_other_instances ();
   test_db_server_err_log ();
   test_db_err_log_param ();
-  test_same_file ();
+  test_file_entry ();
   test_regular_file_mode ();
 
   printf ("%d of %d checks failed\n", failures, checks);

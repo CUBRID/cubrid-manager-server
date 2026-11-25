@@ -7852,6 +7852,9 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
       nv_add_nvp (res, "close", "log");
     }
 
+  /* looked up once here, not for each file of the directory */
+  const ut_file_entry err_log_file (err_log == DB_ERR_LOG_PATH_RESOLVED ? err_log_path : "");
+
   snprintf (find_file, PATH_MAX - 1, "%s/%s", sco.szCubrid,
 	    CUBRID_ERROR_LOG_DIR);
 #if defined(WINDOWS)
@@ -7882,7 +7885,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (err_log == DB_ERR_LOG_PATH_RESOLVED && ut_is_same_file (buf, err_log_path))
+      if (err_log == DB_ERR_LOG_PATH_RESOLVED && err_log_file.is (buf))
 	{
 	  /* the error_log of cubrid.conf, listed above */
 	  continue;

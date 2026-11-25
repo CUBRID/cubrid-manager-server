@@ -34,6 +34,7 @@
 
 #include <istream>
 #include <string>
+#include <sys/types.h>
 
 bool ut_is_broker_log_file (const char *fname, const char *bname, bool shard);
 bool ut_is_db_server_err_log (const char *fname, const char *dbname);
@@ -48,6 +49,27 @@ bool ut_is_regular_file_mode (unsigned int st_mode);
 bool ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value);
 bool ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, std::string &path);
 bool ut_is_same_path (const std::string &path1, const std::string &path2);
-bool ut_is_same_file (const std::string &path1, const std::string &path2);
+
+/*
+ * A file to find in a directory listing by its directory entry, however its
+ * path is spelled. Its lstat () is taken once, when it is made, and is() then
+ * looks up only an entry with the same file name, so a listing of N files
+ * costs at most one more lstat (), not 2N.
+ */
+class ut_file_entry
+{
+  public:
+    explicit ut_file_entry (const std::string &path);
+    bool is (const std::string &path) const;
+
+  private:
+    std::string m_path;
+    std::string m_name;
+    bool m_known;
+#if !defined(WINDOWS)
+    dev_t m_dev;
+    ino_t m_ino;
+#endif
+};
 
 #endif /* _CM_LOG_NAME_H_ */

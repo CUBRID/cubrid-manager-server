@@ -381,25 +381,69 @@ ut_is_same_path (const std::string &path1, const std::string &path2)
 #endif
 }
 
-/*
- * Whether path1 and path2 name the same directory entry, however they are
- * spelled: "//", a $CUBRID that is a symbolic link, or an absolute error_log
- * against a path built from $CUBRID. The last component is not followed
- * (lstat ()), so <db>_latest.err, the link the engine keeps to the current
- * error log, is not taken for the file it points to.
- * Compares the paths with ut_is_same_path () when either cannot be lstat()ed,
- * and on Windows.
- */
-bool
-ut_is_same_file (const std::string &path1, const std::string &path2)
+/* The last component of path */
+static std::string
+base_name (const std::string &path)
+{
+#if defined(WINDOWS)
+  const std::string::size_type sep = path.find_last_of ("/\\");
+#else
+  const std::string::size_type sep = path.find_last_of ('/');
+#endif
+  return (sep == std::string::npos) ? path : path.substr (sep + 1);
+}
+
+ut_file_entry::ut_file_entry (const std::string &path)
+  : m_path (path)
+  , m_name (base_name (path))
+  , m_known (false)
+#if !defined(WINDOWS)
+  , m_dev (0)
+  , m_ino (0)
+#endif
 {
 #if !defined(WINDOWS)
-  struct stat st1, st2;
+  struct stat st;
 
-  if (lstat (path1.c_str (), &st1) == 0 && lstat (path2.c_str (), &st2) == 0)
+  if (lstat (path.c_str (), &st) == 0)
     {
-      return st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino;
+      m_known = true;
+      m_dev = st.st_dev;
+      m_ino = st.st_ino;
     }
 #endif
-  return ut_is_same_path (path1, path2);
+}
+
+/*
+ * Whether path names this directory entry: "//", ".." or a $CUBRID that is a
+ * symbolic link in either path do not matter. The last component is not
+ * followed (lstat ()), so <db>_latest.err, the link the engine keeps to the
+ * current error log, is not taken for the file it points to.
+ *   - Only an entry with the same file name is looked up: a hard link to the
+ *     file under another name is not found.
+ *   - The paths are compared (ut_is_same_path ()) when either cannot be
+ *     lstat()ed, and on Windows.
+ */
+bool
+ut_file_entry::is (const std::string &path) const
+{
+#if defined(WINDOWS)
+  if (!ut_is_same_path (base_name (path), m_name))
+    {
+      return false;
+    }
+#else
+  if (base_name (path) != m_name)
+    {
+      return false;
+    }
+
+  struct stat st;
+
+  if (m_known && lstat (path.c_str (), &st) == 0)
+    {
+      return st.st_dev == m_dev && st.st_ino == m_ino;
+    }
+#endif
+  return ut_is_same_path (path, m_path);
 }
