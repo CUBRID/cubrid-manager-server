@@ -48,5 +48,6 @@ bool ut_is_regular_file_mode (unsigned int st_mode);
 bool ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value);
 bool ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, std::string &path);
 bool ut_is_same_path (const std::string &path1, const std::string &path2);
+bool ut_is_same_file (const std::string &path1, const std::string &path2);
 
 #endif /* _CM_LOG_NAME_H_ */

@@ -43,6 +43,11 @@
 #include <sstream>
 #include <string>
 
+#if !defined(WINDOWS)
+#include <stdlib.h>
+#include <unistd.h>
+#endif
+
 #include "cm_log_name.h"
 
 #define OFF false
@@ -328,6 +333,70 @@ test_db_err_log_param (void)
 	 "another path");
 }
 
+/*
+ * ut_is_same_file (): the same directory entry however it is spelled, and not
+ * the <db>_latest.err link to it. Needs a file system: a temporary directory
+ * with log/server/demodb.err, the link demodb_latest.err to it, and a link
+ * CUBRID_link to the directory, as a $CUBRID that is a symbolic link.
+ */
+static void
+test_same_file (void)
+{
+#if !defined(WINDOWS)
+  char tmpl[] = "/tmp/test_log_name.XXXXXX";
+  const char *root = mkdtemp (tmpl);
+
+  if (root == NULL)
+    {
+      check (false, "mkdtemp () for ut_is_same_file");
+      return;
+    }
+
+  const std::string dir = std::string (root) + "/CUBRID";
+  const std::string link_dir = std::string (root) + "/CUBRID_link";
+  const std::string server = dir + "/log/server";
+  const std::string err = server + "/demodb.err";
+  const std::string latest = server + "/demodb_latest.err";
+  const std::string other = server + "/demodb_20261117_1030.err";
+  bool made = mkdir (dir.c_str (), 0700) == 0 && mkdir ((dir + "/log").c_str (), 0700) == 0
+	      && mkdir (server.c_str (), 0700) == 0;
+  FILE *fp;
+
+  if (made && (fp = fopen (err.c_str (), "w")) != NULL)
+    {
+      fclose (fp);
+    }
+  if (made && (fp = fopen (other.c_str (), "w")) != NULL)
+    {
+      fclose (fp);
+    }
+  made = made && symlink (err.c_str (), latest.c_str ()) == 0 && symlink (dir.c_str (), link_dir.c_str ()) == 0;
+  check (made, "a log directory for ut_is_same_file");
+
+  if (made)
+    {
+      check (ut_is_same_file (err, err), "the same file");
+      check (ut_is_same_file (dir + "//log/server/demodb.err", err), "the same file, \"//\" in the path");
+      check (ut_is_same_file (dir + "/log/server/../server/demodb.err", err), "the same file, \"..\" in the path");
+      check (ut_is_same_file (link_dir + "/log/server/demodb.err", err), "the same file, $CUBRID a symbolic link");
+      check (!ut_is_same_file (latest, err), "not the <db>_latest.err link to the file");
+      check (!ut_is_same_file (other, err), "another file");
+      /* a file that is not there: the paths are compared */
+      check (ut_is_same_file (server + "/gone.err", server + "/gone.err"), "a missing file, the same path");
+      check (!ut_is_same_file (server + "/gone.err", err), "a missing file, another path");
+    }
+
+  unlink (latest.c_str ());
+  unlink (err.c_str ());
+  unlink (other.c_str ());
+  rmdir (server.c_str ());
+  rmdir ((dir + "/log").c_str ());
+  rmdir (dir.c_str ());
+  unlink (link_dir.c_str ());
+  rmdir (root);
+#endif
+}
+
 static void
 test_regular_file_mode (void)
 {
@@ -344,6 +413,7 @@ main (void)
   test_broker_other_instances ();
   test_db_server_err_log ();
   test_db_err_log_param ();
+  test_same_file ();
   test_regular_file_mode ();
 
   printf ("%d of %d checks failed\n", failures, checks);

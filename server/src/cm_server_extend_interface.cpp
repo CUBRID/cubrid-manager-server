@@ -1349,7 +1349,7 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #endif
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,    CUBRID_ERROR_LOG_DIR, fname);
       if (!ut_is_db_server_err_log (fname, dbname.c_str ())
-	  && ! (has_err_log_path && ut_is_same_path (buf, err_log_path)))
+	  && ! (has_err_log_path && ut_is_same_file (buf, err_log_path)))
 	{
 	  continue;
 	}

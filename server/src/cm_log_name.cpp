@@ -380,3 +380,26 @@ ut_is_same_path (const std::string &path1, const std::string &path2)
   return path1 == path2;
 #endif
 }
+
+/*
+ * Whether path1 and path2 name the same directory entry, however they are
+ * spelled: "//", a $CUBRID that is a symbolic link, or an absolute error_log
+ * against a path built from $CUBRID. The last component is not followed
+ * (lstat ()), so <db>_latest.err, the link the engine keeps to the current
+ * error log, is not taken for the file it points to.
+ * Compares the paths with ut_is_same_path () when either cannot be lstat()ed,
+ * and on Windows.
+ */
+bool
+ut_is_same_file (const std::string &path1, const std::string &path2)
+{
+#if !defined(WINDOWS)
+  struct stat st1, st2;
+
+  if (lstat (path1.c_str (), &st1) == 0 && lstat (path2.c_str (), &st2) == 0)
+    {
+      return st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino;
+    }
+#endif
+  return ut_is_same_path (path1, path2);
+}

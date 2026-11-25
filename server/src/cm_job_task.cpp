@@ -503,17 +503,17 @@ ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
 
 /*
  * The path of the server error log that error_log in cubrid.conf gives the
- * database dbname, resolved as the engine does (CBRD-26446).
+ * database dbname, resolved as the engine does (CBRD-26446). The caller has
+ * checked that dbname is a database (uRetrieveDBDirectory ()).
  *   return: DB_ERR_LOG_PATH_RESOLVED with the path in path,
  *           DB_ERR_LOG_PATH_NOT_SET or DB_ERR_LOG_PATH_UNRESOLVABLE
  */
 T_DB_ERR_LOG_PATH
 ts_get_db_err_log_path (const char *dbname, char *path, size_t size)
 {
-  char dbdir[PATH_MAX];
   std::string param, resolved;
 
-  if (dbname == NULL || uRetrieveDBDirectory (dbname, dbdir) != ERR_NO_ERROR)
+  if (dbname == NULL || dbname[0] == '\0')
     {
       return DB_ERR_LOG_PATH_NOT_SET;
     }
@@ -7882,7 +7882,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (err_log == DB_ERR_LOG_PATH_RESOLVED && ut_is_same_path (buf, err_log_path))
+      if (err_log == DB_ERR_LOG_PATH_RESOLVED && ut_is_same_file (buf, err_log_path))
 	{
 	  /* the error_log of cubrid.conf, listed above */
 	  continue;
