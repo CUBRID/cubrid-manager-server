@@ -49,6 +49,8 @@ bool ut_is_regular_file_mode (unsigned int st_mode);
 bool ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value);
 bool ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, std::string &path);
 bool ut_is_same_path (const std::string &path1, const std::string &path2);
+std::string ut_lexical_path (const std::string &path);
+std::string ut_windows_path_key (const std::string &path);
 
 /*
  * A file to find in a directory listing by its directory entry, however its

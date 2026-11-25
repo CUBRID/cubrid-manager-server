@@ -333,6 +333,60 @@ test_db_err_log_param (void)
 	 "another path");
 }
 
+/* ut_lexical_path (): path gives expect */
+static void
+lexical (const char *path, const char *expect)
+{
+  char what[512];
+  const std::string got = ut_lexical_path (path);
+
+  snprintf (what, sizeof (what), "lexical \"%s\" -> \"%s\" (got \"%s\")", path, expect, got.c_str ());
+  check (got == expect, what);
+}
+
+/* ut_windows_path_key (): whether path1 and path2 are the same file on Windows */
+static void
+windows_same (const char *path1, const char *path2, bool expect)
+{
+  char what[512];
+  const bool got = ut_windows_path_key (path1) == ut_windows_path_key (path2);
+
+  snprintf (what, sizeof (what), "Windows \"%s\" and \"%s\" -> %s (got %s)", path1, path2,
+	    expect ? "the same" : "not the same", got ? "the same" : "not the same");
+  check (got == expect, what);
+}
+
+/*
+ * The paths ut_is_same_path () compares on Windows, checked here on any
+ * platform through ut_windows_path_key ().
+ */
+static void
+test_path_spelling (void)
+{
+  lexical ("/a/./b", "/a/b");
+  lexical ("/a//b/", "/a/b");
+  lexical ("/a/b/../c", "/a/c");
+  lexical ("/a/b/c/../../d", "/a/d");
+  lexical ("/../a", "/a");
+  lexical ("a/../../b", "../b");
+  lexical ("../a", "../a");
+  lexical ("C:/x/../y", "C:/y");
+  lexical ("C:/..", "C:");
+  lexical ("C:/./x//y", "C:/x/y");
+  lexical ("//srv/share/./x", "//srv/share/x");
+  lexical ("///a", "/a");
+  lexical (".", "");
+  lexical ("", "");
+
+  /* error_log=server/./demodb.err against the file found in $CUBRID/log/server (review of #168) */
+  windows_same ("C:/CUBRID/log/server/./demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:\\CUBRID\\log\\server\\demodb.err", "c:/cubrid/log/server/./DemoDB.err", true);
+  windows_same ("C:/CUBRID//log/server/demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:/CUBRID/log/server/../server/demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:/CUBRID/log/demodb.err", "C:/CUBRID/log/server/demodb.err", false);
+  windows_same ("C:/CUBRID/log/server/demodb_latest.err", "C:/CUBRID/log/server/demodb.err", false);
+}
+
 /*
  * ut_file_entry: the same directory entry however it is spelled, and not the
  * <db>_latest.err link to it. Needs a file system: a temporary directory with
@@ -385,6 +439,8 @@ test_file_entry (void)
       check (entry.is (err), "the same file");
       check (entry.is (dir + "//log/server/demodb.err"), "the same file, \"//\" in the path");
       check (entry.is (dir + "/log/server/../server/demodb.err"), "the same file, \"..\" in the path");
+      check (entry.is (dir + "/log/server/./demodb.err"), "the same file, \".\" in the path");
+      check (ut_file_entry (dir + "/log/server/./demodb.err").is (err), "the same file, error_log=server/./demodb.err");
       check (entry.is (link_dir + "/log/server/demodb.err"), "the same file, $CUBRID a symbolic link");
       check (linked.is (err), "the same file, the configured path through the link");
       check (!entry.is (latest), "not the <db>_latest.err link to the file");
@@ -427,6 +483,7 @@ main (void)
   test_broker_other_instances ();
   test_db_server_err_log ();
   test_db_err_log_param ();
+  test_path_spelling ();
   test_file_entry ();
   test_regular_file_mode ();
 

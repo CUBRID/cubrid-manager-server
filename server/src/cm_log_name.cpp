@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <vector>
 
 #include "cm_log_name.h"
 
@@ -363,34 +364,112 @@ ut_resolve_err_log_param (const std::string &param, const std::string &log_dir, 
 }
 
 /*
+ * path spelled one way, read as Windows reads it (lexically): no "."
+ * component, no repeated '/', no '/' at the end, and ".." folded into the
+ * component before it. Above the root, or above the drive of "C:/...", ".."
+ * stays at the root; a relative path keeps the ".." it starts with. A leading
+ * "//" (a UNC path) is kept. Only '/' is a separator here: '\' is turned into
+ * '/' by the caller where it is one (ut_windows_path_key ()).
+ */
+std::string
+ut_lexical_path (const std::string &path)
+{
+  std::string prefix;
+  std::vector<std::string> parts;
+  std::string::size_type begin = 0;
+
+  if (path.compare (0, 2, "//") == 0 && path.compare (0, 3, "///") != 0)
+    {
+      prefix = "//";
+    }
+  else if (!path.empty () && path[0] == '/')
+    {
+      prefix = "/";
+    }
+
+  while (begin <= path.size ())
+    {
+      std::string::size_type end = path.find ('/', begin);
+
+      if (end == std::string::npos)
+	{
+	  end = path.size ();
+	}
+
+      const std::string part = path.substr (begin, end - begin);
+      const bool at_drive = (prefix.empty () && parts.size () == 1 && parts[0].size () == 2 && parts[0][1] == ':');
+
+      if (part.empty () || part == ".")
+	{
+	  ;
+	}
+      else if (part != "..")
+	{
+	  parts.push_back (part);
+	}
+      else if (!parts.empty () && parts.back () != ".." && !at_drive)
+	{
+	  parts.pop_back ();
+	}
+      else if (prefix.empty () && !at_drive)
+	{
+	  parts.push_back (part);
+	}
+      begin = end + 1;
+    }
+
+  std::string lexical = prefix;
+
+  for (std::vector<std::string>::size_type i = 0; i < parts.size (); i++)
+    {
+      lexical += (i == 0 ? "" : "/") + parts[i];
+    }
+  return lexical;
+}
+
+/*
+ * The key two Windows paths are compared by: '\' as '/', ut_lexical_path (),
+ * and the case ignored, as Windows names a file. Built on every platform, so
+ * that the unit tests check it.
+ */
+std::string
+ut_windows_path_key (const std::string &path)
+{
+  std::string key = path;
+
+  std::replace (key.begin (), key.end (), '\\', '/');
+  return to_lower (ut_lexical_path (key));
+}
+
+/*
  * Whether path1 and path2, built from the same $CUBRID, name the same file.
- * On Windows the case and the separator ('\' or '/') do not matter.
+ * On Windows they are compared by ut_windows_path_key (), so the case, the
+ * separator ('\' or '/'), "." and ".." components and repeated separators do
+ * not matter, e.g. error_log=server/./demodb.err. Elsewhere they are compared
+ * as they are: ut_file_entry tells the file itself with lstat ().
  */
 bool
 ut_is_same_path (const std::string &path1, const std::string &path2)
 {
 #if defined(WINDOWS)
-  auto normalize = [] (std::string path)
-  {
-    std::replace (path.begin (), path.end (), '\\', '/');
-    return to_lower (path);
-  };
-  return normalize (path1) == normalize (path2);
+  return ut_windows_path_key (path1) == ut_windows_path_key (path2);
 #else
   return path1 == path2;
 #endif
 }
 
-/* The last component of path */
+/* The last component of path, "." and ".." read as ut_lexical_path () does */
 static std::string
 base_name (const std::string &path)
 {
 #if defined(WINDOWS)
-  const std::string::size_type sep = path.find_last_of ("/\\");
+  const std::string lexical = ut_windows_path_key (path);
 #else
-  const std::string::size_type sep = path.find_last_of ('/');
+  const std::string lexical = ut_lexical_path (path);
 #endif
-  return (sep == std::string::npos) ? path : path.substr (sep + 1);
+  const std::string::size_type sep = lexical.find_last_of ('/');
+
+  return (sep == std::string::npos) ? lexical : lexical.substr (sep + 1);
 }
 
 ut_file_entry::ut_file_entry (const std::string &path)
@@ -415,8 +494,8 @@ ut_file_entry::ut_file_entry (const std::string &path)
 }
 
 /*
- * Whether path names this directory entry: "//", ".." or a $CUBRID that is a
- * symbolic link in either path do not matter. The last component is not
+ * Whether path names this directory entry: ".", "..", "//" or a $CUBRID that
+ * is a symbolic link in either path do not matter. The last component is not
  * followed (lstat ()), so <db>_latest.err, the link the engine keeps to the
  * current error log, is not taken for the file it points to.
  *   - Only an entry with the same file name is looked up: a hard link to the
@@ -427,16 +506,11 @@ ut_file_entry::ut_file_entry (const std::string &path)
 bool
 ut_file_entry::is (const std::string &path) const
 {
-#if defined(WINDOWS)
-  if (!ut_is_same_path (base_name (path), m_name))
-    {
-      return false;
-    }
-#else
   if (base_name (path) != m_name)
     {
       return false;
     }
+#if !defined(WINDOWS)
 
   struct stat st;
 
