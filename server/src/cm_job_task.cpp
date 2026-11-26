@@ -7827,7 +7827,12 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
       snprintf (buf, sizeof (buf) - 1, "%s", err_log_path);
     }
 
-  if (err_log != DB_ERR_LOG_PATH_UNRESOLVABLE && stat (buf, &statbuf) == 0)
+  /*
+   * a regular file only, as the files of the directory below and getdberrorlog: not a directory
+   * that error_log names by mistake, e.g. error_log=server
+   */
+  if (err_log != DB_ERR_LOG_PATH_UNRESOLVABLE && stat (buf, &statbuf) == 0
+      && ut_is_regular_file_mode (statbuf.st_mode))
     {
       nv_add_nvp (res, "open", "log");
       nv_add_nvp (res, "path", buf);
