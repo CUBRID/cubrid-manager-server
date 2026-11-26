@@ -46,6 +46,9 @@
 
 #include <fstream>
 #include <sstream>
+#include <set>
+#include <utility>
+#include <vector>
 
 using namespace std;
 
@@ -1328,6 +1331,58 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
   /* looked up once here, not for each file of the directory */
   const ut_file_entry err_log_file (has_err_log_path ? err_log_path : "");
 
+  /*
+   * Read the log file path (st from stat ()) into response, unless its time
+   * is out of start_d - end_d. false once the logs overflow.
+   */
+  auto read_log = [&] (const char *path, const struct stat &st) -> bool
+  {
+    time_to_str (st.st_mtime, "%4d/%02d/%02d %02d:%02d:%02d", format_time, TIME_STR_FMT_DATE_TIME);
+    if ((!start_d.empty () && strcmp (start_d.c_str (), format_time) > 0)
+	|| (!end_d.empty () && strcmp (end_d.c_str (), format_time) < 0))
+      {
+	return true;
+      }
+    if ((fd = fopen (path, "r")) == NULL)
+      {
+	return true;
+      }
+    logitem.clear ();
+    logitem["file"] = path;
+    while (fgets (logbuf, sizeof (logbuf), fd) != NULL)
+      {
+	ut_trim (logbuf);
+	logitem["logs"].append (logbuf);
+	logsize++;
+	if (logsize > 2000)
+	  {
+	    break;
+	  }
+      }
+    fclose (fd);
+    response["result"].append (logitem);
+    if (logsize > 2000)
+      {
+	response["overflow"] = 1;
+	return false;
+      }
+    return true;
+  };
+  bool overflow = false;
+#if !defined(WINDOWS)
+  /*
+   * A file is read once. The server keeps <db>_latest.err, a symbolic link
+   * to the log it writes, in the directory of that log
+   * (er_file_create_link_to_current_log_file ()), so the log would come
+   * twice: as itself and through the link. The links are read after the
+   * files, and only one that leads to a file not read yet, e.g. the
+   * error_log a running server opened before cubrid.conf was changed.
+   */
+  std::set<std::pair<dev_t, ino_t>> read_files;
+  std::vector<std::string> links;
+  struct stat lstatbuf;
+#endif
+
   snprintf (find_file, PATH_MAX - 1, "%s/%s", sco.szCubrid, CUBRID_ERROR_LOG_DIR);
 #if defined(WINDOWS)
   snprintf (&find_file[strlen (find_file)], PATH_MAX - strlen (find_file) - 1, "/*");
@@ -1355,47 +1410,38 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 	{
 	  continue;
 	}
-      if (stat (buf, &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode))
+      if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))
 	{
-	  time_to_str (statbuf.st_mtime, "%4d/%02d/%02d %02d:%02d:%02d", format_time, TIME_STR_FMT_DATE_TIME);
-	  if (!start_d.empty() && strcmp (start_d.c_str(), format_time) > 0)
-	    {
-	      continue;
-	    }
-	  if (!end_d.empty() && strcmp (end_d.c_str(), format_time) < 0)
-	    {
-	      continue;
-	    }
-	  logitem.clear();
-	  logitem["file"] = buf;
-	  fd = fopen (buf, "r");
-	  if (fd == NULL)
-	    {
-	      continue;
-	    }
-	  while (fgets (logbuf, sizeof (logbuf), fd) != NULL)
-	    {
-	      ut_trim (logbuf);
-	      logitem["logs"].append (logbuf);
-	      logsize++;
-	      if (logsize > 2000)
-		{
-		  break;
-		}
-	    }
-	  fclose (fd);
-	  response["result"].append (logitem);
-	  if (logsize > 2000)
-	    {
-	      response["overflow"] = 1;
-	      break;
-	    }
+	  continue;
+	}
+#if !defined(WINDOWS)
+      if (lstat (buf, &lstatbuf) == 0 && S_ISLNK (lstatbuf.st_mode))
+	{
+	  links.push_back (buf);
+	  continue;
+	}
+      read_files.insert (std::make_pair (statbuf.st_dev, statbuf.st_ino));
+#endif
+      if (!read_log (buf, statbuf))
+	{
+	  overflow = true;
+	  break;
 	}
     }
 #if defined(WINDOWS)
   FindClose (handle);
+  (void) overflow;		/* no <db>_latest.err link on Windows */
 #else
   closedir (dirp);
+
+  for (std::vector<std::string>::size_type i = 0; i < links.size () && !overflow; i++)
+    {
+      if (stat (links[i].c_str (), &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode)
+	  && read_files.insert (std::make_pair (statbuf.st_dev, statbuf.st_ino)).second)
+	{
+	  overflow = !read_log (links[i].c_str (), statbuf);
+	}
+    }
 #endif
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
