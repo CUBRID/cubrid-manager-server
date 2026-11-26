@@ -63,6 +63,7 @@ class ut_file_entry
   public:
     explicit ut_file_entry (const std::string &path);
     bool is (const std::string &path) const;
+    bool is (const std::string &dir, const char *name) const;
 
   private:
     std::string m_path;

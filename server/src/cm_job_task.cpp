@@ -7859,6 +7859,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 
   /* looked up once here, not for each file of the directory */
   const ut_file_entry err_log_file (err_log == DB_ERR_LOG_PATH_RESOLVED ? err_log_path : "");
+  const std::string server_log_dir = std::string (sco.szCubrid) + "/" + CUBRID_ERROR_LOG_DIR;
 
   snprintf (find_file, PATH_MAX - 1, "%s/%s", sco.szCubrid,
 	    CUBRID_ERROR_LOG_DIR);
@@ -7890,7 +7891,7 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
-      if (err_log == DB_ERR_LOG_PATH_RESOLVED && err_log_file.is (buf))
+      if (err_log == DB_ERR_LOG_PATH_RESOLVED && err_log_file.is (server_log_dir, fname))
 	{
 	  /* the error_log of cubrid.conf, listed above */
 	  continue;

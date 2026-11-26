@@ -469,6 +469,17 @@ test_file_entry (void)
       check (!entry.is (other), "another file");
       check (!entry.is (hard), "a hard link under another name is not looked for");
 
+      /* an entry of a directory listing: the name first, then the file */
+      check (entry.is (server, "demodb.err"), "the entry demodb.err of the directory");
+      check (entry.is (dir + "//log/server", "demodb.err"), "the entry demodb.err, \"//\" in the directory");
+      check (entry.is (link_dir + "/log/server", "demodb.err"), "the entry demodb.err, $CUBRID a symbolic link");
+      check (!entry.is (server, "demodb_latest.err"), "not the entry <db>_latest.err, the link to the file");
+      check (!entry.is (server, "demodb_20261117_1030.err"), "not another entry");
+      check (!entry.is (server, "DEMODB.ERR"), "not an entry whose name differs in case");
+      check (!entry.is (server, NULL), "no entry");
+      /* the same name in another directory is another file */
+      check (!entry.is (std::string (root), "demodb.err"), "not demodb.err of another directory");
+
       /* a file that is not there: the paths are compared */
       const ut_file_entry gone (server + "/gone.err");
       check (gone.is (server + "/gone.err"), "a missing file, the same path");

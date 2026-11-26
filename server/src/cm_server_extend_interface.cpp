@@ -1330,6 +1330,7 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 		      == DB_ERR_LOG_PATH_RESOLVED);
   /* looked up once here, not for each file of the directory */
   const ut_file_entry err_log_file (has_err_log_path ? err_log_path : "");
+  const std::string server_log_dir = std::string (sco.szCubrid) + "/" + CUBRID_ERROR_LOG_DIR;
 
   /*
    * Read the log file path (st from stat ()) into response, unless its time
@@ -1404,14 +1405,14 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #else
       fname = dp->d_name;
 #endif
-      if (snprintf (buf, sizeof (buf), "%s/%s/%s", sco.szCubrid, CUBRID_ERROR_LOG_DIR, fname) >= (int) sizeof (buf))
+      if (!ut_is_db_server_err_log (fname, dbname.c_str ())
+	  && ! (has_err_log_path && err_log_file.is (server_log_dir, fname)))
 	{
-	  /* a cut path names another file, or none */
 	  continue;
 	}
-      if (!ut_is_db_server_err_log (fname, dbname.c_str ())
-	  && ! (has_err_log_path && err_log_file.is (buf)))
+      if (snprintf (buf, sizeof (buf), "%s/%s", server_log_dir.c_str (), fname) >= (int) sizeof (buf))
 	{
+	  /* a cut path names another file, or none */
 	  continue;
 	}
       if (stat (buf, &statbuf) != 0 || !ut_is_regular_file_mode (statbuf.st_mode))

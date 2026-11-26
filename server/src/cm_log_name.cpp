@@ -568,3 +568,27 @@ ut_file_entry::is (const std::string &path) const
 #endif
   return ut_is_same_path (path, m_path);
 }
+
+/*
+ * is () for the entry name of the directory dir, as a directory listing
+ * gives it. name is compared first, as it is, so an entry with another name
+ * costs no path to build; dir + "/" + name is built for the entry with the
+ * same name only. On Windows the case of name does not matter.
+ */
+bool
+ut_file_entry::is (const std::string &dir, const char *name) const
+{
+  if (name == NULL)
+    {
+      return false;
+    }
+#if defined(WINDOWS)
+  if (_stricmp (name, m_name.c_str ()) != 0)
+#else
+  if (m_name != name)
+#endif
+    {
+      return false;
+    }
+  return is (dir + "/" + name);
+}
