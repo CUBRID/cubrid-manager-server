@@ -297,6 +297,28 @@ test_db_err_log_param (void)
   err_log_param ("[COMMON]\nERROR_LOG=server/common.err\n", "demodb", "server/common.err");
   /* before any section, as [common] */
   err_log_param ("error_log=server/top.err\n", "demodb", "server/top.err");
+  /*
+   * no section is applied again with [@<db>] (prm_read_and_parse_ini_file ()):
+   * it wins over [common] whatever their order, and over [@<db>] only when
+   * it first appears after it
+   */
+  err_log_param ("error_log=server/top.err\n[common]\nerror_log=server/common.err\n", "demodb", "server/top.err");
+  err_log_param ("[common]\nerror_log=server/common.err\n[ ]\nerror_log=server/none.err\n", "demodb",
+		 "server/none.err");
+  err_log_param ("error_log=server/top.err\n[@demodb]\nerror_log=server/demodb.err\n", "demodb",
+		 "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\n[ ]\nerror_log=server/none.err\n", "demodb",
+		 "server/none.err");
+  /* the value of a later line, but the order of the first one */
+  err_log_param ("error_log=server/top.err\n[@demodb]\nerror_log=server/demodb.err\n[ ]\nerror_log=server/last.err\n",
+		 "demodb", "server/demodb.err");
+  /* a last line that goes on into nothing is not read (ini_parser_load ()) */
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\nerror_log=server/\\", "demodb", "server/demodb.err");
+  /* "[]" names no section: the section goes on (ini_parse_line ()) */
+  err_log_param ("[@demodb]\n[]\nerror_log=server/demodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[@otherdb]\n[]\nerror_log=server/otherdb.err\n", "demodb", "");
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\n[]\nerror_log=server/demodb.err\n", "demodb",
+		 "server/demodb.err");
   /* the last one wins */
   err_log_param ("[@demodb]\nerror_log=server/first.err\nerror_log=server/last.err\n", "demodb",
 		 "server/last.err");

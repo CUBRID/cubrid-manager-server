@@ -281,22 +281,38 @@ namespace
 
 /*
  * Read error_log of the database dbname from cubrid.conf conf, as the server
- * of dbname gets it:
- *   - [common] (and the lines before any section) then [@<dbname>], so the
- *     value of [@<dbname>] wins; "<dbname>" is compared case-sensitively,
- *     "common" is not. The other sections ([service], [standalone],
- *     [@<another db>], ...) do not apply to the server.
- *   - the last line wins when a section sets it more than once.
- *   - the key is case-insensitive, a value can be quoted, an unquoted value
- *     ends at ';' or '#', and a line that ends with '\' goes on in the next.
+ * of dbname gets it. ini_parser.c keeps one entry for each "<section>:<key>",
+ * with the value of its last line, in the order the entries first appear,
+ * and system_parameter.c (prm_read_and_parse_ini_file ()) applies them in two
+ * passes, for a server:
+ *   1. the entries of [common] and of no section (the lines before any
+ *      section, or after "[ ]"),
+ *   2. the entries of [@<dbname>] and, again, of no section.
+ * In each pass the entry that appears first is applied first, so the later
+ * one wins. Thus [@<dbname>] wins over [common], and a value of no section
+ * that appears after [@<dbname>] wins over both. Other sections ([service],
+ * [standalone], [@<another db>], ...) do not apply to the server.
+ *   - "@<dbname>" is case-sensitive, "common" and the key are not.
+ *   - "[]" is not a section name: the section goes on, as in
+ *     ini_parse_line (), whose sscanf ("[%[^]]") reads nothing then.
+ *   - a value can be quoted, an unquoted value ends at ';' or '#', and a line
+ *     that ends with '\' goes on in the next.
  * Returns false when error_log is not set or is empty.
  */
 bool
 ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::string &value)
 {
+  /* the entry "<section>:error_log" of ini_parser.c */
+  struct entry
+  {
+    bool set;
+    int order;			/* when it first appears */
+    std::string value;		/* of its last line */
+  };
+  entry none = { false, 0, "" }, common = { false, 0, "" }, db = { false, 0, "" };
   const std::string db_section = "@" + dbname;
-  std::string line, next, section, common_val, db_val;
-  bool db_set = false;
+  std::string line, next, section;
+  int order = 0;
 
   value.clear ();
   if (dbname.empty ())
@@ -307,9 +323,15 @@ ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::str
   while (std::getline (conf, line))
     {
       line = trim (line);
-      while (!line.empty () && line.back () == '\\' && std::getline (conf, next))
+      while (!line.empty () && line.back () == '\\')
 	{
 	  line.pop_back ();
+	  if (!std::getline (conf, next))
+	    {
+	      /* the last line goes on into nothing: ini_parser.c never reads it */
+	      line.clear ();
+	      break;
+	    }
 	  line = trim (line + next);
 	}
 
@@ -319,7 +341,10 @@ ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::str
 	}
       if (line[0] == '[' && line.back () == ']')
 	{
-	  section = section_name (line);
+	  if (line[1] != ']')
+	    {
+	      section = section_name (line);
+	    }
 	  continue;
 	}
 
@@ -328,18 +353,39 @@ ut_get_db_err_log_param (std::istream &conf, const std::string &dbname, std::str
 	{
 	  continue;
 	}
-      if (section.empty () || section == "common")
+
+      entry *e = section.empty () ? &none : (section == "common") ? &common : (section == db_section) ? &db : NULL;
+      if (e == NULL)
 	{
-	  common_val = ini_value (line.substr (eq + 1));
+	  continue;
 	}
-      else if (section == db_section)
+      if (!e->set)
 	{
-	  db_val = ini_value (line.substr (eq + 1));
-	  db_set = true;
+	  e->set = true;
+	  e->order = order++;
 	}
+      e->value = ini_value (line.substr (eq + 1));
     }
 
-  value = db_set ? db_val : common_val;
+  /* the later of a and b that is set, or NULL */
+  auto later = [] (const entry *a, const entry *b) -> const entry *
+  {
+    if (!a->set)
+      {
+	return b->set ? b : NULL;
+      }
+    return (b->set && b->order > a->order) ? b : a;
+  };
+  const entry *got = later (&none, &db);	/* pass 2 */
+
+  if (got == NULL)
+    {
+      got = later (&none, &common);	/* pass 1 */
+    }
+  if (got != NULL)
+    {
+      value = got->value;
+    }
   return !value.empty ();
 }
 
