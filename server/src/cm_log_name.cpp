@@ -229,8 +229,9 @@ namespace
   }
 
   /*
-   * The name of a "[...]" line, as ini_parse_line () keeps it: "@<db>" and
-   * "%<host>|<user>" as written, any other section in lower case.
+   * The name of a "[...]" line, as ini_parse_line () keeps it: the spaces
+   * after a leading '@' or '%' removed, and in lower case except "@<db>",
+   * which stays as written ("%<host>|<user>" is lowered too).
    */
   std::string
   section_name (const std::string &line)
@@ -239,9 +240,9 @@ namespace
 
     if (!name.empty () && (name[0] == '@' || name[0] == '%'))
       {
-	return name[0] + trim (name.substr (1));
+	name = name[0] + trim (name.substr (1));
       }
-    return to_lower (name);
+    return (!name.empty () && name[0] == '@') ? name : to_lower (name);
   }
 
   /*
