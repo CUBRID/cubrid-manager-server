@@ -1288,7 +1288,7 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
   string start_d, end_d;
   string dbname;
   char log_dir[PATH_MAX],  find_file[PATH_MAX], format_time[PATH_MAX];
-  char buf[1024], logbuf[1024];
+  char buf[COMPOSED_PATH_MAX], logbuf[1024];	/* buf: <log dir>/<file name>, as getloginfo */
   char err_log_path[PATH_MAX];
   bool has_err_log_path;
 #if defined(WINDOWS)
@@ -1404,7 +1404,11 @@ int ext_get_db_err_log (Json::Value &request, Json::Value &response)
 #else
       fname = dp->d_name;
 #endif
-      snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,    CUBRID_ERROR_LOG_DIR, fname);
+      if (snprintf (buf, sizeof (buf), "%s/%s/%s", sco.szCubrid, CUBRID_ERROR_LOG_DIR, fname) >= (int) sizeof (buf))
+	{
+	  /* a cut path names another file, or none */
+	  continue;
+	}
       if (!ut_is_db_server_err_log (fname, dbname.c_str ())
 	  && ! (has_err_log_path && err_log_file.is (buf)))
 	{
