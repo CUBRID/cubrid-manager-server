@@ -57,12 +57,12 @@ Every task requires one of the permissions below, or only a login. The permissio
 | DBO | Database Operation - use database utilities and modify configuration files |
 | BRK | Broker - start, stop and configure brokers (including shard brokers) |
 | MON | Monitoring - change monitoring settings and status templates |
-| JOB | Automation - set up automated jobs |
+| JOB | Automation - set up automated jobs and read their settings |
 | VAR | Show Variable - no task requires it at present |
 | ADMIN | Administrator - runs every task, including CMS user management |
 
 - **Several permissions listed** ("one of DBC, DBO"): having any one of them is enough.
-- **none (any logged-in user)**: the task needs only a valid token; read-only tasks are of this kind.
+- **none (any logged-in user)**: the task needs only a valid token; most read-only tasks are of this kind. `getautojobconf`, which returns the mail and automatic job settings, needs the same permission as `setautojobconf` (one of DBC, DBO, JOB).
 - **ADMIN**: a user with ADMIN runs every task, whatever the task lists. The user named `admin` always has ADMIN.
 - A user without the permission gets `"status":"failure"` with the note `The user don't have authority to execute the task: <task>`.
 
@@ -379,7 +379,7 @@ document of their own yet.
 | [executecasrunner](executecasrunner.md) | socket, http | DBC, DBO, BRK, MON |
 | [generatecert](generatecert.md) | socket, http | ADMIN (debug builds only) |
 | getaccesslogfiles | socket, http | any logged-in user |
-| [getautojobconf](getautojobconf.md) | http | any logged-in user |
+| [getautojobconf](getautojobconf.md) | http | DBC, DBO, JOB |
 | getautostart | http | any logged-in user |
 | getbrokerlog | http | any logged-in user |
 | getdberrorlog | http | any logged-in user |

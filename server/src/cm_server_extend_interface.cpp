@@ -73,7 +73,7 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"setloglevel", 0, ext_set_log_level, AU_DBC | AU_DBO | AU_MON},
   {"setautostart", 0, ext_set_auto_start, AU_DBC | AU_DBO | AU_JOB},
   {"getautostart", 0, ext_get_auto_start, AU_ANY},
-  {"getautojobconf", 0, ext_get_autojob_conf, AU_ANY},
+  {"getautojobconf", 0, ext_get_autojob_conf, AU_DBC | AU_DBO | AU_JOB},
   {"setautojobconf", 0, ext_set_autojob_conf, AU_DBC | AU_DBO | AU_JOB},
   {"execautostart", 0, ext_exec_auto_start, AU_DBC | AU_DBO},
   {"getdberrorlog", 0, ext_get_db_err_log, AU_ANY},
