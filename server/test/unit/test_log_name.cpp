@@ -40,6 +40,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <sstream>
+#include <string>
+
+#if !defined(WINDOWS)
+#include <stdlib.h>
+#include <unistd.h>
+#endif
+
 #include "cm_log_name.h"
 
 #define OFF false
@@ -242,6 +250,256 @@ test_db_server_err_log (void)
   db ("demodb_latest.err", NULL, false);
 }
 
+/* ut_get_db_err_log_param (): error_log of dbname in cubrid.conf text conf gives expect ("": not set) */
+static void
+err_log_param (const char *conf, const char *dbname, const std::string &expect)
+{
+  char what[512];
+  std::istringstream in (conf);
+  std::string value;
+  bool got = ut_get_db_err_log_param (in, dbname, value);
+
+  snprintf (what, sizeof (what), "error_log of \"%s\" -> \"%s\" (got \"%s\")\n%s", dbname, expect.c_str (),
+	    got ? value.c_str () : "", conf);
+  check (expect.empty () ? !got : (got && value == expect), what);
+}
+
+/* ut_resolve_err_log_param (): param under $CUBRID/log gives expect ("": not resolvable) */
+static void
+err_log_path (const char *param, const std::string &expect)
+{
+  char what[512];
+  std::string path;
+  bool got = ut_resolve_err_log_param (param, "/home/cubrid/CUBRID/log", path);
+
+  snprintf (what, sizeof (what), "error_log \"%s\" -> \"%s\" (got \"%s\")", param, expect.c_str (),
+	    got ? path.c_str () : "");
+  check (expect.empty () ? !got : (got && path == expect), what);
+}
+
+static void
+test_db_err_log_param (void)
+{
+  /* [@<db>] over [common], whatever the order; other sections do not apply */
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=server/demodb.err\n",
+		 "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\n[common]\nerror_log=server/common.err\n",
+		 "demodb", "server/demodb.err");
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=server/demodb.err\n",
+		 "testdb", "server/common.err");
+  err_log_param ("[@otherdb]\nerror_log=server/otherdb.err\n[common]\ndata_buffer_size=512M\n", "demodb", "");
+  err_log_param ("[service]\nerror_log=server/service.err\n", "demodb", "");
+  err_log_param ("[standalone]\nerror_log=server/sa.err\n", "demodb", "");
+  /* [@demodb_a] is another database, and "@<db>" is case-sensitive as in the engine */
+  err_log_param ("[@demodb_a]\nerror_log=server/demodb_a.err\n", "demodb", "");
+  err_log_param ("[@DemoDB]\nerror_log=server/DemoDB.err\n", "demodb", "");
+  err_log_param ("[ @demodb ]\nerror_log=server/demodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[COMMON]\nERROR_LOG=server/common.err\n", "demodb", "server/common.err");
+  /* before any section, as [common] */
+  err_log_param ("error_log=server/top.err\n", "demodb", "server/top.err");
+  /*
+   * no section is applied again with [@<db>] (prm_read_and_parse_ini_file ()):
+   * it wins over [common] whatever their order, and over [@<db>] only when
+   * it first appears after it
+   */
+  err_log_param ("error_log=server/top.err\n[common]\nerror_log=server/common.err\n", "demodb", "server/top.err");
+  err_log_param ("[common]\nerror_log=server/common.err\n[ ]\nerror_log=server/none.err\n", "demodb",
+		 "server/none.err");
+  err_log_param ("error_log=server/top.err\n[@demodb]\nerror_log=server/demodb.err\n", "demodb",
+		 "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\n[ ]\nerror_log=server/none.err\n", "demodb",
+		 "server/none.err");
+  /* the value of a later line, but the order of the first one */
+  err_log_param ("error_log=server/top.err\n[@demodb]\nerror_log=server/demodb.err\n[ ]\nerror_log=server/last.err\n",
+		 "demodb", "server/demodb.err");
+  /* a last line that goes on into nothing is not read (ini_parser_load ()) */
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err\nerror_log=server/\\", "demodb", "server/demodb.err");
+  /* "[]" names no section: the section goes on (ini_parse_line ()) */
+  err_log_param ("[@demodb]\n[]\nerror_log=server/demodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[@otherdb]\n[]\nerror_log=server/otherdb.err\n", "demodb", "");
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\n[]\nerror_log=server/demodb.err\n", "demodb",
+		 "server/demodb.err");
+  /* the last one wins */
+  err_log_param ("[@demodb]\nerror_log=server/first.err\nerror_log=server/last.err\n", "demodb",
+		 "server/last.err");
+  err_log_param ("[@demodb]\nerror_log=server/a.err\n[common]\n[@demodb]\nerror_log=server/b.err\n", "demodb",
+		 "server/b.err");
+  /* the value: spaces, quotes, comments, a line that goes on */
+  err_log_param ("[@demodb]\n  error_log = server/demodb.err  \n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=\"server/demo db.err\"\n", "demodb", "server/demo db.err");
+  err_log_param ("[@demodb]\nerror_log='server/demodb.err' # memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err # memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/demodb.err;memo\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\nerror_log=server/\\\ndemodb.err\n", "demodb", "server/demodb.err");
+  err_log_param ("[@demodb]\r\nerror_log=server/demodb.err\r\n", "demodb", "server/demodb.err");
+  /* not set */
+  err_log_param ("[@demodb]\n#error_log=server/commented.err\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log=\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log=\"\"\n", "demodb", "");
+  err_log_param ("[@demodb]\nerror_log_size=1000\n", "demodb", "");
+  /* an empty [@<db>] value still wins over [common], as in the engine */
+  err_log_param ("[common]\nerror_log=server/common.err\n[@demodb]\nerror_log=\n", "demodb", "");
+  err_log_param ("", "demodb", "");
+  err_log_param ("error_log=server/top.err\n", "", "");
+
+  /* resolved as er_init () of the engine: relative to $CUBRID/log */
+  err_log_path ("server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.err");
+  err_log_path ("demodb.err", "/home/cubrid/CUBRID/log/demodb.err");
+  err_log_path ("/var/log/cubrid/demodb.err", "/var/log/cubrid/demodb.err");
+  err_log_path ("./demodb.err", "");
+  err_log_path ("", "");
+
+  check (ut_is_same_path ("/home/cubrid/CUBRID/log/server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.err"),
+	 "the same path");
+  check (!ut_is_same_path ("/home/cubrid/CUBRID/log/server/demodb.err", "/home/cubrid/CUBRID/log/server/demodb.er"),
+	 "another path");
+}
+
+/* ut_lexical_path (): path gives expect */
+static void
+lexical (const char *path, const char *expect)
+{
+  char what[512];
+  const std::string got = ut_lexical_path (path);
+
+  snprintf (what, sizeof (what), "lexical \"%s\" -> \"%s\" (got \"%s\")", path, expect, got.c_str ());
+  check (got == expect, what);
+}
+
+/* ut_windows_path_key (): whether path1 and path2 are the same file on Windows */
+static void
+windows_same (const char *path1, const char *path2, bool expect)
+{
+  char what[512];
+  const bool got = ut_windows_path_key (path1) == ut_windows_path_key (path2);
+
+  snprintf (what, sizeof (what), "Windows \"%s\" and \"%s\" -> %s (got %s)", path1, path2,
+	    expect ? "the same" : "not the same", got ? "the same" : "not the same");
+  check (got == expect, what);
+}
+
+/*
+ * The paths ut_is_same_path () compares on Windows, checked here on any
+ * platform through ut_windows_path_key ().
+ */
+static void
+test_path_spelling (void)
+{
+  lexical ("/a/./b", "/a/b");
+  lexical ("/a//b/", "/a/b");
+  lexical ("/a/b/../c", "/a/c");
+  lexical ("/a/b/c/../../d", "/a/d");
+  lexical ("/../a", "/a");
+  lexical ("a/../../b", "../b");
+  lexical ("../a", "../a");
+  lexical ("C:/x/../y", "C:/y");
+  lexical ("C:/..", "C:");
+  lexical ("C:/./x//y", "C:/x/y");
+  lexical ("//srv/share/./x", "//srv/share/x");
+  lexical ("///a", "/a");
+  lexical (".", "");
+  lexical ("", "");
+
+  /* error_log=server/./demodb.err against the file found in $CUBRID/log/server (review of #168) */
+  windows_same ("C:/CUBRID/log/server/./demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:\\CUBRID\\log\\server\\demodb.err", "c:/cubrid/log/server/./DemoDB.err", true);
+  windows_same ("C:/CUBRID//log/server/demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:/CUBRID/log/server/../server/demodb.err", "C:/CUBRID/log/server/demodb.err", true);
+  windows_same ("C:/CUBRID/log/demodb.err", "C:/CUBRID/log/server/demodb.err", false);
+  windows_same ("C:/CUBRID/log/server/demodb_latest.err", "C:/CUBRID/log/server/demodb.err", false);
+}
+
+/*
+ * ut_file_entry: the same directory entry however it is spelled, and not the
+ * <db>_latest.err link to it. Needs a file system: a temporary directory with
+ * log/server/demodb.err, the link demodb_latest.err to it, a hard link to it
+ * under another name, and a link CUBRID_link to the directory, as a $CUBRID
+ * that is a symbolic link.
+ */
+static void
+test_file_entry (void)
+{
+#if !defined(WINDOWS)
+  char tmpl[] = "/tmp/test_log_name.XXXXXX";
+  const char *root = mkdtemp (tmpl);
+
+  if (root == NULL)
+    {
+      check (false, "mkdtemp () for ut_file_entry");
+      return;
+    }
+
+  const std::string dir = std::string (root) + "/CUBRID";
+  const std::string link_dir = std::string (root) + "/CUBRID_link";
+  const std::string server = dir + "/log/server";
+  const std::string err = server + "/demodb.err";
+  const std::string latest = server + "/demodb_latest.err";
+  const std::string hard = server + "/demodb_hard.err";
+  const std::string other = server + "/demodb_20261117_1030.err";
+  bool made = mkdir (dir.c_str (), 0700) == 0 && mkdir ((dir + "/log").c_str (), 0700) == 0
+	      && mkdir (server.c_str (), 0700) == 0;
+  FILE *fp;
+
+  if (made && (fp = fopen (err.c_str (), "w")) != NULL)
+    {
+      fclose (fp);
+    }
+  if (made && (fp = fopen (other.c_str (), "w")) != NULL)
+    {
+      fclose (fp);
+    }
+  made = made && symlink (err.c_str (), latest.c_str ()) == 0 && link (err.c_str (), hard.c_str ()) == 0
+	 && symlink (dir.c_str (), link_dir.c_str ()) == 0;
+  check (made, "a log directory for ut_file_entry");
+
+  if (made)
+    {
+      const ut_file_entry entry (err);
+      /* the configured path spelled another way */
+      const ut_file_entry linked (link_dir + "/log/server/demodb.err");
+
+      check (entry.is (err), "the same file");
+      check (entry.is (dir + "//log/server/demodb.err"), "the same file, \"//\" in the path");
+      check (entry.is (dir + "/log/server/../server/demodb.err"), "the same file, \"..\" in the path");
+      check (entry.is (dir + "/log/server/./demodb.err"), "the same file, \".\" in the path");
+      check (ut_file_entry (dir + "/log/server/./demodb.err").is (err), "the same file, error_log=server/./demodb.err");
+      check (entry.is (link_dir + "/log/server/demodb.err"), "the same file, $CUBRID a symbolic link");
+      check (linked.is (err), "the same file, the configured path through the link");
+      check (!entry.is (latest), "not the <db>_latest.err link to the file");
+      check (!entry.is (other), "another file");
+      check (!entry.is (hard), "a hard link under another name is not looked for");
+
+      /* an entry of a directory listing: the name first, then the file */
+      check (entry.is (server, "demodb.err"), "the entry demodb.err of the directory");
+      check (entry.is (dir + "//log/server", "demodb.err"), "the entry demodb.err, \"//\" in the directory");
+      check (entry.is (link_dir + "/log/server", "demodb.err"), "the entry demodb.err, $CUBRID a symbolic link");
+      check (!entry.is (server, "demodb_latest.err"), "not the entry <db>_latest.err, the link to the file");
+      check (!entry.is (server, "demodb_20261117_1030.err"), "not another entry");
+      check (!entry.is (server, "DEMODB.ERR"), "not an entry whose name differs in case");
+      check (!entry.is (server, NULL), "no entry");
+      /* the same name in another directory is another file */
+      check (!entry.is (std::string (root), "demodb.err"), "not demodb.err of another directory");
+
+      /* a file that is not there: the paths are compared */
+      const ut_file_entry gone (server + "/gone.err");
+      check (gone.is (server + "/gone.err"), "a missing file, the same path");
+      check (!gone.is (dir + "//log/server/gone.err"), "a missing file, the path spelled another way");
+      check (!gone.is (err), "a missing file, another file");
+      check (!ut_file_entry ("").is (err), "no file");
+    }
+
+  unlink (latest.c_str ());
+  unlink (hard.c_str ());
+  unlink (err.c_str ());
+  unlink (other.c_str ());
+  rmdir (server.c_str ());
+  rmdir ((dir + "/log").c_str ());
+  rmdir (dir.c_str ());
+  unlink (link_dir.c_str ());
+  rmdir (root);
+#endif
+}
+
 static void
 test_regular_file_mode (void)
 {
@@ -257,6 +515,9 @@ main (void)
   test_broker_shard_parameter ();
   test_broker_other_instances ();
   test_db_server_err_log ();
+  test_db_err_log_param ();
+  test_path_spelling ();
+  test_file_entry ();
   test_regular_file_mode ();
 
   printf ("%d of %d checks failed\n", failures, checks);

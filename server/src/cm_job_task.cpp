@@ -292,7 +292,6 @@ static int op_make_triggerinput_file_drop (nvplist *req, char *input_filename);
 static int op_make_triggerinput_file_alter (nvplist *req, char *input_filename);
 
 static int get_broker_info_from_filename (char *path, char *br_name, int *as_id);
-static char *_ts_get_error_log_param (char *dbname);
 
 static char *cm_get_abs_file_path (const char *filename, char *buf, size_t len);
 static int check_dbpath (char *dir, char *_dbmt_error);
@@ -502,55 +501,45 @@ ts_add_nvp_time (nvplist *ref, const char *name, time_t t, const char *fmt,
     }
 }
 
-/* if cubrid.conf's error_log is null, construct it by default value if existing */
-static char *
-_ts_get_error_log_param (char *dbname)
+/*
+ * The path of the server error log that error_log in cubrid.conf gives the
+ * database dbname, resolved as the engine does (CBRD-26446). The caller has
+ * checked that dbname is a database (uRetrieveDBDirectory ()).
+ *   return: DB_ERR_LOG_PATH_RESOLVED with the path in path,
+ *           DB_ERR_LOG_PATH_NOT_SET or DB_ERR_LOG_PATH_UNRESOLVABLE
+ */
+T_DB_ERR_LOG_PATH
+ts_get_db_err_log_path (const char *dbname, char *path, size_t size)
 {
-  char *tok[2];
-  FILE *infile;
-  char buf[PATH_MAX], dbdir[PATH_MAX];
+  std::string param, resolved;
 
-  if ((uRetrieveDBDirectory (dbname, dbdir)) != ERR_NO_ERROR)
+  if (dbname == NULL || dbname[0] == '\0')
     {
-      return NULL;
+      return DB_ERR_LOG_PATH_NOT_SET;
     }
 
 #if !defined (DO_NOT_USE_CUBRIDENV)
-  snprintf (buf, PATH_MAX - 1, "%s/conf/%s", sco.szCubrid, CUBRID_CUBRID_CONF);
+  const std::string conf_file = std::string (sco.szCubrid) + "/conf/" + CUBRID_CUBRID_CONF;
+  const std::string log_dir = std::string (sco.szCubrid) + "/log";
 #else
-  snprintf (buf, PATH_MAX - 1, "%s/%s", CUBRID_CONFDIR, CUBRID_CUBRID_CONF);
+  const std::string conf_file = std::string (CUBRID_CONFDIR) + "/" + CUBRID_CUBRID_CONF;
+  const std::string log_dir = CUBRID_LOGDIR;
 #endif
 
-  if ((infile = fopen (buf, "r")) == NULL)
+  std::ifstream conf (conf_file.c_str ());
+  if (!conf || !ut_get_db_err_log_param (conf, dbname, param))
     {
-      return NULL;
+      return DB_ERR_LOG_PATH_NOT_SET;
     }
-
-  while (fgets (buf, sizeof (buf), infile))
-    {
-      ut_trim (buf);
-      if (isalpha ((int) buf[0]))
-	{
-	  if (string_tokenize2 (buf, tok, 2, '=') < 0)
-	    {
-	      continue;
-	    }
-	  if (uStringEqual (tok[0], "error_log"))
-	    {
-	      fclose (infile);
-	      if (tok[1][0] == '\0')
-		{
-		  return NULL;
-		}
 #if defined(WINDOWS)
-	      unix_style_path (tok[1]);
+  std::replace (param.begin (), param.end (), '\\', '/');
 #endif
-	      return (strdup (tok[1]));
-	    }
-	}
+  if (!ut_resolve_err_log_param (param, log_dir, resolved) || resolved.size () >= size)
+    {
+      return DB_ERR_LOG_PATH_UNRESOLVABLE;
     }
-  fclose (infile);
-  return NULL;
+  snprintf (path, size, "%s", resolved.c_str ());
+  return DB_ERR_LOG_PATH_RESOLVED;
 }
 
 int
@@ -7798,7 +7787,8 @@ int
 ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 {
   char *dbname, log_dir[PATH_MAX], buf[COMPOSED_PATH_MAX];
-  char *error_log_param;
+  char err_log_path[PATH_MAX];
+  T_DB_ERR_LOG_PATH err_log;
   struct stat statbuf;
 #if defined(WINDOWS)
   WIN32_FIND_DATA data;
@@ -7826,26 +7816,23 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
   nv_add_nvp (res, "dbname", dbname);
   nv_add_nvp (res, "open", "loginfo");
 
-  if ((error_log_param = _ts_get_error_log_param (dbname)) == NULL)
+  /* error_log of cubrid.conf: a relative path is under $CUBRID/log, as the engine has it */
+  err_log = ts_get_db_err_log_path (dbname, err_log_path, sizeof (err_log_path));
+  if (err_log == DB_ERR_LOG_PATH_NOT_SET)
     {
       snprintf (buf, sizeof (buf) - 1, "%s/%s.err", log_dir, dbname);
     }
-  else if (error_log_param[0] == '/')
+  else if (err_log == DB_ERR_LOG_PATH_RESOLVED)
     {
-      snprintf (buf, sizeof (buf) - 1, "%s", error_log_param);
-    }
-#if defined(WINDOWS)
-  else if (error_log_param[2] == '/')
-    {
-      snprintf (buf, sizeof (buf) - 1, "%s", error_log_param);
-    }
-#endif
-  else
-    {
-      snprintf (buf, sizeof (buf) - 1, "%s/%s", log_dir, error_log_param);
+      snprintf (buf, sizeof (buf) - 1, "%s", err_log_path);
     }
 
-  if (stat (buf, &statbuf) == 0)
+  /*
+   * a regular file only, as the files of the directory below and getdberrorlog: not a directory
+   * that error_log names by mistake, e.g. error_log=server
+   */
+  if (err_log != DB_ERR_LOG_PATH_UNRESOLVABLE && stat (buf, &statbuf) == 0
+      && ut_is_regular_file_mode (statbuf.st_mode))
     {
       nv_add_nvp (res, "open", "log");
       nv_add_nvp (res, "path", buf);
@@ -7856,7 +7843,6 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 		       NV_ADD_DATE);
       nv_add_nvp (res, "close", "log");
     }
-  FREE_MEM (error_log_param);
 
   snprintf (buf, sizeof (buf) - 1, "%s/cub_server.err", log_dir);
   if (stat (buf, &statbuf) == 0)
@@ -7870,6 +7856,10 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 		       NV_ADD_DATE);
       nv_add_nvp (res, "close", "log");
     }
+
+  /* looked up once here, not for each file of the directory */
+  const ut_file_entry err_log_file (err_log == DB_ERR_LOG_PATH_RESOLVED ? err_log_path : "");
+  const std::string server_log_dir = std::string (sco.szCubrid) + "/" + CUBRID_ERROR_LOG_DIR;
 
   snprintf (find_file, PATH_MAX - 1, "%s/%s", sco.szCubrid,
 	    CUBRID_ERROR_LOG_DIR);
@@ -7901,6 +7891,11 @@ ts_get_log_info (nvplist *req, nvplist *res, char *_dbmt_error)
 	}
       snprintf (buf, sizeof (buf) - 1, "%s/%s/%s", sco.szCubrid,
 		CUBRID_ERROR_LOG_DIR, fname);
+      if (err_log == DB_ERR_LOG_PATH_RESOLVED && err_log_file.is (server_log_dir, fname))
+	{
+	  /* the error_log of cubrid.conf, listed above */
+	  continue;
+	}
       if (stat (buf, &statbuf) == 0 && ut_is_regular_file_mode (statbuf.st_mode))
 	{
 	  nv_add_nvp (res, "open", "log");
