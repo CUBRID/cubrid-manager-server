@@ -227,10 +227,13 @@ smtp_wait (T_SMTP_SOCKET sock, T_SMTP_WAIT what, std::chrono::steady_clock::time
 }
 
 /*
- * smtp_printable () - server text made safe for a log line: characters
- *   other than printable ASCII become '?', and long text is cut.
+ * smtp_printable () - text made safe for one log line: characters other
+ *   than printable ASCII (CR and LF among them) become '?', and text longer
+ *   than SMTP_DETAIL_TEXT_MAX is cut and ends with "...". Used for the
+ *   replies of the server in the detail, and by the callers for values of
+ *   a request they log.
  */
-static std::string
+std::string
 smtp_printable (const std::string &text)
 {
   std::string out;

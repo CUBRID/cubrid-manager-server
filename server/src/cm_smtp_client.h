@@ -77,6 +77,7 @@ typedef struct
 
 T_SMTP_SEND_RESULT smtp_send_mail (const T_SMTP_SERVER &server, const T_SMTP_MAIL &mail, std::string &detail);
 const char *smtp_send_result_name (T_SMTP_SEND_RESULT result);
+std::string smtp_printable (const std::string &text);
 
 std::string smtp_base64_encode (const std::string &data);
 bool smtp_mailbox_address (const std::string &mailbox, std::string &address);

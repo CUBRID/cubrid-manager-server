@@ -1109,7 +1109,7 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       if (send_result != SMTP_SEND_OK)
 	{
 	  LOG_ERROR ("automail: the mail report of %s to %s was not sent: %s: %s",
-		     mailreport[i]["dbname"].asString ().c_str (), receiver.c_str (),
+		     smtp_printable (mailreport[i]["dbname"].asString ()).c_str (), smtp_printable (receiver).c_str (),
 		     smtp_send_result_name (send_result), detail.c_str ());
 	}
 
@@ -1615,7 +1615,7 @@ int ext_send_mail (Json::Value &request, Json::Value &response)
 				   (request.get ("body_type", 0).asInt () == 1) ? SMTP_BODY_HTML : SMTP_BODY_TEXT, detail);
   if (send_result != SMTP_SEND_OK)
     {
-      LOG_ERROR ("sendmail: the mail to %s was not sent: %s: %s", receiver.c_str (),
+      LOG_ERROR ("sendmail: the mail to %s was not sent: %s: %s", smtp_printable (receiver).c_str (),
 		 smtp_send_result_name (send_result), detail.c_str ());
     }
 

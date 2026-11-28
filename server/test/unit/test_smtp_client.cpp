@@ -406,6 +406,18 @@ test_mailbox (void)
 }
 
 static void
+test_printable (void)
+{
+  std::string long_text (250, 'a');
+
+  check (smtp_printable ("250 2.0.0 ok") == "250 2.0.0 ok", "printable text is kept");
+  check (smtp_printable ("a@b>\r\nRCPT TO:<c@d") == "a@b>??RCPT TO:<c@d", "CR and LF become '?'");
+  check (smtp_printable (std::string ("x\0y\x7f\xed\x95\x9c", 7)) == "x?y????", "NUL, DEL and UTF-8 become '?'");
+  check (smtp_printable (long_text) == std::string (200, 'a') + "...", "long text is cut");
+  check (smtp_printable (std::string (200, 'a')) == std::string (200, 'a'), "200 characters are not cut");
+}
+
+static void
 set_tz (const char *tz)
 {
   setenv ("TZ", tz, 1);
@@ -755,6 +767,7 @@ main (void)
 
   test_base64 ();
   test_mailbox ();
+  test_printable ();
   test_message ();
   test_invalid_argument ();
   test_send ();
