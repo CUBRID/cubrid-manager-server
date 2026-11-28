@@ -5,6 +5,8 @@
 // answers, nobody listens on 25254. Each "cm_conf" line changes cm.conf and
 // restarts the manager server. The cases check the response and how many
 // connections the fake servers got ("test_smtp_connections").
+// sendmail is built only in debug builds: against a release build every
+// sendmail request must fail with "Undefined request - sendmail" instead.
 //
 // not set: fails without connecting anywhere, even with smtp_server in the
 // request

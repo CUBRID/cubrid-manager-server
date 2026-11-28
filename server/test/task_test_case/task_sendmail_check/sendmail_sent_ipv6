@@ -12,5 +12,6 @@
  },
  "test_no_key": "response",
  "test_smtp_connections": 1,
- "test_needs_ipv6": true
+ "test_needs_ipv6": true,
+ "test_debug_only": true
 }

@@ -11,5 +11,6 @@
   "note": "Failed to send mail."
  },
  "test_no_text": "resolve",
- "test_smtp_connections": 0
+ "test_smtp_connections": 0,
+ "test_debug_only": true
 }

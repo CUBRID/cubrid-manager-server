@@ -81,7 +81,9 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"execautostart", 0, ext_exec_auto_start, AU_DBC | AU_DBO},
   {"getdberrorlog", 0, ext_get_db_err_log, AU_ANY},
   {"getbrokerlog", 0, ext_get_broker_start_log, AU_ANY},
+#if !defined (NDEBUG)
   {"sendmail", 0, ext_send_mail, AU_DBC | AU_DBO | AU_MON},
+#endif
   {"automail", 0, ext_exec_auto_mail, AU_DBC | AU_DBO | AU_MON},
   {"readprivatedata", 0, ext_read_private_data, AU_DBC | AU_DBO | AU_BRK},
   {"writeprivatedata", 0, ext_write_private_data, AU_DBC | AU_DBO | AU_BRK},
@@ -946,6 +948,7 @@ mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *
   time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
 }
 
+#if !defined (NDEBUG)
 /* smtp_server of cm.conf, set by ext_load_smtp_server_conf (); empty host: not set or invalid */
 static string smtp_server_host;
 static unsigned short smtp_server_port = 0;
@@ -1005,6 +1008,21 @@ ext_get_smtp_server_conf (string &host, unsigned short &port)
   port = smtp_server_port;
   return true;
 }
+#else
+/*
+ * ext_load_smtp_server_conf () - release builds: sendmail, the only user of
+ *   smtp_server of cm.conf, is built only in debug builds. A value is
+ *   ignored, and the log says so.
+ */
+void
+ext_load_smtp_server_conf (void)
+{
+  if (sco.szSmtpServer[0] != '\0')
+    {
+      LOG_INFO ("smtp_server in cm.conf is ignored: sendmail is built only in debug builds");
+    }
+}
+#endif
 
 /*
  * mail_conf_string () - a string member of a mail configuration; "" if it
@@ -1656,9 +1674,14 @@ int ext_get_broker_start_log (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
+#if !defined (NDEBUG)
 /*
- * ext_send_mail () - the sendmail task: send one mail through the SMTP
- *   server of smtp_server in cm.conf.
+ * ext_send_mail () - the sendmail task, debug builds only: send one mail
+ *   through the SMTP server of smtp_server in cm.conf.
+ *
+ *   Release builds do not offer it: a request that sends a mail of its own
+ *   to any receiver through the SMTP server of CMS can be used to send mail
+ *   in the name of others, through a relay that trusts the CMS host.
  *
  *   smtp_server of the request is ignored. username and password may be
  *   left out for a server without authentication.
@@ -1702,6 +1725,7 @@ int ext_send_mail (Json::Value &request, Json::Value &response)
 
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
+#endif
 
 int ext_write_private_data (Json::Value &request, Json::Value &response)
 {

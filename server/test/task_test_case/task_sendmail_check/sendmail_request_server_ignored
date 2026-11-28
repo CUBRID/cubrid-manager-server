@@ -10,5 +10,6 @@
  "test_value": {
   "status": "success"
  },
- "test_smtp_connections": 1
+ "test_smtp_connections": 1,
+ "test_debug_only": true
 }

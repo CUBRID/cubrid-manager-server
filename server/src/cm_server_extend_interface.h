@@ -62,9 +62,12 @@ int ext_exec_auto_jobs (Json::Value &request, Json::Value &response);
 int ext_cub_broker_start (Json::Value &request, Json::Value &response);
 int ext_get_db_err_log (Json::Value &request, Json::Value &response);
 int ext_get_broker_start_log (Json::Value &request, Json::Value &response);
+#if !defined (NDEBUG)
+/* sendmail, debug builds only */
 int ext_send_mail (Json::Value &request, Json::Value &response);
-void ext_load_smtp_server_conf (void);
 bool ext_get_smtp_server_conf (std::string &host, unsigned short &port);
+#endif
+void ext_load_smtp_server_conf (void);
 int ext_exec_auto_mail (Json::Value &request, Json::Value &response);
 int ext_get_autojob_conf (Json::Value &request, Json::Value &response);
 int ext_set_autojob_conf (Json::Value &request, Json::Value &response);

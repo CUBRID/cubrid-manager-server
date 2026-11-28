@@ -814,6 +814,10 @@ CMS 로그에 남는 실패 원인은 확인하지 않는다.
 | `sendmail_refused` | `127.0.0.1:25254` | `Failed to send mail.`, 연결 0 |
 | `sendmail_unresolved` | `no-such-host.invalid:25251` | `Failed to send mail.`, 연결 0 |
 
+`sendmail`은 디버그 빌드 전용이라 (CBRD-27830) sendmail 요청마다 `"test_debug_only": true`가 있다.
+release 빌드에 대해 이 세트를 돌리면 모든 sendmail 요청이 `Undefined request - sendmail`로 실패해야
+통과하고, 연결 수를 포함한 다른 검사는 하지 않는다.
+
 실패 네 경우 (`rejected`, `timeout`, `refused`, `unresolved`)는 `status`와 `note`가 모두 같은지를
 `test_value`로 본다. 포트를 생략했을 때의 25는 root 권한이 필요해 이 세트로 확인하지 않고, 단위
 테스트 (`unit/test_smtp_client.cpp`)가 확인한다. 목록의 마지막 줄이 세트가 바꾼 cm.conf를 되돌린다.

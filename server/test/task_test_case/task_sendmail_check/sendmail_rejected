@@ -12,5 +12,6 @@
  },
  "test_no_key": "response",
  "test_no_text": "554",
- "test_smtp_connections": 1
+ "test_smtp_connections": 1,
+ "test_debug_only": true
 }
