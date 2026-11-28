@@ -702,6 +702,17 @@ test_send (void)
   result = run_session (AF_INET, "127.0.0.1", script, server, mail, detail, server_ok);
   check (result == SMTP_SEND_OK && server_ok, "send with AUTH LOGIN: " + detail);
 
+  /* AUTH LOGIN with an empty password: the answer to the second 334 is an empty line */
+  server.password.clear ();
+  script = greeting_and_ehlo ();
+  script.push_back (step (EXPECT_EXACT, "AUTH LOGIN", "334 VXNlcm5hbWU6\r\n"));
+  script.push_back (step (EXPECT_EXACT, smtp_base64_encode ("user"), "334 UGFzc3dvcmQ6\r\n"));
+  script.push_back (step (EXPECT_EXACT, "", "235 2.7.0 ok\r\n"));
+  add_transaction (script, "To: to@example.com");
+  result = run_session (AF_INET, "127.0.0.1", script, server, mail, detail, server_ok);
+  check (result == SMTP_SEND_OK && server_ok, "send with AUTH LOGIN and an empty password: " + detail);
+  server.password = "secret";
+
   /* AUTH PLAIN */
   server.auth = SMTP_AUTH_PLAIN;
   script = greeting_and_ehlo ();

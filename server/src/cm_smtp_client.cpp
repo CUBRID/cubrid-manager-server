@@ -590,6 +590,7 @@ class smtp_session
     T_SMTP_SEND_RESULT connect_to (const std::string &host, unsigned short port);
     T_SMTP_SEND_RESULT send_text (const std::string &text);
     T_SMTP_SEND_RESULT read_reply (int &code, std::string &text);
+    T_SMTP_SEND_RESULT expect_reply (const char *step, int expected, int also_expected = 0);
     T_SMTP_SEND_RESULT command (const char *step, const std::string &line, int expected,
 				int also_expected = 0);
     void quit ();
@@ -887,20 +888,17 @@ smtp_session::read_reply (int &code, std::string &text)
 }
 
 /*
- * smtp_session::command () - send a command line (if any) and read its
- *   reply, which must have one of the expected codes.
+ * smtp_session::expect_reply () - read a reply, which must have one of the
+ *   expected codes.
  *
  *   return: SMTP_SEND_OK; SMTP_SEND_REJECTED for another code, with the
- *           step and the reply in the detail; or the failure of sending or
- *           reading
- *   step(in): what the command does, for the detail. Never the line itself,
- *             which can hold the password.
- *   line(in): the command without CRLF; empty to only read a reply
+ *           step and the reply in the detail; or the failure of reading
+ *   step(in): what the reply answers, for the detail
  *   expected(in), also_expected(in): accepted codes; also_expected 0 if
  *                                    only one
  */
 T_SMTP_SEND_RESULT
-smtp_session::command (const char *step, const std::string &line, int expected, int also_expected)
+smtp_session::expect_reply (const char *step, int expected, int also_expected)
 {
   T_SMTP_SEND_RESULT result;
   std::string text;
@@ -908,16 +906,6 @@ smtp_session::command (const char *step, const std::string &line, int expected, 
   char code_text[8];
 
   m_last_code = 0;
-  if (!line.empty ())
-    {
-      result = send_text (line + "\r\n");
-      if (result != SMTP_SEND_OK)
-	{
-	  m_detail = std::string (step) + ": " + m_detail;
-	  return result;
-	}
-    }
-
   result = read_reply (code, text);
   if (result != SMTP_SEND_OK)
     {
@@ -933,6 +921,36 @@ smtp_session::command (const char *step, const std::string &line, int expected, 
       return SMTP_SEND_OK;
     }
   return SMTP_SEND_REJECTED;
+}
+
+/*
+ * smtp_session::command () - send a line and read its reply, which must have
+ *   one of the expected codes. The line is always sent, also when it is
+ *   empty: the answer to a 334 challenge can be an empty line (AUTH LOGIN
+ *   with an empty password).
+ *
+ *   return: SMTP_SEND_OK; SMTP_SEND_REJECTED for another code, with the
+ *           step and the reply in the detail; or the failure of sending or
+ *           reading
+ *   step(in): what the command does, for the detail. Never the line itself,
+ *             which can hold the password.
+ *   line(in): the line without CRLF
+ *   expected(in), also_expected(in): accepted codes; also_expected 0 if
+ *                                    only one
+ */
+T_SMTP_SEND_RESULT
+smtp_session::command (const char *step, const std::string &line, int expected, int also_expected)
+{
+  T_SMTP_SEND_RESULT result;
+
+  m_last_code = 0;
+  result = send_text (line + "\r\n");
+  if (result != SMTP_SEND_OK)
+    {
+      m_detail = std::string (step) + ": " + m_detail;
+      return result;
+    }
+  return expect_reply (step, expected, also_expected);
 }
 
 /*
@@ -1044,7 +1062,7 @@ smtp_send_mail (const T_SMTP_SERVER &server, const T_SMTP_MAIL &mail, std::strin
       return result;
     }
 
-  result = session.command ("greeting", "", 220);
+  result = session.expect_reply ("greeting", 220);
   if (result == SMTP_SEND_OK)
     {
       result = session.command ("EHLO", "EHLO " + smtp_client_name (), 250);
