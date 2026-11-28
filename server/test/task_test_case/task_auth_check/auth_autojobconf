@@ -14,7 +14,7 @@
    "dbc": "no",
    "dbo": "no",
    "brk": "no",
-   "mon": "no",
+   "mon": "yes",
    "job": "no",
    "var": "no"
   },
@@ -26,6 +26,12 @@
     "dbbrokeraddress": "localhost,33000"
    }
   ]
+ },
+ {
+  "task": "updatedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajnone",
+  "statusmonitorauth": "none"
  },
  {
   "task": "login",
