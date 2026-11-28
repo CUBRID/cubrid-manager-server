@@ -67,6 +67,7 @@ cub_manager_SOURCES = \
         $(DBMT_DIR)/cm_session_ip.cpp \
         $(DBMT_DIR)/cm_task_file.cpp \
         $(DBMT_DIR)/cm_os_release.cpp \
-        $(DBMT_DIR)/cm_log_name.cpp
+        $(DBMT_DIR)/cm_log_name.cpp \
+        $(DBMT_DIR)/cm_smtp_client.cpp
 cub_manager_CPPFLAGS = $(AM_CFLAGS) -DFSERVER_SLAVE -DJSON_SUPPORT -DEVENT__HAVE_OPENSSL -D_FILE_OFFSET_BITS=64 @EXTERNAL_INC@
 cub_manager_LDFLAGS = -lcubridcs @CMSTAT_LIB@ @CMDEP_LIB@ @EXTERNAL_LIB@ -lrt
