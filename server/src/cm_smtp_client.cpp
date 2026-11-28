@@ -18,7 +18,8 @@
 
 /*
  * cm_smtp_client.cpp - a minimal SMTP client (RFC 5321) for sendmail and the
- *   automatic mail report. It replaces the jwSMTP library (cm_mailer.h).
+ *   automatic mail report. It replaces the jwSMTP library (GPLv2) that CMS
+ *   used before.
  *
  *   It sends one mail to one receiver through the one server it is given:
  *   no MX lookup, no TLS. It authenticates with AUTH LOGIN or AUTH PLAIN

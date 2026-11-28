@@ -39,7 +39,9 @@
 #include "cm_task_file.h"
 #include "cm_text_encryption.h"
 #include "cm_server_extend_interface.h"
-#include "cm_mailer.h"
+#if defined (WINDOWS)
+#include <winsock2.h>		/* gethostname (); it came with cm_mailer.h before */
+#endif
 #include "cm_mon_stat.h"
 #include "cm_user.h"
 #include "cm_session_ip.h"
