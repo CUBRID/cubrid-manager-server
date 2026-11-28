@@ -15,6 +15,8 @@ import tempfile
 import time
 from getpass import getpass
 
+import fake_smtp
+
 CONFIG_FILE = "test_tasks.conf"
 
 TEST_CASE_ROOT = "task_test_case/"
@@ -481,6 +483,12 @@ helper_procs = []
 #                                  other test_* checks of the request are not
 #                                  made, and the case is judged by status
 #                                  only (no baseline); see debug_build ()
+#   "test_smtp_connections": <n>   while this request ran, the fake SMTP
+#                                  servers (fake_smtp.py) accepted exactly n
+#                                  connections (removed before sending);
+#                                  checks that sendmail connected only where
+#                                  it should, or not at all. Only in
+#                                  task_sendmail_check, which starts them
 #   "test_file_mode": {"<path>": "<octal>"}
 #                                  after the response, each file on this host
 #                                  (the target, for a link) must have that
@@ -621,8 +629,10 @@ def file_mode_mismatch(modes):
 
 
 def judged_status(data, expected, note_text=None, no_text=None, body="",
-                  no_key=None, values=None, file_modes=None):
+                  no_key=None, values=None, file_modes=None, smtp_mismatch=None):
     """The value compared with `expected` for a response `data`."""
+    if smtp_mismatch is not None:
+        return "%s (%s)" % (data.get("status"), smtp_mismatch)
     if file_modes:
         mismatch = file_mode_mismatch(file_modes)
         if mismatch is not None:
@@ -864,12 +874,28 @@ def follow_job(name, data, token):
                                 % (uuid, ASYNC_WAIT_SEC))
 
 
+def smtp_connection_mismatch(expected, before):
+    """What is wrong with the connections to the fake SMTP servers, or None.
+
+    `expected` is the "test_smtp_connections" of the request (None: not
+    checked), `before` the count when the request was sent.
+    """
+    if expected is None:
+        return None
+    made = fake_smtp.connections() - before
+    if made == expected:
+        return None
+    return "%d SMTP connection(s), expected %d" % (made, expected)
+
+
 def send_one(name, req, token, expected="success", casefile="",
              must_be_sync=False, note_text=None, no_text=None, no_key=None,
-             values=None, source_ip=None, file_modes=None):
+             values=None, source_ip=None, file_modes=None,
+             smtp_connections=None):
     req["token"] = token
     task = req.get("task", name)
     started = time.time()
+    smtp_before = fake_smtp.connections()
     response = exec_task(cmsip, port, url, json.dumps(req), source_ip)
     # Tasks that echo a log file back (loadaccesslog) can carry bytes that are
     # not valid UTF-8, because the server writes error messages with an
@@ -912,7 +938,9 @@ def send_one(name, req, token, expected="success", casefile="",
             # prints that verdict instead of this status line.
             record(name, casefile, task,
                    judged_status(data, expected, note_text, no_text, body,
-                                 no_key, values, file_modes),
+                                 no_key, values, file_modes,
+                                 smtp_connection_mismatch(smtp_connections,
+                                                          smtp_before)),
                    data.get("note", ""), expected, body,
                    quiet=(file_check or strict_timeout))
             flag_timeout_fallback(name, uuid, started)
@@ -921,7 +949,9 @@ def send_one(name, req, token, expected="success", casefile="",
     # formatting, so a re-serialized copy would not be comparable.
     record(name, casefile, task,
            judged_status(data, expected, note_text, no_text, body,
-                         no_key, values, file_modes),
+                         no_key, values, file_modes,
+                         smtp_connection_mismatch(smtp_connections,
+                                                  smtp_before)),
            data.get("note", ""), expected, body, quiet=file_check)
     return data
 
@@ -991,11 +1021,19 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             sys.exit(1)
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
+        req_smtp = req.pop("test_smtp_connections", None)
+        if req_smtp is not None and (isinstance(req_smtp, bool)
+                                     or not isinstance(req_smtp, int)
+                                     or req_smtp < 0):
+            print("\033[31m%s: \"test_smtp_connections\" must be a number of "
+                  "connections, 0 or more.\033[0m" % taskfile)
+            sys.exit(1)
         if req_debug_only and not debug_build():
             # A release build does not have the task at all, whoever asks.
             req_expected = "failure"
             req_note = "Undefined request - %s" % req.get("task")
             req_no_text = req_no_key = req_values = req_file_modes = None
+            req_smtp = None
             undefined_in_release = True
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
@@ -1004,7 +1042,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key,
-                        req_values, req_source_ip, req_file_modes)
+                        req_values, req_source_ip, req_file_modes, req_smtp)
         if (req.get("task") == "login" and data.get("status") == "success"
                 and data.get("token")):
             case_tokens.append(data["token"])
@@ -1138,6 +1176,9 @@ def report_status_only(name, entries):
                   + '\033[31mexpected {0}, got {1} ({2})\033[0m'.format(
                       item["expected"], item["status"], item["note"]))
 
+
+# The set whose cases send mail to the fake SMTP servers of fake_smtp.py.
+SENDMAIL_SET = "task_sendmail_check"
 
 SLEEP_LINE = re.compile(r"^sleep[ \t]+(\d+(?:\.\d+)?)$")
 # "cm_conf <key>=<value>" sets a cm.conf entry, "cm_conf <key>" removes it;
@@ -1894,11 +1935,17 @@ def build_env():
     probe({"task": "deletedbmtuser", "targetid": "yifan"})
     wait_for_mon_data()
     start_kill_targets()
+    if REPORT_BASE == SENDMAIL_SET:
+        # The SMTP servers sendmail is pointed at by "cm_conf smtp_server=..."
+        # lines; a taken port stops the run (OSError).
+        for warning in fake_smtp.start():
+            print("\033[33mwarning: %s\033[0m" % warning)
 
 
 def clean_env():
     """Remove what this run created. Runs from the finally block."""
     stop_kill_targets()
+    fake_smtp.stop()
     reset_test_dbs()
     remove_name_match_decoys()
     remove_exec_write_files()

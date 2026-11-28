@@ -1021,18 +1021,19 @@ mail_conf_string (const Json::Value &mail_conf, const char *key)
 }
 
 /*
- * send_mail_by_conf () - send one mail through the SMTP server and account
- *   of a mail configuration: a sendmail request, or mail_config of
- *   autojobs.conf for the automatic mail report.
+ * send_mail_by_conf () - send one mail through an SMTP server with the
+ *   sender and account of a mail configuration: a sendmail request, or
+ *   mail_config of autojobs.conf for the automatic mail report.
  *
- *   smtp_server is a host name or an IP address; the port is always 25.
  *   Authentication is used only when username is not empty. authtype is 1
  *   (AUTH LOGIN) or 2 (AUTH PLAIN, the default).
  *
  *   return: the result of smtp_send_mail (); SMTP_SEND_INVALID_ARGUMENT,
- *           without connecting, if smtp_server or sender is missing or a
- *           value is invalid
- *   mail_conf(in): smtp_server, sender, username, password, authtype
+ *           without connecting, if the host or sender is missing or a value
+ *           is invalid
+ *   host(in): host name or IP address of the SMTP server
+ *   port(in): its port
+ *   mail_conf(in): sender, username, password, authtype
  *   receiver(in): the receiver
  *   subject(in): the subject
  *   body(in): the body
@@ -1041,8 +1042,8 @@ mail_conf_string (const Json::Value &mail_conf, const char *key)
  *                reply of the SMTP server, never the password
  */
 static T_SMTP_SEND_RESULT
-send_mail_by_conf (const Json::Value &mail_conf, const string &receiver, const string &subject, const string &body,
-		   T_SMTP_BODY_TYPE body_type, string &detail)
+send_mail_by_conf (const string &host, unsigned short port, const Json::Value &mail_conf, const string &receiver,
+		   const string &subject, const string &body, T_SMTP_BODY_TYPE body_type, string &detail)
 {
   T_SMTP_SERVER server;
   T_SMTP_MAIL mail;
@@ -1058,8 +1059,8 @@ send_mail_by_conf (const Json::Value &mail_conf, const string &receiver, const s
       return SMTP_SEND_INVALID_ARGUMENT;
     }
 
-  server.host = mail_conf_string (mail_conf, "smtp_server");
-  server.port = SMTP_DEFAULT_PORT;
+  server.host = host;
+  server.port = port;
   server.timeout_ms = SMTP_DEFAULT_TIMEOUT_MS;
   server.username = mail_conf_string (mail_conf, "username");
   server.password = mail_conf_string (mail_conf, "password");
@@ -1167,7 +1168,8 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       mailbody += build_report_log (log_response);
 
       receiver = mailreport[i]["receiver"].isString () ? mailreport[i]["receiver"].asString () : "";
-      send_result = send_mail_by_conf (mail_conf, receiver, mailhead, mailbody, SMTP_BODY_HTML, detail);
+      send_result = send_mail_by_conf (mail_conf_string (mail_conf, "smtp_server"), SMTP_DEFAULT_PORT, mail_conf,
+				       receiver, mailhead, mailbody, SMTP_BODY_HTML, detail);
       if (send_result != SMTP_SEND_OK)
 	{
 	  LOG_ERROR ("automail: the mail report of %s to %s was not sent: %s: %s",
@@ -1654,36 +1656,50 @@ int ext_get_broker_start_log (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
+/*
+ * ext_send_mail () - the sendmail task: send one mail through the SMTP
+ *   server of smtp_server in cm.conf.
+ *
+ *   smtp_server of the request is ignored. username and password may be
+ *   left out for a server without authentication.
+ *
+ *   The response says only whether the mail was sent: the reply of the SMTP
+ *   server and the kind of error (refused, timed out, name not resolved)
+ *   would tell the requester about hosts it cannot reach itself, so they go
+ *   to the CMS log only. The one other message is for smtp_server not set,
+ *   which is the state of this server, not of another host.
+ */
 int ext_send_mail (Json::Value &request, Json::Value &response)
 {
-  string receiver, detail;
+  string receiver, host, detail;
+  unsigned short port = 0;
   T_SMTP_SEND_RESULT send_result;
-  Json::Value result;
+  T_SMTP_BODY_TYPE body_type = SMTP_BODY_TEXT;
 
   JSON_FIND_V (request, "sender",
 	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(sender) missing in the request"));
   JSON_FIND_V (request, "receiver",
 	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(receiver) missing in the request"));
-  JSON_FIND_V (request, "smtp_server",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(smtp_server) missing in the request"));
-  JSON_FIND_V (request, "username",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
-  JSON_FIND_V (request, "password",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
 
-  receiver = request["receiver"].asString ();
-  send_result = send_mail_by_conf (request, receiver, request.get ("msg_header", "").asString (),
-				   request.get ("msg_body", "").asString (),
-				   (request.get ("body_type", 0).asInt () == 1) ? SMTP_BODY_HTML : SMTP_BODY_TEXT, detail);
+  if (!ext_get_smtp_server_conf (host, port))
+    {
+      return build_server_header (response, ERR_WITH_MSG, "smtp_server is not configured in cm.conf.");
+    }
+
+  if (request.isMember ("body_type") && request["body_type"].isInt () && request["body_type"].asInt () == 1)
+    {
+      body_type = SMTP_BODY_HTML;
+    }
+  receiver = mail_conf_string (request, "receiver");
+  send_result = send_mail_by_conf (host, port, request, receiver, mail_conf_string (request, "msg_header"),
+				   mail_conf_string (request, "msg_body"), body_type, detail);
   if (send_result != SMTP_SEND_OK)
     {
       LOG_ERROR ("sendmail: the mail to %s was not sent: %s: %s", smtp_printable (receiver).c_str (),
 		 smtp_send_result_name (send_result), detail.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, "Failed to send mail.");
     }
 
-  result["receiver"] = receiver;
-  result["message"] = detail;
-  response["response"].append (result);
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 

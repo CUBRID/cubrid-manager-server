@@ -1,0 +1,15 @@
+{
+ "task": "sendmail",
+ "token": "",
+ "sender": "CMS Test <cms@example.com>",
+ "receiver": "dba@example.com",
+ "msg_header": "sendmail test",
+ "msg_body": "sendmail test body",
+ "body_type": 0,
+ "test_value": {
+  "status": "failure",
+  "note": "Failed to send mail."
+ },
+ "test_no_text": "refused",
+ "test_smtp_connections": 0
+}

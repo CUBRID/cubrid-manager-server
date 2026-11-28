@@ -126,7 +126,7 @@ Set `enforce` only when each client has a fixed IP address and does not share it
 
 ### SMTP server of sendmail
 
-`smtp_server` in `cm.conf` is the only SMTP server the `sendmail` task connects to:
+`smtp_server` in `cm.conf` is the only SMTP server the [sendmail](sendmail.md) task connects to:
 
 ```
 smtp_server=smtp.example.com:587
@@ -418,7 +418,7 @@ document of their own yet.
 | [rolechange](rolechange.md) | socket, http | DBC, DBO |
 | [runscript](runscript.md) | socket, http | ADMIN (debug builds only) |
 | runsqlstatement | socket, http | DBC, DBO |
-| sendmail | http | DBC, DBO, MON |
+| [sendmail](sendmail.md) | http | DBC, DBO, MON |
 | [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |
 | setautostart | http | DBC, DBO, JOB |
 | setloglevel | http | DBC, DBO, MON |
