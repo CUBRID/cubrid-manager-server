@@ -135,6 +135,7 @@ smtp_server=smtp.example.com:587
 - The host is a host name or an IPv4 address, or an IPv6 address in `[]` (`[2001:db8::25]:587`). The port is 1 to 65535; without it, 25 is used.
 - There is no default: when `smtp_server` is not set, `sendmail` fails. A value in another form is written to the error log at startup and taken as not set; CMS still starts.
 - The value is read at startup; restart CMS to change it.
+- `sendmail` is built only in debug builds. A release build ignores `smtp_server` and writes that to the log at startup.
 - The automatic mail report (`automail`) does not use it: it sends through `smtp_server` of `mail_config` in `autojobs.conf` (see [setautojobconf](setautojobconf.md)).
 
 ### Reserved keys
@@ -418,7 +419,7 @@ document of their own yet.
 | [rolechange](rolechange.md) | socket, http | DBC, DBO |
 | [runscript](runscript.md) | socket, http | ADMIN (debug builds only) |
 | runsqlstatement | socket, http | DBC, DBO |
-| [sendmail](sendmail.md) | http | DBC, DBO, MON |
+| [sendmail](sendmail.md) | http | DBC, DBO, MON (debug builds only) |
 | [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |
 | setautostart | http | DBC, DBO, JOB |
 | setloglevel | http | DBC, DBO, MON |

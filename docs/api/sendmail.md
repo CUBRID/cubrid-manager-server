@@ -1,5 +1,11 @@
 # sendmail
 
+> **Debug builds only.** Release builds do not offer this task and answer
+> `Undefined request - sendmail`: a request that sends a mail of its own to any receiver through
+> the SMTP server of CMS could send mail in the name of others, through a relay that trusts the
+> CMS host. `smtp_server` in `cm.conf` is ignored by release builds. The automatic mail report
+> (`automail`) is not affected.
+
 Send one mail through the SMTP server set by `smtp_server` in `cm.conf`, for example to check the
 mail settings, and answer only whether it was sent.
 
@@ -17,7 +23,7 @@ mail settings, and answer only whether it was sent.
 - The mail is sent as UTF-8; the subject and the body may be in any language.
 - CR, LF and NUL in `sender`, `receiver` and `msg_header` are refused before connecting.
 
-Permissions required to run this task: one of DBC, DBO, MON
+Permissions required to run this task: one of DBC, DBO, MON (debug builds only)
 
 ## Request JSON Syntax
 

@@ -55,6 +55,8 @@ OVERRIDES = {
     "generatecert": ("ADMIN (debug builds only)", "ADMIN (debug builds only)"),
     # likewise, CBRD-27831
     "runscript": ("ADMIN (debug builds only)", "ADMIN (debug builds only)"),
+    # likewise, CBRD-27830
+    "sendmail": ("one of DBC, DBO, MON (debug builds only)", "DBC, DBO, MON (debug builds only)"),
 }
 
 # Documents that describe more than one task, or a task under another name.
