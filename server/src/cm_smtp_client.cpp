@@ -418,6 +418,9 @@ smtp_date_header (time_t now, std::string &header)
   char text[64];
   int offset;
 
+  memset (&local, 0, sizeof (local));
+  memset (&utc, 0, sizeof (utc));
+
 #if defined (WINDOWS)
   if (localtime_s (&local, &now) != 0 || gmtime_s (&utc, &now) != 0)
     {
