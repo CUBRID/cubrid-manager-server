@@ -110,6 +110,8 @@ server/test/
     task_auth_check/<case>            그 세트의 요청 JSON
     task_session_ip_check.txt         세트 4: 요청 IP 검사 (session_ip_check, 4.10 참고)
     task_session_ip_check/<case>      그 세트의 요청 JSON
+    task_sendmail_check.txt           세트 5: sendmail (cm.conf smtp_server, 4.12 참고)
+    task_sendmail_check/<case>        그 세트의 요청 JSON
   unit/                               단위 테스트 (CUBRID 빌드 없이 실행, unit/README.md)
   task_test_config/                   케이스가 읽을 픽스처
     test_analyzecaslog.sql.log          analyzecaslog 용 CAS 로그
@@ -598,6 +600,8 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"test_no_text": "<문자열>"` | 응답 원문에 이 문자열이 없어야 통과. 러너가 지우고 보낸다. 비밀번호가 응답에 나오지 않는지 확인할 때 쓴다 |
 | `"test_source_ip": "<주소>"` | 이 요청을 이 호스트의 그 주소에서 보낸다. 러너가 지우고 보낸다. 서버가 다른 클라이언트의 요청으로 보게 할 때 쓴다. `cmsip`가 `127.0.0.1`이면 Linux에서는 `127.0.0.2`처럼 `127.x.x.x` 아무 주소나 쓸 수 있다 |
 | `"test_debug_only": true` | 디버그 빌드에만 있는 task의 요청. 러너가 지우고 보낸다. release 빌드에서는 이 요청이 `Undefined request - <task>`로 실패해야 통과하고, 이 요청의 다른 `test_*` 검사는 하지 않으며, 케이스는 baseline 비교 없이 상태로만 판정한다(`--answer`도 baseline을 쓰지 않는다). 빌드 종류는 첫 요청에서 한 번 `/upload`로 확인한다: 디버그 빌드만 `/upload`를 처리해 쿠키 없는 요청에 `{"failure" : true}`를 주고, release 빌드는 `{"error" : "Not Found"}`를 준다. 확인 결과는 `manager server: debug build`처럼 출력한다 |
+| `"test_smtp_connections": <n>` | 이 요청을 보내고 응답을 받는 동안 가짜 SMTP 서버 (`fake_smtp.py`)가 받은 연결이 정확히 n개여야 통과. 러너가 지우고 보낸다. sendmail이 cm.conf의 서버로만 접속하는지, 접속하지 않아야 할 때 (미설정, 잘못된 수신자) 접속하지 않는지 확인한다. 가짜 서버는 `task_sendmail_check` 세트에서만 뜬다 (4.12). 0 이상의 정수가 아니면 오류로 실행을 멈춘다 |
+| `"test_needs_ipv6": true` | 이 요청은 IPv6 loopback (`::1`)이 있어야 한다. 가짜 SMTP 서버가 `::1`에 뜨지 못한 호스트에서는 요청을 보내지 않고 `skipped`로 기록한다 (실패 아님). 러너가 지우고 보낸다. `task_sendmail_check` 세트에서만 쓴다 (4.12) |
 | `"test_file_mode": {"<경로>": "<8진수>", ...}` | 응답을 받은 뒤 이 호스트의 각 파일(링크면 대상)의 모드가 그 값이어야 통과. 러너가 지우고 보낸다. 예: `{"$CUBRID/tmp/a.sh": "0755"}`. 거부된 쓰기가 파일을 그대로 두었는지, 새 파일의 모드를 확인할 때 쓴다. 모드 대신 `"none"`이면 그 경로가 없어야 통과(만들어지면 안 되는 파일). 러너가 CMS 호스트에서 돌 때만 쓸 수 있다. 빈 객체나 8진수도 `"none"`도 아닌 값은 오류로 실행을 멈춘다 |
 | `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
 | `"test_value": {"<a.b.c>": <값>, ...}` | 응답 JSON의 각 key 경로 값이 `<값>`과 같아야 통과. 러너가 지우고 보낸다. 경로는 `test_no_key`와 같고, 경로 중간의 배열은 원소 하나라도 같으면 통과. JSON 타입까지 비교한다(`2`와 `"2"`, `true`와 `1`은 다르다). 기대값이 배열·객체이면 원소와 key까지 같은 방식으로 비교한다. 빈 객체(`{}`)는 아무것도 비교하지 않으므로 오류로 실행을 멈춘다. 예: `{"closed_sessions": 2}` |
@@ -640,6 +644,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `path_db_unload` | admin | `unloaddb`가 `targetdir`(환경 변수 포함, `allowed_db_dirs` 밖, `..`), `hashdir`, 디렉터리가 섞인 `prefix`를 거부하고, `targetdir: "+D"`(웹 매니저 경로, 기본 `$CUBRID/share/webmanager/files/`)도 같은 규칙으로 거부하는지 확인. 없는 DB(`authtest_nodb`)라 회귀해도 unload가 실행되지 않음 |
 | `path_db_load` | admin | `loaddb`가 환경 변수가 든 `schema`와 `allowed_db_dirs` 밖의 `schema`, `object`, `index`(`$CUBRID/tmp` 포함), `errorcontrolfile`, `ignoreclassfile`, `schema-file-list`를 실행 전에 거부. 없는 DB와 `delete_orignal_files: n`이라 회귀해도 아무것도 지우지 않음. 목록 파일 안의 항목 검사와 삭제 직전 재검사는 파일을 미리 만들어야 해서 넣지 않음 |
 | `file_auto_conf` | admin | 자동 작업 설정 파일(`autobackupdb.conf`, `autoaddvoldb.conf`, `autohistory.conf`)을 `writeandsaveconf`, `setsysparam`(`confname`, 응답은 기존 `file_protected_read`와 같은 `conf path is not authorized`)으로 쓰지 못하고 `viewlog`로 읽지 못함. 전용 task(`getautoaddvol`)는 그대로 동작. 쓰기 케이스는 경로 끝 `/`로 회귀해도 파일이 바뀌지 않음 |
+| `auth_autojobconf` | `_new` API 권한 하나씩 (mon, brk, var, dbc, dbo, job, admin)과 권한 없음 (`_new`로 mon만 준 뒤 `updatedbmtuser`로 `statusmonitorauth: none`, `auth_mixed_update`와 같은 방법. `_new`는 모두 no를 거부한다), 기존 API (세 권한 모두 none) | `getautojobconf` (`service: mail_config` 와 전체 조회)가 권한 없음·MON·BRK·VAR 사용자는 거부하고, DBC·DBO·JOB·ADMIN 사용자는 성공. 기존 API 사용자는 DBO·JOB이 기본 부여되므로 성공 (CBRD-27830) |
 | `path_db_autobackup` | admin | `addbackupinfo`, `setbackupinfo`가 `allowed_db_dirs` 밖과 `$CUBRID/bin`의 `path`를 거부. 없는 DB(`authtest_nodb`)의 계획이라 회귀해 등록되더라도 백업은 실행되지 않고, 앞뒤의 `deletebackupinfo`가 지움. 실행 시점 재검사(`aj_backupdb ()`)는 실행 시각을 기다려야 해서 넣지 않음 |
 | `resp_no_user_password` | admin | `getdbmtuserinfo`·`getdbmtuserinfo_new`와 사용자 관리 task 응답에 CMS 사용자 비밀번호(`@passwd`, 평문)가 없음 |
 | `resp_no_mail_password` | admin | `getautojobconf` 응답에 메일 비밀번호 key가 없음(`jobconf.password`, 전체 조회 시 `jobconf.mail_config.password`), 비밀번호 없이 `setautojobconf` 저장 가능. 대상 서버의 `mail_config`를 덮어쓴다(메일 off) |
@@ -766,6 +771,57 @@ API 테스트의 broker는 SHARD=OFF인 `query_editor`뿐이다. SHARD=ON broker
 
 ---
 
+### 4.12 sendmail 세트 (`task_sendmail_check`)
+
+`sendmail` (CBRD-27830)이 cm.conf의 `smtp_server`로만 접속하고, 실패하면 원인과 관계없이
+`Failed to send mail.`만 돌려주는지 확인한다. 서버는 목록의 `cm_conf smtp_server=...` 줄로 바꾸고
+(4.4), 러너가 이 세트를 실행할 때만 루프백에 가짜 SMTP 서버 (`fake_smtp.py`)를 띄운다.
+
+| 포트 | 동작 |
+| --- | --- |
+| 25251 | 메일을 받는다. 인증 없음, AUTH LOGIN, AUTH PLAIN (아무 계정)을 모두 받는다. `127.0.0.1`과, 호스트에 있으면 `::1` |
+| 25252 | 인사말로 554를 보내고 거부 |
+| 25253 | 연결만 받고 아무것도 보내지 않음 (timeout) |
+| 25254 | 아무도 listen하지 않음 (연결 거부) |
+
+케이스마다 응답과 함께, 요청 동안 가짜 서버가 받은 연결 수 (`"test_smtp_connections"`, 4.8의 요청 키 표)를 본다.
+CMS 로그에 남는 실패 원인은 확인하지 않는다.
+
+조건: 러너가 CMS와 같은 호스트에서 돌아야 하고 (`cm_conf`), 위 포트가 비어 있어야 한다
+(`127.0.0.1`의 포트가 사용 중이면 실행을 멈춘다). `::1`이 없는 호스트 (`lo`의 IPv6가 꺼진 경우 등)에서는
+가짜 서버가 `::1`에 뜨지 못하고, IPv6 케이스 (`sendmail_sent_ipv6`)는 요청을 보내지 않고 건너뛴다
+(`"test_needs_ipv6"`). 건너뛴 케이스는 실패가 아니며, 끝에 따로 표시되고 JUnit XML에는 `<skipped>`로 남는다.
+`cm_conf` 줄마다 manager를 다시 시작하고 timeout 케이스는 30초를 기다리므로 몇 분 걸린다. 그래서
+이 세트도 **이름을 지정했을 때만 실행한다** (`NAMED_ONLY_SETS`).
+
+```sh
+./run_tests.sh task_sendmail_check.txt
+```
+
+| 케이스 | cm.conf `smtp_server` | 확인하는 것 |
+| --- | --- | --- |
+| `sendmail_unset` | 없음, `[::1]:70000`, `bad_host:25251` | 요청에 `smtp_server`가 있어도 `smtp_server is not configured in cm.conf.`로 실패하고 연결 0. 잘못된 값이어도 manager가 시작함 |
+| `sendmail_sent` | `127.0.0.1:25251`, `localhost:25251` | 성공, `note`는 `none`, 응답에 `response`가 없음, 연결 1 |
+| `sendmail_sent_ipv6` | `[::1]:25251` | `sendmail_sent`와 같음. `::1`이 없는 호스트에서는 건너뜀 |
+| `sendmail_request_server_ignored` | `127.0.0.1:25251` | 요청의 `smtp_server` (없는 호스트)를 무시하고 성공, 연결 1 |
+| `sendmail_auth` | `127.0.0.1:25251` | AUTH PLAIN (`authtype` 2)과 AUTH LOGIN (1)으로 성공. 응답에 비밀번호가 없음 |
+| `sendmail_html_utf8` | `127.0.0.1:25251` | 한글 제목과 HTML 본문 (`body_type` 1)으로 성공 |
+| `sendmail_no_account` | `127.0.0.1:25251` | `username`, `password` 없이 성공 (인증 없음) |
+| `sendmail_bad_receiver` | `127.0.0.1:25251` | CR/LF가 든 수신자: `Failed to send mail.`, 연결 0 |
+| `sendmail_missing_receiver` | `127.0.0.1:25251` | `receiver` 없음: `Parameter(receiver) missing`, 연결 0 |
+| `sendmail_rejected` | `127.0.0.1:25252` | `Failed to send mail.`, 응답에 `554`가 없음, 연결 1 |
+| `sendmail_timeout` | `127.0.0.1:25253` | 30초 뒤 `Failed to send mail.`, 연결 1 |
+| `sendmail_refused` | `127.0.0.1:25254` | `Failed to send mail.`, 연결 0 |
+| `sendmail_unresolved` | `no-such-host.invalid:25251` | `Failed to send mail.`, 연결 0 |
+
+`sendmail`은 디버그 빌드 전용이라 (CBRD-27830) sendmail 요청마다 `"test_debug_only": true`가 있다.
+release 빌드에 대해 이 세트를 돌리면 모든 sendmail 요청이 `Undefined request - sendmail`로 실패해야
+통과하고, 연결 수를 포함한 다른 검사는 하지 않는다.
+
+실패 네 경우 (`rejected`, `timeout`, `refused`, `unresolved`)는 `status`와 `note`가 모두 같은지를
+`test_value`로 본다. 포트를 생략했을 때의 25는 root 권한이 필요해 이 세트로 확인하지 않고, 단위
+테스트 (`unit/test_smtp_client.cpp`)가 확인한다. 목록의 마지막 줄이 세트가 바꾼 cm.conf를 되돌린다.
+
 ## 5. API를 추가하거나 변경할 때
 
 새 CMS task를 추가/변경했다면 아래를 갱신한다.
@@ -827,5 +883,6 @@ task_test_case/task_status_check/unloaddb_optional  # as-dba 등 선택 파라�
   `server/src/cm_server_extend_interface.cpp`의 `ext_task_info[]`
 - API 문서: `docs/api/<task>.md` (요청/응답 규격)
 - 실행 스크립트: `run_tests.sh`
+- 가짜 SMTP 서버: `fake_smtp.py` (`task_sendmail_check`, 4.12)
 - 단위 테스트: `unit/` (CUBRID 빌드 없이 도는 서버 소스 테스트, `unit/README.md` 참고)
 

@@ -37,6 +37,7 @@ tests=(
   "test_log_name:cm_log_name.cpp"
   "test_file_write:cm_task_file.cpp"
   "test_script_path:cm_task_file.cpp"
+  "test_smtp_client:cm_smtp_client.cpp"
 )
 
 status=0

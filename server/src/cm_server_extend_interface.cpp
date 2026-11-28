@@ -39,10 +39,13 @@
 #include "cm_task_file.h"
 #include "cm_text_encryption.h"
 #include "cm_server_extend_interface.h"
-#include "cm_mailer.h"
+#if defined (WINDOWS)
+#include <winsock2.h>		/* gethostname (); it came with cm_mailer.h before */
+#endif
 #include "cm_mon_stat.h"
 #include "cm_user.h"
 #include "cm_session_ip.h"
+#include "cm_smtp_client.h"
 
 #include <fstream>
 #include <sstream>
@@ -73,12 +76,14 @@ static T_EXTEND_TASK_INFO ext_task_info[] =
   {"setloglevel", 0, ext_set_log_level, AU_DBC | AU_DBO | AU_MON},
   {"setautostart", 0, ext_set_auto_start, AU_DBC | AU_DBO | AU_JOB},
   {"getautostart", 0, ext_get_auto_start, AU_ANY},
-  {"getautojobconf", 0, ext_get_autojob_conf, AU_ANY},
+  {"getautojobconf", 0, ext_get_autojob_conf, AU_DBC | AU_DBO | AU_JOB},
   {"setautojobconf", 0, ext_set_autojob_conf, AU_DBC | AU_DBO | AU_JOB},
   {"execautostart", 0, ext_exec_auto_start, AU_DBC | AU_DBO},
   {"getdberrorlog", 0, ext_get_db_err_log, AU_ANY},
   {"getbrokerlog", 0, ext_get_broker_start_log, AU_ANY},
+#if !defined (NDEBUG)
   {"sendmail", 0, ext_send_mail, AU_DBC | AU_DBO | AU_MON},
+#endif
   {"automail", 0, ext_exec_auto_mail, AU_DBC | AU_DBO | AU_MON},
   {"readprivatedata", 0, ext_read_private_data, AU_DBC | AU_DBO | AU_BRK},
   {"writeprivatedata", 0, ext_write_private_data, AU_DBC | AU_DBO | AU_BRK},
@@ -943,6 +948,151 @@ mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *
   time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
 }
 
+#if !defined (NDEBUG)
+/* smtp_server of cm.conf, set by ext_load_smtp_server_conf (); empty host: not set or invalid */
+static string smtp_server_host;
+static unsigned short smtp_server_port = 0;
+
+/*
+ * ext_load_smtp_server_conf () - check smtp_server of cm.conf, the SMTP
+ *   server of the sendmail task, once at startup.
+ *
+ *   A value that is not host[:port] or [IPv6 address][:port] with a port
+ *   from 1 to 65535 is logged and taken as not set: sendmail then fails, and
+ *   CMS still starts.
+ */
+void
+ext_load_smtp_server_conf (void)
+{
+  T_SMTP_ADDRESS_PARSE result;
+  string host;
+  unsigned short port = 0;
+
+  smtp_server_host.clear ();
+  smtp_server_port = 0;
+
+  result = smtp_parse_server_address (sco.szSmtpServer, host, port);
+  if (result == SMTP_ADDRESS_EMPTY)
+    {
+      return;
+    }
+  if (result != SMTP_ADDRESS_OK)
+    {
+      LOG_ERROR ("invalid smtp_server in cm.conf (%s): %s; it is taken as not set, so sendmail fails",
+		 smtp_printable (sco.szSmtpServer).c_str (), smtp_address_parse_name (result));
+      return;
+    }
+
+  smtp_server_host = host;
+  smtp_server_port = port;
+  LOG_INFO ("smtp_server of sendmail: %s, port %u", smtp_server_host.c_str (), (unsigned int) smtp_server_port);
+}
+
+/*
+ * ext_get_smtp_server_conf () - the SMTP server of the sendmail task, from
+ *   smtp_server of cm.conf.
+ *
+ *   return: true if smtp_server is set and valid; false otherwise, with host
+ *           and port unchanged
+ *   host(out): host name or IP address (an IPv6 address without [])
+ *   port(out): port
+ */
+bool
+ext_get_smtp_server_conf (string &host, unsigned short &port)
+{
+  if (smtp_server_host.empty ())
+    {
+      return false;
+    }
+  host = smtp_server_host;
+  port = smtp_server_port;
+  return true;
+}
+#else
+/*
+ * ext_load_smtp_server_conf () - release builds: sendmail, the only user of
+ *   smtp_server of cm.conf, is built only in debug builds. A value is
+ *   ignored, and the log says so.
+ */
+void
+ext_load_smtp_server_conf (void)
+{
+  if (sco.szSmtpServer[0] != '\0')
+    {
+      LOG_INFO ("smtp_server in cm.conf is ignored: sendmail is built only in debug builds");
+    }
+}
+#endif
+
+/*
+ * mail_conf_string () - a string member of a mail configuration; "" if it
+ *   is missing or not a string.
+ */
+static string
+mail_conf_string (const Json::Value &mail_conf, const char *key)
+{
+  if (!mail_conf.isObject () || !mail_conf.isMember (key) || !mail_conf[key].isString ())
+    {
+      return "";
+    }
+  return mail_conf[key].asString ();
+}
+
+/*
+ * send_mail_by_conf () - send one mail through an SMTP server with the
+ *   sender and account of a mail configuration: a sendmail request, or
+ *   mail_config of autojobs.conf for the automatic mail report.
+ *
+ *   Authentication is used only when username is not empty. authtype is 1
+ *   (AUTH LOGIN) or 2 (AUTH PLAIN, the default).
+ *
+ *   return: the result of smtp_send_mail (); SMTP_SEND_INVALID_ARGUMENT,
+ *           without connecting, if the host or sender is missing or a value
+ *           is invalid
+ *   host(in): host name or IP address of the SMTP server
+ *   port(in): its port
+ *   mail_conf(in): sender, username, password, authtype
+ *   receiver(in): the receiver
+ *   subject(in): the subject
+ *   body(in): the body
+ *   body_type(in): SMTP_BODY_TEXT or SMTP_BODY_HTML
+ *   detail(out): what ended the session, for the log only: it can hold the
+ *                reply of the SMTP server, never the password
+ */
+static T_SMTP_SEND_RESULT
+send_mail_by_conf (const string &host, unsigned short port, const Json::Value &mail_conf, const string &receiver,
+		   const string &subject, const string &body, T_SMTP_BODY_TYPE body_type, string &detail)
+{
+  T_SMTP_SERVER server;
+  T_SMTP_MAIL mail;
+  int auth_type = SMTP_AUTH_PLAIN;
+
+  if (mail_conf.isObject () && mail_conf.isMember ("authtype") && mail_conf["authtype"].isInt ())
+    {
+      auth_type = mail_conf["authtype"].asInt ();
+    }
+  if (auth_type != SMTP_AUTH_LOGIN && auth_type != SMTP_AUTH_PLAIN)
+    {
+      detail = "invalid authtype";
+      return SMTP_SEND_INVALID_ARGUMENT;
+    }
+
+  server.host = host;
+  server.port = port;
+  server.timeout_ms = SMTP_DEFAULT_TIMEOUT_MS;
+  server.username = mail_conf_string (mail_conf, "username");
+  server.password = mail_conf_string (mail_conf, "password");
+  server.auth = (T_SMTP_AUTH) auth_type;
+
+  mail.sender = mail_conf_string (mail_conf, "sender");
+  mail.receiver = receiver;
+  mail.subject = subject;
+  mail.body = body;
+  mail.body_type = body_type;
+
+  return smtp_send_mail (server, mail, detail);
+}
+
 int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
 {
   unsigned int i, period_type, save_flag = 0;
@@ -954,8 +1104,9 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
   Json::Value sent_updates (Json::arrayValue);
   time_t cur_time;
   char format_time[PATH_MAX], next_exec_time[PATH_MAX];
-  string next_exec, prev_exec, mailhead, mailbody, userpasswd;
+  string next_exec, prev_exec, mailhead, mailbody, userpasswd, receiver, detail;
   char decrypted[PASSWD_LENGTH + 1];
+  T_SMTP_SEND_RESULT send_result;
 
   if (mailreport == Json::Value::null || mailreport.size() == 0)
     {
@@ -1034,11 +1185,23 @@ int ext_exec_mail_report (Json::Value &mailreport,  Json::Value &response)
       ext_get_broker_start_log (log_request, log_response["broker"]);
       mailbody += build_report_log (log_response);
 
-      mail_conf["receiver"] = mailreport[i]["receiver"];
-      mail_conf["msg_header"] = mailhead;
-      mail_conf["msg_body"] =  mailbody;
-      mail_conf["body_type"] =  1;
-      ext_send_mail (mail_conf, response);
+      receiver = mailreport[i]["receiver"].isString () ? mailreport[i]["receiver"].asString () : "";
+      send_result = send_mail_by_conf (mail_conf_string (mail_conf, "smtp_server"), SMTP_DEFAULT_PORT, mail_conf,
+				       receiver, mailhead, mailbody, SMTP_BODY_HTML, detail);
+      if (send_result != SMTP_SEND_OK)
+	{
+	  LOG_ERROR ("automail: the mail report of %s to %s was not sent: %s: %s",
+		     smtp_printable (mailreport[i]["dbname"].asString ()).c_str (), smtp_printable (receiver).c_str (),
+		     smtp_send_result_name (send_result), detail.c_str ());
+	}
+
+      /* the result only: the reply of the SMTP server stays in the log */
+      {
+	Json::Value sent;
+	sent["receiver"] = receiver;
+	sent["message"] = (send_result == SMTP_SEND_OK) ? "Mail sent." : "Failed to send mail.";
+	response["response"].append (sent);
+      }
 
       period_type = mailreport[i].get ("period_type", 2).asInt();
       mail_report_compute_next_exec (period_type, cur_time, next_exec_time);
@@ -1216,7 +1379,7 @@ int ext_exec_auto_mail (Json::Value &request,  Json::Value &response)
   /*
    * Only this one read takes the autojobs.conf lock. It used to hold that
    * lock for the whole call, including ext_exec_mail_report ()'s
-   * log-scanning and ext_send_mail () -> mail.send () SMTP send below;
+   * log-scanning and send_mail_by_conf () SMTP send below;
    * run_lock above keeps two automail runs from sending the same report
    */
   {
@@ -1511,64 +1674,58 @@ int ext_get_broker_start_log (Json::Value &request, Json::Value &response)
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
 
+#if !defined (NDEBUG)
+/*
+ * ext_send_mail () - the sendmail task, debug builds only: send one mail
+ *   through the SMTP server of smtp_server in cm.conf.
+ *
+ *   Release builds do not offer it: a request that sends a mail of its own
+ *   to any receiver through the SMTP server of CMS can be used to send mail
+ *   in the name of others, through a relay that trusts the CMS host.
+ *
+ *   smtp_server of the request is ignored. username and password may be
+ *   left out for a server without authentication.
+ *
+ *   The response says only whether the mail was sent: the reply of the SMTP
+ *   server and the kind of error (refused, timed out, name not resolved)
+ *   would tell the requester about hosts it cannot reach itself, so they go
+ *   to the CMS log only. The one other message is for smtp_server not set,
+ *   which is the state of this server, not of another host.
+ */
 int ext_send_mail (Json::Value &request, Json::Value &response)
 {
-  string sender, receiver;
-  string smtp_server, uname, passwd;
-  string msg_body, msg_header;
-  jwsmtp::mailer mail;
-  int auth_type, body_type;
-  Json::Value result;
+  string receiver, host, detail;
+  unsigned short port = 0;
+  T_SMTP_SEND_RESULT send_result;
+  T_SMTP_BODY_TYPE body_type = SMTP_BODY_TEXT;
 
   JSON_FIND_V (request, "sender",
 	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(sender) missing in the request"));
   JSON_FIND_V (request, "receiver",
 	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(receiver) missing in the request"));
-  JSON_FIND_V (request, "smtp_server",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(smtp_server) missing in the request"));
-  JSON_FIND_V (request, "username",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(username) missing in the request"));
-  JSON_FIND_V (request, "password",
-	       build_server_header (response, ERR_PARAM_MISSING, "Parameter(password) missing in the request"));
 
-  sender = request["sender"].asString();
-  mail.setsender (sender);
-
-  receiver = request["receiver"].asString();
-  mail.addrecipient (receiver);
-
-  smtp_server = request["smtp_server"].asString();
-  mail.setserver (smtp_server);
-
-  auth_type = request.get ("authtype", 2).asInt();
-  mail.authtype ((enum jwsmtp::mailer::authtype)auth_type);
-
-  uname = request["username"].asString();
-  mail.username (uname);
-
-  passwd = request["password"].asString();
-  mail.password (passwd);
-
-  msg_header = request.get ("msg_header", "").asString();
-  mail.setsubject (msg_header);
-
-  msg_body = request.get ("msg_body", "").asString();
-  body_type = request.get ("body_type", 0).asInt();
-  if (body_type == 1)
+  if (!ext_get_smtp_server_conf (host, port))
     {
-      mail.setmessageHTML (msg_body);
-    }
-  else
-    {
-      mail.setmessage (msg_body);
+      return build_server_header (response, ERR_WITH_MSG, "smtp_server is not configured in cm.conf.");
     }
 
-  mail.send();
-  result["receiver"] = receiver;
-  result["message"] = mail.response();
-  response["response"].append (result);
+  if (request.isMember ("body_type") && request["body_type"].isInt () && request["body_type"].asInt () == 1)
+    {
+      body_type = SMTP_BODY_HTML;
+    }
+  receiver = mail_conf_string (request, "receiver");
+  send_result = send_mail_by_conf (host, port, request, receiver, mail_conf_string (request, "msg_header"),
+				   mail_conf_string (request, "msg_body"), body_type, detail);
+  if (send_result != SMTP_SEND_OK)
+    {
+      LOG_ERROR ("sendmail: the mail to %s was not sent: %s: %s", smtp_printable (receiver).c_str (),
+		 smtp_send_result_name (send_result), detail.c_str ());
+      return build_server_header (response, ERR_WITH_MSG, "Failed to send mail.");
+    }
+
   return build_server_header (response, ERR_NO_ERROR, STATUS_NONE);
 }
+#endif
 
 int ext_write_private_data (Json::Value &request, Json::Value &response)
 {

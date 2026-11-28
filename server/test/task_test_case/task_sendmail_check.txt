@@ -1,0 +1,52 @@
+// sendmail (CBRD-27830): the SMTP server is smtp_server of cm.conf only, and a
+// failure answers "Failed to send mail." only. See README.md 4.12.
+// The runner starts fake SMTP servers (fake_smtp.py) on loopback ports:
+// 25251 accepts mail (127.0.0.1 and ::1), 25252 refuses with 554, 25253 never
+// answers, nobody listens on 25254. Each "cm_conf" line changes cm.conf and
+// restarts the manager server. The cases check the response and how many
+// connections the fake servers got ("test_smtp_connections").
+// sendmail is built only in debug builds: against a release build every
+// sendmail request must fail with "Undefined request - sendmail" instead.
+//
+// not set: fails without connecting anywhere, even with smtp_server in the
+// request
+cm_conf smtp_server
+sendmail_unset,failure
+
+// set: sent through it; smtp_server of the request is ignored
+cm_conf smtp_server=127.0.0.1:25251
+sendmail_sent,success
+sendmail_request_server_ignored,success
+sendmail_auth,success
+sendmail_html_utf8,success
+sendmail_no_account,success
+// refused before connecting
+sendmail_bad_receiver,failure
+sendmail_missing_receiver,failure
+
+// a host name, and an IPv6 address (skipped on a host without ::1)
+cm_conf smtp_server=localhost:25251
+sendmail_sent,success
+cm_conf smtp_server=[::1]:25251
+sendmail_sent_ipv6,success
+
+// every kind of failure has the same answer; the reason is only in the log.
+// The timeout case waits 30 s for the server.
+cm_conf smtp_server=127.0.0.1:25252
+sendmail_rejected,failure
+cm_conf smtp_server=127.0.0.1:25253
+sendmail_timeout,failure
+cm_conf smtp_server=127.0.0.1:25254
+sendmail_refused,failure
+cm_conf smtp_server=no-such-host.invalid:25251
+sendmail_unresolved,failure
+
+// an invalid value is logged at startup and taken as not set; the manager
+// still starts
+cm_conf smtp_server=[::1]:70000
+sendmail_unset,failure
+cm_conf smtp_server=bad_host:25251
+sendmail_unset,failure
+
+// leave cm.conf as it was
+cm_conf smtp_server

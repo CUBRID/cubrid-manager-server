@@ -34,8 +34,9 @@ LOG_DIR=log
 # Sets that --all leaves out, because they need a particular environment;
 # they run only when named. task_session_ip_check sends requests from
 # 127.0.0.1 and 127.0.0.2, so it needs cmsip 127.0.0.1 on a Linux host
-# (README.md 4.10).
-NAMED_ONLY_SETS="task_session_ip_check.txt"
+# (README.md 4.10). task_sendmail_check needs free loopback ports for its
+# fake SMTP servers and restarts the manager many times (README.md 4.12).
+NAMED_ONLY_SETS="task_session_ip_check.txt task_sendmail_check.txt"
 
 usage() {
     sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'

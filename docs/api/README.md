@@ -57,12 +57,12 @@ Every task requires one of the permissions below, or only a login. The permissio
 | DBO | Database Operation - use database utilities and modify configuration files |
 | BRK | Broker - start, stop and configure brokers (including shard brokers) |
 | MON | Monitoring - change monitoring settings and status templates |
-| JOB | Automation - set up automated jobs |
+| JOB | Automation - set up automated jobs and read their settings |
 | VAR | Show Variable - no task requires it at present |
 | ADMIN | Administrator - runs every task, including CMS user management |
 
 - **Several permissions listed** ("one of DBC, DBO"): having any one of them is enough.
-- **none (any logged-in user)**: the task needs only a valid token; read-only tasks are of this kind.
+- **none (any logged-in user)**: the task needs only a valid token; most read-only tasks are of this kind. `getautojobconf`, which returns the mail and automatic job settings, needs the same permission as `setautojobconf` (one of DBC, DBO, JOB).
 - **ADMIN**: a user with ADMIN runs every task, whatever the task lists. The user named `admin` always has ADMIN.
 - A user without the permission gets `"status":"failure"` with the note `The user don't have authority to execute the task: <task>`.
 
@@ -123,6 +123,20 @@ Set `enforce` only when each client has a fixed IP address and does not share it
 - Behind a forward proxy with more than 8 outgoing addresses in turn, `log` can still write a warning for most requests, because the addresses warned about longest ago are forgotten.
 - Behind a reverse proxy or a layer 4 load balancer, CMS sees the address of the proxy, and the check has no effect. CMS does not read `X-Forwarded-For` or the PROXY protocol.
 - An active man-in-the-middle logs in from its own address, so it is not detected. What the check detects is a token used somewhere other than where it was issued, such as a token leaked from a log or a client PC.
+
+### SMTP server of sendmail
+
+`smtp_server` in `cm.conf` is the only SMTP server the [sendmail](sendmail.md) task connects to:
+
+```
+smtp_server=smtp.example.com:587
+```
+
+- The host is a host name or an IPv4 address, or an IPv6 address in `[]` (`[2001:db8::25]:587`). The port is 1 to 65535; without it, 25 is used.
+- There is no default: when `smtp_server` is not set, `sendmail` fails. A value in another form is written to the error log at startup and taken as not set; CMS still starts.
+- The value is read at startup; restart CMS to change it.
+- `sendmail` is built only in debug builds. A release build ignores `smtp_server` and writes that to the log at startup.
+- The automatic mail report (`automail`) does not use it: it sends through `smtp_server` of `mail_config` in `autojobs.conf` (see [setautojobconf](setautojobconf.md)).
 
 ### Reserved keys
 
@@ -379,7 +393,7 @@ document of their own yet.
 | [executecasrunner](executecasrunner.md) | socket, http | DBC, DBO, BRK, MON |
 | [generatecert](generatecert.md) | socket, http | ADMIN (debug builds only) |
 | getaccesslogfiles | socket, http | any logged-in user |
-| [getautojobconf](getautojobconf.md) | http | any logged-in user |
+| [getautojobconf](getautojobconf.md) | http | DBC, DBO, JOB |
 | getautostart | http | any logged-in user |
 | getbrokerlog | http | any logged-in user |
 | getdberrorlog | http | any logged-in user |
@@ -405,7 +419,7 @@ document of their own yet.
 | [rolechange](rolechange.md) | socket, http | DBC, DBO |
 | [runscript](runscript.md) | socket, http | ADMIN (debug builds only) |
 | runsqlstatement | socket, http | DBC, DBO |
-| sendmail | http | DBC, DBO, MON |
+| [sendmail](sendmail.md) | http | DBC, DBO, MON (debug builds only) |
 | [setautojobconf](setautojobconf.md) | http | DBC, DBO, JOB |
 | setautostart | http | DBC, DBO, JOB |
 | setloglevel | http | DBC, DBO, MON |

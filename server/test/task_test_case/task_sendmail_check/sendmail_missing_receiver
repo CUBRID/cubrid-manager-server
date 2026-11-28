@@ -1,0 +1,11 @@
+{
+ "task": "sendmail",
+ "token": "",
+ "sender": "CMS Test <cms@example.com>",
+ "msg_header": "sendmail test",
+ "msg_body": "sendmail test body",
+ "body_type": 0,
+ "test_note": "Parameter(receiver) missing",
+ "test_smtp_connections": 0,
+ "test_debug_only": true
+}

@@ -2,7 +2,9 @@
 
 Get a configuration of the automation jobs saved in `autojobs.conf`.
 
-Permissions required to run this task: none (any logged-in user)
+Permissions required to run this task: one of DBC, DBO, JOB
+
+Reading the automation job settings needs the same authority as writing them with [setautojobconf](setautojobconf.md). A user created with the legacy API (`adddbmtuser`) has DBO and JOB unless it was given `user_auth` with the new API, so only users created or updated with the new API can lack them.
 
 ## Request JSON Syntax
 

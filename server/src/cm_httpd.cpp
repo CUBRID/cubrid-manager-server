@@ -1105,6 +1105,7 @@ main (int argc, char **argv)
 				    sizeof (cubrid_version_build));
   LOG_INFO ("started '%s' with Engine Version: %d.%d (%s)", argv[0], cubrid_version_major, cubrid_version_minor,
 	    cubrid_version_build);
+  ext_load_smtp_server_conf ();
 
   if (start_service () < 0)
     {

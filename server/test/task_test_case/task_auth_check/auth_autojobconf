@@ -1,0 +1,484 @@
+[
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajnone",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajnone",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "yes",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "updatedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajnone",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajnone",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajnone"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajmon",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajmon",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "yes",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajmon",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajmon"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajbrk",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajbrk",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "yes",
+   "mon": "no",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajbrk",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajbrk"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajvar",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajvar",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "no",
+   "job": "no",
+   "var": "yes"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajvar",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "denied"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "denied"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajvar"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajdbc",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajdbc",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "yes",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "no",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajdbc",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "success"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajdbc"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajdbo",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajdbo",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "yes",
+   "brk": "no",
+   "mon": "no",
+   "job": "no",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajdbo",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "success"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajdbo"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajjob",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajjob",
+  "password": "authtest1",
+  "authoritylist": {
+   "dbc": "no",
+   "dbo": "no",
+   "brk": "no",
+   "mon": "no",
+   "job": "yes",
+   "var": "no"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajjob",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "success"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajjob"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajadmin",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser_new",
+  "token": "",
+  "targetid": "authtest_ajadmin",
+  "password": "authtest1",
+  "authoritylist": {
+   "admin": "yes"
+  },
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ]
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajadmin",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "success"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajadmin"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajlegacy",
+  "test_expect": "any"
+ },
+ {
+  "task": "adddbmtuser",
+  "token": "",
+  "targetid": "authtest_ajlegacy",
+  "password": "authtest1",
+  "dbauth": [
+   {
+    "dbname": "demodb",
+    "dbid": "dba",
+    "dbpassword": "",
+    "dbbrokeraddress": "localhost,33000"
+   }
+  ],
+  "casauth": "none",
+  "dbcreate": "none",
+  "statusmonitorauth": "none"
+ },
+ {
+  "task": "login",
+  "id": "authtest_ajlegacy",
+  "password": "authtest1",
+  "clientver": "8.4"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "service": "mail_config",
+  "test_expect": "success"
+ },
+ {
+  "task": "getautojobconf",
+  "token": "$CASE_LOGIN_TOKEN",
+  "test_expect": "success"
+ },
+ {
+  "task": "logout",
+  "token": "$CASE_LOGIN_TOKEN"
+ },
+ {
+  "task": "deletedbmtuser",
+  "token": "",
+  "targetid": "authtest_ajlegacy"
+ }
+]
