@@ -489,6 +489,11 @@ helper_procs = []
 #                                  checks that sendmail connected only where
 #                                  it should, or not at all. Only in
 #                                  task_sendmail_check, which starts them
+#   "test_needs_ipv6": true        the request needs the IPv6 loopback (::1):
+#                                  on a host without it (the fake SMTP server
+#                                  could not listen on ::1) the request is not
+#                                  sent and is recorded as skipped, which is
+#                                  not a failure. Only in task_sendmail_check
 #   "test_file_mode": {"<path>": "<octal>"}
 #                                  after the response, each file on this host
 #                                  (the target, for a link) must have that
@@ -745,6 +750,14 @@ def load_task(taskfile):
         return json.loads(replace_env_vars(task.read()))
 
 
+def record_skip(name, casefile, task, reason):
+    """Log a request that was not sent because the host cannot run it."""
+    results.append({"name": name, "file": casefile, "task": task, "ok": True,
+                    "skipped": True, "note": reason, "response": None,
+                    "status": "skipped", "expected": "skipped"})
+    print("%s [%s] : \033[33mskipped (%s)\033[0m" % (name, task, reason))
+
+
 def record(name, casefile, task, status, note, expected, response=None,
            quiet=False):
     """Log one result.
@@ -995,6 +1008,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
     case_tokens = []
     # a "test_debug_only" request against a release build: judged by status
     undefined_in_release = False
+    data = {}
     requests = request if isinstance(request, list) else [request]
     for index, req in enumerate(requests):
         req_debug_only = req.pop("test_debug_only", False)
@@ -1022,6 +1036,7 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
         req_sleep = req.pop("test_sleep", None)
         req_source_ip = req.pop("test_source_ip", None)
         req_smtp = req.pop("test_smtp_connections", None)
+        req_needs_ipv6 = req.pop("test_needs_ipv6", False)
         if req_smtp is not None and (isinstance(req_smtp, bool)
                                      or not isinstance(req_smtp, int)
                                      or req_smtp < 0):
@@ -1035,11 +1050,15 @@ def do_one_job(name, taskfile, token, expected="success", record_files=True,
             req_no_text = req_no_key = req_values = req_file_modes = None
             req_smtp = None
             undefined_in_release = True
+        label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
+        if req_needs_ipv6 and not fake_smtp.ipv6_available():
+            record_skip(label, taskfile, req.get("task", name),
+                        "no IPv6 loopback (::1) on this host")
+            continue
         req_token = case_login_token(req.get("token"), case_tokens, token)
         resolve_nested_tokens(req, case_tokens)
         if req_sleep:
             time.sleep(float(req_sleep))
-        label = ("%s[%d]" % (name, index)) if isinstance(request, list) else name
         data = send_one(label, req, req_token, req_expected, taskfile,
                         must_be_sync, req_note, req_no_text, req_no_key,
                         req_values, req_source_ip, req_file_modes, req_smtp)
@@ -2025,7 +2044,9 @@ def write_junit_xml(path, with_response=False):
             if item.get("timeout_fallback"):
                 out.write('<properties><property name="timeout_fallback" '
                           'value="yes"/></properties>\n')
-            if not item["ok"]:
+            if item.get("skipped"):
+                out.write('<skipped message="%s"/>\n' % xml_escape(item["note"]))
+            elif not item["ok"]:
                 out.write('<failure message="%s" type=""></failure>\n'
                           % xml_escape(item["note"]))
             if with_response and item.get("response") is not None:
@@ -2621,4 +2642,13 @@ if nfailed:
                   % (item["name"], item["file"], item["note"]))
     sys.exit(1)
 
-print("\n\033[32mall %d tasks succeeded.\033[0m" % len(results))
+nskipped = sum(1 for r in results if r.get("skipped"))
+if nskipped:
+    print("\n\033[32mall %d tasks succeeded\033[0m, \033[33m%d of them skipped:\033[0m"
+          % (len(results), nskipped))
+    for item in results:
+        if item.get("skipped"):
+            print("  \033[33m%s\033[0m (%s): %s"
+                  % (item["name"], item["file"], item["note"]))
+else:
+    print("\n\033[32mall %d tasks succeeded.\033[0m" % len(results))

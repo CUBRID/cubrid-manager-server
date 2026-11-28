@@ -601,6 +601,7 @@ python3 test_tasks.py --dump <name> [<name> ...]
 | `"test_source_ip": "<주소>"` | 이 요청을 이 호스트의 그 주소에서 보낸다. 러너가 지우고 보낸다. 서버가 다른 클라이언트의 요청으로 보게 할 때 쓴다. `cmsip`가 `127.0.0.1`이면 Linux에서는 `127.0.0.2`처럼 `127.x.x.x` 아무 주소나 쓸 수 있다 |
 | `"test_debug_only": true` | 디버그 빌드에만 있는 task의 요청. 러너가 지우고 보낸다. release 빌드에서는 이 요청이 `Undefined request - <task>`로 실패해야 통과하고, 이 요청의 다른 `test_*` 검사는 하지 않으며, 케이스는 baseline 비교 없이 상태로만 판정한다(`--answer`도 baseline을 쓰지 않는다). 빌드 종류는 첫 요청에서 한 번 `/upload`로 확인한다: 디버그 빌드만 `/upload`를 처리해 쿠키 없는 요청에 `{"failure" : true}`를 주고, release 빌드는 `{"error" : "Not Found"}`를 준다. 확인 결과는 `manager server: debug build`처럼 출력한다 |
 | `"test_smtp_connections": <n>` | 이 요청을 보내고 응답을 받는 동안 가짜 SMTP 서버 (`fake_smtp.py`)가 받은 연결이 정확히 n개여야 통과. 러너가 지우고 보낸다. sendmail이 cm.conf의 서버로만 접속하는지, 접속하지 않아야 할 때 (미설정, 잘못된 수신자) 접속하지 않는지 확인한다. 가짜 서버는 `task_sendmail_check` 세트에서만 뜬다 (4.12). 0 이상의 정수가 아니면 오류로 실행을 멈춘다 |
+| `"test_needs_ipv6": true` | 이 요청은 IPv6 loopback (`::1`)이 있어야 한다. 가짜 SMTP 서버가 `::1`에 뜨지 못한 호스트에서는 요청을 보내지 않고 `skipped`로 기록한다 (실패 아님). 러너가 지우고 보낸다. `task_sendmail_check` 세트에서만 쓴다 (4.12) |
 | `"test_file_mode": {"<경로>": "<8진수>", ...}` | 응답을 받은 뒤 이 호스트의 각 파일(링크면 대상)의 모드가 그 값이어야 통과. 러너가 지우고 보낸다. 예: `{"$CUBRID/tmp/a.sh": "0755"}`. 거부된 쓰기가 파일을 그대로 두었는지, 새 파일의 모드를 확인할 때 쓴다. 모드 대신 `"none"`이면 그 경로가 없어야 통과(만들어지면 안 되는 파일). 러너가 CMS 호스트에서 돌 때만 쓸 수 있다. 빈 객체나 8진수도 `"none"`도 아닌 값은 오류로 실행을 멈춘다 |
 | `"test_no_key": "<a.b.c>"` | 응답 JSON에 이 key 경로가 없어야 통과. 러너가 지우고 보낸다. `.`으로 key를 잇고, 경로 중간의 배열은 모든 원소를 찾는다(예: `userlist.user.@passwd`). 값이 무엇이든 key가 있으면 실패하므로 암호문 형태의 유출도 잡는다 |
 | `"test_value": {"<a.b.c>": <값>, ...}` | 응답 JSON의 각 key 경로 값이 `<값>`과 같아야 통과. 러너가 지우고 보낸다. 경로는 `test_no_key`와 같고, 경로 중간의 배열은 원소 하나라도 같으면 통과. JSON 타입까지 비교한다(`2`와 `"2"`, `true`와 `1`은 다르다). 기대값이 배열·객체이면 원소와 key까지 같은 방식으로 비교한다. 빈 객체(`{}`)는 아무것도 비교하지 않으므로 오류로 실행을 멈춘다. 예: `{"closed_sessions": 2}` |
@@ -787,7 +788,9 @@ API 테스트의 broker는 SHARD=OFF인 `query_editor`뿐이다. SHARD=ON broker
 CMS 로그에 남는 실패 원인은 확인하지 않는다.
 
 조건: 러너가 CMS와 같은 호스트에서 돌아야 하고 (`cm_conf`), 위 포트가 비어 있어야 한다
-(`127.0.0.1`의 포트가 사용 중이면 실행을 멈춘다). `::1`이 없으면 IPv6 케이스가 실패한다.
+(`127.0.0.1`의 포트가 사용 중이면 실행을 멈춘다). `::1`이 없는 호스트 (`lo`의 IPv6가 꺼진 경우 등)에서는
+가짜 서버가 `::1`에 뜨지 못하고, IPv6 케이스 (`sendmail_sent_ipv6`)는 요청을 보내지 않고 건너뛴다
+(`"test_needs_ipv6"`). 건너뛴 케이스는 실패가 아니며, 끝에 따로 표시되고 JUnit XML에는 `<skipped>`로 남는다.
 `cm_conf` 줄마다 manager를 다시 시작하고 timeout 케이스는 30초를 기다리므로 몇 분 걸린다. 그래서
 이 세트도 **이름을 지정했을 때만 실행한다** (`NAMED_ONLY_SETS`).
 
@@ -798,7 +801,8 @@ CMS 로그에 남는 실패 원인은 확인하지 않는다.
 | 케이스 | cm.conf `smtp_server` | 확인하는 것 |
 | --- | --- | --- |
 | `sendmail_unset` | 없음, `[::1]:70000`, `bad_host:25251` | 요청에 `smtp_server`가 있어도 `smtp_server is not configured in cm.conf.`로 실패하고 연결 0. 잘못된 값이어도 manager가 시작함 |
-| `sendmail_sent` | `127.0.0.1:25251`, `localhost:25251`, `[::1]:25251` | 성공, `note`는 `none`, 응답에 `response`가 없음, 연결 1 |
+| `sendmail_sent` | `127.0.0.1:25251`, `localhost:25251` | 성공, `note`는 `none`, 응답에 `response`가 없음, 연결 1 |
+| `sendmail_sent_ipv6` | `[::1]:25251` | `sendmail_sent`와 같음. `::1`이 없는 호스트에서는 건너뜀 |
 | `sendmail_request_server_ignored` | `127.0.0.1:25251` | 요청의 `smtp_server` (없는 호스트)를 무시하고 성공, 연결 1 |
 | `sendmail_auth` | `127.0.0.1:25251` | AUTH PLAIN (`authtype` 2)과 AUTH LOGIN (1)으로 성공. 응답에 비밀번호가 없음 |
 | `sendmail_html_utf8` | `127.0.0.1:25251` | 한글 제목과 HTML 본문 (`body_type` 1)으로 성공 |

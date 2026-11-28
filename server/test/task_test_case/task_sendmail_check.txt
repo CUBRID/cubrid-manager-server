@@ -22,11 +22,11 @@ sendmail_no_account,success
 sendmail_bad_receiver,failure
 sendmail_missing_receiver,failure
 
-// a host name, and an IPv6 address (needs ::1 on the host)
+// a host name, and an IPv6 address (skipped on a host without ::1)
 cm_conf smtp_server=localhost:25251
 sendmail_sent,success
 cm_conf smtp_server=[::1]:25251
-sendmail_sent,success
+sendmail_sent_ipv6,success
 
 // every kind of failure has the same answer; the reason is only in the log.
 // The timeout case waits 30 s for the server.

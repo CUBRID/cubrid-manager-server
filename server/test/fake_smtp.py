@@ -24,6 +24,7 @@ case picks the behavior by the port it puts in cm.conf smtp_server:
     ACCEPT_PORT  answers like a mail server and accepts every mail, with or
                  without AUTH LOGIN / AUTH PLAIN (any user and password);
                  on 127.0.0.1 and, when the host has it, on ::1
+                 (ipv6_available())
     REJECT_PORT  greets with 554 and refuses the session
     SILENT_PORT  accepts the connection and never answers
     CLOSED_PORT  nobody listens: the connection is refused
@@ -49,6 +50,15 @@ SILENT_HOLD_SEC = 40
 _lock = threading.Lock()
 _connections = 0
 _servers = []
+_ipv6 = False
+
+
+def ipv6_available():
+    """Whether the accepting server listens on ::1 as well.
+
+    False on a host without an IPv6 loopback address, and before start().
+    """
+    return _ipv6
 
 
 def connections():
@@ -158,20 +168,24 @@ def start():
     Raises OSError when a port of 127.0.0.1 is taken, so that the run stops
     rather than testing someone else's server.
     """
+    global _ipv6
     warnings = []
     _start(_Server, "127.0.0.1", ACCEPT_PORT, "accept")
     _start(_Server, "127.0.0.1", REJECT_PORT, "reject")
     _start(_Server, "127.0.0.1", SILENT_PORT, "silent")
     try:
         _start(_Server6, "::1", ACCEPT_PORT, "accept")
+        _ipv6 = True
     except OSError as e:
         warnings.append("no fake SMTP server on [::1]:%d (%s); the IPv6 case "
-                        "fails" % (ACCEPT_PORT, e))
+                        "is skipped" % (ACCEPT_PORT, e))
     return warnings
 
 
 def stop():
     """Stop the servers started by start()."""
+    global _ipv6
+    _ipv6 = False
     while _servers:
         server = _servers.pop()
         server.shutdown()
