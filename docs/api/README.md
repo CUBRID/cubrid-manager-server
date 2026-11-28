@@ -124,6 +124,19 @@ Set `enforce` only when each client has a fixed IP address and does not share it
 - Behind a reverse proxy or a layer 4 load balancer, CMS sees the address of the proxy, and the check has no effect. CMS does not read `X-Forwarded-For` or the PROXY protocol.
 - An active man-in-the-middle logs in from its own address, so it is not detected. What the check detects is a token used somewhere other than where it was issued, such as a token leaked from a log or a client PC.
 
+### SMTP server of sendmail
+
+`smtp_server` in `cm.conf` is the only SMTP server the `sendmail` task connects to:
+
+```
+smtp_server=smtp.example.com:587
+```
+
+- The host is a host name or an IPv4 address, or an IPv6 address in `[]` (`[2001:db8::25]:587`). The port is 1 to 65535; without it, 25 is used.
+- There is no default: when `smtp_server` is not set, `sendmail` fails. A value in another form is written to the error log at startup and taken as not set; CMS still starts.
+- The value is read at startup; restart CMS to change it.
+- The automatic mail report (`automail`) does not use it: it sends through `smtp_server` of `mail_config` in `autojobs.conf` (see [setautojobconf](setautojobconf.md)).
+
 ### Reserved keys
 
 Keys starting with `_` (`_ID`, `_DBID`, `_DBPASSWD`, ...) are reserved for values the server sets. A client must not send them: CMS removes them from a request at every nesting level before processing it. Send the DB login as `dbuser`/`dbpasswd`. (For compatibility, `loaddb` and `killtransaction` still take `_DBID`/`_DBPASSWD` for one more release; see their documents.)

@@ -1109,3 +1109,178 @@ smtp_send_result_name (T_SMTP_SEND_RESULT result)
     }
   return "unknown";
 }
+
+/*
+ * smtp_is_host_name () - whether text is a host name: labels of letters,
+ *   digits and '-' (not first or last), 1 to 63 characters each, separated
+ *   by single dots, at most 253 characters in all. A name of digits and
+ *   dots only must be an IPv4 address instead.
+ */
+static bool
+smtp_is_host_name (const std::string &text)
+{
+  size_t label_len = 0;
+
+  if (text.empty () || text.size () > 253)
+    {
+      return false;
+    }
+  if (text.find_first_not_of ("0123456789.") == std::string::npos)
+    {
+      return false;
+    }
+
+  for (size_t i = 0; i < text.size (); ++i)
+    {
+      char c = text[i];
+      bool letter_or_digit = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+
+      if (c == '.')
+	{
+	  if (label_len == 0 || text[i - 1] == '-')
+	    {
+	      return false;
+	    }
+	  label_len = 0;
+	  continue;
+	}
+      if (!letter_or_digit && c != '-')
+	{
+	  return false;
+	}
+      if (c == '-' && label_len == 0)
+	{
+	  return false;
+	}
+      if (++label_len > 63)
+	{
+	  return false;
+	}
+    }
+  return label_len > 0 && text[text.size () - 1] != '-';
+}
+
+/*
+ * smtp_parse_port () - a port: 1 to 5 digits, from 1 to 65535.
+ */
+static bool
+smtp_parse_port (const std::string &text, unsigned short &port)
+{
+  unsigned long value = 0;
+
+  if (text.empty () || text.size () > 5 || text.find_first_not_of ("0123456789") != std::string::npos)
+    {
+      return false;
+    }
+  for (size_t i = 0; i < text.size (); ++i)
+    {
+      value = value * 10 + (unsigned long) (text[i] - '0');
+    }
+  if (value < 1 || value > 65535)
+    {
+      return false;
+    }
+  port = (unsigned short) value;
+  return true;
+}
+
+/*
+ * smtp_parse_server_address () - an SMTP server written as host or
+ *   host:port: a host name or an IPv4 address, or an IPv6 address in []
+ *   ([addr] or [addr]:port). The port is 1 to 65535, SMTP_DEFAULT_PORT when
+ *   not written. Nothing else is allowed, spaces included.
+ *
+ *   return: SMTP_ADDRESS_OK, or what is wrong. host and port are set only
+ *           with SMTP_ADDRESS_OK.
+ *   text(in): the address
+ *   host(out): the host, an IPv6 address without []
+ *   port(out): the port
+ */
+T_SMTP_ADDRESS_PARSE
+smtp_parse_server_address (const std::string &text, std::string &host, unsigned short &port)
+{
+  std::string host_part, port_text;
+  bool has_port = false;
+  unsigned short parsed_port = SMTP_DEFAULT_PORT;
+
+  if (text.empty ())
+    {
+      return SMTP_ADDRESS_EMPTY;
+    }
+
+  if (text[0] == '[')
+    {
+      size_t close = text.find (']');
+      struct in6_addr addr6;
+
+      if (close == std::string::npos)
+	{
+	  return SMTP_ADDRESS_BAD_HOST;
+	}
+      host_part = text.substr (1, close - 1);
+      if (host_part.empty () || host_part.find ('%') != std::string::npos
+	  || inet_pton (AF_INET6, host_part.c_str (), &addr6) != 1)
+	{
+	  return SMTP_ADDRESS_BAD_HOST;
+	}
+      if (close + 1 < text.size ())
+	{
+	  if (text[close + 1] != ':')
+	    {
+	      return SMTP_ADDRESS_BAD_HOST;
+	    }
+	  has_port = true;
+	  port_text = text.substr (close + 2);
+	}
+    }
+  else
+    {
+      size_t colon = text.find (':');
+      struct in_addr addr4;
+
+      if (colon != std::string::npos && text.find (':', colon + 1) != std::string::npos)
+	{
+	  return SMTP_ADDRESS_BAD_HOST;	/* an IPv6 address must be in [] */
+	}
+      host_part = text.substr (0, colon);
+      if (colon != std::string::npos)
+	{
+	  has_port = true;
+	  port_text = text.substr (colon + 1);
+	}
+      if (inet_pton (AF_INET, host_part.c_str (), &addr4) != 1 && !smtp_is_host_name (host_part))
+	{
+	  return SMTP_ADDRESS_BAD_HOST;
+	}
+    }
+
+  if (has_port && !smtp_parse_port (port_text, parsed_port))
+    {
+      return SMTP_ADDRESS_BAD_PORT;
+    }
+
+  host = host_part;
+  port = parsed_port;
+  return SMTP_ADDRESS_OK;
+}
+
+/*
+ * smtp_address_parse_name () - a result of smtp_parse_server_address () as
+ *   text, for the log.
+ */
+const char *
+smtp_address_parse_name (T_SMTP_ADDRESS_PARSE result)
+{
+  switch (result)
+    {
+    case SMTP_ADDRESS_OK:
+      return "valid";
+    case SMTP_ADDRESS_EMPTY:
+      return "empty";
+    case SMTP_ADDRESS_BAD_HOST:
+      return "the host must be a host name, an IPv4 address or an IPv6 address in []";
+    case SMTP_ADDRESS_BAD_PORT:
+      return "the port must be a number from 1 to 65535";
+    }
+  return "unknown";
+}

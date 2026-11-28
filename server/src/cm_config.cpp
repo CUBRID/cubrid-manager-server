@@ -259,6 +259,7 @@ uReadSystemConfig (void)
   sco.iMaxLogFileSize = DEFAULT_LOG_FILE_SIZE;
   sco.iSSLCertAutoGenerate = DEFAULT_SSL_CERT_AUTO_GENERATE;
   sco.szSSLCertSan[0] = '\0';
+  sco.szSmtpServer[0] = '\0';
   strcpy (sco.szAutoUpdateURL, "");
   strcpy (sco.szCMSVersion, "");
   sco.iTokenActiveTime = DEFAULT_TOKEN_ACTIVE_TIME;
@@ -447,6 +448,15 @@ uReadSystemConfig (void)
 	   * ignored above, so token always fits.
 	   */
 	  strcpy_limit (sco.szSSLCertSan, token, sizeof (sco.szSSLCertSan));
+	}
+      else if (strcasecmp (ent_name, "smtp_server") == 0)
+	{
+	  /*
+	   * Kept as written; cub_manager checks it at startup and logs a
+	   * value it cannot use (ext_load_smtp_server_conf ()). Taken from
+	   * token, not ent_val, which is shorter than a host name may be.
+	   */
+	  strcpy_limit (sco.szSmtpServer, token, sizeof (sco.szSmtpServer));
 	}
       else if (strcasecmp (ent_name, "allowed_db_dirs") == 0)
 	{

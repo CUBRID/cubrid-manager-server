@@ -418,6 +418,95 @@ test_printable (void)
 }
 
 static void
+test_server_address (void)
+{
+  struct
+  {
+    const char *text;
+    const char *host;
+    unsigned short port;
+  } valid[] =
+  {
+    {"smtp.example.com", "smtp.example.com", 25},
+    {"smtp.example.com:587", "smtp.example.com", 587},
+    {"localhost", "localhost", 25},
+    {"mail-1.EXAMPLE.org:2525", "mail-1.EXAMPLE.org", 2525},
+    {"192.168.0.10", "192.168.0.10", 25},
+    {"192.168.0.10:1", "192.168.0.10", 1},
+    {"10.0.0.1:65535", "10.0.0.1", 65535},
+    {"[::1]", "::1", 25},
+    {"[2001:db8::25]:587", "2001:db8::25", 587},
+    {"[::ffff:192.0.2.1]:25", "::ffff:192.0.2.1", 25},
+    {"a", "a", 25}
+  };
+  struct
+  {
+    const char *text;
+    T_SMTP_ADDRESS_PARSE result;
+  } invalid[] =
+  {
+    {"", SMTP_ADDRESS_EMPTY},
+    {":25", SMTP_ADDRESS_BAD_HOST},
+    {"::1", SMTP_ADDRESS_BAD_HOST},
+    {"2001:db8::25:587", SMTP_ADDRESS_BAD_HOST},
+    {"[::1", SMTP_ADDRESS_BAD_HOST},
+    {"[]:25", SMTP_ADDRESS_BAD_HOST},
+    {"[::1]587", SMTP_ADDRESS_BAD_HOST},
+    {"[fe80::1%eth0]:25", SMTP_ADDRESS_BAD_HOST},
+    {"[192.168.0.1]:25", SMTP_ADDRESS_BAD_HOST},
+    {"[smtp.example.com]", SMTP_ADDRESS_BAD_HOST},
+    {"smtp example.com", SMTP_ADDRESS_BAD_HOST},
+    {" smtp.example.com", SMTP_ADDRESS_BAD_HOST},
+    {"smtp_1.example.com", SMTP_ADDRESS_BAD_HOST},
+    {"-smtp.example.com", SMTP_ADDRESS_BAD_HOST},
+    {"smtp-.example.com", SMTP_ADDRESS_BAD_HOST},
+    {"smtp..example.com", SMTP_ADDRESS_BAD_HOST},
+    {".example.com", SMTP_ADDRESS_BAD_HOST},
+    {"example.com.", SMTP_ADDRESS_BAD_HOST},
+    {"999.1.1.1", SMTP_ADDRESS_BAD_HOST},
+    {"192.168.0", SMTP_ADDRESS_BAD_HOST},
+    {"http://smtp.example.com", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com\r\n", SMTP_ADDRESS_BAD_HOST},
+    {"smtp.example.com:", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:0", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:65536", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:100000", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:-25", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:+25", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:25 ", SMTP_ADDRESS_BAD_PORT},
+    {"smtp.example.com:2a", SMTP_ADDRESS_BAD_PORT},
+    {"[::1]:", SMTP_ADDRESS_BAD_PORT},
+    {"[::1]:70000", SMTP_ADDRESS_BAD_PORT}
+  };
+  std::string host;
+  unsigned short port;
+
+  for (size_t i = 0; i < sizeof (valid) / sizeof (valid[0]); ++i)
+    {
+      host = "unchanged";
+      port = 0;
+      check (smtp_parse_server_address (valid[i].text, host, port) == SMTP_ADDRESS_OK && host == valid[i].host
+	     && port == valid[i].port, std::string ("server address '") + valid[i].text + "'");
+    }
+  for (size_t i = 0; i < sizeof (invalid) / sizeof (invalid[0]); ++i)
+    {
+      host = "unchanged";
+      port = 7;
+      check (smtp_parse_server_address (invalid[i].text, host, port) == invalid[i].result && host == "unchanged"
+	     && port == 7, std::string ("not a server address: '") + invalid[i].text + "'");
+    }
+
+  /* the longest host name: 253 characters in labels of 63 */
+  std::string longest = std::string (63, 'a') + "." + std::string (63, 'b') + "." + std::string (63, 'c') + "."
+			+ std::string (61, 'd');
+  check (longest.size () == 253 && smtp_parse_server_address (longest + ":25", host, port) == SMTP_ADDRESS_OK,
+	 "host name of 253 characters");
+  check (smtp_parse_server_address (longest + "d", host, port) == SMTP_ADDRESS_BAD_HOST, "host name of 254 characters");
+  check (smtp_parse_server_address (std::string (64, 'a') + ".com", host, port) == SMTP_ADDRESS_BAD_HOST,
+	 "label of 64 characters");
+}
+
+static void
 set_tz (const char *tz)
 {
   setenv ("TZ", tz, 1);
@@ -768,6 +857,7 @@ main (void)
   test_base64 ();
   test_mailbox ();
   test_printable ();
+  test_server_address ();
   test_message ();
   test_invalid_argument ();
   test_send ();

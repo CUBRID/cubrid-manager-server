@@ -946,6 +946,66 @@ mail_report_compute_next_exec (unsigned int period_type, time_t cur_time, char *
   time_to_str (next_time, "%4d/%02d/%02d %02d:%02d:%02d", next_exec_time, TIME_STR_FMT_DATE_TIME);
 }
 
+/* smtp_server of cm.conf, set by ext_load_smtp_server_conf (); empty host: not set or invalid */
+static string smtp_server_host;
+static unsigned short smtp_server_port = 0;
+
+/*
+ * ext_load_smtp_server_conf () - check smtp_server of cm.conf, the SMTP
+ *   server of the sendmail task, once at startup.
+ *
+ *   A value that is not host[:port] or [IPv6 address][:port] with a port
+ *   from 1 to 65535 is logged and taken as not set: sendmail then fails, and
+ *   CMS still starts.
+ */
+void
+ext_load_smtp_server_conf (void)
+{
+  T_SMTP_ADDRESS_PARSE result;
+  string host;
+  unsigned short port = 0;
+
+  smtp_server_host.clear ();
+  smtp_server_port = 0;
+
+  result = smtp_parse_server_address (sco.szSmtpServer, host, port);
+  if (result == SMTP_ADDRESS_EMPTY)
+    {
+      return;
+    }
+  if (result != SMTP_ADDRESS_OK)
+    {
+      LOG_ERROR ("invalid smtp_server in cm.conf (%s): %s; it is taken as not set, so sendmail fails",
+		 smtp_printable (sco.szSmtpServer).c_str (), smtp_address_parse_name (result));
+      return;
+    }
+
+  smtp_server_host = host;
+  smtp_server_port = port;
+  LOG_INFO ("smtp_server of sendmail: %s, port %u", smtp_server_host.c_str (), (unsigned int) smtp_server_port);
+}
+
+/*
+ * ext_get_smtp_server_conf () - the SMTP server of the sendmail task, from
+ *   smtp_server of cm.conf.
+ *
+ *   return: true if smtp_server is set and valid; false otherwise, with host
+ *           and port unchanged
+ *   host(out): host name or IP address (an IPv6 address without [])
+ *   port(out): port
+ */
+bool
+ext_get_smtp_server_conf (string &host, unsigned short &port)
+{
+  if (smtp_server_host.empty ())
+    {
+      return false;
+    }
+  host = smtp_server_host;
+  port = smtp_server_port;
+  return true;
+}
+
 /*
  * mail_conf_string () - a string member of a mail configuration; "" if it
  *   is missing or not a string.

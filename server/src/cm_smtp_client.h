@@ -43,6 +43,15 @@ typedef enum
   SMTP_SEND_REJECTED		/* the server answered a command with an error */
 } T_SMTP_SEND_RESULT;
 
+/* result of smtp_parse_server_address () */
+typedef enum
+{
+  SMTP_ADDRESS_OK,
+  SMTP_ADDRESS_EMPTY,		/* nothing given */
+  SMTP_ADDRESS_BAD_HOST,	/* not a host name, IPv4 address or [IPv6 address] */
+  SMTP_ADDRESS_BAD_PORT		/* not a number from 1 to 65535 */
+} T_SMTP_ADDRESS_PARSE;
+
 /* how to authenticate; the values are those of authtype in the sendmail request */
 typedef enum
 {
@@ -78,6 +87,8 @@ typedef struct
 T_SMTP_SEND_RESULT smtp_send_mail (const T_SMTP_SERVER &server, const T_SMTP_MAIL &mail, std::string &detail);
 const char *smtp_send_result_name (T_SMTP_SEND_RESULT result);
 std::string smtp_printable (const std::string &text);
+T_SMTP_ADDRESS_PARSE smtp_parse_server_address (const std::string &text, std::string &host, unsigned short &port);
+const char *smtp_address_parse_name (T_SMTP_ADDRESS_PARSE result);
 
 std::string smtp_base64_encode (const std::string &data);
 bool smtp_mailbox_address (const std::string &mailbox, std::string &address);

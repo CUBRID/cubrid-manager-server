@@ -613,6 +613,7 @@ typedef struct
   char szSSLCertificate[PATH_MAX];
   int iSSLCertAutoGenerate;	/* ssl_cert_auto_generate: TRUE (YES) or FALSE (NO) */
   char szSSLCertSan[1024];	/* ssl_cert_san: extra subject alternative names, "" for none */
+  char szSmtpServer[300];	/* smtp_server: SMTP server of sendmail as written, "" if not set */
   int iAutoJobTimeout;
   int iCMS_port;
   int iSupportMonStat;
