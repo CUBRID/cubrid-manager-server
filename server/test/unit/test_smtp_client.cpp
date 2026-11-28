@@ -85,6 +85,7 @@ struct fake_step
   std::string text;
   std::string reply;
   T_AFTER_REPLY after;
+  int drip_ms;			/* > 0: send the reply one byte at a time, this far apart */
 };
 
 static fake_step
@@ -97,6 +98,7 @@ step (T_EXPECT expect, const std::string &text, const std::string &reply,
   s.text = text;
   s.reply = reply;
   s.after = after;
+  s.drip_ms = 0;
   return s;
 }
 
@@ -190,7 +192,18 @@ fake_run (int listen_fd, const std::vector<fake_step> &script)
 	    }
 	}
 
-      if (!s.reply.empty () && write (fd, s.reply.data (), s.reply.size ()) != (ssize_t) s.reply.size ())
+      if (s.drip_ms > 0)
+	{
+	  for (size_t b = 0; b < s.reply.size (); ++b)
+	    {
+	      if (write (fd, s.reply.data () + b, 1) != 1)
+		{
+		  break;	/* the client gave up */
+		}
+	      usleep ((useconds_t) s.drip_ms * 1000);
+	    }
+	}
+      else if (!s.reply.empty () && write (fd, s.reply.data (), s.reply.size ()) != (ssize_t) s.reply.size ())
 	{
 	  return 2;
 	}
@@ -768,6 +781,32 @@ test_send (void)
     fake_finish (fake, true);
     check (result == SMTP_SEND_TIMEOUT, "silent server times out: " + detail);
     check (elapsed_ms >= 250 && elapsed_ms < 2000, "timeout is the given one");
+    server.timeout_ms = 2000;
+  }
+
+  /*
+   * a reply sent a byte at a time, each well within the timeout: the reply as
+   * a whole must still end at the timeout, not when the server stops
+   */
+  {
+    fake_server fake;
+    std::chrono::steady_clock::time_point start;
+    long long elapsed_ms;
+    fake_step drip = step (EXPECT_NOTHING, "", "220" + std::string (60, '-'), AFTER_REPLY_CLOSE);
+
+    drip.drip_ms = 50;		/* 3 s for the whole reply */
+    script.clear ();
+    script.push_back (drip);
+    check (fake_start (AF_INET, script, fake), "fake server for the slow reply");
+    server.host = "127.0.0.1";
+    server.port = fake.port;
+    server.timeout_ms = 300;
+    start = std::chrono::steady_clock::now ();
+    result = smtp_send_mail (server, mail, detail);
+    elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds> (std::chrono::steady_clock::now () - start).count ();
+    fake_finish (fake, true);
+    check (result == SMTP_SEND_TIMEOUT, "a reply a byte at a time times out: " + detail);
+    check (elapsed_ms >= 250 && elapsed_ms < 1500, "the timeout is for the whole reply");
     server.timeout_ms = 2000;
   }
 

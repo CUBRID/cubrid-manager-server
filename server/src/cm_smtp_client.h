@@ -69,7 +69,7 @@ typedef struct
 {
   std::string host;		/* host name, IPv4 address or IPv6 address without [] */
   unsigned short port;
-  int timeout_ms;		/* for connecting to each address and for each wait */
+  int timeout_ms;		/* for connecting to each address, each send and each reply */
   std::string username;		/* empty: no authentication */
   std::string password;
   T_SMTP_AUTH auth;

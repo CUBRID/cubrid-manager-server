@@ -27,9 +27,10 @@
  *   sent in base64, so that long lines and lines starting with '.' need no
  *   special handling.
  *
- *   Every connect, send and receive waits at most the timeout of the
- *   server. The resolution of the host name (getaddrinfo ()) is not bounded
- *   by it.
+ *   Connecting to an address, sending a command or the message, and
+ *   reading a reply each end within the timeout of the server, however
+ *   slowly the server takes or sends its bytes: each has one deadline. The
+ *   resolution of the host name (getaddrinfo ()) is not bounded by it.
  *
  *   No CUBRID or CMS dependency, so that it can be tested against a fake
  *   server (server/test/unit/test_smtp_client.cpp). It does not log: the
@@ -599,7 +600,7 @@ class smtp_session
 
   private:
     T_SMTP_SEND_RESULT connect_address (const struct addrinfo *ai, const std::string &where);
-    std::chrono::steady_clock::time_point deadline () const
+    std::chrono::steady_clock::time_point deadline_from_now () const
     {
       return std::chrono::steady_clock::now () + m_timeout;
     }
@@ -650,7 +651,7 @@ smtp_session::connect_address (const struct addrinfo *ai, const std::string &whe
       return SMTP_SEND_CONNECT_FAILED;
     }
 
-  result = smtp_wait (m_sock, SMTP_WAIT_WRITE, deadline (), m_detail);
+  result = smtp_wait (m_sock, SMTP_WAIT_WRITE, deadline_from_now (), m_detail);
   if (result == SMTP_SEND_TIMEOUT)
     {
       m_detail = "connect to " + where + ": timed out";
@@ -738,8 +739,9 @@ smtp_session::connect_to (const std::string &host, unsigned short port)
 }
 
 /*
- * smtp_session::send_text () - send all of text, waiting at most the
- *   timeout each time the socket cannot take more.
+ * smtp_session::send_text () - send all of text within the timeout. The
+ *   deadline is set once, so a server that takes the text a few bytes at a
+ *   time cannot make it last longer.
  *
  *   return: SMTP_SEND_OK, SMTP_SEND_TIMEOUT or SMTP_SEND_CONNECTION_LOST
  *           (detail set)
@@ -747,6 +749,7 @@ smtp_session::connect_to (const std::string &host, unsigned short port)
 T_SMTP_SEND_RESULT
 smtp_session::send_text (const std::string &text)
 {
+  const std::chrono::steady_clock::time_point deadline = deadline_from_now ();
   size_t sent = 0;
 
   while (sent < text.size ())
@@ -769,7 +772,7 @@ smtp_session::send_text (const std::string &text)
 #endif
       if (n < 0 && smtp_would_block (error))
 	{
-	  result = smtp_wait (m_sock, SMTP_WAIT_WRITE, deadline (), m_detail);
+	  result = smtp_wait (m_sock, SMTP_WAIT_WRITE, deadline, m_detail);
 	  if (result == SMTP_SEND_TIMEOUT)
 	    {
 	      m_detail = "sending to the server timed out";
@@ -788,7 +791,9 @@ smtp_session::send_text (const std::string &text)
 
 /*
  * smtp_session::read_reply () - read one reply of the server: lines
- *   "ddd-text" and a last line "ddd text" or "ddd".
+ *   "ddd-text" and a last line "ddd text" or "ddd". The whole reply must
+ *   come within the timeout: the deadline is set once, so a server that
+ *   sends a byte now and then cannot make it last longer.
  *
  *   return: SMTP_SEND_OK, SMTP_SEND_TIMEOUT or SMTP_SEND_CONNECTION_LOST
  *           (detail set; also for a line that is not a reply line and for a
@@ -799,6 +804,7 @@ smtp_session::send_text (const std::string &text)
 T_SMTP_SEND_RESULT
 smtp_session::read_reply (int &code, std::string &text)
 {
+  const std::chrono::steady_clock::time_point deadline = deadline_from_now ();
   size_t total = 0;
 
   for (;;)
@@ -842,7 +848,7 @@ smtp_session::read_reply (int &code, std::string &text)
 	  return SMTP_SEND_CONNECTION_LOST;
 	}
 
-      T_SMTP_SEND_RESULT result = smtp_wait (m_sock, SMTP_WAIT_READ, deadline (), m_detail);
+      T_SMTP_SEND_RESULT result = smtp_wait (m_sock, SMTP_WAIT_READ, deadline, m_detail);
       if (result == SMTP_SEND_TIMEOUT)
 	{
 	  m_detail = "waiting for the reply of the server timed out";
